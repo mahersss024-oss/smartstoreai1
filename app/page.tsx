@@ -753,7 +753,7 @@ export default function Page() {
           <Conversation>
             <ConversationContent className="chat-conversation-content">
               <ConversationAutoScroll
-                watchKey={`${filteredMessages.length}-${status}-${activeChatId}`}
+                watchKey={filteredMessages}
                 enabled
               />
               {filteredMessages.length === 0 ? (

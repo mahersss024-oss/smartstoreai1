@@ -106,7 +106,7 @@ export const ConversationScrollButton = ({
 };
 
 export type ConversationAutoScrollProps = {
-  watchKey: string | number;
+  watchKey: unknown;
   enabled?: boolean;
 };
 
