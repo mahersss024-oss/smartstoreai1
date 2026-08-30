@@ -291,12 +291,16 @@
   }
 
   .chat-conversation-content .is-user > div {
-    @apply rounded-3xl border border-border/40 bg-secondary px-5 py-3 text-base leading-8 text-foreground shadow-sm;
+    @apply rounded-3xl border px-5 py-3 text-base leading-8 text-foreground shadow-sm;
+    background-color: #dbeafe;
+    border-color: #b8cdf0;
     border-start-end-radius: 0.75rem;
+    box-shadow: 0 8px 20px rgb(58 111 184 / 10%);
   }
 
   .dark .chat-conversation-content .is-user > div {
     @apply border-white/5 bg-secondary/80;
+    box-shadow: none;
   }
 
   .chat-assistant-message-frame {
