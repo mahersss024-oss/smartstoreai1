@@ -29,6 +29,8 @@ export const appCopy = {
     imageAlt: 'شعار SmartStore AI',
     themeToDark: 'الوضع الداكن',
     themeToLight: 'الوضع الفاتح',
+    privacyPolicy: 'سياسة الخصوصية',
+    partners: 'الشراكات',
     quickPrompts: [
       {
         title: 'منتج بميزانية محددة',
@@ -105,6 +107,8 @@ export const appCopy = {
     imageAlt: 'SmartStore AI logo',
     themeToDark: 'Switch to dark mode',
     themeToLight: 'Switch to light mode',
+    privacyPolicy: 'Privacy policy',
+    partners: 'Partners',
     quickPrompts: [
       {
         title: 'Product within budget',

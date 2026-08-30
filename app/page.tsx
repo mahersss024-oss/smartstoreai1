@@ -4,6 +4,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
+import Link from 'next/link';
 import {
   Check,
   Gift,
@@ -848,6 +849,17 @@ export default function Page() {
               <PromptInputSubmit status={status} />
             </PromptInputFooter>
           </PromptInput>
+          <footer className="chat-footer" aria-label="Site links">
+            <Link href="/privacy" className="chat-footer-link">
+              {copy.privacyPolicy}
+            </Link>
+            <span className="chat-footer-divider" aria-hidden="true">
+              /
+            </span>
+            <Link href="/partners" className="chat-footer-link">
+              {copy.partners}
+            </Link>
+          </footer>
         </div>
       </main>
     </div>

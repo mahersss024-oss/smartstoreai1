@@ -323,6 +323,18 @@
     background-color: var(--input-background);
   }
 
+  .chat-footer {
+    @apply mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground;
+  }
+
+  .chat-footer-link {
+    @apply transition-colors hover:text-foreground;
+  }
+
+  .chat-footer-divider {
+    @apply text-muted-foreground/60;
+  }
+
   .location-input {
     @apply h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
   }
