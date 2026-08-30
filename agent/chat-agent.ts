@@ -5,22 +5,10 @@ import { appConfig } from '@/app/app-config';
 import { searchWeb } from '@/agent/tools/web-search';
 import { systemPrompt } from './system-prompt';
 
-function getDeepseekApiKey() {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      'DEEPSEEK_API_KEY is missing. Add it to your production environment variables.',
-    );
-  }
-
-  return apiKey;
-}
-
 const deepseek = createOpenAI({
   name: 'deepseek',
   baseURL: 'https://api.deepseek.com',
-  apiKey: getDeepseekApiKey(),
+  apiKey: process.env.DEEPSEEK_API_KEY ?? '',
   fetch: async (input, init) => {
     if (typeof init?.body !== 'string') {
       return fetch(input, init);

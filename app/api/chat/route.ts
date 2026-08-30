@@ -5,6 +5,10 @@ import { chatAgent } from '@/agent/chat-agent';
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
 
+function hasDeepseekApiKey() {
+  return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
+}
+
 type ChatRequestBody = {
   messages: Array<unknown>;
   model?: string;
@@ -125,6 +129,13 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
 }
 
 export async function POST(request: Request) {
+  if (!hasDeepseekApiKey()) {
+    return new Response(
+      'DEEPSEEK_API_KEY is missing. Add it to your Render environment variables and redeploy.',
+      { status: 500 },
+    );
+  }
+
   let body: ChatRequestBody;
 
   try {
