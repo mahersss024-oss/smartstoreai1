@@ -265,7 +265,8 @@
   }
 
   .chat-mobile-new-chat,
-  .chat-mobile-brand {
+  .chat-mobile-brand,
+  .chat-mobile-history {
     @apply hidden;
   }
 
@@ -361,6 +362,10 @@
       @apply inline-flex;
     }
 
+    .chat-mobile-history {
+      @apply inline-flex;
+    }
+
     .chat-mobile-brand {
       @apply pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center text-lg font-semibold text-foreground;
       letter-spacing: 0;
@@ -371,8 +376,37 @@
     }
 
     .chat-mobile-new-chat,
+    .chat-mobile-history,
     .chat-header-actions [data-slot="button"] {
       @apply size-11 rounded-full border border-border/70 bg-card text-foreground shadow-sm hover:bg-accent/70;
+    }
+
+    .chat-history-dialog {
+      @apply h-[100dvh] max-w-none overflow-hidden rounded-none border-0 p-0;
+      inset: 0 !important;
+      left: 0 !important;
+      top: 0 !important;
+      transform: none !important;
+    }
+
+    .chat-history-dialog [data-slot="dialog-close"] {
+      @apply top-5 right-5;
+    }
+
+    .chat-history-panel {
+      @apply flex h-full flex-col border-t border-border/60 bg-background px-4 pb-6 pt-4;
+    }
+
+    .chat-history-panel .chat-history-header {
+      @apply px-0;
+    }
+
+    .chat-history-panel .chat-history-list {
+      @apply pr-0;
+    }
+
+    .chat-history-panel .chat-history-empty {
+      @apply bg-muted/30;
     }
 
     .chat-body {

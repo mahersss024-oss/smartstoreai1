@@ -8,6 +8,7 @@ import {
   Check,
   Gift,
   Laptop,
+  History,
   type LucideIcon,
   Scale,
   Settings,
@@ -494,6 +495,73 @@ export default function Page() {
     [locationSettings, updateLocationSettings],
   );
 
+  const historyPanel = (
+    <>
+      <div className="chat-history-header">
+        <div className="chat-history-title">{copy.historyTitle}</div>
+        {chatHistory.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="chat-history-clear"
+                onClick={handleClearHistory}
+                aria-label={copy.clearHistory}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{copy.clearHistory}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      {chatHistory.length ? (
+        <div className="chat-history-list">
+          {chatHistory.map((historyItem) => (
+            <div
+              key={historyItem.id}
+              className="chat-history-item"
+              data-active={historyItem.id === activeChatId}
+            >
+              <button
+                type="button"
+                className="chat-history-item-main"
+                onClick={() => handleSelectChat(historyItem)}
+              >
+                <span className="chat-history-item-title">
+                  {historyItem.title}
+                </span>
+                <span className="chat-history-item-time">
+                  {formatHistoryTime(historyItem.updatedAt, language)}
+                </span>
+              </button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="chat-history-delete"
+                    onClick={() => handleDeleteChat(historyItem.id)}
+                    aria-label={copy.deleteChat}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{copy.deleteChat}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="chat-history-empty">{copy.historyEmpty}</div>
+      )}
+    </>
+  );
+
   return (
     <div className="chat-container" dir={pageDirection}>
       <aside className="chat-sidebar">
@@ -523,72 +591,7 @@ export default function Page() {
           {copy.newChat}
         </Button>
 
-        <div className="chat-history">
-          <div className="chat-history-header">
-            <div className="chat-history-title">{copy.historyTitle}</div>
-            {chatHistory.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="chat-history-clear"
-                    onClick={handleClearHistory}
-                    aria-label={copy.clearHistory}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{copy.clearHistory}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-          {chatHistory.length ? (
-            <div className="chat-history-list">
-              {chatHistory.map((historyItem) => (
-                <div
-                  key={historyItem.id}
-                  className="chat-history-item"
-                  data-active={historyItem.id === activeChatId}
-                >
-                  <button
-                    type="button"
-                    className="chat-history-item-main"
-                    onClick={() => handleSelectChat(historyItem)}
-                  >
-                    <span className="chat-history-item-title">
-                      {historyItem.title}
-                    </span>
-                    <span className="chat-history-item-time">
-                      {formatHistoryTime(historyItem.updatedAt, language)}
-                    </span>
-                  </button>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="chat-history-delete"
-                        onClick={() => handleDeleteChat(historyItem.id)}
-                        aria-label={copy.deleteChat}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{copy.deleteChat}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="chat-history-empty">
-              {copy.historyEmpty}
-            </div>
-          )}
-        </div>
+        <div className="chat-history">{historyPanel}</div>
       </aside>
 
       <main className="chat-main">
@@ -609,6 +612,35 @@ export default function Page() {
           </div>
 
           <div className="chat-header-actions">
+            <Dialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="chat-mobile-history"
+                      aria-label={copy.historyTitle}
+                    >
+                      <History className="size-5" />
+                    </Button>
+                  </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{copy.historyTitle}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <DialogContent className="chat-history-dialog sm:max-w-md" dir={pageDirection}>
+                <DialogHeader>
+                  <DialogTitle>{copy.historyTitle}</DialogTitle>
+                </DialogHeader>
+                <div className="chat-history chat-history-panel">
+                  {historyPanel}
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog>
               <Tooltip>
                 <TooltipTrigger asChild>
