@@ -267,7 +267,7 @@
   .chat-mobile-new-chat,
   .chat-mobile-brand,
   .chat-mobile-history {
-    @apply hidden;
+    display: none;
   }
 
   .chat-header-actions {
@@ -375,11 +375,11 @@
     }
 
     .chat-mobile-new-chat {
-      @apply inline-flex;
+      display: inline-flex;
     }
 
     .chat-mobile-history {
-      @apply inline-flex;
+      display: inline-flex;
     }
 
     .chat-mobile-brand {
@@ -553,6 +553,7 @@
     }
 
     .chat-mobile-new-chat,
+    .chat-mobile-history,
     .chat-header-actions [data-slot="button"] {
       @apply size-10;
     }
@@ -563,6 +564,14 @@
 
     .chat-input-wrapper {
       @apply px-3;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .chat-top-header .chat-mobile-new-chat,
+    .chat-top-header .chat-mobile-brand,
+    .chat-top-header .chat-mobile-history {
+      display: none;
     }
   }
 }
