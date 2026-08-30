@@ -410,6 +410,7 @@
 
   @media (max-width: 1023px) {
     .chat-container {
+      --chat-bottom-spacing: calc(5.5rem + env(safe-area-inset-bottom));
       width: 100%;
       max-width: 100vw;
     }
@@ -512,7 +513,7 @@
     }
 
     .chat-body {
-      padding-bottom: 7.75rem;
+      padding-bottom: calc(13rem + env(safe-area-inset-bottom));
     }
 
     .chat-conversation-content {
