@@ -4,9 +4,71 @@ import { chatAgent } from '@/agent/chat-agent';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
+const rateLimitWindowMs = 60_000;
+const maxRequestsPerWindow = 20;
+
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function hasDeepseekApiKey() {
   return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
+}
+
+function hasTavilyApiKey() {
+  return Boolean(process.env.TAVILY_API_KEY?.trim());
+}
+
+function getMissingApiKeys() {
+  const missingKeys: string[] = [];
+
+  if (!hasDeepseekApiKey()) {
+    missingKeys.push('DEEPSEEK_API_KEY');
+  }
+
+  if (!hasTavilyApiKey()) {
+    missingKeys.push('TAVILY_API_KEY');
+  }
+
+  return missingKeys;
+}
+
+function getClientId(request: Request) {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  const firstForwardedIp = forwardedFor?.split(',')[0]?.trim();
+
+  return (
+    firstForwardedIp ||
+    request.headers.get('x-real-ip') ||
+    request.headers.get('cf-connecting-ip') ||
+    'anonymous'
+  );
+}
+
+function checkRateLimit(clientId: string) {
+  const now = Date.now();
+
+  for (const [bucketClientId, bucket] of requestBuckets) {
+    if (bucket.resetAt <= now) {
+      requestBuckets.delete(bucketClientId);
+    }
+  }
+
+  const bucket = requestBuckets.get(clientId);
+
+  if (!bucket || bucket.resetAt <= now) {
+    requestBuckets.set(clientId, {
+      count: 1,
+      resetAt: now + rateLimitWindowMs,
+    });
+
+    return null;
+  }
+
+  if (bucket.count >= maxRequestsPerWindow) {
+    return Math.ceil((bucket.resetAt - now) / 1000);
+  }
+
+  bucket.count += 1;
+  return null;
 }
 
 type ChatRequestBody = {
@@ -129,9 +191,22 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
 }
 
 export async function POST(request: Request) {
-  if (!hasDeepseekApiKey()) {
+  const retryAfterSeconds = checkRateLimit(getClientId(request));
+
+  if (retryAfterSeconds !== null) {
+    return new Response('Too many requests. Please try again shortly.', {
+      status: 429,
+      headers: {
+        'Retry-After': retryAfterSeconds.toString(),
+      },
+    });
+  }
+
+  const missingApiKeys = getMissingApiKeys();
+
+  if (missingApiKeys.length) {
     return new Response(
-      'DEEPSEEK_API_KEY is missing. Add it to your Render environment variables and redeploy.',
+      `Missing production environment variables: ${missingApiKeys.join(', ')}. Add them to your Render environment variables and redeploy.`,
       { status: 500 },
     );
   }
@@ -165,6 +240,10 @@ export async function POST(request: Request) {
 
   // Filter out empty assistant messages rejected by some model APIs.
   const filteredMessages = messages.filter((message) => {
+    if (isChatMessage(message) && message.role === 'system') {
+      return false;
+    }
+
     if (isChatMessage(message) && message.role === 'assistant') {
       return hasChatMessagePayload(message);
     }

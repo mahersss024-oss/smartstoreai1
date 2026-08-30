@@ -9,25 +9,10 @@ const deepseek = createOpenAI({
   name: 'deepseek',
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.DEEPSEEK_API_KEY ?? '',
-  fetch: async (input, init) => {
-    if (typeof init?.body !== 'string') {
-      return fetch(input, init);
-    }
-
-    const body = JSON.parse(init.body) as { model?: string };
-
-    return fetch(input, {
-      ...init,
-      body: JSON.stringify({
-        ...body,
-        model: appConfig.model,
-      }),
-    });
-  },
 });
 
 export const chatAgent = new ToolLoopAgent({
-  model: deepseek.chat('gpt-4o'),
+  model: deepseek.chat(appConfig.model),
   instructions: appConfig.agent.instructions + systemPrompt,
   tools: {
     searchWeb,

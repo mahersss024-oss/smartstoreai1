@@ -27,7 +27,7 @@ function getTavilyApiKey() {
 
   if (!apiKey) {
     throw new Error(
-      'TAVILY_API_KEY is missing. Add it to .env.local to enable web search.',
+      'TAVILY_API_KEY is missing. Add it to your environment variables to enable web search.',
     );
   }
 
