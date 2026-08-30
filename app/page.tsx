@@ -593,6 +593,21 @@ export default function Page() {
 
       <main className="chat-main">
         <header className="chat-top-header">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="chat-mobile-new-chat"
+            onClick={handleNewChat}
+            disabled={isLoading}
+            aria-label={copy.newChat}
+          >
+            <SquarePen className="size-5" />
+          </Button>
+
+          <div className="chat-mobile-brand">
+            <span>SmartStore AI</span>
+          </div>
+
           <div className="chat-header-actions">
             <Dialog>
               <Tooltip>
