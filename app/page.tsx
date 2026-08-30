@@ -21,6 +21,8 @@ import {
 import {
   Conversation,
   ConversationContent,
+  ConversationAutoScroll,
+  ConversationScrollButton,
 } from '@chat-elements/conversation';
 import {
   Message,
@@ -750,6 +752,10 @@ export default function Page() {
         <div className="chat-body">
           <Conversation>
             <ConversationContent className="chat-conversation-content">
+              <ConversationAutoScroll
+                watchKey={`${filteredMessages.length}-${status}-${activeChatId}`}
+                enabled
+              />
               {filteredMessages.length === 0 ? (
                 <div className="chat-empty-state">
                   <div className="chat-empty-mark">
@@ -798,6 +804,7 @@ export default function Page() {
                 </>
               )}
             </ConversationContent>
+            <ConversationScrollButton className="chat-scroll-button" />
           </Conversation>
         </div>
 

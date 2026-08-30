@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
@@ -103,4 +103,30 @@ export const ConversationScrollButton = ({
       </Button>
     )
   );
+};
+
+export type ConversationAutoScrollProps = {
+  watchKey: string | number;
+  enabled?: boolean;
+};
+
+export const ConversationAutoScroll = ({
+  watchKey,
+  enabled = true,
+}: ConversationAutoScrollProps) => {
+  const { scrollToBottom } = useStickToBottomContext();
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      void scrollToBottom();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [enabled, scrollToBottom, watchKey]);
+
+  return null;
 };
