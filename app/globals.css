@@ -282,6 +282,48 @@
     @apply mx-auto w-full max-w-3xl gap-5 px-4 pt-6 pb-6 sm:px-6;
   }
 
+  .chat-conversation-content .is-user {
+    width: fit-content;
+    max-width: min(78%, 42rem);
+    margin-right: 0 !important;
+    margin-left: auto !important;
+    align-items: flex-end;
+  }
+
+  .chat-conversation-content .is-user > div {
+    @apply rounded-3xl border border-border/40 bg-secondary px-5 py-3 text-base leading-8 text-foreground shadow-sm;
+    border-start-end-radius: 0.75rem;
+  }
+
+  .dark .chat-conversation-content .is-user > div {
+    @apply border-white/5 bg-secondary/80;
+  }
+
+  .chat-assistant-message-frame {
+    @apply flex w-full items-start gap-3;
+  }
+
+  .chat-assistant-avatar {
+    @apply mt-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-white shadow-sm;
+  }
+
+  .chat-assistant-avatar img {
+    @apply h-full w-full object-cover;
+  }
+
+  .chat-assistant-message-frame > div:last-child {
+    @apply min-w-0 flex-1 overflow-visible text-start;
+  }
+
+  .chat-conversation-content .is-assistant > .chat-assistant-message-frame > div:last-child {
+    @apply px-0 py-0 text-[1.05rem] leading-8 text-foreground;
+  }
+
+  .chat-conversation-content .is-assistant [data-slot="markdown"],
+  .chat-conversation-content .is-assistant .streamdown {
+    @apply text-start;
+  }
+
   .chat-empty-state {
     @apply flex min-h-[30vh] w-full flex-col items-center justify-start gap-4 pt-3 text-center sm:pt-5;
   }
@@ -474,6 +516,27 @@
       min-height: 100%;
     }
 
+    .chat-conversation-content .is-user {
+      max-width: 82%;
+    }
+
+    .chat-conversation-content .is-user > div {
+      @apply rounded-[1.35rem] px-4 py-2.5 text-[1.05rem] leading-8;
+      border-start-end-radius: 0.7rem;
+    }
+
+    .chat-assistant-message-frame {
+      @apply gap-2.5;
+    }
+
+    .chat-assistant-avatar {
+      @apply size-8;
+    }
+
+    .chat-conversation-content .is-assistant > .chat-assistant-message-frame > div:last-child {
+      @apply text-[1.08rem] leading-9;
+    }
+
     .chat-empty-state {
       @apply justify-center gap-5 p-0;
       min-height: calc(100dvh - 13rem);
@@ -496,14 +559,6 @@
 
     .chat-empty-copy p {
       @apply hidden;
-    }
-
-    .chat-conversation-content .is-user {
-      max-width: 88%;
-    }
-
-    .chat-conversation-content .is-user > div {
-      @apply rounded-2xl px-4 py-3 text-base leading-7;
     }
 
     .chat-input-wrapper {

@@ -275,6 +275,17 @@ function ErrorDisplay({ message }: { message: string }) {
   return <div className="error-message">{message}</div>;
 }
 
+function AssistantMessageFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="chat-assistant-message-frame">
+      <div className="chat-assistant-avatar" aria-hidden="true">
+        <img alt="" src="/smartstore-mark.png" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function Page() {
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
@@ -791,14 +802,22 @@ export default function Page() {
                 <>
                   {filteredMessages.map((message, messageIndex) => (
                     <Message key={`${message.id}-${messageIndex}`} from={message.role}>
-                      <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                      {message.role === 'assistant' ? (
+                        <AssistantMessageFrame>
+                          <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                        </AssistantMessageFrame>
+                      ) : (
+                        <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                      )}
                     </Message>
                   ))}
                   {isLoading && (
                     <Message from="assistant">
-                      <MessageContent>
-                        <SearchStatusIndicator language={language} mode="thinking" />
-                      </MessageContent>
+                      <AssistantMessageFrame>
+                        <MessageContent>
+                          <SearchStatusIndicator language={language} mode="thinking" />
+                        </MessageContent>
+                      </AssistantMessageFrame>
                     </Message>
                   )}
                   {error && <ErrorDisplay message={error.message} />}
