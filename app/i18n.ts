@@ -20,6 +20,7 @@ export const appCopy = {
     arabic: 'العربية',
     english: 'English',
     savedLocally: 'يتم الحفظ تلقائيًا على هذا المتصفح.',
+    close: 'إغلاق',
     emptyTitle: 'كيف أقدر أساعدك في التسوق اليوم؟',
     emptyDescription:
       'اكتب ما تريد شراءه أو مقارنته. جلب المنتجات المباشر متوقف مؤقتًا إلى حين اختيار مصدر بيانات جديد.',
@@ -95,6 +96,7 @@ export const appCopy = {
     arabic: 'العربية',
     english: 'English',
     savedLocally: 'Saved automatically on this browser.',
+    close: 'Close',
     emptyTitle: 'How can I help you shop today?',
     emptyDescription:
       'Ask what you want to buy or compare. Live product fetching is temporarily disabled until a new data source is selected.',

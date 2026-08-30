@@ -371,6 +371,34 @@
       letter-spacing: 0;
     }
 
+    .chat-mobile-history-overlay {
+      @apply fixed inset-0 z-50 flex;
+    }
+
+    .chat-mobile-history-backdrop {
+      @apply absolute inset-0 border-0 bg-black/40;
+    }
+
+    .chat-mobile-history-sheet {
+      @apply relative z-10 ml-auto flex h-full w-[min(22rem,100vw)] flex-col border-l border-border/60 bg-background shadow-2xl;
+    }
+
+    .chat-mobile-history-sheet-header {
+      @apply flex items-center justify-between gap-3 border-b border-border/60 px-4 py-4;
+    }
+
+    .chat-mobile-history-sheet-title {
+      @apply text-lg font-semibold text-foreground;
+    }
+
+    .chat-mobile-history-sheet-subtitle {
+      @apply text-xs text-muted-foreground;
+    }
+
+    .chat-mobile-history-close {
+      @apply size-10 rounded-full border border-border/70 bg-card text-foreground shadow-sm;
+    }
+
     .chat-header-actions {
       @apply ml-auto gap-2;
     }
@@ -394,7 +422,7 @@
     }
 
     .chat-history-panel {
-      @apply flex h-full flex-col border-t border-border/60 bg-background px-4 pb-6 pt-4;
+      @apply flex min-h-0 flex-1 flex-col border-t border-border/60 bg-background px-4 pb-6 pt-4;
     }
 
     .chat-history-panel .chat-history-header {
@@ -407,6 +435,18 @@
 
     .chat-history-panel .chat-history-empty {
       @apply bg-muted/30;
+    }
+
+    .chat-history-panel .chat-history-item {
+      @apply rounded-xl border border-border/50 bg-card px-1;
+    }
+
+    .chat-history-panel .chat-history-item-main {
+      @apply px-3 py-3;
+    }
+
+    .chat-history-panel .chat-history-delete {
+      @apply opacity-100;
     }
 
     .chat-body {

@@ -13,6 +13,7 @@ import {
   Scale,
   Settings,
   Smartphone,
+  X,
   SquarePen,
   Trash2,
 } from 'lucide-react';
@@ -280,6 +281,7 @@ export default function Page() {
   );
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const [activeChatId, setActiveChatId] = useState(initialChatId);
+  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
   const language = locationSettings.language;
   const copy = appCopy[language];
   const pageDirection = copy.direction;
@@ -323,6 +325,19 @@ export default function Page() {
     document.documentElement.lang = language;
     document.documentElement.dir = pageDirection;
   }, [language, pageDirection]);
+
+  useEffect(() => {
+    if (!isMobileHistoryOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileHistoryOpen]);
 
   useEffect(() => {
     if (!filteredMessages.length) {
@@ -406,6 +421,7 @@ export default function Page() {
     saveActiveChatId(nextChatId);
     setActiveChatId(nextChatId);
     setMessages([]);
+    setIsMobileHistoryOpen(false);
   }, [setMessages]);
 
   const handleSelectChat = useCallback(
@@ -413,6 +429,7 @@ export default function Page() {
       saveActiveChatId(historyItem.id);
       setActiveChatId(historyItem.id);
       setMessages(historyItem.messages);
+      setIsMobileHistoryOpen(false);
     },
     [setMessages],
   );
@@ -431,6 +448,8 @@ export default function Page() {
         setActiveChatId(nextChatId);
         setMessages([]);
       }
+
+      setIsMobileHistoryOpen(false);
     },
     [activeChatId, setMessages],
   );
@@ -446,6 +465,7 @@ export default function Page() {
     setChatHistory([]);
     setActiveChatId(nextChatId);
     setMessages([]);
+    setIsMobileHistoryOpen(false);
   }, [copy.clearHistoryConfirm, setMessages]);
 
   const updateLocationSettings = useCallback((settings: LocationSettings) => {
@@ -612,34 +632,22 @@ export default function Page() {
           </div>
 
           <div className="chat-header-actions">
-            <Dialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="chat-mobile-history"
-                      aria-label={copy.historyTitle}
-                    >
-                      <History className="size-5" />
-                    </Button>
-                  </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{copy.historyTitle}</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <DialogContent className="chat-history-dialog sm:max-w-md" dir={pageDirection}>
-                <DialogHeader>
-                  <DialogTitle>{copy.historyTitle}</DialogTitle>
-                </DialogHeader>
-                <div className="chat-history chat-history-panel">
-                  {historyPanel}
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="chat-mobile-history"
+                  onClick={() => setIsMobileHistoryOpen(true)}
+                  aria-label={copy.historyTitle}
+                >
+                  <History className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{copy.historyTitle}</p>
+              </TooltipContent>
+            </Tooltip>
 
             <Dialog>
               <Tooltip>
@@ -792,6 +800,37 @@ export default function Page() {
             </ConversationContent>
           </Conversation>
         </div>
+
+        {isMobileHistoryOpen && (
+          <div className="chat-mobile-history-overlay" role="dialog" aria-modal="true" aria-label={copy.historyTitle}>
+            <button
+              type="button"
+              className="chat-mobile-history-backdrop"
+              aria-label={copy.close}
+              onClick={() => setIsMobileHistoryOpen(false)}
+            />
+            <section className="chat-mobile-history-sheet" dir={pageDirection}>
+              <div className="chat-mobile-history-sheet-header">
+                <div>
+                  <div className="chat-mobile-history-sheet-title">{copy.historyTitle}</div>
+                  <div className="chat-mobile-history-sheet-subtitle">{copy.assistantLabel}</div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="chat-mobile-history-close"
+                  onClick={() => setIsMobileHistoryOpen(false)}
+                  aria-label={copy.close}
+                >
+                  <X className="size-5" />
+                </Button>
+              </div>
+              <div className="chat-history chat-history-panel">
+                {historyPanel}
+              </div>
+            </section>
+          </div>
+        )}
 
         <div className="chat-input-wrapper">
           <PromptInput onSubmit={handleSubmit}>
