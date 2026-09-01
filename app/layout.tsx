@@ -7,7 +7,12 @@ export const metadata: Metadata = {
   title: appConfig.metadata.title,
   description: appConfig.metadata.description,
   icons: {
-    icon: "/smartstore-mark.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png" },
+      { url: "/smartstore-mark.png", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
   },
 };
 
