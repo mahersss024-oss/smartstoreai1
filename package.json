@@ -6,7 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "node scripts/start.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx --test tests/*.test.ts"
   },
   "packageManager": "pnpm@10.32.1",
   "engines": {
