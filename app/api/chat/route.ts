@@ -194,7 +194,7 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
 
   return {
     role: 'system',
-    content: `User shopping region context: country=${country ?? 'unknown'}, city=${city ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Use this to tailor general shopping guidance, suggested regions, currencies, and future provider choices. Product data fetching remains disabled.`,
+    content: `User shopping region context: country=${country ?? 'unknown'}, city=${city ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Use this to tailor general shopping guidance, suggested regions, currencies, and provider choices. Fetch product data only through configured server-side product tools, and never invent live prices or links.`,
   } satisfies ModelMessage;
 }
 

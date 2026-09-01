@@ -23,7 +23,7 @@ export const appCopy = {
     close: 'إغلاق',
     emptyTitle: 'كيف أقدر أساعدك في التسوق اليوم؟',
     emptyDescription:
-      'اكتب ما تريد شراءه أو مقارنته. جلب المنتجات المباشر متوقف مؤقتًا إلى حين اختيار مصدر بيانات جديد.',
+      'اكتب ما تريد شراءه أو مقارنته. عند ربط مصادر المنتجات ستظهر الأسعار والروابط من المتاجر المتصلة فقط.',
     inputPlaceholder: 'اسأل عن منتج، مقارنة، أو نصيحة شراء...',
     fallbackChatTitle: 'محادثة جديدة',
     imageAlt: 'شعار SmartStore AI',
@@ -101,7 +101,7 @@ export const appCopy = {
     close: 'Close',
     emptyTitle: 'How can I help you shop today?',
     emptyDescription:
-      'Ask what you want to buy or compare. Live product fetching is temporarily disabled until a new data source is selected.',
+      'Ask what you want to buy or compare. When product sources are connected, prices and links will come only from connected stores.',
     inputPlaceholder: 'Ask about a product, comparison, or shopping advice...',
     fallbackChatTitle: 'New chat',
     imageAlt: 'SmartStore AI logo',
