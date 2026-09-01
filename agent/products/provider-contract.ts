@@ -9,6 +9,14 @@ export type ProductSearchQuery = {
   query: string;
   region: ProductProviderRegion;
   limit?: number;
+  filters?: {
+    minPrice?: number;
+    maxPrice?: number;
+    brand?: string;
+    category?: string;
+    merchantNames?: string[];
+    availability?: 'in_stock' | 'out_of_stock' | 'unknown';
+  };
 };
 
 export type ProductSearchResult = {
@@ -38,4 +46,15 @@ export type ProductSearchProvider = {
 export type ProductProviderRegistry = {
   providers: ProductSearchProvider[];
   search: (query: ProductSearchQuery) => Promise<ProductSearchResult[]>;
+};
+
+export type ProductSearchSourceStatus = {
+  searchedProviders?: string[];
+  failedProviders?: string[];
+  generatedAt?: string;
+};
+
+export type ProductSearchProviderResponse = {
+  results: ProductSearchResult[];
+  sourceStatus?: ProductSearchSourceStatus;
 };

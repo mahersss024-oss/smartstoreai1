@@ -131,12 +131,19 @@ POST /v1/products/search
 
 ## نموذج الربط المستقبلي داخل الشات
 
-عند توفر مشروع المنتجات، يضاف Provider جديد داخل مشروع الشات يقرأ:
+تم تجهيز Provider داخل مشروع الشات يقرأ:
 
 - `SMARTSTORE_PRODUCTS_API_URL`
 - `SMARTSTORE_PRODUCTS_API_KEY`
 
 ثم يرسل الطلب إلى مشروع المنتجات من الخادم فقط.
+
+الملفات الجاهزة للربط:
+
+- `agent/products/provider-contract.ts`
+- `agent/products/smartstore-products-api.ts`
+- `agent/products/registry.ts`
+- `agent/tools/product-search.ts`
 
 المساعد الرئيسي يستقبل النتائج كنص/سياق موثوق، مع تعليمات واضحة:
 
@@ -149,6 +156,8 @@ If results are empty, say that no matching products were found in connected stor
 ## حالة المشروع الحالية
 
 - مشروع الشات جاهز معمارياً لهذا الربط.
+- أداة `searchProducts` موجودة وجاهزة للمساعد.
+- إذا لم يتم ضبط متغيرات API، ترجع الأداة حالة `unconfigured` ولا تسمح بتخمين الأسعار أو الروابط.
 - حارس النطاق موجود ويعمل قبل المساعد.
 - البحث بالإنترنت موجود لكنه ليس بديلاً عن Product API.
-- جلب المنتجات المباشر مؤجل حتى توفر مصدر مناسب.
+- جلب المنتجات المباشر يبدأ فقط بعد نشر مشروع Product Data API وضبط متغيرات البيئة.
