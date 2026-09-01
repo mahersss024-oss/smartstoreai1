@@ -1,6 +1,6 @@
 # SmartStore AI
 
-AI shopping assistant for product guidance, comparison, and decision support.
+AI shopping assistant for non-food product guidance, comparison, and decision support.
 
 ## Setup
 
@@ -12,11 +12,12 @@ pnpm dev
 
 ## Notes
 
-- Live product fetching is disabled.
-- The assistant focuses on comparisons, criteria, and general shopping advice.
-- Region settings are available in the app for better recommendations.
+- Connected product data is used only when the server-side Product Data API is configured.
+- The assistant focuses on non-food product comparisons, criteria, and general shopping advice.
+- Country, currency, and language settings are available in the app for better recommendations.
 - Web search is available for current facts, documentation, and company details.
 - Product data fetching should be provided by a separate server-side Product Data API.
+- Food, groceries, beverages, meals, and restaurant orders are outside the assistant scope.
 
 ## Product Data API Foundation
 
@@ -28,7 +29,7 @@ Architecture:
 Client -> Scope Guard -> Product Data API -> Shopping Assistant -> Output Guard -> Client
 ```
 
-The chat app must not invent product prices, availability, images, or purchase links. Those fields should come from a real Product API, product feed, affiliate API, or merchant integration.
+The chat app must not invent product prices, availability, images, or purchase links. Those fields should come from a real Product API, product feed, affiliate API, or merchant integration. Food and grocery products are excluded.
 
 See the technical foundation document:
 

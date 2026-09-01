@@ -5,7 +5,7 @@ import { productProviderRegistry } from '@/agent/products/registry';
 
 export const searchProducts = tool({
   description:
-    'Search connected online product data providers for real product names, prices, availability, images, and product or affiliate links. Use only for online ecommerce product requests.',
+    'Search connected online product data providers for real non-food product names, prices, availability, images, and product or affiliate links. Use only for non-food online ecommerce product requests.',
   inputSchema: z.object({
     query: z.string().min(2).describe('Product search query.'),
     region: z.object({

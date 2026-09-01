@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'الشراكات | SmartStore AI',
-  description: 'صفحة الشراكات لمزودي المنتجات وروابط التسويق والبيانات.',
+  description: 'صفحة الشراكات لمزودي المنتجات غير الغذائية وروابط التسويق والبيانات.',
 };
 
 const requirements = [
@@ -12,6 +12,7 @@ const requirements = [
   'الرابط المباشر للمنتج أو صفحة الهبوط.',
   'اسم المتجر أو الماركة.',
   'توفر المنتج أو حالته إن كانت مهمة.',
+  'تصنيف واضح يساعد على استبعاد المواد الغذائية.',
 ];
 
 const benefits = [
@@ -42,7 +43,7 @@ export default function PartnersPage() {
 
       <section className="grid gap-4 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
         <p className="text-sm leading-7 text-muted-foreground">
-          SmartStore AI مصمم ليستقبل بيانات المنتجات من أكثر من مصدر، ثم
+          SmartStore AI مصمم ليستقبل بيانات المنتجات غير الغذائية من أكثر من مصدر، ثم
           يعرضها داخل المحادثة ويحوّلها إلى تجربة شراء أو إحالة مناسبة حسب
           المصدر المتوفر.
         </p>
@@ -75,9 +76,9 @@ export default function PartnersPage() {
       </div>
 
       <section className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm leading-7 text-muted-foreground shadow-sm sm:p-8">
-        إذا كنت متجرًا أو مزود بيانات أو شبكة أفلييت، فهذا المسار مناسب لربط
-        بياناتك لاحقًا داخل الشات بشكل منظم، مع قابلية التوسع لمصادر متعددة
-        دون تغيير تجربة المستخدم الأساسية.
+        إذا كنت متجرًا أو مزود بيانات أو شبكة أفلييت للمنتجات غير الغذائية،
+        فهذا المسار مناسب لربط بياناتك لاحقًا داخل الشات بشكل منظم، مع قابلية
+        التوسع لمصادر متعددة دون تغيير تجربة المستخدم الأساسية.
       </section>
     </main>
   );
