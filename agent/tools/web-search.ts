@@ -65,7 +65,7 @@ function normalizeResult(result: unknown): WebSearchResult | null {
 
 export const searchWeb = tool({
   description:
-    'Search the live web for general current information, company pages, API docs, service regions, documentation, news, and facts that may have changed.',
+    'Search the live web for general current information, company pages, API docs, service regions, documentation, news, manufacturer pages, official store pages, product discovery pages, and facts that may have changed. Web result snippets are not confirmed live product data.',
   inputSchema: z.object({
     query: z.string().min(2).describe('Natural-language web search query'),
     topic: z

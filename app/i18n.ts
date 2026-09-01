@@ -23,7 +23,7 @@ export const appCopy = {
     close: 'إغلاق',
     emptyTitle: 'كيف أقدر أساعدك في التسوق اليوم؟',
     emptyDescription:
-      'اكتب ما تريد شراءه أو مقارنته. عند ربط مصادر المنتجات ستظهر الأسعار والروابط من المتاجر المتصلة فقط.',
+      'اكتب ما تريد شراءه أو مقارنته. يمكنني استخدام البحث كحل مؤقت لاكتشاف الصفحات، أما الأسعار المؤكدة فتأتي لاحقًا من المتاجر المتصلة.',
     inputPlaceholder: 'اسأل عن منتج، مقارنة، أو نصيحة شراء...',
     fallbackChatTitle: 'محادثة جديدة',
     imageAlt: 'شعار SmartStore AI',
@@ -101,7 +101,7 @@ export const appCopy = {
     close: 'Close',
     emptyTitle: 'How can I help you shop today?',
     emptyDescription:
-      'Ask what you want to buy or compare. When product sources are connected, prices and links will come only from connected stores.',
+      'Ask what you want to buy or compare. I can use web search for temporary page discovery, while confirmed prices will come from connected stores later.',
     inputPlaceholder: 'Ask about a product, comparison, or shopping advice...',
     fallbackChatTitle: 'New chat',
     imageAlt: 'SmartStore AI logo',
