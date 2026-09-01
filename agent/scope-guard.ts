@@ -247,13 +247,13 @@ export function getSafeScopeResponse(
 ) {
   if (decision === 'UNCLEAR') {
     return language === 'en'
-      ? 'Please clarify your request related to a product or online shopping.'
-      : 'وضح طلبك المتعلق بالمنتج أو التسوق عبر الإنترنت.';
+      ? 'I can help once you clarify the product or online shopping request you need.'
+      : 'يسعدني مساعدتك، فقط وضّح طلبك المتعلق بمنتج أو تسوق عبر الإنترنت.';
   }
 
   return language === 'en'
-    ? 'I only help with online shopping, products, online stores, and price comparisons.'
-    : 'أنا متخصص في التسوق والمنتجات والمتاجر الإلكترونية ومقارنة الأسعار فقط.';
+    ? 'I’m here to help with online shopping, products, online stores, and price comparisons. Tell me what you want to buy or compare, and I’ll guide you.'
+    : 'يسعدني مساعدتك في التسوق الإلكتروني والمنتجات والمتاجر ومقارنة الأسعار. أخبرني بما تريد شراءه أو مقارنته، وسأرشدك للاختيار الأنسب.';
 }
 
 export function applyAllowedRequestToLatestUserMessage(

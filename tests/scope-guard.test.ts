@@ -103,10 +103,10 @@ test('rewrites only the latest user message for partial requests', () => {
 test('returns localized safe responses without internal decision details', () => {
   assert.equal(
     getSafeScopeResponse('BLOCK', 'ar'),
-    'أنا متخصص في التسوق والمنتجات والمتاجر الإلكترونية ومقارنة الأسعار فقط.',
+    'يسعدني مساعدتك في التسوق الإلكتروني والمنتجات والمتاجر ومقارنة الأسعار. أخبرني بما تريد شراءه أو مقارنته، وسأرشدك للاختيار الأنسب.',
   );
   assert.equal(
     getSafeScopeResponse('UNCLEAR', 'en'),
-    'Please clarify your request related to a product or online shopping.',
+    'I can help once you clarify the product or online shopping request you need.',
   );
 });
