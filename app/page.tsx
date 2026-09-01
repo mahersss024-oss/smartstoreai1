@@ -64,7 +64,6 @@ type CountryCode = 'SA' | 'AE' | 'KW' | 'QA' | 'BH' | 'OM' | 'EG' | 'JO';
 
 type LocationSettings = {
   country: CountryCode;
-  city: string;
   currency: string;
   language: AppLanguage;
 };
@@ -89,23 +88,21 @@ const countryOptions: Array<{
   code: CountryCode;
   name: string;
   currency: string;
-  defaultCity: string;
 }> = [
-  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR', defaultCity: 'Riyadh' },
-  { code: 'AE', name: 'United Arab Emirates', currency: 'AED', defaultCity: 'Dubai' },
-  { code: 'KW', name: 'Kuwait', currency: 'KWD', defaultCity: 'Kuwait City' },
-  { code: 'QA', name: 'Qatar', currency: 'QAR', defaultCity: 'Doha' },
-  { code: 'BH', name: 'Bahrain', currency: 'BHD', defaultCity: 'Manama' },
-  { code: 'OM', name: 'Oman', currency: 'OMR', defaultCity: 'Muscat' },
-  { code: 'EG', name: 'Egypt', currency: 'EGP', defaultCity: 'Cairo' },
-  { code: 'JO', name: 'Jordan', currency: 'JOD', defaultCity: 'Amman' },
+  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
+  { code: 'AE', name: 'United Arab Emirates', currency: 'AED' },
+  { code: 'KW', name: 'Kuwait', currency: 'KWD' },
+  { code: 'QA', name: 'Qatar', currency: 'QAR' },
+  { code: 'BH', name: 'Bahrain', currency: 'BHD' },
+  { code: 'OM', name: 'Oman', currency: 'OMR' },
+  { code: 'EG', name: 'Egypt', currency: 'EGP' },
+  { code: 'JO', name: 'Jordan', currency: 'JOD' },
 ];
 
 const currencyOptions = ['SAR', 'AED', 'KWD', 'QAR', 'BHD', 'OMR', 'EGP', 'JOD', 'USD'];
 
 const defaultLocationSettings: LocationSettings = {
   country: 'SA',
-  city: 'Riyadh',
   currency: 'SAR',
   language: 'ar',
 };
@@ -148,10 +145,6 @@ function readStoredLocationSettings(): LocationSettings {
 
     return {
       country,
-      city:
-        typeof parsed.city === 'string' && parsed.city.trim()
-          ? parsed.city.trim()
-          : countryOption.defaultCity,
       currency:
         typeof parsed.currency === 'string' && parsed.currency.trim()
           ? parsed.currency.trim().toUpperCase()
@@ -495,16 +488,8 @@ export default function Page() {
       updateLocationSettings({
         ...locationSettings,
         country,
-        city: nextCountry.defaultCity,
         currency: nextCountry.currency,
       });
-    },
-    [locationSettings, updateLocationSettings],
-  );
-
-  const handleCityChange = useCallback(
-    (value: string) => {
-      updateLocationSettings({ ...locationSettings, city: value });
     },
     [locationSettings, updateLocationSettings],
   );
@@ -700,16 +685,6 @@ export default function Page() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </label>
-
-                  <label className="grid gap-2 text-sm font-medium">
-                    {copy.city}
-                    <input
-                      value={locationSettings.city}
-                      onChange={(event) => handleCityChange(event.target.value)}
-                      className="location-input"
-                      placeholder="Riyadh"
-                    />
                   </label>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

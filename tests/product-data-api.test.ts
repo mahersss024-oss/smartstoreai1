@@ -16,7 +16,6 @@ const sampleQuery: ProductSearchQuery = {
   query: 'Samsung Galaxy',
   region: {
     country: 'SA',
-    city: 'Riyadh',
     currency: 'SAR',
     language: 'ar',
   },

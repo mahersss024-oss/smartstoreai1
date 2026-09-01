@@ -103,7 +103,6 @@ type ChatMessage = {
 
 type LocationSettings = {
   country?: unknown;
-  city?: unknown;
   currency?: unknown;
   language?: unknown;
 };
@@ -184,17 +183,16 @@ function cleanString(value: unknown) {
 
 function buildLocationSystemMessage(settings: LocationSettings | undefined) {
   const country = cleanString(settings?.country);
-  const city = cleanString(settings?.city);
   const currency = cleanString(settings?.currency);
   const language = cleanString(settings?.language);
 
-  if (!country && !city && !currency && !language) {
+  if (!country && !currency && !language) {
     return undefined;
   }
 
   return {
     role: 'system',
-    content: `User shopping region context: country=${country ?? 'unknown'}, city=${city ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Use this to tailor general shopping guidance, suggested regions, currencies, and provider choices. Fetch product data only through configured server-side product tools, and never invent live prices or links.`,
+    content: `User shopping region context: country=${country ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Online stores are treated at country level. Use this to tailor general shopping guidance, suggested regions, currencies, and provider choices. Fetch product data only through configured server-side product tools, and never invent live prices or links.`,
   } satisfies ModelMessage;
 }
 

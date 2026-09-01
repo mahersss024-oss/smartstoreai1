@@ -14,7 +14,6 @@ export const appCopy = {
     settingsDescription:
       'تساعد هذه الإعدادات المساعد على تخصيص النصائح حسب الدولة والعملة والمنطقة.',
     country: 'الدولة',
-    city: 'المدينة',
     currency: 'العملة',
     language: 'لغة الواجهة والرد',
     arabic: 'العربية',
@@ -92,7 +91,6 @@ export const appCopy = {
     settingsDescription:
       'These settings help the assistant tailor guidance by country, currency, and region.',
     country: 'Country',
-    city: 'City',
     currency: 'Currency',
     language: 'Interface and reply language',
     arabic: 'العربية',

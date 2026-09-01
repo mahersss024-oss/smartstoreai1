@@ -10,7 +10,6 @@ export const searchProducts = tool({
     query: z.string().min(2).describe('Product search query.'),
     region: z.object({
       country: z.string().min(2),
-      city: z.string().optional(),
       currency: z.string().optional(),
       language: z.enum(['ar', 'en']).optional(),
     }),

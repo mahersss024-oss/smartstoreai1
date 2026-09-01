@@ -1,6 +1,5 @@
 export type ProductProviderRegion = {
   country: string;
-  city?: string;
   currency?: string;
   language?: 'ar' | 'en';
 };
