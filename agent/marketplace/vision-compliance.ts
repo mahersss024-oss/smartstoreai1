@@ -8,20 +8,27 @@ const imageComplianceTimeoutMs = 18_000;
 const imageComplianceMaxAttempts = 2;
 const imageComplianceRetryDelayMs = 700;
 
+const optionalModelText = (maxLength: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === 'string' && !value.trim() ? undefined : value,
+    z.string().trim().min(1).max(maxLength).optional(),
+  );
+
 const imageComplianceSchema = z.object({
   decision: z.enum(['allow', 'block', 'needs_review']),
   confidence: z.number().min(0).max(1).default(0.5),
-  reasons: z.array(z.string().trim().min(1).max(120)).default([]),
-  prohibited_category: z.string().trim().min(1).max(80).optional(),
-  prohibitedCategory: z.string().trim().min(1).max(80).optional(),
-  detected_category: z.string().trim().min(1).max(80).optional(),
-  detectedCategory: z.string().trim().min(1).max(80).optional(),
-  expected_category: z.string().trim().min(1).max(80).optional(),
-  expectedCategory: z.string().trim().min(1).max(80).optional(),
+  reasons: z.array(z.string().trim().min(1).max(600)).default([]),
+  prohibited_category: optionalModelText(160),
+  prohibitedCategory: optionalModelText(160),
+  detected_category: optionalModelText(160),
+  detectedCategory: optionalModelText(160),
+  expected_category: optionalModelText(160),
+  expectedCategory: optionalModelText(160),
   category_match: z.enum(['match', 'mismatch', 'unclear']).optional(),
   categoryMatch: z.enum(['match', 'mismatch', 'unclear']).optional(),
-  detected_product: z.string().trim().min(1).max(120).optional(),
-  detectedProduct: z.string().trim().min(1).max(120).optional(),
+  detected_product: optionalModelText(240),
+  detectedProduct: optionalModelText(240),
   sharia_sensitive: z.boolean().optional(),
   shariaSensitive: z.boolean().optional(),
 });
@@ -225,7 +232,9 @@ export function parseImageComplianceDecision(text: string): ImageComplianceDecis
     parsed.expected_category ?? parsed.expectedCategory;
   const categoryMatch =
     parsed.category_match ?? parsed.categoryMatch ?? 'unclear';
-  const reasons = [...parsed.reasons];
+  const reasons = parsed.reasons.map((reason) =>
+    reason.length > 180 ? `${reason.slice(0, 177)}...` : reason,
+  );
   const decision =
     parsed.decision === 'allow' &&
     expectedCategory &&
@@ -313,7 +322,6 @@ async function generateImageComplianceText(imageMessage: ModelMessage) {
       const result = await withTimeout(imageComplianceTimeoutMs, (signal) =>
         generateText({
           model: getDeepseekChatModel('vision'),
-          temperature: 0,
           maxOutputTokens: 520,
           abortSignal: signal,
           messages: [

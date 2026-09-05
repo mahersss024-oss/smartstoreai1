@@ -49,6 +49,26 @@ test('routes category mismatches to manual review', () => {
   ]);
 });
 
+test('accepts verbose vision reasons and empty optional categories', () => {
+  const decision = parseImageComplianceDecision(`{
+  "decision": "allow",
+  "confidence": 0.88,
+  "reasons": ["The image appears to show an ordinary passenger car in a showroom or parking area, with no visible prohibited item, and the visible product is consistent with a regular marketplace vehicle listing for buyer or seller assistance."],
+  "prohibited_category": "",
+  "detected_category": "cars",
+  "expected_category": "cars",
+  "category_match": "match",
+  "detected_product": "white sedan",
+  "sharia_sensitive": false
+}`);
+
+  assert.equal(decision.decision, 'allow');
+  assert.equal(decision.prohibitedCategory, undefined);
+  assert.equal(decision.detectedCategory, 'cars');
+  assert.equal(decision.categoryMatch, 'match');
+  assert.ok(decision.reasons[0].length <= 180);
+});
+
 test('keeps weapon-like toys in review decisions from vision', () => {
   const decision = parseImageComplianceDecision(`{
   "decision": "needs_review",

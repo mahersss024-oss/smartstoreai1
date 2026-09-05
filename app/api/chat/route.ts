@@ -7,6 +7,7 @@ import {
 } from 'ai';
 
 import { createChatAgent } from '@/agent/chat-agent';
+import { getDeepseekApiKey } from '@/agent/deepseek-provider';
 import {
   buildAdaptiveIntentSystemMessage,
   resolveAdaptiveMarketplaceIntent,
@@ -47,7 +48,7 @@ const maxRequestsPerWindow = 20;
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function hasDeepseekApiKey() {
-  return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
+  return Boolean(getDeepseekApiKey());
 }
 
 function getMissingApiKeys() {

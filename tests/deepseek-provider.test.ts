@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  getDeepseekApiKey,
   getDeepseekModelName,
   normalizeDeepseekChatBody,
 } from '@/agent/deepseek-provider';
 import { appConfig } from '@/app/app-config';
 
 const modelEnvKeys = [
+  'DEEPSEEK_API_KEY',
   'DEEPSEEK_MODEL',
   'DEEPSEEK_CHAT_MODEL',
   'DEEPSEEK_SCOPE_MODEL',
@@ -82,6 +87,30 @@ test('uses profile-specific DeepSeek model overrides first', () => {
       );
     },
   );
+});
+
+test('prefers local DeepSeek key over stale machine environment key', () => {
+  const previousCwd = process.cwd();
+  const tempDirectory = mkdtempSync(join(tmpdir(), 'smartstore-env-'));
+  const previousKey = process.env.DEEPSEEK_API_KEY;
+
+  try {
+    process.chdir(tempDirectory);
+    process.env.DEEPSEEK_API_KEY = 'sk-stale-machine-key';
+    writeFileSync('.env.local', 'DEEPSEEK_API_KEY=sk-local-file-key\n');
+
+    assert.equal(getDeepseekApiKey(), 'sk-local-file-key');
+  } finally {
+    process.chdir(previousCwd);
+
+    if (previousKey === undefined) {
+      delete process.env.DEEPSEEK_API_KEY;
+    } else {
+      process.env.DEEPSEEK_API_KEY = previousKey;
+    }
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  }
 });
 
 test('normalizes DeepSeek requests for non-thinking marketplace responses', () => {
