@@ -31,7 +31,21 @@ const adaptiveExecutionSchema = z.enum([
   'support',
 ]);
 
-const adaptiveIntentSchema = z.object({
+export type AdaptiveMarketplaceIntent = {
+  intent: MarketplaceIntent;
+  execution: z.infer<typeof adaptiveExecutionSchema>;
+  confidence: number;
+  reasonCode: string;
+  normalizedRequest?: string;
+  searchQuery?: string;
+  targetListingId?: string;
+  missingFields?: string[];
+  requiresAuth: boolean;
+  requiresConfirmation: boolean;
+};
+
+const adaptiveIntentSchema = z
+  .object({
   intent: z.enum([
     'general_info',
     'search_listing',
@@ -51,16 +65,57 @@ const adaptiveIntentSchema = z.object({
   ]),
   execution: adaptiveExecutionSchema,
   confidence: z.number().min(0).max(1),
-  reasonCode: z.string().min(1).max(80),
-  normalizedRequest: z.string().trim().min(1).max(1_000).optional(),
-  searchQuery: z.string().trim().min(1).max(300).optional(),
-  targetListingId: z.string().trim().min(1).max(120).optional(),
-  missingFields: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
-  requiresAuth: z.boolean(),
-  requiresConfirmation: z.boolean(),
-});
+    reasonCode: z.string().trim().min(1).max(80).optional(),
+    reason_code: z.string().trim().min(1).max(80).optional(),
+    normalizedRequest: z.string().trim().min(1).max(1_000).optional(),
+    normalized_request: z.string().trim().min(1).max(1_000).optional(),
+    searchQuery: z.string().trim().min(1).max(300).optional(),
+    search_query: z.string().trim().min(1).max(300).optional(),
+    targetListingId: z.string().trim().min(1).max(120).optional(),
+    target_listing_id: z.string().trim().min(1).max(120).optional(),
+    missingFields: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+    missing_fields: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+    requiresAuth: z.boolean().optional(),
+    requires_auth: z.boolean().optional(),
+    requiresConfirmation: z.boolean().optional(),
+    requires_confirmation: z.boolean().optional(),
+  })
+  .transform((parsed) => {
+    const normalized: AdaptiveMarketplaceIntent = {
+      intent: parsed.intent,
+      execution: parsed.execution,
+      confidence: parsed.confidence,
+      reasonCode: parsed.reasonCode ?? parsed.reason_code ?? 'adaptive_intent',
+      requiresAuth: parsed.requiresAuth ?? parsed.requires_auth ?? false,
+      requiresConfirmation:
+        parsed.requiresConfirmation ?? parsed.requires_confirmation ?? false,
+    };
 
-export type AdaptiveMarketplaceIntent = z.infer<typeof adaptiveIntentSchema>;
+    const normalizedRequest =
+      parsed.normalizedRequest ?? parsed.normalized_request;
+    const searchQuery = parsed.searchQuery ?? parsed.search_query;
+    const targetListingId =
+      parsed.targetListingId ?? parsed.target_listing_id;
+    const missingFields = parsed.missingFields ?? parsed.missing_fields;
+
+    if (normalizedRequest) {
+      normalized.normalizedRequest = normalizedRequest;
+    }
+
+    if (searchQuery) {
+      normalized.searchQuery = searchQuery;
+    }
+
+    if (targetListingId) {
+      normalized.targetListingId = targetListingId;
+    }
+
+    if (missingFields) {
+      normalized.missingFields = missingFields;
+    }
+
+    return normalized;
+  });
 
 const authRequiredIntents = new Set<MarketplaceIntent>([
   'create_listing',
@@ -260,7 +315,6 @@ export async function resolveAdaptiveMarketplaceIntent({
     const result = await withTimeout(adaptiveIntentTimeoutMs, (signal) =>
       generateText({
         model: getDeepseekChatModel('scope'),
-        temperature: 0,
         maxOutputTokens: 420,
         abortSignal: signal,
         system: `You are the SmartStore AI adaptive intent router.

@@ -16,6 +16,17 @@ test('parses adaptive marketplace intent JSON', () => {
   assert.equal(intent.searchQuery, 'كامري 2020 الرياض');
 });
 
+test('parses adaptive marketplace intent JSON with snake case fields', () => {
+  const intent = parseAdaptiveMarketplaceIntent(
+    '{"intent":"general_info","execution":"analyze_images","confidence":0.91,"reason_code":"marketplace_image_upload","normalized_request":"افحص الصورة","requires_auth":false,"requires_confirmation":false}',
+  );
+
+  assert.equal(intent.intent, 'general_info');
+  assert.equal(intent.execution, 'analyze_images');
+  assert.equal(intent.reasonCode, 'marketplace_image_upload');
+  assert.equal(intent.normalizedRequest, 'افحص الصورة');
+});
+
 test('uses conversation context for short marketplace follow-ups', () => {
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },

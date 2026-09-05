@@ -281,7 +281,6 @@ export async function checkInputScope({ messages }: ScopeCheckInput) {
     const result = await withTimeout(scopeTimeoutMs, (signal) =>
       generateText({
         model: getDeepseekChatModel('scope'),
-        temperature: 0,
         maxOutputTokens: 320,
         abortSignal: signal,
         system: `You are the SmartStore AI input Scope Checker.
@@ -326,7 +325,6 @@ export async function checkOutputScope({
     const result = await withTimeout(outputScopeTimeoutMs, (signal) =>
       generateText({
         model: getDeepseekChatModel('moderation'),
-        temperature: 0,
         maxOutputTokens: 240,
         abortSignal: signal,
         system: `You are the SmartStore AI output Scope Checker.
