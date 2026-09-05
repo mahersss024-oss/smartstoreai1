@@ -56,6 +56,11 @@ test('strips image file parts before text-only chat model calls', () => {
           mediaType: 'image/jpeg',
           data: new Uint8Array([1, 2, 3]),
         },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: new Uint8Array([7, 8, 9]),
+        },
       ],
     },
     {

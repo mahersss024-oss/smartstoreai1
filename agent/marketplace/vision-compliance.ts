@@ -314,6 +314,133 @@ export function createImageComplianceUserMessage({
   return null;
 }
 
+export function createImageComplianceUserMessages({
+  messages,
+  userRequest,
+  language,
+  expectedCategory,
+  listingText,
+}: {
+  messages: ModelMessage[];
+  userRequest: string;
+  language: AppLanguage;
+  expectedCategory?: string;
+  listingText?: string;
+}) {
+  const imageMessage = createImageComplianceUserMessage({
+    messages,
+    userRequest,
+    language,
+    expectedCategory,
+    listingText,
+  });
+
+  if (!imageMessage || !Array.isArray(imageMessage.content)) {
+    return [];
+  }
+
+  const imageParts = imageMessage.content.filter(isModelImageFilePart);
+  const textPart = imageMessage.content.find(isModelTextPart);
+
+  if (imageParts.length <= 1) {
+    return [imageMessage];
+  }
+
+  return imageParts.map((imagePart, index) => {
+    const imageNumber = index + 1;
+    const perImageText = `${textPart?.text ?? ''}\nImage ${imageNumber} of ${imageParts.length}. Inspect this image independently as part of the same marketplace listing.`;
+
+    return {
+      role: 'user' as const,
+      content: [{ type: 'text' as const, text: perImageText }, imagePart],
+    } satisfies ModelMessage;
+  });
+}
+
+function firstDefined<T>(values: Array<T | undefined>) {
+  return values.find((value): value is T => value !== undefined);
+}
+
+function uniqueDefined(values: Array<string | undefined>) {
+  return [
+    ...new Set(
+      values
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+}
+
+export function aggregateImageComplianceDecisions(
+  decisions: ImageComplianceDecision[],
+) {
+  if (!decisions.length) {
+    return {
+      decision: 'allow',
+      confidence: 1,
+      reasons: [],
+      categoryMatch: 'unclear',
+      shariaSensitive: false,
+    } satisfies ImageComplianceDecision;
+  }
+
+  const blockingDecision = decisions.find(
+    (decision) => decision.decision === 'block',
+  );
+  const reviewDecision = decisions.find(
+    (decision) => decision.decision === 'needs_review',
+  );
+  const finalDecision = blockingDecision
+    ? 'block'
+    : reviewDecision
+      ? 'needs_review'
+      : 'allow';
+  const categoryMatch = decisions.some(
+    (decision) => decision.categoryMatch === 'mismatch',
+  )
+    ? 'mismatch'
+    : decisions.some((decision) => decision.categoryMatch === 'unclear')
+      ? 'unclear'
+      : 'match';
+  const detectedCategories = uniqueDefined(
+    decisions.map((decision) => decision.detectedCategory),
+  );
+  const detectedProducts = uniqueDefined(
+    decisions.map((decision) => decision.detectedProduct),
+  );
+  const reasons = [
+    ...(decisions.length > 1
+      ? [`inspected_${decisions.length}_images`]
+      : []),
+    ...decisions.flatMap((decision) => decision.reasons),
+  ];
+
+  return {
+    decision: finalDecision,
+    confidence: Math.min(...decisions.map((decision) => decision.confidence)),
+    reasons: [...new Set(reasons)].slice(0, 12),
+    prohibitedCategory: firstDefined(
+      [blockingDecision, reviewDecision, ...decisions].map(
+        (decision) => decision?.prohibitedCategory,
+      ),
+    ),
+    detectedCategory:
+      detectedCategories.length === 1
+        ? detectedCategories[0]
+        : detectedCategories.length > 1
+          ? 'multiple'
+          : undefined,
+    expectedCategory: firstDefined(
+      decisions.map((decision) => decision.expectedCategory),
+    ),
+    categoryMatch,
+    detectedProduct: detectedProducts.length
+      ? detectedProducts.join(', ').slice(0, 240)
+      : undefined,
+    shariaSensitive: decisions.some((decision) => decision.shariaSensitive),
+  } satisfies ImageComplianceDecision;
+}
+
 async function generateImageComplianceText(imageMessage: ModelMessage) {
   let lastError: unknown;
 
@@ -355,7 +482,14 @@ async function generateImageComplianceText(imageMessage: ModelMessage) {
 export const imageComplianceSystemPrompt = `You are the SmartStore AI visual compliance checker for a Saudi marketplace.
 Return JSON only. Do not answer the user.
 
-Classify the attached marketplace product images before the chat assistant responds.
+Classify every attached marketplace product image before the chat assistant responds.
+
+Multi-image rule:
+- Inspect every attached image, not only the first image.
+- If any attached image contains a prohibited product or prohibited content, the final decision must be block.
+- If any attached image is unclear, regulated, sensitive, or mismatches the expected category/listing text, the final decision must be needs_review unless another image requires block.
+- Use allow only when all attached images are ordinary lawful marketplace products and all reasonably match the expected listing context.
+- Mention the number of inspected images in reasons when there is more than one image.
 
 Use Saudi prohibited/restricted goods policy examples, including ZATCA traveler/customs examples such as intoxicants, narcotics, immoral media, counterfeit currency, fireworks, prohibited chewing smoke, tear gas, weapons, ammunition, secret-camera products, electric shocks, radar detectors, unregistered sexual tonics/abortion pills/herbs/lotions, sexual tools/devices, and eavesdropping devices.
 
@@ -413,7 +547,7 @@ export async function checkImageMarketplaceCompliance({
   expectedCategory?: string;
   listingText?: string;
 }) {
-  const imageMessage = createImageComplianceUserMessage({
+  const imageMessages = createImageComplianceUserMessages({
     messages,
     userRequest,
     language,
@@ -421,7 +555,7 @@ export async function checkImageMarketplaceCompliance({
     listingText,
   });
 
-  if (!imageMessage) {
+  if (!imageMessages.length) {
     return {
       decision: 'allow',
       confidence: 1,
@@ -431,7 +565,15 @@ export async function checkImageMarketplaceCompliance({
     } satisfies ImageComplianceDecision;
   }
 
-  return parseImageComplianceDecision(
-    await generateImageComplianceText(imageMessage),
-  );
+  const decisions: ImageComplianceDecision[] = [];
+
+  for (const imageMessage of imageMessages) {
+    decisions.push(
+      parseImageComplianceDecision(
+        await generateImageComplianceText(imageMessage),
+      ),
+    );
+  }
+
+  return aggregateImageComplianceDecisions(decisions);
 }

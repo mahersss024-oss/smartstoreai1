@@ -4,7 +4,9 @@ import test from 'node:test';
 import type { ModelMessage } from 'ai';
 
 import {
+  aggregateImageComplianceDecisions,
   createImageComplianceUserMessage,
+  createImageComplianceUserMessages,
   parseImageComplianceDecision,
 } from '@/agent/marketplace/vision-compliance';
 
@@ -145,4 +147,126 @@ test('creates a vision compliance message from the latest user image', () => {
   const content = Array.isArray(message.content) ? message.content : [];
   assert.equal(content.length, 2);
   assert.deepEqual((content[1] as { data: Uint8Array }).data, new Uint8Array([2]));
+});
+
+test('passes all latest user images to visual compliance', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'افحص صور المنتج' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: new Uint8Array([10]),
+        },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: new Uint8Array([20]),
+        },
+      ],
+    },
+  ];
+
+  const message = createImageComplianceUserMessage({
+    messages,
+    userRequest: 'افحص صور المنتج',
+    language: 'ar',
+  });
+
+  assert.ok(message);
+  assert.ok(Array.isArray(message.content));
+
+  const content = Array.isArray(message.content) ? message.content : [];
+  const imageParts = content.filter((part) => part.type === 'file');
+
+  assert.equal(imageParts.length, 2);
+  assert.deepEqual(
+    (imageParts[0] as { data: Uint8Array }).data,
+    new Uint8Array([10]),
+  );
+  assert.deepEqual(
+    (imageParts[1] as { data: Uint8Array }).data,
+    new Uint8Array([20]),
+  );
+});
+
+test('splits latest user images into independent visual compliance requests', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'inspect product images' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: new Uint8Array([10]),
+        },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: new Uint8Array([20]),
+        },
+      ],
+    },
+  ];
+
+  const imageMessages = createImageComplianceUserMessages({
+    messages,
+    userRequest: 'inspect product images',
+    language: 'ar',
+  });
+
+  assert.equal(imageMessages.length, 2);
+
+  for (const imageMessage of imageMessages) {
+    const content = Array.isArray(imageMessage.content)
+      ? imageMessage.content
+      : [];
+
+    assert.equal(content.filter((part) => part.type === 'file').length, 1);
+  }
+
+  assert.deepEqual(
+    ((imageMessages[0].content as Array<{ data?: Uint8Array }>)[1]).data,
+    new Uint8Array([10]),
+  );
+  assert.deepEqual(
+    ((imageMessages[1].content as Array<{ data?: Uint8Array }>)[1]).data,
+    new Uint8Array([20]),
+  );
+});
+
+test('aggregates multi-image compliance using the strictest decision', () => {
+  const decision = aggregateImageComplianceDecisions([
+    {
+      decision: 'allow',
+      confidence: 0.95,
+      reasons: ['ordinary phone'],
+      detectedCategory: 'mobile_phones',
+      expectedCategory: 'mobile_phones',
+      categoryMatch: 'match',
+      detectedProduct: 'iphone',
+      shariaSensitive: false,
+    },
+    {
+      decision: 'block',
+      confidence: 0.9,
+      reasons: ['visible real firearm'],
+      prohibitedCategory: 'weapons',
+      detectedCategory: 'weapons',
+      expectedCategory: 'mobile_phones',
+      categoryMatch: 'mismatch',
+      detectedProduct: 'handgun',
+      shariaSensitive: true,
+    },
+  ]);
+
+  assert.equal(decision.decision, 'block');
+  assert.equal(decision.prohibitedCategory, 'weapons');
+  assert.equal(decision.detectedCategory, 'multiple');
+  assert.equal(decision.categoryMatch, 'mismatch');
+  assert.equal(decision.shariaSensitive, true);
+  assert.ok(decision.reasons.includes('inspected_2_images'));
 });
