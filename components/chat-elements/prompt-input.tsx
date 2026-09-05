@@ -77,12 +77,17 @@ import {
 // ============================================================================
 
 export type AttachmentsContext = {
-  files: (FileUIPart & { id: string })[];
+  files: PromptInputAttachment[];
   add: (files: File[] | FileList) => void;
   remove: (id: string) => void;
   clear: () => void;
   openFileDialog: () => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
+};
+
+type PromptInputAttachment = FileUIPart & {
+  id: string;
+  file?: File;
 };
 
 export type TextInputContext = {
@@ -152,9 +157,9 @@ export function PromptInputProvider({
   const clearInput = useCallback(() => setTextInput(""), []);
 
   // ----- attachments state (global when wrapped)
-  const [attachements, setAttachements] = useState<
-    (FileUIPart & { id: string })[]
-  >([]);
+  const [attachements, setAttachements] = useState<PromptInputAttachment[]>(
+    []
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openRef = useRef<() => void>(() => {});
 
@@ -169,6 +174,7 @@ export function PromptInputProvider({
         incoming.map((file) => ({
           id: nanoid(),
           type: "file" as const,
+          file,
           url: URL.createObjectURL(file),
           mediaType: file.type,
           filename: file.name,
@@ -471,7 +477,7 @@ export const PromptInput = ({
   }, []);
 
   // ----- Local attachments (only used when no provider)
-  const [items, setItems] = useState<(FileUIPart & { id: string })[]>([]);
+  const [items, setItems] = useState<PromptInputAttachment[]>([]);
   const files = usingProvider ? controller.attachments.files : items;
 
   const openFileDialogLocal = useCallback(() => {
@@ -531,11 +537,12 @@ export const PromptInput = ({
             message: "Too many files. Some were not added.",
           });
         }
-        const next: (FileUIPart & { id: string })[] = [];
+        const next: PromptInputAttachment[] = [];
         for (const file of capped) {
           next.push({
             id: nanoid(),
             type: "file",
+            file,
             url: URL.createObjectURL(file),
             mediaType: file.type,
             filename: file.name,
@@ -693,12 +700,21 @@ export const PromptInput = ({
 
   const convertBlobUrlToDataUrl = async (url: string): Promise<string> => {
     const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("Attachment preview could not be read.");
+    }
+
     const blob = await response.blob();
+    return convertFileToDataUrl(blob);
+  };
+
+  const convertFileToDataUrl = async (file: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.onerror = reject;
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(file);
     });
   };
 
@@ -733,7 +749,7 @@ export const PromptInput = ({
       form.reset();
     }
 
-    // Convert blob URLs to data URLs asynchronously
+    // Convert attachments to data URLs before sending them to the chat API.
     Promise.all(
       (allowAttachments ? files : []).map(async (item) => {
         const filePart = {
@@ -742,6 +758,13 @@ export const PromptInput = ({
           mediaType: item.mediaType,
           filename: item.filename,
         };
+
+        if (item.file) {
+          return {
+            ...filePart,
+            url: await convertFileToDataUrl(item.file),
+          };
+        }
 
         if (filePart.url && filePart.url.startsWith("blob:")) {
           return {
@@ -777,6 +800,11 @@ export const PromptInput = ({
       } catch {
         // Don't clear on error - user may want to retry
       }
+    }).catch(() => {
+      onError?.({
+        code: "accept",
+        message: "Could not read the selected attachment. Remove it and attach it again.",
+      });
     });
   };
 
