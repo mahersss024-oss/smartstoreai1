@@ -4,8 +4,6 @@ import { appConfig } from '@/app/app-config';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AuthSession } from '@/lib/auth/session';
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
-import { searchProducts } from '@/agent/tools/product-search';
-import { searchWeb } from '@/agent/tools/web-search';
 import { marketplaceSystemInstructions } from './marketplace/agents';
 import { systemPrompt } from './system-prompt';
 
@@ -19,8 +17,6 @@ export function createChatAgent(
       appConfig.agent.instructions + marketplaceSystemInstructions + systemPrompt,
     tools: {
       ...createMarketplaceTools(session),
-      searchProducts,
-      searchWeb,
     },
   });
 }

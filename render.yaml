@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: smartstore-ai-affiliate-hub
+    name: smartstore-ai-marketplace
     runtime: node
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
@@ -9,6 +9,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: TAVILY_API_KEY
         sync: false

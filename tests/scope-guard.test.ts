@@ -159,20 +159,20 @@ test('rewrites only the latest user message for partial requests', () => {
 
   const rewritten = applyAllowedRequestToLatestUserMessage(
     messages,
-    'قارن آيفون وسامسونج فقط من ناحية الشراء أونلاين.',
+    'قارن آيفون وسامسونج فقط من ناحية الاختيار داخل السوق.',
   );
 
-  assert.equal(getLatestUserRequest(rewritten), 'قارن آيفون وسامسونج فقط من ناحية الشراء أونلاين.');
+  assert.equal(getLatestUserRequest(rewritten), 'قارن آيفون وسامسونج فقط من ناحية الاختيار داخل السوق.');
   assert.equal(getLatestUserRequest(messages), 'قارن آيفون وسامسونج ثم اشرح موضوعا سياسيا');
 });
 
 test('returns localized safe responses without internal decision details', () => {
   assert.equal(
     getSafeScopeResponse('BLOCK', 'ar'),
-    'يسعدني مساعدتك في التسوق الإلكتروني للمنتجات غير الغذائية والمتاجر ومقارنة الأسعار. أخبرني بما تريد شراءه أو مقارنته، وسأرشدك للاختيار الأنسب.',
+    'أنا هنا لمساعدتك في سوق SmartStore AI: البحث عن الإعلانات، إنشاء إعلان، إدارة منتجاتك، المحادثة الداخلية، البلاغات، والإرشاد للمنتجات المسموحة.',
   );
   assert.equal(
     getSafeScopeResponse('UNCLEAR', 'en'),
-    'I can help once you clarify the non-food product or online shopping request you need.',
+    'I can help once you clarify the marketplace product, listing, buyer search, or seller action you need.',
   );
 });

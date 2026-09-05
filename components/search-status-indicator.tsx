@@ -6,7 +6,7 @@ import { Loader2, SearchIcon } from 'lucide-react';
 import { appCopy, type AppLanguage } from '@/app/i18n';
 import { cn } from '@/lib/utils';
 
-type SearchStatusMode = 'web' | 'thinking';
+type SearchStatusMode = 'marketplace' | 'thinking';
 
 type SearchStatusIndicatorProps = {
   mode?: SearchStatusMode;

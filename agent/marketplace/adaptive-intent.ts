@@ -273,7 +273,7 @@ If the latest user message contains images, set execution="analyze_images" unles
 For seller listing creation, set execution="create_listing_draft" only when there is enough useful product detail; otherwise set execution="ask_clarifying_question" and list missingFields.
 For account-bound actions, requiresAuth must be true. The user is currently ${session ? 'signed in' : 'not signed in'}.
 Dangerous or final actions such as publish, delete, mark sold, price change, accept offer, and open seller chat require confirmation.
-Keep decisions within allowed non-food marketplace work. Language=${language}.`,
+Keep decisions within allowed Saudi marketplace work. Language=${language}.`,
         prompt: JSON.stringify({
           required_schema: {
             intent:

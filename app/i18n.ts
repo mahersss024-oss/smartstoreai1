@@ -3,16 +3,16 @@ export type AppLanguage = 'ar' | 'en';
 export const appCopy = {
   ar: {
     direction: 'rtl',
-    assistantLabel: 'مساعد التسوق',
+    assistantLabel: 'مساعد السوق الذكي',
     newChat: 'محادثة جديدة',
     historyTitle: 'سجل المحادثات',
     historyEmpty: 'ستظهر محادثاتك السابقة هنا بعد إرسال أول رسالة.',
     clearHistory: 'حذف جميع المحادثات',
     clearHistoryConfirm: 'هل تريد حذف جميع المحادثات المحفوظة؟',
     deleteChat: 'حذف المحادثة',
-    settings: 'إعدادات الموقع',
+    settings: 'إعدادات السوق',
     settingsDescription:
-      'تساعد هذه الإعدادات المساعد على تخصيص النصائح حسب الدولة والعملة والمنطقة.',
+      'تساعد هذه الإعدادات المساعد على تخصيص تجربة السوق حسب الدولة والعملة واللغة.',
     country: 'الدولة',
     currency: 'العملة',
     language: 'لغة الواجهة والرد',
@@ -20,50 +20,45 @@ export const appCopy = {
     english: 'English',
     savedLocally: 'يتم الحفظ تلقائيًا على هذا المتصفح.',
     close: 'إغلاق',
-    emptyTitle: 'كيف أقدر أساعدك في التسوق اليوم؟',
+    emptyTitle: 'ماذا تريد أن تفعل في السوق اليوم؟',
     emptyDescription:
-      'اكتب ما تريد شراءه أو مقارنته من المنتجات غير الغذائية. يمكنني استخدام البحث كحل مؤقت لاكتشاف الصفحات، أما الأسعار المؤكدة فتأتي لاحقًا من المتاجر المتصلة.',
-    inputPlaceholder: 'اسأل عن منتج، مقارنة، أو نصيحة شراء...',
+      'اكتب طلبك طبيعيًا: ابحث عن منتج، اعرض منتج للبيع، ارفع صور إعلان، أو اسأل عن محادثات البيع والشراء.',
+    inputPlaceholder: 'اكتب طلبك أو أرفق صور المنتج...',
     fallbackChatTitle: 'محادثة جديدة',
     imageAlt: 'شعار SmartStore AI',
     themeToDark: 'الوضع الداكن',
     themeToLight: 'الوضع الفاتح',
     privacyPolicy: 'سياسة الخصوصية',
-    partners: 'الشراكات',
     quickPrompts: [
       {
-        title: 'منتج بميزانية محددة',
-        prompt:
-          'أريد شراء منتج مناسب بميزانية محددة. ساعدني أحدد أفضل خيار حسب السعر والاستخدام.',
+        title: 'أبحث عن منتج',
+        prompt: 'أبحث عن سيارة في الرياض',
       },
       {
-        title: 'قارن بين منتجين',
-        prompt:
-          'قارن لي بين منتجين من ناحية المواصفات والقيمة مقابل السعر.',
+        title: 'أعرض منتج للبيع',
+        prompt: 'عندي آيفون 14 برو للبيع',
       },
       {
-        title: 'اختيار منتج محدد',
-        prompt:
-          'ساعدني أختار منتجًا محددًا بشكل دقيق بناءً على المواصفات التي أحتاجها.',
+        title: 'افحص صور الإعلان',
+        prompt: 'أريد فحص صور المنتج قبل نشر الإعلان',
       },
       {
-        title: 'هدية مناسبة',
-        prompt:
-          'أريد اقتراح هدية مناسبة. اسألني الأسئلة المهمة ثم رشح لي خيارات.',
+        title: 'أحتاج مساعدة في إعلان',
+        prompt: 'ساعدني أجهز إعلان واضح ومطابق للسياسة',
       },
     ],
     status: {
-      web: [
-        { title: 'جاري البحث في الويب', detail: 'أراجع مصادر حديثة وموثوقة' },
-        { title: 'جاري جمع النتائج', detail: 'أرتب المعلومات الأهم أولًا' },
-        { title: 'جاري التحقق من المعلومات', detail: 'أراجع التفاصيل قبل الرد' },
-        { title: 'لحظة واحدة', detail: 'أجهز لك خلاصة واضحة' },
+      marketplace: [
+        { title: 'جاري فهم الطلب', detail: 'أحدد هل العميل يريد بحثًا أو إعلانًا أو محادثة' },
+        { title: 'جاري مراجعة السوق', detail: 'أبحث داخل إعلانات SmartStore AI المناسبة' },
+        { title: 'جاري التحقق', detail: 'أراجع السياسة والتصنيف قبل الرد' },
+        { title: 'لحظة واحدة', detail: 'أجهز لك ردًا مناسبًا للعملية' },
       ],
       thinking: [
-        { title: 'جاري تجهيز الرد', detail: 'أراجع طلبك وأرتب الإجابة المناسبة' },
-        { title: 'لحظة واحدة', detail: 'أفكر في أفضل طريقة لمساعدتك' },
-        { title: 'جاري التحليل', detail: 'أحول طلبك إلى خطوات واضحة' },
-        { title: 'قريبًا ينتهي الرد', detail: 'أجهز لك خلاصة مختصرة ومفيدة' },
+        { title: 'جاري تجهيز الرد', detail: 'أراجع طلبك وأرتب الخطوة المناسبة' },
+        { title: 'لحظة واحدة', detail: 'أفهم النية وأحدد أفضل مسار' },
+        { title: 'جاري التحليل', detail: 'أحوّل الطلب إلى إجراء واضح داخل السوق' },
+        { title: 'قريبًا ينتهي الرد', detail: 'أجهز خلاصة مختصرة ومفيدة' },
       ],
       queryPrefix: 'جاري البحث عن',
     },
@@ -80,16 +75,16 @@ export const appCopy = {
   },
   en: {
     direction: 'ltr',
-    assistantLabel: 'Shopping assistant',
+    assistantLabel: 'Smart marketplace assistant',
     newChat: 'New chat',
     historyTitle: 'Chat history',
     historyEmpty: 'Your previous conversations will appear here after your first message.',
     clearHistory: 'Clear all chats',
     clearHistoryConfirm: 'Do you want to delete all saved conversations?',
     deleteChat: 'Delete chat',
-    settings: 'Location settings',
+    settings: 'Marketplace settings',
     settingsDescription:
-      'These settings help the assistant tailor guidance by country, currency, and region.',
+      'These settings help the assistant tailor marketplace work by country, currency, and language.',
     country: 'Country',
     currency: 'Currency',
     language: 'Interface and reply language',
@@ -97,50 +92,45 @@ export const appCopy = {
     english: 'English',
     savedLocally: 'Saved automatically on this browser.',
     close: 'Close',
-    emptyTitle: 'How can I help you shop today?',
+    emptyTitle: 'What do you want to do in the marketplace today?',
     emptyDescription:
-      'Ask what non-food product you want to buy or compare. I can use web search for temporary page discovery, while confirmed prices will come from connected stores later.',
-    inputPlaceholder: 'Ask about a product, comparison, or shopping advice...',
+      'Ask naturally: search for a listing, sell an item, upload listing images, or ask about buyer-seller chat.',
+    inputPlaceholder: 'Type your request or attach product images...',
     fallbackChatTitle: 'New chat',
     imageAlt: 'SmartStore AI logo',
     themeToDark: 'Switch to dark mode',
     themeToLight: 'Switch to light mode',
     privacyPolicy: 'Privacy policy',
-    partners: 'Partners',
     quickPrompts: [
       {
-        title: 'Product within budget',
-        prompt:
-          'I want to buy a suitable product within a specific budget. Help me choose the best option based on price and use.',
+        title: 'Search listings',
+        prompt: 'Find me a car in Riyadh',
       },
       {
-        title: 'Compare two products',
-        prompt:
-          'Compare two products for me based on specs and value for money.',
+        title: 'Sell an item',
+        prompt: 'I have an iPhone 14 Pro for sale',
       },
       {
-        title: 'Choose a specific product',
-        prompt:
-          'Help me choose a specific product accurately based on the specs I need.',
+        title: 'Review listing images',
+        prompt: 'Review these product images before publishing',
       },
       {
-        title: 'Suitable gift',
-        prompt:
-          'I want a suitable gift suggestion. Ask me the important questions, then recommend options.',
+        title: 'Prepare a listing',
+        prompt: 'Help me prepare a clear policy-compliant listing',
       },
     ],
     status: {
-      web: [
-        { title: 'Searching the web', detail: 'Reviewing recent and reliable sources' },
-        { title: 'Collecting results', detail: 'Putting the most important details first' },
-        { title: 'Checking the information', detail: 'Reviewing details before replying' },
-        { title: 'One moment', detail: 'Preparing a clear summary for you' },
+      marketplace: [
+        { title: 'Understanding request', detail: 'Detecting whether this is search, selling, or messaging' },
+        { title: 'Checking marketplace', detail: 'Looking through matching SmartStore AI listings' },
+        { title: 'Verifying policy', detail: 'Reviewing category and marketplace safety before replying' },
+        { title: 'One moment', detail: 'Preparing the right next step' },
       ],
       thinking: [
-        { title: 'Preparing the reply', detail: 'Reviewing your request and organizing the answer' },
-        { title: 'One moment', detail: 'Thinking through the best way to help' },
-        { title: 'Analyzing', detail: 'Turning your request into clear steps' },
-        { title: 'Almost ready', detail: 'Preparing a short and useful summary' },
+        { title: 'Preparing the reply', detail: 'Reviewing your request and organizing the next step' },
+        { title: 'One moment', detail: 'Understanding intent and choosing the best path' },
+        { title: 'Analyzing', detail: 'Turning the request into a marketplace action' },
+        { title: 'Almost ready', detail: 'Preparing a short and useful response' },
       ],
       queryPrefix: 'Searching for',
     },

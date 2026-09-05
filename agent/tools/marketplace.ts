@@ -69,7 +69,7 @@ export function createMarketplaceTools(session: AuthSession | null) {
 
     createListingDraft: tool({
       description:
-        'Create a structured marketplace listing draft from a natural seller conversation. Use only after the user wants to sell or publish an allowed non-food item. Do not use for prohibited Saudi or Islamic-policy items.',
+        'Create a structured marketplace listing draft from a natural seller conversation. Use only after the user wants to sell or publish an allowed marketplace item. Do not use for prohibited Saudi or Islamic-policy items.',
       inputSchema: z.object({
         category: z.string().min(2),
         title: z.string().min(2).optional(),

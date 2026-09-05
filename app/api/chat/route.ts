@@ -203,7 +203,7 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
 
   return {
     role: 'system',
-    content: `User marketplace region context: country=${country ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Treat marketplace coverage at country level. Use this to tailor listing guidance, search filters, suggested regions, currencies, and provider choices. Fetch product data only through configured server-side product tools, and never invent live prices or links.`,
+    content: `User marketplace region context: country=${country ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Treat marketplace coverage at country level. Use this to tailor listing guidance, search filters, region wording, currency formatting, and safety reminders. Use only SmartStore AI marketplace listings for visible cards and seller actions. Never invent listings, prices, seller contact, images, or availability.`,
   } satisfies ModelMessage;
 }
 

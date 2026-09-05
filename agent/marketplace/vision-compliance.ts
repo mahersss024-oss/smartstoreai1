@@ -289,7 +289,7 @@ Also compare the visible product against the expected category/listing text supp
 - category_match="unclear" if the image is too partial, blurry, or no expected category was supplied.
 - If category_match is mismatch, use needs_review unless the visible product is prohibited, then use block.
 
-Use allow only for ordinary lawful non-food marketplace products.
+Use allow only for ordinary lawful marketplace products and listings.
 
 Return this exact JSON shape:
 {

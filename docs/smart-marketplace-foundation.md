@@ -1,6 +1,6 @@
 # SmartStore AI Marketplace Foundation
 
-This project is being shifted from a full-page shopping chatbot into a chat-first Saudi marketplace inspired by classifieds apps.
+This project is a chat-first Saudi smart marketplace inspired by classifieds apps.
 
 ## Core Product Rules
 
