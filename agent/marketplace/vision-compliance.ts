@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AppLanguage } from '@/app/i18n';
 
-const imageComplianceTimeoutMs = 12_000;
+const imageComplianceTimeoutMs = 18_000;
+const imageComplianceMaxAttempts = 2;
+const imageComplianceRetryDelayMs = 700;
 
 const imageComplianceSchema = z.object({
   decision: z.enum(['allow', 'block', 'needs_review']),
@@ -174,6 +176,47 @@ function withTimeout<T>(
   return run(controller.signal).finally(() => clearTimeout(timeout));
 }
 
+function getErrorStatusCode(error: unknown) {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    response?: { status?: unknown };
+  };
+  const status =
+    candidate.status ?? candidate.statusCode ?? candidate.response?.status;
+
+  return typeof status === 'number' ? status : undefined;
+}
+
+function shouldRetryImageComplianceError(error: unknown) {
+  const status = getErrorStatusCode(error);
+
+  if (status !== undefined) {
+    return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+  }
+
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+
+  return (
+    name === 'AbortError' ||
+    name === 'TimeoutError' ||
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('fetch failed')
+  );
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export function parseImageComplianceDecision(text: string): ImageComplianceDecision {
   const parsed = imageComplianceSchema.parse(
     JSON.parse(extractJsonObject(text)),
@@ -262,6 +305,45 @@ export function createImageComplianceUserMessage({
   return null;
 }
 
+async function generateImageComplianceText(imageMessage: ModelMessage) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= imageComplianceMaxAttempts; attempt += 1) {
+    try {
+      const result = await withTimeout(imageComplianceTimeoutMs, (signal) =>
+        generateText({
+          model: getDeepseekChatModel('vision'),
+          temperature: 0,
+          maxOutputTokens: 520,
+          abortSignal: signal,
+          messages: [
+            {
+              role: 'system',
+              content: imageComplianceSystemPrompt,
+            },
+            imageMessage,
+          ],
+        }),
+      );
+
+      return result.text;
+    } catch (error) {
+      lastError = error;
+
+      if (
+        attempt >= imageComplianceMaxAttempts ||
+        !shouldRetryImageComplianceError(error)
+      ) {
+        throw error;
+      }
+
+      await wait(imageComplianceRetryDelayMs);
+    }
+  }
+
+  throw lastError;
+}
+
 export const imageComplianceSystemPrompt = `You are the SmartStore AI visual compliance checker for a Saudi marketplace.
 Return JSON only. Do not answer the user.
 
@@ -341,21 +423,7 @@ export async function checkImageMarketplaceCompliance({
     } satisfies ImageComplianceDecision;
   }
 
-  const result = await withTimeout(imageComplianceTimeoutMs, (signal) =>
-    generateText({
-      model: getDeepseekChatModel('vision'),
-      temperature: 0,
-      maxOutputTokens: 520,
-      abortSignal: signal,
-      messages: [
-        {
-          role: 'system',
-          content: imageComplianceSystemPrompt,
-        },
-        imageMessage,
-      ],
-    }),
+  return parseImageComplianceDecision(
+    await generateImageComplianceText(imageMessage),
   );
-
-  return parseImageComplianceDecision(result.text);
 }

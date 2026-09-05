@@ -252,6 +252,12 @@ function getImageComplianceReviewResponse(language: AppLanguage) {
     : 'هذه الصورة تحتاج مراجعة قبل أي نشر أو بيع لأن المنتج قد يكون منظمًا أو غير واضح أو حساسًا. أرسل تفاصيل أوضح وسأجهزه للمراجعة بدل النشر المباشر.';
 }
 
+function getImageComplianceUnavailableResponse(language: AppLanguage) {
+  return language === 'en'
+    ? 'I could not inspect the image right now. Send a clear JPG, PNG, or WEBP image again; listing or sale actions will wait until the image check succeeds.'
+    : 'تعذر فحص الصورة حاليًا. أعد إرسال صورة واضحة بصيغة JPG أو PNG أو WEBP، ولن أتابع أي إجراء نشر أو بيع حتى ينجح فحص الصورة.';
+}
+
 function addDefaultTextToLatestImageOnlyMessage(
   messages: unknown[],
   language: AppLanguage,
@@ -502,7 +508,9 @@ export async function POST(request: Request) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[vision_compliance] failure=${errorName}`);
 
-      return createTextUIResponse(getModelProviderFailureResponse(language));
+      return createTextUIResponse(
+        getImageComplianceUnavailableResponse(language),
+      );
     }
 
     if (imageComplianceDecision.decision === 'block') {
