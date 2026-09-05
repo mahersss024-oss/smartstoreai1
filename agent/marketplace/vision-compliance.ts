@@ -15,9 +15,55 @@ const optionalModelText = (maxLength: number) =>
     z.string().trim().min(1).max(maxLength).optional(),
   );
 
+const decisionSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
+  z.enum(['allow', 'block', 'needs_review']),
+);
+
+const confidenceSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+
+  return value;
+}, z.number().min(0).max(1).default(0.5));
+
+const categoryMatchSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const normalized = value.trim().toLowerCase();
+
+    return ['match', 'mismatch', 'unclear'].includes(normalized)
+      ? normalized
+      : 'unclear';
+  },
+  z.enum(['match', 'mismatch', 'unclear']).optional(),
+);
+
+const booleanSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (['true', 'yes', '1'].includes(normalized)) {
+      return true;
+    }
+
+    if (['false', 'no', '0'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean().optional());
+
 const imageComplianceSchema = z.object({
-  decision: z.enum(['allow', 'block', 'needs_review']),
-  confidence: z.number().min(0).max(1).default(0.5),
+  decision: decisionSchema,
+  confidence: confidenceSchema,
   reasons: z.array(z.string().trim().min(1).max(600)).default([]),
   prohibited_category: optionalModelText(160),
   prohibitedCategory: optionalModelText(160),
@@ -25,12 +71,12 @@ const imageComplianceSchema = z.object({
   detectedCategory: optionalModelText(160),
   expected_category: optionalModelText(160),
   expectedCategory: optionalModelText(160),
-  category_match: z.enum(['match', 'mismatch', 'unclear']).optional(),
-  categoryMatch: z.enum(['match', 'mismatch', 'unclear']).optional(),
+  category_match: categoryMatchSchema,
+  categoryMatch: categoryMatchSchema,
   detected_product: optionalModelText(240),
   detectedProduct: optionalModelText(240),
-  sharia_sensitive: z.boolean().optional(),
-  shariaSensitive: z.boolean().optional(),
+  sharia_sensitive: booleanSchema,
+  shariaSensitive: booleanSchema,
 });
 
 export type ImageComplianceDecision = {
@@ -408,15 +454,25 @@ export function aggregateImageComplianceDecisions(
   const detectedProducts = uniqueDefined(
     decisions.map((decision) => decision.detectedProduct),
   );
+  const hasMultipleDetectedCategories = detectedCategories.length > 1;
+  const shouldReviewMixedImages =
+    decisions.length > 1 && !blockingDecision && hasMultipleDetectedCategories;
+  const aggregatedDecision = shouldReviewMixedImages
+    ? 'needs_review'
+    : finalDecision;
+  const aggregatedCategoryMatch = shouldReviewMixedImages
+    ? 'mismatch'
+    : categoryMatch;
   const reasons = [
     ...(decisions.length > 1
       ? [`inspected_${decisions.length}_images`]
       : []),
+    ...(shouldReviewMixedImages ? ['multiple_distinct_products_in_images'] : []),
     ...decisions.flatMap((decision) => decision.reasons),
   ];
 
   return {
-    decision: finalDecision,
+    decision: aggregatedDecision,
     confidence: Math.min(...decisions.map((decision) => decision.confidence)),
     reasons: [...new Set(reasons)].slice(0, 12),
     prohibitedCategory: firstDefined(
@@ -427,13 +483,13 @@ export function aggregateImageComplianceDecisions(
     detectedCategory:
       detectedCategories.length === 1
         ? detectedCategories[0]
-        : detectedCategories.length > 1
+        : hasMultipleDetectedCategories
           ? 'multiple'
           : undefined,
     expectedCategory: firstDefined(
       decisions.map((decision) => decision.expectedCategory),
     ),
-    categoryMatch,
+    categoryMatch: aggregatedCategoryMatch,
     detectedProduct: detectedProducts.length
       ? detectedProducts.join(', ').slice(0, 240)
       : undefined,

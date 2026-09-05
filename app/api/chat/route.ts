@@ -42,8 +42,15 @@ import { getAuthSession } from '@/lib/auth/session';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
+const maxImagesPerChatMessage = 8;
+const maxChatImageBytes = 12 * 1024 * 1024;
 const rateLimitWindowMs = 60_000;
 const maxRequestsPerWindow = 20;
+const supportedChatImageMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
 
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -117,6 +124,13 @@ type ChatMessage = {
   parts?: unknown;
 };
 
+type ChatFilePart = {
+  type: string;
+  mediaType?: unknown;
+  url?: unknown;
+  data?: unknown;
+};
+
 type LocationSettings = {
   country?: unknown;
   currency?: unknown;
@@ -142,6 +156,15 @@ function isTextPart(part: unknown): part is { type: string; text: string } {
     'text' in part &&
     typeof (part as { type?: unknown }).type === 'string' &&
     typeof (part as { text?: unknown }).text === 'string'
+  );
+}
+
+function isFilePart(part: unknown): part is ChatFilePart {
+  return (
+    typeof part === 'object' &&
+    part !== null &&
+    'type' in part &&
+    (part as { type?: unknown }).type === 'file'
   );
 }
 
@@ -183,6 +206,68 @@ function countTextCharacters(value: unknown): number {
   }
 
   return 0;
+}
+
+function getDataUrlByteLength(value: string) {
+  const match = value.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const base64 = match[2].replace(/\s/g, '');
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
+
+function getFilePartPayload(part: ChatFilePart) {
+  return typeof part.url === 'string'
+    ? part.url
+    : typeof part.data === 'string'
+      ? part.data
+      : undefined;
+}
+
+function validateChatImageAttachments(messages: unknown[]) {
+  for (const message of messages) {
+    if (!isChatMessage(message) || !Array.isArray(message.parts)) {
+      continue;
+    }
+
+    const imageParts = message.parts.filter((part) => {
+      if (!isFilePart(part)) {
+        return false;
+      }
+
+      return (
+        typeof part.mediaType === 'string' &&
+        part.mediaType.startsWith('image/')
+      );
+    });
+
+    if (imageParts.length > maxImagesPerChatMessage) {
+      return 'too_many_images';
+    }
+
+    for (const part of imageParts) {
+      if (
+        typeof part.mediaType !== 'string' ||
+        !supportedChatImageMimeTypes.has(part.mediaType)
+      ) {
+        return 'unsupported_image_type';
+      }
+
+      const payload = getFilePartPayload(part);
+      const byteLength = payload ? getDataUrlByteLength(payload) : null;
+
+      if (byteLength !== null && byteLength > maxChatImageBytes) {
+        return 'image_too_large';
+      }
+    }
+  }
+
+  return null;
 }
 
 function countMessageCharacters(message: unknown) {
@@ -261,6 +346,33 @@ function getImageComplianceUnavailableResponse(language: AppLanguage) {
   return language === 'en'
     ? 'I could not inspect the image right now. Send a clear JPG, PNG, or WEBP image again; listing or sale actions will wait until the image check succeeds.'
     : 'تعذر فحص الصورة حاليًا. أعد إرسال صورة واضحة بصيغة JPG أو PNG أو WEBP، ولن أتابع أي إجراء نشر أو بيع حتى ينجح فحص الصورة.';
+}
+
+function getImageUploadValidationResponse(
+  language: AppLanguage,
+  reason: string,
+) {
+  if (language === 'en') {
+    if (reason === 'too_many_images') {
+      return 'Attach up to 8 images in one chat message.';
+    }
+
+    if (reason === 'image_too_large') {
+      return 'Each image must be 12 MB or smaller.';
+    }
+
+    return 'Attach product images only as JPG, PNG, or WEBP files.';
+  }
+
+  if (reason === 'too_many_images') {
+    return 'ط£ط±ظپظ‚ ط­طھظ‰ 8 طµظˆط± ظپظ‚ط· ظپظٹ ط±ط³ط§ظ„ط© ط§ظ„ط´ط§طھ ط§ظ„ظˆط§ط­ط¯ط©.';
+  }
+
+  if (reason === 'image_too_large') {
+    return 'ط­ط¬ظ… ظƒظ„ طµظˆط±ط© ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† 12 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ط£ظˆ ط£ظ‚ظ„.';
+  }
+
+  return 'ط£ط±ظپظ‚ طµظˆط± ط§ظ„ظ…ظ†طھط¬ ظپظ‚ط· ط¨طµظٹط؛ط© JPG ط£ظˆ PNG ط£ظˆ WEBP.';
 }
 
 function createImageComplianceContextMessage(
@@ -442,6 +554,14 @@ export async function POST(request: Request) {
 
   const locationSystemMessage = buildLocationSystemMessage(body.locationSettings);
   const language = getRequestLanguage(body.locationSettings);
+  const imageValidationFailure = validateChatImageAttachments(filteredMessages);
+
+  if (imageValidationFailure) {
+    return createTextUIResponse(
+      getImageUploadValidationResponse(language, imageValidationFailure),
+    );
+  }
+
   const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
   const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
   const preliminaryComplianceDecision =

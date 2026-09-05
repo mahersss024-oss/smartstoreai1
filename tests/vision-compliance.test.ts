@@ -89,6 +89,23 @@ test('keeps weapon-like toys in review decisions from vision', () => {
   assert.equal(decision.detectedProduct, 'bead gun');
 });
 
+test('parses tolerant image compliance values from vision', () => {
+  const decision = parseImageComplianceDecision(`{
+  "decision": "ALLOW",
+  "confidence": "0.83",
+  "reasons": ["ordinary marketplace item"],
+  "detected_category": "furniture",
+  "category_match": "not_applicable",
+  "detected_product": "chair",
+  "sharia_sensitive": "false"
+}`);
+
+  assert.equal(decision.decision, 'allow');
+  assert.equal(decision.confidence, 0.83);
+  assert.equal(decision.categoryMatch, 'unclear');
+  assert.equal(decision.shariaSensitive, false);
+});
+
 test('infers expected marketplace categories from user text', async () => {
   const { inferExpectedMarketplaceCategory } = await import(
     '@/agent/marketplace/vision-compliance'
@@ -269,4 +286,32 @@ test('aggregates multi-image compliance using the strictest decision', () => {
   assert.equal(decision.categoryMatch, 'mismatch');
   assert.equal(decision.shariaSensitive, true);
   assert.ok(decision.reasons.includes('inspected_2_images'));
+});
+
+test('routes mixed product images in one listing to manual review', () => {
+  const decision = aggregateImageComplianceDecisions([
+    {
+      decision: 'allow',
+      confidence: 0.95,
+      reasons: ['ordinary car'],
+      detectedCategory: 'cars',
+      categoryMatch: 'unclear',
+      detectedProduct: 'sedan',
+      shariaSensitive: false,
+    },
+    {
+      decision: 'allow',
+      confidence: 0.93,
+      reasons: ['ordinary laptop'],
+      detectedCategory: 'computers',
+      categoryMatch: 'unclear',
+      detectedProduct: 'laptop',
+      shariaSensitive: false,
+    },
+  ]);
+
+  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.detectedCategory, 'multiple');
+  assert.equal(decision.categoryMatch, 'mismatch');
+  assert.ok(decision.reasons.includes('multiple_distinct_products_in_images'));
 });

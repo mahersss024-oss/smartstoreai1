@@ -493,11 +493,24 @@ export const PromptInput = ({
       if (!accept || accept.trim() === "") {
         return true;
       }
-      if (accept.includes("image/*")) {
-        return f.type.startsWith("image/");
-      }
-      // NOTE: keep simple; expand as needed
-      return true;
+
+      return accept
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean)
+        .some((acceptedType) => {
+          if (acceptedType.endsWith("/*")) {
+            return f.type
+              .toLowerCase()
+              .startsWith(acceptedType.slice(0, -1));
+          }
+
+          if (acceptedType.startsWith(".")) {
+            return f.name.toLowerCase().endsWith(acceptedType);
+          }
+
+          return f.type.toLowerCase() === acceptedType;
+        });
     },
     [accept, allowAttachments]
   );

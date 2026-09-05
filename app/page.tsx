@@ -958,7 +958,7 @@ export default function Page() {
 
               <div className="shrink-0 border-t p-3">
                 <PromptInput
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   allowAttachments
                   maxFileSize={12 * 1024 * 1024}
                   maxFiles={8}
