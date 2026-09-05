@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   getFallbackAdaptiveMarketplaceIntent,
   parseAdaptiveMarketplaceIntent,
+  resolveAdaptiveMarketplaceIntent,
 } from '@/agent/marketplace/adaptive-intent';
 
 test('parses adaptive marketplace intent JSON', () => {
@@ -72,4 +73,27 @@ test('routes image-only messages to listing image analysis', () => {
   assert.equal(intent.execution, 'analyze_images');
   assert.equal(intent.reasonCode, 'marketplace_image_upload');
   assert.equal(intent.requiresAuth, false);
+});
+
+test('resolves image uploads without calling the model router', async () => {
+  const intent = await resolveAdaptiveMarketplaceIntent({
+    messages: [
+      {
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'افحص الصورة' },
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            url: 'data:image/png;base64,AA==',
+          },
+        ],
+      },
+    ],
+    language: 'ar',
+    session: null,
+  });
+
+  assert.equal(intent.execution, 'analyze_images');
+  assert.equal(intent.reasonCode, 'marketplace_image_upload');
 });

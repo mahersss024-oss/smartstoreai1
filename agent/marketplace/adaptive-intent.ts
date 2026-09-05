@@ -306,6 +306,10 @@ export async function resolveAdaptiveMarketplaceIntent({
   const latestRequest = getLatestUserRequest(messages);
   const latestHasImage = latestUserMessageHasImageAttachment(messages);
 
+  if (latestHasImage) {
+    return fallback;
+  }
+
   if (!latestRequest && !latestHasImage) {
     return fallback;
   }
