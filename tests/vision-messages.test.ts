@@ -6,6 +6,7 @@ import type { ModelMessage } from 'ai';
 import {
   dataUrlToBytes,
   normalizeModelMessageFileData,
+  stripImageAttachmentsFromModelMessages,
 } from '@/agent/vision-messages';
 
 test('converts image data URLs into bytes for model messages', () => {
@@ -42,4 +43,38 @@ test('normalizes model file parts from data URLs and hosted URLs', () => {
   assert.equal(dataUrlPart.mediaType, 'image/jpeg');
   assert.ok(dataUrlPart.data instanceof Uint8Array);
   assert.ok(hostedUrlPart.data instanceof URL);
+});
+
+test('strips image file parts before text-only chat model calls', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'افحص هذه السيارة' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: new Uint8Array([1, 2, 3]),
+        },
+      ],
+    },
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: new Uint8Array([4, 5, 6]),
+        },
+      ],
+    },
+  ];
+
+  const stripped = stripImageAttachmentsFromModelMessages(messages);
+
+  assert.equal(stripped.length, 1);
+  assert.deepEqual(stripped[0], {
+    role: 'user',
+    content: [{ type: 'text', text: 'افحص هذه السيارة' }],
+  });
 });

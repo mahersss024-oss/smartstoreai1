@@ -21,6 +21,7 @@ import {
 import {
   checkImageMarketplaceCompliance,
   inferExpectedMarketplaceCategory,
+  type ImageComplianceDecision,
 } from '@/agent/marketplace/vision-compliance';
 import {
   applyAllowedRequestToLatestUserMessage,
@@ -31,7 +32,10 @@ import {
   latestUserMessageHasImageAttachment,
   messageHasImageAttachment,
 } from '@/agent/scope-guard';
-import { normalizeModelMessageFileData } from '@/agent/vision-messages';
+import {
+  normalizeModelMessageFileData,
+  stripImageAttachmentsFromModelMessages,
+} from '@/agent/vision-messages';
 import type { AppLanguage } from '@/app/i18n';
 import { getAuthSession } from '@/lib/auth/session';
 
@@ -256,6 +260,29 @@ function getImageComplianceUnavailableResponse(language: AppLanguage) {
   return language === 'en'
     ? 'I could not inspect the image right now. Send a clear JPG, PNG, or WEBP image again; listing or sale actions will wait until the image check succeeds.'
     : 'تعذر فحص الصورة حاليًا. أعد إرسال صورة واضحة بصيغة JPG أو PNG أو WEBP، ولن أتابع أي إجراء نشر أو بيع حتى ينجح فحص الصورة.';
+}
+
+function createImageComplianceContextMessage(
+  decision: ImageComplianceDecision,
+) {
+  return {
+    role: 'system' as const,
+    content: `Latest uploaded marketplace image analysis:
+${JSON.stringify(
+  {
+    decision: decision.decision,
+    detectedProduct: decision.detectedProduct,
+    detectedCategory: decision.detectedCategory,
+    expectedCategory: decision.expectedCategory,
+    categoryMatch: decision.categoryMatch,
+    reasons: decision.reasons,
+  },
+  null,
+  2,
+)}
+
+The raw image has already been checked by the visual compliance model and is intentionally removed before the chat agent runs. Use this analysis as the image context. Do not claim live database results from the image. If product details are missing, ask concise follow-up questions.`,
+  } satisfies ModelMessage;
 }
 
 function addDefaultTextToLatestImageOnlyMessage(
@@ -485,6 +512,7 @@ export async function POST(request: Request) {
     convertToModelMessages(scopedMessages as UIMessage[]),
   );
   const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
+  let imageComplianceContextMessage: ModelMessage | null = null;
 
   if (hasVisionInput) {
     let imageComplianceDecision: Awaited<
@@ -520,6 +548,10 @@ export async function POST(request: Request) {
     if (imageComplianceDecision.decision === 'needs_review') {
       return createTextUIResponse(getImageComplianceReviewResponse(language));
     }
+
+    imageComplianceContextMessage = createImageComplianceContextMessage(
+      imageComplianceDecision,
+    );
   }
 
   if ((marketplaceIntent.requiresAuth || adaptiveIntent.requiresAuth) && !session) {
@@ -528,15 +560,24 @@ export async function POST(request: Request) {
 
   const adaptiveIntentSystemMessage =
     buildAdaptiveIntentSystemMessage(adaptiveIntent);
-  const messagesWithContext = locationSystemMessage
-    ? [locationSystemMessage, adaptiveIntentSystemMessage, ...modelMessages]
-    : [adaptiveIntentSystemMessage, ...modelMessages];
+  const assistantModelMessages = hasVisionInput
+    ? stripImageAttachmentsFromModelMessages(modelMessages)
+    : modelMessages;
+  const internalContextMessages = [
+    ...(locationSystemMessage ? [locationSystemMessage] : []),
+    adaptiveIntentSystemMessage,
+    ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),
+  ];
+  const messagesWithContext = [
+    ...internalContextMessages,
+    ...assistantModelMessages,
+  ];
 
   return generateCheckedAssistantResponse(
     messagesWithContext,
     userRequest,
     language,
     session,
-    { hasVisionInput },
+    { hasVisionInput: false },
   );
 }

@@ -63,6 +63,10 @@ function normalizeFilePartData(part: ModelFilePart) {
   return url ? { ...part, data: url } : part;
 }
 
+function isImageModelFilePart(part: unknown) {
+  return isModelFilePart(part) && part.mediaType.startsWith('image/');
+}
+
 export function normalizeModelMessageFileData(messages: ModelMessage[]) {
   return messages.map((message) => {
     if (!Array.isArray(message.content)) {
@@ -75,5 +79,19 @@ export function normalizeModelMessageFileData(messages: ModelMessage[]) {
         isModelFilePart(part) ? normalizeFilePartData(part) : part,
       ),
     };
+  }) as ModelMessage[];
+}
+
+export function stripImageAttachmentsFromModelMessages(messages: ModelMessage[]) {
+  return messages.flatMap((message) => {
+    if (!Array.isArray(message.content)) {
+      return [message];
+    }
+
+    const content = message.content.filter(
+      (part) => !isImageModelFilePart(part),
+    );
+
+    return content.length ? [{ ...message, content } as ModelMessage] : [];
   }) as ModelMessage[];
 }
