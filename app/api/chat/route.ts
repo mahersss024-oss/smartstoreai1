@@ -28,8 +28,8 @@ import {
   checkOutputScope,
   getLatestUserRequest,
   getSafeScopeResponse,
+  latestUserMessageHasImageAttachment,
   messageHasImageAttachment,
-  messagesHaveImageAttachment,
 } from '@/agent/scope-guard';
 import { normalizeModelMessageFileData } from '@/agent/vision-messages';
 import type { AppLanguage } from '@/app/i18n';
@@ -478,7 +478,7 @@ export async function POST(request: Request) {
   const modelMessages = normalizeModelMessageFileData(
     convertToModelMessages(scopedMessages as UIMessage[]),
   );
-  const hasVisionInput = messagesHaveImageAttachment(scopedMessages);
+  const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
 
   if (hasVisionInput) {
     let imageComplianceDecision: Awaited<

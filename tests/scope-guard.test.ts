@@ -90,6 +90,32 @@ test('detects image attachments in marketplace chat messages', () => {
   assert.equal(messagesHaveImageAttachment(messages), true);
 });
 
+test('does not treat earlier image attachments as latest vision input', () => {
+  const messages = [
+    {
+      role: 'user',
+      parts: [
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          url: 'data:image/jpeg;base64,AA==',
+        },
+      ],
+    },
+    {
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'تم استلام الصورة' }],
+    },
+    {
+      role: 'user',
+      parts: [{ type: 'text', text: 'سلام' }],
+    },
+  ];
+
+  assert.equal(messagesHaveImageAttachment(messages), true);
+  assert.equal(latestUserMessageHasImageAttachment(messages), false);
+});
+
 test('allows short marketplace search follow-ups from prior context', () => {
   const context = buildScopeContext([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
