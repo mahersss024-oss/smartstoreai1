@@ -277,11 +277,17 @@ Block if the image or described product appears to include:
 - adult, pornographic, sexual, obscene, or indecent products or media
 - magic, occult, sorcery, shirk-promoting items, or items marketed for forbidden spiritual claims
 - counterfeit, stolen, forged, fake currency, fake documents, or obvious IP-infringing goods
-- weapons, ammunition, explosives, fireworks, stun devices, or dangerous weapon accessories
+- real firearms, real guns, ammunition, explosives, fireworks, stun devices, or dangerous weapon accessories
 - hidden surveillance or secret-camera devices
 - products clearly offensive to Islamic values or illegal to trade in Saudi Arabia
 
 Use needs_review for uncertainty, partial visibility, regulated products, tobacco/vape, medicines, prescriptions, telecom/radio devices, drones, financial accounts, chemicals, cosmetics with unclear compliance, or anything that might require manual approval.
+
+Weapon-like distinction:
+- A real firearm, live ammunition, or dangerous weapon must be block.
+- A BB gun, pellet gun, airsoft gun, gel blaster, bead gun, toy gun, water pistol, plastic gun, Nerf-style toy, or realistic replica must not be treated as a confirmed real firearm unless the image clearly proves it is real.
+- Weapon-like toys and replicas must be needs_review, not allow, because they can be restricted, confusing, or used to bypass policy.
+- If the image is unclear and could be a real weapon or weapon-like toy, use needs_review unless there is clear evidence of a real firearm, then block.
 
 Also compare the visible product against the expected category/listing text supplied by the user or system:
 - category_match="match" if the visible product reasonably matches the expected category.

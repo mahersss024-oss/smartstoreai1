@@ -49,6 +49,24 @@ test('routes category mismatches to manual review', () => {
   ]);
 });
 
+test('keeps weapon-like toys in review decisions from vision', () => {
+  const decision = parseImageComplianceDecision(`{
+  "decision": "needs_review",
+  "confidence": 0.82,
+  "reasons": ["visible item appears to be a bead gun, not confirmed firearm"],
+  "prohibited_category": "weapon_lookalike_or_airsoft",
+  "detected_category": "gaming_hobbies",
+  "expected_category": "kids",
+  "category_match": "unclear",
+  "detected_product": "bead gun",
+  "sharia_sensitive": false
+}`);
+
+  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.prohibitedCategory, 'weapon_lookalike_or_airsoft');
+  assert.equal(decision.detectedProduct, 'bead gun');
+});
+
 test('infers expected marketplace categories from user text', async () => {
   const { inferExpectedMarketplaceCategory } = await import(
     '@/agent/marketplace/vision-compliance'

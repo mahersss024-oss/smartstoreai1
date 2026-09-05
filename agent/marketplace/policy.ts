@@ -154,6 +154,13 @@ const blockedProductRules: Array<{
     patterns: [/(?:شرك|وثن|اصنام|أصنام|تمثال معبود|عبادة الاصنام|عبادة الأصنام|idol|idols|idolatry|shirk)/i],
   },
   {
+    category: 'real_weapons_or_ammunition',
+    shariaSensitive: false,
+    patterns: [
+      /(?:سلاح ناري|مسدس حقيقي|بندقية حقيقية|رشاش|كلاشنكوف|ذخيرة|رصاص حي|firearm|real gun|real pistol|rifle|live ammo|ammunition)/i,
+    ],
+  },
+  {
     category: 'weapons',
     shariaSensitive: false,
     patterns: [/(?:سلاح|مسدس|ذخيرة|رصاص|بندقية|سكين قتالي|صاعق|weapon|gun|ammo|ammunition|stun gun)/i],
@@ -185,6 +192,13 @@ const reviewProductRules: Array<{
   shariaSensitive: boolean;
   patterns: RegExp[];
 }> = [
+  {
+    category: 'weapon_lookalike_or_airsoft',
+    shariaSensitive: false,
+    patterns: [
+      /(?=.*(?:مسدس|بندقية|سلاح|gun|pistol|rifle))(?=.*(?:خرز|لعبة|العاب|أطفال|اطفال|بلاستيك|ماء|هوائي|ايرسوفت|airsoft|bb|pellet|toy|plastic|water|nerf|gel blaster))/i,
+    ],
+  },
   {
     category: 'tobacco_or_vape',
     shariaSensitive: true,
@@ -221,8 +235,10 @@ export function classifyMarketplaceIntent(text: string): MarketplaceIntentDecisi
 
 export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDecision {
   const normalized = text.trim();
+  const hardBlockedRules = blockedProductRules.filter((rule) => rule.category === 'real_weapons_or_ammunition');
+  const regularBlockedRules = blockedProductRules.filter((rule) => rule.category !== 'real_weapons_or_ammunition');
 
-  for (const rule of blockedProductRules) {
+  for (const rule of hardBlockedRules) {
     if (rule.patterns.some((pattern) => pattern.test(normalized))) {
       return {
         decision: 'block',
@@ -239,6 +255,18 @@ export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDeci
       return {
         decision: 'needs_review',
         reasons: ['high_risk_or_regulated_product'],
+        jurisdiction: 'SA',
+        shariaSensitive: rule.shariaSensitive,
+        prohibitedCategory: rule.category,
+      };
+    }
+  }
+
+  for (const rule of regularBlockedRules) {
+    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
+      return {
+        decision: 'block',
+        reasons: ['prohibited_in_saudi_marketplace_policy'],
         jurisdiction: 'SA',
         shariaSensitive: rule.shariaSensitive,
         prohibitedCategory: rule.category,

@@ -61,6 +61,29 @@ test('blocks explosives, secret cameras, and forged goods', () => {
   );
 });
 
+test('routes bead, airsoft, and toy guns to review instead of real weapon block', () => {
+  const beadGun = evaluateSaudiMarketplaceCompliance('عندي مسدس خرز للبيع');
+  const airsoft = evaluateSaudiMarketplaceCompliance('airsoft pistol for sale');
+  const toyGun = evaluateSaudiMarketplaceCompliance('مسدس لعبة بلاستيك للأطفال');
+
+  assert.equal(beadGun.decision, 'needs_review');
+  assert.equal(beadGun.prohibitedCategory, 'weapon_lookalike_or_airsoft');
+  assert.equal(airsoft.decision, 'needs_review');
+  assert.equal(toyGun.decision, 'needs_review');
+});
+
+test('blocks clearly real firearms and ammunition', () => {
+  const realGun = evaluateSaudiMarketplaceCompliance('مسدس حقيقي للبيع');
+  const liveAmmo = evaluateSaudiMarketplaceCompliance('ذخيرة ورصاص حي للبيع');
+  const disguisedRealGun = evaluateSaudiMarketplaceCompliance('مسدس حقيقي لعبة');
+
+  assert.equal(realGun.decision, 'block');
+  assert.equal(realGun.prohibitedCategory, 'real_weapons_or_ammunition');
+  assert.equal(liveAmmo.decision, 'block');
+  assert.equal(disguisedRealGun.decision, 'block');
+  assert.equal(disguisedRealGun.prohibitedCategory, 'real_weapons_or_ammunition');
+});
+
 test('routes sensitive regulated products to review', () => {
   const decision = evaluateSaudiMarketplaceCompliance('عندي فيب للبيع');
 
