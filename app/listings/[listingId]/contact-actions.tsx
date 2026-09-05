@@ -1,0 +1,76 @@
+'use client';
+
+import { useState } from 'react';
+import { MessageCircle, ShieldCheck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+import { Button } from '@ui/button';
+
+export function ListingContactActions({ listingId }: { listingId: string }) {
+  const router = useRouter();
+  const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const openConversation = async () => {
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/marketplace/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId }),
+      });
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (response.status === 409) {
+        setMessage('لا يمكن فتح محادثة مع إعلانك أنت.');
+        return;
+      }
+
+      if (!response.ok) {
+        setMessage('تعذر فتح المحادثة لهذا الإعلان.');
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        conversation?: { id?: string };
+      };
+
+      if (payload.conversation?.id) {
+        router.push(`/conversations/${payload.conversation.id}`);
+        return;
+      }
+
+      setMessage('تم فتح محادثة داخلية بخصوص الإعلان.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-3">
+      <Button
+        className="h-11 rounded-md bg-blue-600 hover:bg-blue-700"
+        disabled={isLoading}
+        onClick={openConversation}
+      >
+        <MessageCircle className="size-4" />
+        تواصل مع البائع
+      </Button>
+      <div className="flex items-start gap-2 rounded-md border bg-blue-50 p-3 text-xs leading-6 text-blue-950 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-50">
+        <ShieldCheck className="mt-1 size-4 shrink-0 text-blue-600 dark:text-blue-200" />
+        <span>المحادثة تتم داخل SmartStore AI، وقد يُطلب تسجيل Google قبل التواصل.</span>
+      </div>
+      {message && (
+        <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground dark:bg-card">
+          {message}
+        </div>
+      )}
+    </div>
+  );
+}

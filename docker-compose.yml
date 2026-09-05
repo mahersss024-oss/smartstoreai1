@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartstore-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartstore_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - smartstore_ai_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartstore_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  smartstore_ai_postgres:

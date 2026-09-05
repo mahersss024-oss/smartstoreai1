@@ -1,28 +1,38 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  Check,
-  Gift,
-  Laptop,
-  History,
-  type LucideIcon,
-  Scale,
-  Settings,
-  Smartphone,
-  X,
-  SquarePen,
-  Trash2,
+  BadgeCheck,
+  Bell,
+  Bot,
+  Heart,
+  LogOut,
+  MapPin,
+  MessageCircle,
+  MoreHorizontal,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  User,
 } from 'lucide-react';
 
 import {
   Conversation,
-  ConversationContent,
   ConversationAutoScroll,
+  ConversationContent,
   ConversationScrollButton,
 } from '@chat-elements/conversation';
 import {
@@ -33,226 +43,377 @@ import {
 } from '@chat-elements/message';
 import {
   PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
+  PromptInputAttachment,
+  PromptInputAttachments,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputHeader,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
-import { appCopy, type AppLanguage } from './i18n';
-
-type CountryCode = 'SA' | 'AE' | 'KW' | 'QA' | 'BH' | 'OM' | 'EG' | 'JO';
 
 type LocationSettings = {
-  country: CountryCode;
+  country: 'SA';
   currency: string;
-  language: AppLanguage;
+  language: 'ar';
 };
 
-type ChatHistoryItem = {
+type AuthUser = {
   id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+};
+
+type AuthSessionPayload = {
+  authenticated: boolean;
+  user: AuthUser | null;
+};
+
+type ListingCard = {
+  id?: string;
   title: string;
-  messages: UIMessage[];
-  updatedAt: number;
+  price: string;
+  city: string;
+  image: string;
+  category?: string;
+  status?: string;
+  stats?: string;
+  description?: string;
 };
 
-type QuickPrompt = {
-  icon: LucideIcon;
+type ApiListingRecord = {
+  id: string;
+  category: string;
+  title?: string;
+  description?: string;
+  price?: number | 'bid' | 'negotiable';
+  city?: string;
+  status?: string;
+  views?: number;
+  messageCount?: number;
+  favoriteCount?: number;
+  images?: Array<{
+    displayUrl?: string;
+    originalUrl?: string;
+    thumbnailUrl?: string;
+    status?: string;
+  }>;
 };
 
-const chatHistoryStorageKey = 'smartstore-chat-history';
-const activeChatStorageKey = 'smartstore-active-chat-id';
-const maxSavedChats = 20;
-const initialChatId = 'draft-chat';
+type ClientIntentKind =
+  | 'general_info'
+  | 'search_listing'
+  | 'create_listing'
+  | 'open_conversation'
+  | 'compare_listings'
+  | 'image_review';
 
-const countryOptions: Array<{
-  code: CountryCode;
-  name: string;
-  currency: string;
-}> = [
-  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
-  { code: 'AE', name: 'United Arab Emirates', currency: 'AED' },
-  { code: 'KW', name: 'Kuwait', currency: 'KWD' },
-  { code: 'QA', name: 'Qatar', currency: 'QAR' },
-  { code: 'BH', name: 'Bahrain', currency: 'BHD' },
-  { code: 'OM', name: 'Oman', currency: 'OMR' },
-  { code: 'EG', name: 'Egypt', currency: 'EGP' },
-  { code: 'JO', name: 'Jordan', currency: 'JOD' },
-];
+type ClientIntentState = {
+  kind: ClientIntentKind;
+  label: string;
+};
 
-const currencyOptions = ['SAR', 'AED', 'KWD', 'QAR', 'BHD', 'OMR', 'EGP', 'JOD', 'USD'];
-
-const defaultLocationSettings: LocationSettings = {
+const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
+const locationSettings: LocationSettings = {
   country: 'SA',
   currency: 'SAR',
   language: 'ar',
 };
 
-const quickPrompts: QuickPrompt[] = [
-  { icon: Smartphone },
-  { icon: Scale },
-  { icon: Laptop },
-  { icon: Gift },
+const featuredListings: ListingCard[] = [
+  {
+    title: 'آيفون 14 برو 256GB',
+    price: '3,200 ر.س',
+    city: 'الرياض',
+    category: 'الجوالات',
+    description: 'نظيف مع الكرتون والملحقات',
+    image:
+      'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?auto=format&fit=crop&w=900&q=80',
+    stats: '124 مشاهدة · 6 رسائل',
+    status: 'موثق',
+  },
+  {
+    title: 'تويوتا كامري 2020',
+    price: '48,500 ر.س',
+    city: 'جدة',
+    category: 'السيارات',
+    description: 'استخدام شخصي وفحص حديث',
+    image:
+      'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=900&q=80',
+    stats: '310 مشاهدة · 14 رسائل',
+    status: 'موثق',
+  },
+  {
+    title: 'كاميرا فوجي فيلم',
+    price: '2,450 ر.س',
+    city: 'الخبر',
+    category: 'الأجهزة',
+    description: 'عدسة أصلية وحالة ممتازة',
+    image:
+      'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
+    stats: '76 مشاهدة · 4 رسائل',
+    status: 'موثق',
+  },
+  {
+    title: 'كرسي تصميم حديث',
+    price: '420 ر.س',
+    city: 'الرياض',
+    category: 'الأثاث',
+    description: 'مناسب للمكتب أو غرفة المعيشة',
+    image:
+      'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80',
+    stats: '53 مشاهدة · 2 رسائل',
+    status: 'موثق',
+  },
 ];
 
-function createConversationId() {
-  return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+const starters = [
+  'أريد بيع منتج',
+  'أبحث عن سيارة في الرياض',
+  'افحص صور الإعلان',
+];
 
-function getCountryOption(country: CountryCode) {
-  return (
-    countryOptions.find((option) => option.code === country) ??
-    countryOptions[0]
-  );
-}
+const defaultClientIntent: ClientIntentState = {
+  kind: 'general_info',
+  label: 'بانتظار طلب العميل',
+};
 
-function isCountryCode(value: unknown): value is CountryCode {
-  return countryOptions.some((option) => option.code === value);
-}
+function inferClientIntent(text: string, hasFiles = false): ClientIntentState {
+  const normalized = text.trim().toLowerCase();
 
-function readStoredLocationSettings(): LocationSettings {
-  if (typeof window === 'undefined') {
-    return defaultLocationSettings;
-  }
-
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem('smartstore-location') ?? '',
-    ) as Partial<LocationSettings>;
-    const country: CountryCode = isCountryCode(parsed.country)
-      ? parsed.country
-      : defaultLocationSettings.country;
-    const countryOption = getCountryOption(country);
-
+  if (hasFiles || /صور|صورة|ارفق|رفع|افحص|وضوح|دقة|طمس|تحسين/.test(normalized)) {
     return {
-      country,
-      currency:
-        typeof parsed.currency === 'string' && parsed.currency.trim()
-          ? parsed.currency.trim().toUpperCase()
-          : countryOption.currency,
-      language: parsed.language === 'en' ? 'en' : 'ar',
+      kind: 'image_review',
+      label: 'فحص صور إعلان',
     };
-  } catch {
-    return defaultLocationSettings;
-  }
-}
-
-function saveLocationSettings(settings: LocationSettings) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem('smartstore-location', JSON.stringify(settings));
-  }
-}
-
-function isTextPart(part: unknown): part is { type: 'text'; text: string } {
-  return (
-    typeof part === 'object' &&
-    part !== null &&
-    'type' in part &&
-    'text' in part &&
-    (part as { type?: unknown }).type === 'text' &&
-    typeof (part as { text?: unknown }).text === 'string'
-  );
-}
-
-function getMessageText(message: UIMessage) {
-  return message.parts.filter(isTextPart).map((part) => part.text).join(' ');
-}
-
-function createChatTitle(messages: UIMessage[], fallbackTitle: string) {
-  const firstUserMessage = messages.find((message) => message.role === 'user');
-  const text = firstUserMessage ? getMessageText(firstUserMessage).trim() : '';
-
-  if (!text) {
-    return fallbackTitle;
   }
 
-  return text.length > 42 ? `${text.slice(0, 42)}...` : text;
+  if (/بيع|اعلان|إعلان|انشر|اعرض|لدي|عندي/.test(normalized)) {
+    return {
+      kind: 'create_listing',
+      label: 'إنشاء إعلان بيع',
+    };
+  }
+
+  if (/تواصل|كلم|راسل|محادثة|البائع|المشتري/.test(normalized)) {
+    return {
+      kind: 'open_conversation',
+      label: 'فتح تواصل داخلي',
+    };
+  }
+
+  if (/قارن|مقارنة|افضل|أفضل|اختار|اختر|انصح/.test(normalized)) {
+    return {
+      kind: 'compare_listings',
+      label: 'مقارنة واختيار',
+    };
+  }
+
+  if (/ابحث|أبحث|احتاج|ابي|أبي|اريد|أريد|دور|وين|سعر/.test(normalized)) {
+    return {
+      kind: 'search_listing',
+      label: 'بحث عن منتج',
+    };
+  }
+
+  return defaultClientIntent;
 }
 
-function isChatHistoryItem(value: unknown): value is ChatHistoryItem {
-  if (typeof value !== 'object' || value === null) {
+function shouldRefreshListingsForIntent(intent: ClientIntentState) {
+  return intent.kind === 'search_listing' || intent.kind === 'compare_listings';
+}
+
+function isSearchRefinement(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  if (!normalized || normalized.length > 60) {
     return false;
   }
 
-  const candidate = value as Partial<ChatHistoryItem>;
   return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.title === 'string' &&
-    typeof candidate.updatedAt === 'number' &&
-    Array.isArray(candidate.messages)
+    /^(?:19|20)\d{2}$/.test(normalized) ||
+    /^[\d٠-٩\s,.٬]+(?:ر\.?س|ريال|sar)?$/i.test(normalized) ||
+    /(?:ميزانية|ميزانيه|ميزانيتي|حدي|بحدود|حدود|تحت|اقل|أقل|اكثر|أكثر|اكبر|أكبر|فوق|حتى|الف|ألف|ريال|ر\.?س|sar)/i.test(
+      normalized,
+    ) ||
+    /(?:لون|ابيض|أبيض|اسود|أسود|فضي|رمادي|ازرق|أزرق|احمر|أحمر|ذهبي|بيج|قير|اوتوماتيك|أوتوماتيك|عادي|ممشى|عداد|كيلو|كم|فل كامل|ستاندر|نص فل|بدون حوادث|مالك اول|مالك أول)/i.test(
+      normalized,
+    ) ||
+    /(?:تويوتا|تايوتا|كامري|كورولا|يارس|نيسان|هوندا|هيونداي|كيا|مازدا|لكزس|مرسيدس|الرياض|جدة|جده|الدمام|الخبر|مستعمل|مستعملة|جديد|جديدة|سيدان|هايبرد|بنزين|toyota|camry|corolla|nissan|honda|hyundai|kia|mazda|lexus|mercedes|riyadh|jeddah|used|new|sedan|hybrid)/i.test(
+      normalized,
+    )
   );
 }
 
-function readChatHistory(): ChatHistoryItem[] {
-  if (typeof window === 'undefined') {
-    return [];
+function getNextListingQuery(
+  text: string,
+  activeQuery: string,
+  intent: ClientIntentState,
+) {
+  if (shouldRefreshListingsForIntent(intent)) {
+    return text;
   }
 
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(chatHistoryStorageKey) ?? '[]',
-    ) as unknown;
-
-    return Array.isArray(parsed) ? parsed.filter(isChatHistoryItem) : [];
-  } catch {
-    return [];
+  if (activeQuery && isSearchRefinement(text)) {
+    return `${activeQuery} ${text}`.trim();
   }
+
+  return '';
 }
 
-function saveChatHistory(history: ChatHistoryItem[]) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(
-      chatHistoryStorageKey,
-      JSON.stringify(history.slice(0, maxSavedChats)),
-    );
-  }
+function getFallbackImage(category: string, index = 0) {
+  const images = {
+    mobile_phones:
+      'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?auto=format&fit=crop&w=900&q=80',
+    cars:
+      'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=900&q=80',
+    computers:
+      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80',
+    furniture:
+      'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80',
+    real_estate:
+      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80',
+    auto_parts:
+      'https://images.unsplash.com/photo-1632823469850-1b7b1e8b7e1e?auto=format&fit=crop&w=900&q=80',
+    fashion:
+      'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=900&q=80',
+    home_garden:
+      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=900&q=80',
+    sports:
+      'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=900&q=80',
+    gaming_hobbies:
+      'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=900&q=80',
+    books_education:
+      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=900&q=80',
+    kids:
+      'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80',
+    tools_equipment:
+      'https://images.unsplash.com/photo-1581147036324-c1c88bb0b379?auto=format&fit=crop&w=900&q=80',
+    watches_accessories:
+      'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=900&q=80',
+    beauty:
+      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80',
+  } satisfies Record<string, string>;
+  const values = Object.values(images);
+
+  return images[category as keyof typeof images] ?? values[index % values.length];
 }
 
-function readActiveChatId() {
-  if (typeof window === 'undefined') {
-    return initialChatId;
+function formatListingPrice(price: ApiListingRecord['price']) {
+  if (typeof price === 'number') {
+    return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
   }
 
-  return window.localStorage.getItem(activeChatStorageKey) ?? createConversationId();
-}
-
-function saveActiveChatId(id: string) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(activeChatStorageKey, id);
+  if (price === 'bid') {
+    return 'على السوم';
   }
+
+  if (price === 'negotiable') {
+    return 'قابل للتفاوض';
+  }
+
+  return 'السعر غير محدد';
 }
 
-function formatHistoryTime(timestamp: number, language: AppLanguage) {
-  return new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(timestamp);
+function formatListingStatus(status: string | undefined) {
+  const labels: Record<string, string> = {
+    draft: 'مسودة',
+    pending: 'مراجعة',
+    published: 'موثق',
+    paused: 'موقوف',
+    sold: 'مباع',
+    rejected: 'مرفوض',
+    deleted: 'محذوف',
+  };
+
+  return status ? labels[status] : undefined;
+}
+
+function formatCategory(category: string) {
+  const labels: Record<string, string> = {
+    mobile_phones: 'الجوالات',
+    cars: 'السيارات',
+    computers: 'الأجهزة',
+    furniture: 'الأثاث',
+    real_estate: 'العقارات',
+    auto_parts: 'قطع الغيار',
+    fashion: 'الموضة',
+    home_garden: 'المنزل والحديقة',
+    sports: 'الرياضة',
+    gaming_hobbies: 'الألعاب والهوايات',
+    books_education: 'الكتب والتعليم',
+    kids: 'مستلزمات الأطفال',
+    tools_equipment: 'معدات وأدوات',
+    watches_accessories: 'ساعات وإكسسوارات',
+    beauty: 'العناية والتجميل',
+    other: 'أخرى',
+  };
+
+  return labels[category] ?? category;
+}
+
+function listingRecordToCard(listing: ApiListingRecord, index: number): ListingCard {
+  const primaryImage = listing.images?.find(
+    (image) => image.status === 'approved',
+  );
+
+  return {
+    id: listing.id,
+    title: listing.title ?? 'إعلان بدون عنوان',
+    price: formatListingPrice(listing.price),
+    city: listing.city ?? 'السعودية',
+    category: formatCategory(listing.category),
+    description: listing.description,
+    image:
+      primaryImage?.thumbnailUrl ??
+      primaryImage?.displayUrl ??
+      primaryImage?.originalUrl ??
+      getFallbackImage(listing.category, index),
+    status: formatListingStatus(listing.status),
+    stats:
+      typeof listing.views === 'number'
+        ? `${listing.views} مشاهدة · ${listing.messageCount ?? 0} رسائل`
+        : undefined,
+  };
+}
+
+function SignInCard({ text }: { text: string }) {
+  return (
+    <div className="grid gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-right text-blue-950 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-50">
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="mt-1 size-4 shrink-0 text-blue-700 dark:text-blue-300" />
+        <p className="text-sm leading-7">{text.replace(authRequiredMarker, '').trim()}</p>
+      </div>
+      <Button asChild className="h-9 w-full rounded-md bg-white text-[#1f1f1f] hover:bg-white/90">
+        <a href="/api/auth/google/start">
+          <span className="grid size-5 place-items-center rounded-full border text-sm font-bold text-blue-600">
+            G
+          </span>
+          المتابعة باستخدام Google
+        </a>
+      </Button>
+    </div>
+  );
 }
 
 function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
+      if (part.text.includes(authRequiredMarker)) {
+        return [<SignInCard key={`auth-${index}`} text={part.text} />];
+      }
+
       return [<MessageResponse key={`text-${index}`}>{part.text}</MessageResponse>];
     }
 
@@ -264,115 +425,214 @@ function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
   });
 }
 
-function ErrorDisplay({ message }: { message: string }) {
-  return <div className="error-message">{message}</div>;
+function ListingCardView({
+  listing,
+  onAsk,
+  onFavorite,
+  onOpen,
+}: {
+  listing: ListingCard;
+  onAsk: (prompt: string) => void;
+  onFavorite: (listing: ListingCard) => void;
+  onOpen: (listing: ListingCard) => void;
+}) {
+  return (
+    <article
+      className="cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card"
+      onClick={() => onOpen(listing)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen(listing);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="relative aspect-square bg-slate-100">
+        <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="absolute left-2 top-2 rounded-md border border-white/80 bg-white/95 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-white hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100"
+          aria-label="حفظ الإعلان"
+          onClick={(event) => {
+            event.stopPropagation();
+            onFavorite(listing);
+          }}
+        >
+          <Heart className="size-4" />
+        </Button>
+      </div>
+      <div className="grid gap-2 p-2.5 text-right">
+        <h3 className="line-clamp-1 text-xs font-bold">{listing.title}</h3>
+        <div className="text-sm font-bold text-slate-950 dark:text-card-foreground">{listing.price}</div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <MapPin className="size-3" />
+          {listing.city}
+        </div>
+        {listing.description && (
+          <p className="line-clamp-1 text-[11px] leading-5 text-muted-foreground">
+            {listing.description}
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <BadgeCheck className="size-3" />
+            {listing.status ?? 'موثق'}
+          </span>
+          <span className="truncate text-[10px] text-muted-foreground">{listing.stats}</span>
+        </div>
+        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-2">
+          <Button
+            size="sm"
+            className="h-8 rounded-md bg-blue-600 text-xs hover:bg-blue-700"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAsk(`أريد التواصل بخصوص ${listing.title}`);
+            }}
+          >
+            <MessageCircle className="size-3.5" />
+            تواصل
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            className="rounded-md"
+            aria-label="مقارنة الإعلان"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAsk(`قارن لي إعلان ${listing.title} بالسوق`);
+            }}
+          >
+            <Sparkles className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function AssistantMessageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="chat-assistant-message-frame">
-      <div className="chat-assistant-avatar" aria-hidden="true">
-        <img alt="" src="/smartstore-mark.png" />
+    <div className="flex w-full items-start gap-2">
+      <div className="mt-1 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
+        <Bot className="size-4" />
       </div>
-      {children}
+      <div className="min-w-0 flex-1 text-right">{children}</div>
     </div>
   );
 }
 
 export default function Page() {
+  const router = useRouter();
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
-  const [locationSettings, setLocationSettings] = useState<LocationSettings>(
-    defaultLocationSettings,
-  );
-  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
-  const [activeChatId, setActiveChatId] = useState(initialChatId);
-  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
-  const language = locationSettings.language;
-  const copy = appCopy[language];
-  const pageDirection = copy.direction;
-
-  const localizedQuickPrompts = useMemo(
-    () =>
-      copy.quickPrompts.map((item, index) => ({
-        ...item,
-        icon: quickPrompts[index]?.icon ?? Smartphone,
-      })),
-    [copy],
-  );
+  const [session, setSession] = useState<AuthSessionPayload>({
+    authenticated: false,
+    user: null,
+  });
+  const [marketplaceListings, setMarketplaceListings] =
+    useState<ListingCard[]>(featuredListings);
+  const [activeListingQuery, setActiveListingQuery] = useState('');
+  const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
+  const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
     () => messages.filter((message) => message.role !== 'system'),
     [messages],
   );
+  const isLoading = status === 'streaming' || status === 'submitted';
+  const scrollWatchKey = useMemo(() => {
+    const lastMessage = filteredMessages.at(-1);
+    const lastTextLength =
+      lastMessage?.parts.reduce((length, part) => {
+        return part.type === 'text' ? length + part.text.length : length;
+      }, 0) ?? 0;
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const storedLocationSettings = readStoredLocationSettings();
-      const storedChatHistory = readChatHistory();
-      const storedActiveChatId = readActiveChatId();
-      const activeChat = storedChatHistory.find(
-        (item) => item.id === storedActiveChatId,
-      );
+    return `${status}-${filteredMessages.length}-${lastMessage?.id ?? 'empty'}-${lastTextLength}`;
+  }, [filteredMessages, status]);
 
-      setLocationSettings(storedLocationSettings);
-      setChatHistory(storedChatHistory);
-      setActiveChatId(storedActiveChatId);
+  const refreshMarketplaceListings = useCallback((query?: string) => {
+    const params = new URLSearchParams();
 
-      if (activeChat) {
-        setMessages(activeChat.messages);
-      }
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [setMessages]);
-
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = pageDirection;
-  }, [language, pageDirection]);
-
-  useEffect(() => {
-    if (!isMobileHistoryOpen) {
-      return;
+    if (query?.trim()) {
+      params.set('q', query.trim());
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const endpoint = params.size
+      ? `/api/marketplace/listings?${params.toString()}`
+      : '/api/marketplace/listings';
+
+    return fetch(endpoint)
+      .then((response) =>
+        response.json() as Promise<{ listings?: ApiListingRecord[] }>,
+      )
+      .then((payload) => {
+        if (payload.listings) {
+          setMarketplaceListings(payload.listings.map(listingRecordToCard));
+        }
+      })
+      .catch(() => {
+        setMarketplaceListings(featuredListings);
+      });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = 'ar';
+    document.documentElement.dir = 'rtl';
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void fetch('/api/auth/session')
+      .then((response) => response.json() as Promise<AuthSessionPayload>)
+      .then((payload) => {
+        if (mounted) {
+          setSession(payload);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setSession({ authenticated: false, user: null });
+        }
+      });
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      mounted = false;
     };
-  }, [isMobileHistoryOpen]);
+  }, []);
 
   useEffect(() => {
-    if (!filteredMessages.length) {
+    void refreshMarketplaceListings();
+  }, [refreshMarketplaceListings]);
+
+  useEffect(() => {
+    if (status !== 'ready') {
       return;
     }
 
-    const historyItem: ChatHistoryItem = {
-      id: activeChatId,
-      title: createChatTitle(filteredMessages, copy.fallbackChatTitle),
-      messages: filteredMessages,
-      updatedAt: Date.now(),
-    };
+    const lastAssistantMessage = [...filteredMessages]
+      .reverse()
+      .find((message) => message.role === 'assistant');
 
-    const frame = window.requestAnimationFrame(() => {
-      setChatHistory((currentHistory) => {
-        const nextHistory = [
-          historyItem,
-          ...currentHistory.filter((item) => item.id !== activeChatId),
-        ].slice(0, maxSavedChats);
+    if (
+      !lastAssistantMessage ||
+      lastAssistantMessage.id === lastSyncedAssistantMessageIdRef.current
+    ) {
+      return;
+    }
 
-        saveChatHistory(nextHistory);
-        saveActiveChatId(activeChatId);
-        return nextHistory;
-      });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeChatId, copy.fallbackChatTitle, filteredMessages]);
+    lastSyncedAssistantMessageIdRef.current = lastAssistantMessage.id;
+    void refreshMarketplaceListings(activeListingQuery);
+  }, [
+    activeListingQuery,
+    filteredMessages,
+    refreshMarketplaceListings,
+    status,
+  ]);
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
@@ -395,22 +655,60 @@ export default function Page() {
       const text = hasText && 'text' in message ? message.text : '';
       const files = hasFiles && 'files' in message ? message.files : undefined;
 
-      void sendMessage({
+      const intent = inferClientIntent(text, Boolean(files));
+      setClientIntent(intent);
+
+      const nextListingQuery = getNextListingQuery(
         text,
-        files,
-      }, {
-        body: { locationSettings },
-      });
+        activeListingQuery,
+        intent,
+      );
+
+      if (nextListingQuery) {
+        setActiveListingQuery(nextListingQuery);
+        void refreshMarketplaceListings(nextListingQuery);
+      } else if (
+        intent.kind === 'create_listing' ||
+        intent.kind === 'open_conversation' ||
+        intent.kind === 'image_review'
+      ) {
+        setActiveListingQuery('');
+      }
+
+      void sendMessage(
+        { text, files },
+        {
+          body: { locationSettings },
+        },
+      );
     },
-    [locationSettings, sendMessage],
+    [activeListingQuery, refreshMarketplaceListings, sendMessage],
   );
 
-  const isLoading = status === 'streaming' || status === 'submitted';
-
-  const handleQuickPrompt = useCallback(
+  const sendStarter = useCallback(
     (prompt: string) => {
       if (isLoading) {
         return;
+      }
+
+      const intent = inferClientIntent(prompt);
+      setClientIntent(intent);
+
+      const nextListingQuery = getNextListingQuery(
+        prompt,
+        activeListingQuery,
+        intent,
+      );
+
+      if (nextListingQuery) {
+        setActiveListingQuery(nextListingQuery);
+        void refreshMarketplaceListings(nextListingQuery);
+      } else if (
+        intent.kind === 'create_listing' ||
+        intent.kind === 'open_conversation' ||
+        intent.kind === 'image_review'
+      ) {
+        setActiveListingQuery('');
       }
 
       void sendMessage(
@@ -420,444 +718,279 @@ export default function Page() {
         },
       );
     },
-    [isLoading, locationSettings, sendMessage],
+    [activeListingQuery, isLoading, refreshMarketplaceListings, sendMessage],
   );
 
-  const handleNewChat = useCallback(() => {
-    const nextChatId = createConversationId();
-    saveActiveChatId(nextChatId);
-    setActiveChatId(nextChatId);
-    setMessages([]);
-    setIsMobileHistoryOpen(false);
-  }, [setMessages]);
-
-  const handleSelectChat = useCallback(
-    (historyItem: ChatHistoryItem) => {
-      saveActiveChatId(historyItem.id);
-      setActiveChatId(historyItem.id);
-      setMessages(historyItem.messages);
-      setIsMobileHistoryOpen(false);
-    },
-    [setMessages],
-  );
-
-  const handleDeleteChat = useCallback(
-    (chatId: string) => {
-      setChatHistory((currentHistory) => {
-        const nextHistory = currentHistory.filter((item) => item.id !== chatId);
-        saveChatHistory(nextHistory);
-        return nextHistory;
-      });
-
-      if (chatId === activeChatId) {
-        const nextChatId = createConversationId();
-        saveActiveChatId(nextChatId);
-        setActiveChatId(nextChatId);
-        setMessages([]);
+  const openListing = useCallback(
+    (listing: ListingCard) => {
+      if (!listing.id) {
+        return;
       }
 
-      setIsMobileHistoryOpen(false);
+      router.push(`/listings/${listing.id}`);
     },
-    [activeChatId, setMessages],
+    [router],
   );
 
-  const handleClearHistory = useCallback(() => {
-    if (!window.confirm(copy.clearHistoryConfirm)) {
-      return;
-    }
+  const favoriteListing = useCallback(
+    (listing: ListingCard) => {
+      if (!listing.id) {
+        return;
+      }
 
-    const nextChatId = createConversationId();
-    saveChatHistory([]);
-    saveActiveChatId(nextChatId);
-    setChatHistory([]);
-    setActiveChatId(nextChatId);
-    setMessages([]);
-    setIsMobileHistoryOpen(false);
-  }, [copy.clearHistoryConfirm, setMessages]);
+      void fetch(`/api/marketplace/listings/${listing.id}/favorite`, {
+        method: 'POST',
+      }).then((response) => {
+        if (response.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
 
-  const updateLocationSettings = useCallback((settings: LocationSettings) => {
-    saveLocationSettings(settings);
-    setLocationSettings(settings);
+        if (response.ok) {
+          void refreshMarketplaceListings(activeListingQuery);
+        }
+      });
+    },
+    [activeListingQuery, refreshMarketplaceListings, router],
+  );
+
+  const handleLogout = useCallback(() => {
+    void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
+      setSession({ authenticated: false, user: null });
+    });
   }, []);
 
-  const handleCountryChange = useCallback(
-    (value: string) => {
-      const country = value as CountryCode;
-      const nextCountry = getCountryOption(country);
-
-      updateLocationSettings({
-        ...locationSettings,
-        country,
-        currency: nextCountry.currency,
-      });
-    },
-    [locationSettings, updateLocationSettings],
-  );
-
-  const handleCurrencyChange = useCallback(
-    (value: string) => {
-      updateLocationSettings({
-        ...locationSettings,
-        currency: value.toUpperCase(),
-      });
-    },
-    [locationSettings, updateLocationSettings],
-  );
-
-  const handleLanguageChange = useCallback(
-    (value: string) => {
-      updateLocationSettings({
-        ...locationSettings,
-        language: value === 'en' ? 'en' : 'ar',
-      });
-    },
-    [locationSettings, updateLocationSettings],
-  );
-
-  const historyPanel = (
-    <>
-      <div className="chat-history-header">
-        <div className="chat-history-title">{copy.historyTitle}</div>
-        {chatHistory.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="chat-history-clear"
-                onClick={handleClearHistory}
-                aria-label={copy.clearHistory}
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{copy.clearHistory}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-      {chatHistory.length ? (
-        <div className="chat-history-list">
-          {chatHistory.map((historyItem) => (
-            <div
-              key={historyItem.id}
-              className="chat-history-item"
-              data-active={historyItem.id === activeChatId}
-            >
-              <button
-                type="button"
-                className="chat-history-item-main"
-                onClick={() => handleSelectChat(historyItem)}
-              >
-                <span className="chat-history-item-title">
-                  {historyItem.title}
-                </span>
-                <span className="chat-history-item-time">
-                  {formatHistoryTime(historyItem.updatedAt, language)}
-                </span>
-              </button>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="chat-history-delete"
-                    onClick={() => handleDeleteChat(historyItem.id)}
-                    aria-label={copy.deleteChat}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{copy.deleteChat}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="chat-history-empty">{copy.historyEmpty}</div>
-      )}
-    </>
-  );
-
   return (
-    <div className="chat-container" dir={pageDirection}>
-      <aside className="chat-sidebar">
-        <div className="chat-sidebar-brand">
-          <div className="chat-brand-mark">
-            <img
-              alt={copy.imageAlt}
-              className="h-full w-full object-cover"
-              src="/smartstore-mark.png"
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">SmartStore AI</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {copy.assistantLabel}
+    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
+      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-4 py-3 sm:px-6 lg:h-full lg:min-h-0">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card">
+          <header className="flex h-14 items-center justify-between border-b bg-[#f7f9fc] px-4 dark:bg-background">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+                <img alt="SmartStore AI" className="size-8 object-cover" src="/smartstore-mark.png" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate text-sm font-bold">SmartStore AI</h1>
+                <p className="truncate text-[11px] text-muted-foreground">سوق ذكي للتسويق للمنتجات</p>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <Button
-          variant="ghost"
-          className="chat-new-button"
-          onClick={handleNewChat}
-          disabled={isLoading}
-        >
-          <SquarePen className="size-4" />
-          {copy.newChat}
-        </Button>
+            <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
+              <Sparkles className="size-4 text-blue-600" />
+              <button className="min-w-0 truncate text-start text-xs" type="button" onClick={() => sendStarter('أبحث عن منتج بمساعدة الذكاء الاصطناعي')}>
+                اسأل مساعد SmartStore AI عن المنتج الذي تبحث عنه
+              </button>
+            </div>
 
-        <div className="chat-history">{historyPanel}</div>
-      </aside>
-
-      <main className="chat-main">
-        <header className="chat-top-header">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="chat-mobile-new-chat"
-            onClick={handleNewChat}
-            disabled={isLoading}
-            aria-label={copy.newChat}
-          >
-            <SquarePen className="size-5" />
-          </Button>
-
-          <div className="chat-mobile-brand">
-            <span>SmartStore AI</span>
-          </div>
-
-          <div className="chat-header-actions">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="chat-mobile-history"
-                  onClick={() => setIsMobileHistoryOpen(true)}
-                  aria-label={copy.historyTitle}
-                >
-                  <History className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{copy.historyTitle}</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Dialog>
+            <div className="flex items-center gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label={copy.settings}>
-                      <Settings className="size-5" />
-                    </Button>
-                  </DialogTrigger>
+                  <Button size="icon-sm" variant="ghost" aria-label="الإشعارات">
+                    <Bell className="size-4" />
+                  </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>{copy.settings}</p>
-                </TooltipContent>
+                <TooltipContent>الإشعارات</TooltipContent>
               </Tooltip>
-
-              <DialogContent className="sm:max-w-md" dir={pageDirection}>
-                <DialogHeader>
-                  <DialogTitle>{copy.settings}</DialogTitle>
-                  <DialogDescription>
-                    {copy.settingsDescription}
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-4">
-                  <label className="grid gap-2 text-sm font-medium">
-                    {copy.country}
-                    <Select value={locationSettings.country} onValueChange={handleCountryChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countryOptions.map((option) => (
-                          <SelectItem key={option.code} value={option.code}>
-                            {copy.countries[option.code]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm font-medium">
-                      {copy.currency}
-                      <Select
-                        value={locationSettings.currency}
-                        onValueChange={handleCurrencyChange}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {currencyOptions.map((currency) => (
-                            <SelectItem key={currency} value={currency}>
-                              {currency}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium">
-                      {copy.language}
-                      <Select
-                        value={locationSettings.language}
-                        onValueChange={handleLanguageChange}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ar">{copy.arabic}</SelectItem>
-                          <SelectItem value="en">{copy.english}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </label>
-                  </div>
-
-                  <div className="location-confirmation">
-                    <Check className="size-4" />
-                    <span>{copy.savedLocally}</span>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <ThemeToggle language={language} />
-          </div>
-        </header>
-
-        <div className="chat-body">
-          <Conversation>
-            <ConversationContent className="chat-conversation-content">
-              <ConversationAutoScroll
-                watchKey={filteredMessages}
-                enabled
-              />
-              {filteredMessages.length === 0 ? (
-                <div className="chat-empty-state">
-                  <div className="chat-empty-mark">
-                    <img
-                      alt={copy.imageAlt}
-                      className="h-10 w-10"
-                      src="/smartstore-mark.png"
-                    />
-                  </div>
-                  <div className="chat-empty-copy">
-                    <h2>{copy.emptyTitle}</h2>
-                    <p>{copy.emptyDescription}</p>
-                  </div>
-                  <div className="quick-prompt-grid">
-                    {localizedQuickPrompts.map((item) => (
-                      <button
-                        type="button"
-                        key={item.title}
-                        className="quick-prompt-card"
-                        onClick={() => handleQuickPrompt(item.prompt)}
-                        disabled={isLoading}
-                      >
-                        <span className="quick-prompt-icon">
-                          <item.icon className="size-5" />
-                        </span>
-                        <span>{item.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
+              <ThemeToggle language="ar" />
+              {session.authenticated ? (
                 <>
-                  {filteredMessages.map((message, messageIndex) => (
-                    <Message key={`${message.id}-${messageIndex}`} from={message.role}>
-                      {message.role === 'assistant' ? (
-                        <AssistantMessageFrame>
-                          <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
-                        </AssistantMessageFrame>
-                      ) : (
-                        <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
-                      )}
-                    </Message>
-                  ))}
-                  {isLoading && (
-                    <Message from="assistant">
-                      <AssistantMessageFrame>
-                        <MessageContent>
-                          <SearchStatusIndicator language={language} mode="thinking" />
-                        </MessageContent>
-                      </AssistantMessageFrame>
-                    </Message>
-                  )}
-                  {error && <ErrorDisplay message={error.message} />}
+                  <Button asChild variant="outline" size="sm" className="rounded-md">
+                    <Link href="/account">
+                      <User className="size-4" />
+                      حسابي
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" className="rounded-md" onClick={handleLogout}>
+                    <LogOut className="size-4" />
+                    خروج
+                  </Button>
                 </>
+              ) : (
+                <Button asChild size="sm" className="rounded-md bg-blue-600 hover:bg-blue-700">
+                  <a href="/api/auth/google/start">
+                    <User className="size-4" />
+                    دخول
+                  </a>
+                </Button>
               )}
-            </ConversationContent>
-            <ConversationScrollButton className="chat-scroll-button" />
-          </Conversation>
-        </div>
+            </div>
+          </header>
 
-        {isMobileHistoryOpen && (
-          <div className="chat-mobile-history-overlay" role="dialog" aria-modal="true" aria-label={copy.historyTitle}>
-            <button
-              type="button"
-              className="chat-mobile-history-backdrop"
-              aria-label={copy.close}
-              onClick={() => setIsMobileHistoryOpen(false)}
-            />
-            <section className="chat-mobile-history-sheet" dir={pageDirection}>
-              <div className="chat-mobile-history-sheet-header">
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_25rem]">
+            <section className="min-w-0 overflow-y-auto border-b bg-[#eef4fb] p-4 dark:bg-background lg:border-b-0 lg:border-l">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <div className="chat-mobile-history-sheet-title">{copy.historyTitle}</div>
-                  <div className="chat-mobile-history-sheet-subtitle">{copy.assistantLabel}</div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                    <Store className="size-4" />
+                    واجهة الإعلانات
+                  </div>
+                  <h2 className="mt-1 text-xl font-bold">إعلانات SmartStore AI</h2>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="chat-mobile-history-close"
-                  onClick={() => setIsMobileHistoryOpen(false)}
-                  aria-label={copy.close}
-                >
-                  <X className="size-5" />
+                <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
+                  <Plus className="size-4" />
+                  إعلان جديد
                 </Button>
               </div>
-              <div className="chat-history chat-history-panel">
-                {historyPanel}
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {marketplaceListings.map((listing) => (
+                  <ListingCardView
+                    key={listing.id ?? listing.title}
+                    listing={listing}
+                    onAsk={sendStarter}
+                    onFavorite={favoriteListing}
+                    onOpen={openListing}
+                  />
+                ))}
+              </div>
+
+              {marketplaceListings.length === 0 && (
+                <div className="grid min-h-56 place-items-center rounded-md border border-dashed bg-white p-6 text-center dark:bg-card">
+                  <div className="grid max-w-sm gap-3">
+                    <Sparkles className="mx-auto size-9 text-blue-600" />
+                    <h3 className="text-base font-bold">لا توجد نتائج مطابقة</h3>
+                    <p className="text-sm leading-7 text-muted-foreground">
+                      اكتب طلبًا آخر في مساعد SmartStore AI.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+            </section>
+
+            <section className="flex min-h-[32rem] flex-col bg-white dark:bg-card lg:min-h-0">
+              <header className="shrink-0 border-b px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-8 place-items-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
+                      <Bot className="size-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold">مساعد SmartStore AI</h2>
+                      <p className="text-[11px] text-muted-foreground">
+                        {session.authenticated ? session.user?.email : 'التسجيل للعمليات فقط'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={() => setMessages([])} aria-label="محادثة جديدة">
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </div>
+              </header>
+
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <Conversation className="min-h-0 flex-1">
+                  <ConversationContent className="gap-4 px-4 py-5">
+                    <ConversationAutoScroll watchKey={scrollWatchKey} enabled />
+                    {filteredMessages.length === 0 ? (
+                      <div className="grid h-full place-items-center text-center">
+                        <div className="grid max-w-xs gap-4">
+                          <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-100 text-blue-700">
+                            <MessageCircle className="size-7" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold">كيف أساعدك؟</h3>
+                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                              بيع، بحث، مقارنة، صور، أو فتح شات بين البائع والمشتري.
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            {starters.map((prompt) => (
+                              <Button
+                                key={prompt}
+                                variant="outline"
+                                className="rounded-md"
+                                disabled={isLoading}
+                                onClick={() => sendStarter(prompt)}
+                              >
+                                {prompt}
+                              </Button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 rounded-md border bg-[#f7f9fc] p-2 dark:bg-background">
+                            {featuredListings.slice(0, 3).map((listing) => (
+                              <button
+                                key={listing.title}
+                                type="button"
+                                className="grid gap-1 text-right"
+                                onClick={() => sendStarter(`اعرض لي تفاصيل ${listing.title}`)}
+                              >
+                                <img alt={listing.title} className="aspect-square rounded-md object-cover" src={listing.image} />
+                                <span className="truncate text-[10px] font-semibold">{listing.price}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {filteredMessages.map((message, messageIndex) => (
+                          <Message key={`${message.id}-${messageIndex}`} from={message.role}>
+                            {message.role === 'assistant' ? (
+                              <AssistantMessageFrame>
+                                <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                              </AssistantMessageFrame>
+                            ) : (
+                              <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                            )}
+                          </Message>
+                        ))}
+                        {isLoading && (
+                          <Message from="assistant">
+                            <AssistantMessageFrame>
+                              <MessageContent>
+                                <SearchStatusIndicator language="ar" mode="thinking" />
+                              </MessageContent>
+                            </AssistantMessageFrame>
+                          </Message>
+                        )}
+                        {error && (
+                          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            {error.message}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </ConversationContent>
+                  <ConversationScrollButton className="bottom-24" />
+                </Conversation>
+              </div>
+
+              <div className="shrink-0 border-t p-3">
+                <PromptInput
+                  accept="image/*"
+                  allowAttachments
+                  maxFileSize={12 * 1024 * 1024}
+                  maxFiles={8}
+                  multiple
+                  onSubmit={handleSubmit}
+                >
+                  <PromptInputHeader>
+                    <PromptInputAttachments>
+                      {(attachment) => <PromptInputAttachment data={attachment} />}
+                    </PromptInputAttachments>
+                  </PromptInputHeader>
+                  <PromptInputBody>
+                    <PromptInputTextarea className="max-h-28 min-h-12" placeholder="اكتب طلبك أو أرفق صور المنتج..." />
+                  </PromptInputBody>
+                  <PromptInputFooter>
+                    <PromptInputTools>
+                      <PromptInputActionMenu>
+                        <PromptInputActionMenuTrigger aria-label="إرفاق صورة" />
+                        <PromptInputActionMenuContent>
+                          <PromptInputActionAddAttachments label="إرفاق صور المنتج" />
+                        </PromptInputActionMenuContent>
+                      </PromptInputActionMenu>
+                    </PromptInputTools>
+                    <PromptInputSubmit status={status} />
+                  </PromptInputFooter>
+                </PromptInput>
               </div>
             </section>
           </div>
-        )}
+        </section>
 
-        <div className="chat-input-wrapper">
-          <PromptInput onSubmit={handleSubmit}>
-            <PromptInputBody>
-              <PromptInputTextarea placeholder={copy.inputPlaceholder} />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputSubmit status={status} />
-            </PromptInputFooter>
-          </PromptInput>
-          <footer className="chat-footer" aria-label="Site links">
-            <Link href="/privacy" className="chat-footer-link">
-              {copy.privacyPolicy}
-            </Link>
-            <span className="chat-footer-divider" aria-hidden="true">
-              /
-            </span>
-            <Link href="/partners" className="chat-footer-link">
-              {copy.partners}
-            </Link>
-          </footer>
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
-
-

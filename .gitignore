@@ -14,6 +14,8 @@
 # app build output
 /.next/
 /out/
+/.data/
+/public/uploads/
 
 # production
 /build

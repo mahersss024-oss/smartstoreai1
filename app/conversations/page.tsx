@@ -1,0 +1,274 @@
+'use client';
+/* eslint-disable @next/next/no-img-element */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  BadgeCheck,
+  MessageCircle,
+  ShieldCheck,
+  User,
+} from 'lucide-react';
+
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@ui/button';
+
+type AuthUser = {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+};
+
+type AuthSessionPayload = {
+  authenticated: boolean;
+  user: AuthUser | null;
+};
+
+type ConversationListing = {
+  id: string;
+  title?: string;
+  price?: number | 'bid' | 'negotiable';
+  city?: string;
+  images?: Array<{
+    displayUrl?: string;
+    originalUrl?: string;
+    thumbnailUrl?: string;
+  }>;
+};
+
+type ConversationRecord = {
+  id: string;
+  listingId: string;
+  sellerId: string;
+  buyerId: string;
+  status: 'open' | 'closed' | 'reported';
+  messages: Array<{
+    id: string;
+    body: string;
+    senderId: string;
+    status: 'sent' | 'blocked';
+    createdAt: string;
+  }>;
+  updatedAt: string;
+  listing: ConversationListing | null;
+};
+
+function getListingImage(listing: ConversationListing | null) {
+  const image = listing?.images?.[0];
+
+  return (
+    image?.thumbnailUrl ??
+    image?.displayUrl ??
+    image?.originalUrl ??
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80'
+  );
+}
+
+function formatPrice(price: ConversationListing['price']) {
+  if (typeof price === 'number') {
+    return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
+  }
+
+  if (price === 'bid') {
+    return 'على السوم';
+  }
+
+  if (price === 'negotiable') {
+    return 'قابل للتفاوض';
+  }
+
+  return 'السعر غير محدد';
+}
+
+function formatUpdatedAt(value: string) {
+  return new Intl.DateTimeFormat('ar-SA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+export default function ConversationsPage() {
+  const [session, setSession] = useState<AuthSessionPayload>({
+    authenticated: false,
+    user: null,
+  });
+  const [conversations, setConversations] = useState<ConversationRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const conversationsCount = conversations.length;
+  const openConversationsCount = useMemo(
+    () =>
+      conversations.filter((conversation) => conversation.status === 'open')
+        .length,
+    [conversations],
+  );
+
+  const refreshConversations = useCallback(async () => {
+    setIsLoading(true);
+
+    try {
+      const [sessionResponse, conversationsResponse] = await Promise.all([
+        fetch('/api/auth/session'),
+        fetch('/api/marketplace/me/conversations'),
+      ]);
+      const nextSession =
+        (await sessionResponse.json()) as AuthSessionPayload;
+      setSession(nextSession);
+
+      if (!conversationsResponse.ok) {
+        setConversations([]);
+        return;
+      }
+
+      const payload = (await conversationsResponse.json()) as {
+        conversations?: ConversationRecord[];
+      };
+      setConversations(payload.conversations ?? []);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = 'ar';
+    document.documentElement.dir = 'rtl';
+    void refreshConversations();
+  }, [refreshConversations]);
+
+  return (
+    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button asChild variant="outline" size="icon" className="rounded-md">
+              <Link href="/">
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-bold">محادثاتي</h1>
+              <p className="truncate text-xs text-muted-foreground">
+                محادثات البيع والشراء داخل SmartStore AI
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle language="ar" />
+            <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
+              <Link href="/account">
+                <User className="size-4" />
+                حسابي
+              </Link>
+            </Button>
+          </div>
+        </header>
+
+        {!session.authenticated ? (
+          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+            <div className="grid max-w-md gap-4">
+              <ShieldCheck className="mx-auto size-12 text-blue-600" />
+              <div>
+                <h2 className="text-xl font-bold">سجل الدخول لعرض محادثاتك</h2>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  المحادثات تظهر فقط للأطراف المرتبطة بالإعلان.
+                </p>
+              </div>
+              <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
+                <a href="/api/auth/google/start">
+                  <User className="size-4" />
+                  دخول Google
+                </a>
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+                <div className="text-xs text-muted-foreground">إجمالي المحادثات</div>
+                <div className="mt-1 text-2xl font-bold">{conversationsCount}</div>
+              </div>
+              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+                <div className="text-xs text-muted-foreground">المحادثات المفتوحة</div>
+                <div className="mt-1 text-2xl font-bold">{openConversationsCount}</div>
+              </div>
+            </section>
+
+            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+                <MessageCircle className="size-4 text-blue-600" />
+                قائمة المحادثات
+              </div>
+
+              {isLoading ? (
+                <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
+                  جار تحميل المحادثات...
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="grid min-h-56 place-items-center rounded-md border border-dashed p-6 text-center">
+                  <div className="grid max-w-sm gap-3">
+                    <MessageCircle className="mx-auto size-9 text-blue-600" />
+                    <h3 className="text-base font-bold">لا توجد محادثات بعد</h3>
+                    <p className="text-sm leading-7 text-muted-foreground">
+                      عندما يتواصل مشتري مع بائع أو تضغط على تواصل داخل إعلان، ستظهر المحادثة هنا.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {conversations.map((conversation) => {
+                    const lastMessage = [...conversation.messages]
+                      .reverse()
+                      .find((message) => message.status === 'sent');
+                    const isSeller = session.user?.id === conversation.sellerId;
+
+                    return (
+                      <Link
+                        key={conversation.id}
+                        className="grid gap-3 rounded-md border p-3 transition hover:border-blue-400 hover:bg-blue-50/60 dark:hover:bg-blue-400/10 md:grid-cols-[5rem_1fr_auto]"
+                        href={`/conversations/${conversation.id}`}
+                      >
+                        <img
+                          alt={conversation.listing?.title ?? 'صورة الإعلان'}
+                          className="aspect-square w-full rounded-md object-cover md:size-20"
+                          src={getListingImage(conversation.listing)}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-bold">
+                              {conversation.listing?.title ?? 'إعلان غير متاح'}
+                            </h3>
+                            <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                              {isSeller ? 'بائع' : 'مشتري'}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-sm text-muted-foreground">
+                            {lastMessage?.body ?? 'لم تبدأ الرسائل بعد'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                            <span>{formatPrice(conversation.listing?.price)}</span>
+                            <span>{conversation.listing?.city ?? 'السعودية'}</span>
+                            <span>{formatUpdatedAt(conversation.updatedAt)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-200">
+                          <BadgeCheck className="size-4" />
+                          {conversation.status === 'open' ? 'مفتوحة' : 'مغلقة'}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}

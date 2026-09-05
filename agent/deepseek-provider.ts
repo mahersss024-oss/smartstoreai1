@@ -2,7 +2,16 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 import { appConfig } from '@/app/app-config';
 
-function normalizeDeepseekChatBody(body: string) {
+export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
+
+const profileEnvironmentKeys = {
+  chat: 'DEEPSEEK_CHAT_MODEL',
+  scope: 'DEEPSEEK_SCOPE_MODEL',
+  moderation: 'DEEPSEEK_MODERATION_MODEL',
+  vision: 'DEEPSEEK_VISION_MODEL',
+} satisfies Record<DeepseekModelProfile, string>;
+
+export function normalizeDeepseekChatBody(body: string) {
   let parsed: unknown;
 
   try {
@@ -21,6 +30,8 @@ function normalizeDeepseekChatBody(body: string) {
   }
 
   return JSON.stringify({
+    thinking:
+      'thinking' in parsed ? parsed.thinking : { type: 'disabled' },
     ...parsed,
     messages: parsed.messages.map((message) => {
       if (
@@ -56,6 +67,14 @@ export const deepseek = createOpenAI({
   },
 });
 
-export function getDeepseekChatModel() {
-  return deepseek.chat(appConfig.model);
+export function getDeepseekModelName(profile: DeepseekModelProfile = 'chat') {
+  return (
+    process.env[profileEnvironmentKeys[profile]]?.trim() ||
+    process.env.DEEPSEEK_MODEL?.trim() ||
+    appConfig.models[profile]
+  );
+}
+
+export function getDeepseekChatModel(profile: DeepseekModelProfile = 'chat') {
+  return deepseek.chat(getDeepseekModelName(profile));
 }

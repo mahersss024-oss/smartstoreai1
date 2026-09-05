@@ -5,7 +5,11 @@ import {
   applyAllowedRequestToLatestUserMessage,
   buildScopeContext,
   getLatestUserRequest,
+  getMarketplaceContinuationScopeDecision,
   getSafeScopeResponse,
+  latestUserMessageHasImageAttachment,
+  messageHasImageAttachment,
+  messagesHaveImageAttachment,
   parseOutputScopeDecision,
   parseScopeDecision,
 } from '@/agent/scope-guard';
@@ -65,6 +69,68 @@ test('builds limited conversation context without system messages', () => {
     { role: 'user', text: 'أريد لابتوب' },
     { role: 'assistant', text: 'ما الميزانية؟' },
   ]);
+});
+
+test('detects image attachments in marketplace chat messages', () => {
+  const messages = [
+    {
+      role: 'user',
+      parts: [
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          url: 'data:image/jpeg;base64,AA==',
+        },
+      ],
+    },
+  ];
+
+  assert.equal(messageHasImageAttachment(messages[0]), true);
+  assert.equal(latestUserMessageHasImageAttachment(messages), true);
+  assert.equal(messagesHaveImageAttachment(messages), true);
+});
+
+test('allows short marketplace search follow-ups from prior context', () => {
+  const context = buildScopeContext([
+    { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
+    { role: 'user', parts: [{ type: 'text', text: 'تايوتا كامري' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'ما سنة الصنع؟' }] },
+    { role: 'user', parts: [{ type: 'text', text: '2020' }] },
+  ]);
+
+  const decision = getMarketplaceContinuationScopeDecision('2020', context);
+
+  assert.equal(decision?.decision, 'ALLOW');
+  assert.equal(decision?.reason_code, 'marketplace_context_follow_up');
+});
+
+test('allows buyer budget follow-ups from prior marketplace context', () => {
+  const context = buildScopeContext([
+    { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
+    { role: 'user', parts: [{ type: 'text', text: 'ميزانيتي 50 ألف' }] },
+  ]);
+
+  const decision = getMarketplaceContinuationScopeDecision(
+    'ميزانيتي 50 ألف',
+    context,
+  );
+
+  assert.equal(decision?.decision, 'ALLOW');
+  assert.equal(decision?.reason_code, 'marketplace_context_follow_up');
+});
+
+test('does not allow unrelated short follow-ups through marketplace context', () => {
+  const context = buildScopeContext([
+    { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
+    { role: 'user', parts: [{ type: 'text', text: 'اخبار سياسية' }] },
+  ]);
+
+  const decision = getMarketplaceContinuationScopeDecision('اخبار سياسية', context);
+
+  assert.equal(decision, null);
 });
 
 test('rewrites only the latest user message for partial requests', () => {
