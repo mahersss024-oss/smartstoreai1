@@ -47,6 +47,10 @@ async function persistGoogleUserRegistration(
   user: AuthSessionUser,
 ) {
   if (!shouldPersistUserRegistration()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_USER_REGISTRATION_REQUIRED');
+    }
+
     return user;
   }
 
