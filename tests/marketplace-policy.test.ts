@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  evaluateForbiddenMarketplaceTerms,
+} from '@/agent/marketplace/forbidden-terms';
+import {
   classifyMarketplaceIntent,
   evaluateSaudiMarketplaceCompliance,
   getAuthRequiredResponse,
 } from '@/agent/marketplace/policy';
+import { evaluateConversationMessageSafety } from '@/agent/marketplace/message-safety';
 
 test('allows marketplace questions without authentication', () => {
   const decision = classifyMarketplaceIntent('كيف يعمل الشات في السوق؟');
@@ -35,7 +39,7 @@ test('blocks products prohibited by Saudi and Islamic marketplace policy', () =>
   assert.equal(decision.decision, 'block');
   assert.equal(decision.jurisdiction, 'SA');
   assert.equal(decision.shariaSensitive, true);
-  assert.equal(decision.prohibitedCategory, 'alcohol');
+  assert.equal(decision.prohibitedCategory, 'alcohol_or_intoxicants');
 });
 
 test('blocks pork and pig-derived products', () => {
@@ -59,6 +63,26 @@ test('blocks explosives, secret cameras, and forged goods', () => {
     evaluateSaudiMarketplaceCompliance('وثيقة مزورة للبيع').decision,
     'block',
   );
+});
+
+test('dedicated forbidden terms model blocks Saudi prohibited and Islamic-sensitive terms', () => {
+  const eavesdropping = evaluateForbiddenMarketplaceTerms('جهاز تنصت صغير للبيع');
+  const radar = evaluateForbiddenMarketplaceTerms('كاشف رادار للسيارة');
+  const obscene = evaluateForbiddenMarketplaceTerms('وسائط مخلة للبيع');
+
+  assert.equal(eavesdropping.decision, 'block');
+  assert.equal(eavesdropping.prohibitedCategory, 'surveillance_or_eavesdropping');
+  assert.equal(radar.decision, 'block');
+  assert.equal(radar.prohibitedCategory, 'radar_detectors_or_restricted_devices');
+  assert.equal(obscene.decision, 'block');
+  assert.equal(obscene.shariaSensitive, true);
+});
+
+test('dedicated forbidden terms model routes regulated terms to review', () => {
+  const decision = evaluateForbiddenMarketplaceTerms('عندي قلم ليزر قوي');
+
+  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.prohibitedCategory, 'restricted_laser_devices');
 });
 
 test('routes bead, airsoft, and toy guns to review instead of real weapon block', () => {
@@ -89,6 +113,13 @@ test('routes sensitive regulated products to review', () => {
 
   assert.equal(decision.decision, 'needs_review');
   assert.equal(decision.prohibitedCategory, 'tobacco_or_vape');
+});
+
+test('blocks forbidden terms inside buyer seller conversations', () => {
+  const decision = evaluateConversationMessageSafety('اقدر اوفر لك جهاز تنصت');
+
+  assert.equal(decision.decision, 'block');
+  assert.ok(decision.reasons.includes('forbidden_or_regulated_marketplace_terms'));
 });
 
 test('marks auth response with a frontend-renderable Google sign-in marker', () => {

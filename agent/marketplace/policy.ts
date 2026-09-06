@@ -3,6 +3,7 @@ import type {
   MarketplaceIntent,
   MarketplaceIntentDecision,
 } from './types';
+import { evaluateForbiddenMarketplaceTerms } from './forbidden-terms';
 
 const executableIntents = new Set<MarketplaceIntent>([
   'create_listing',
@@ -108,109 +109,6 @@ const intentPatterns: Array<{
   },
 ];
 
-const blockedProductRules: Array<{
-  category: string;
-  shariaSensitive: boolean;
-  patterns: RegExp[];
-}> = [
-  {
-    category: 'pork_or_pig_derived',
-    shariaSensitive: true,
-    patterns: [/(?:خنزير|لحم خنزير|دهن خنزير|جيلاتين خنزير|pork|pig|lard|porcine|pork gelatin)/i],
-  },
-  {
-    category: 'alcohol',
-    shariaSensitive: true,
-    patterns: [/(?:خمر|خمور|مسكر|مشروب كحولي|ويسكي|فودكا|wine|whisky|vodka|alcohol)/i],
-  },
-  {
-    category: 'drugs',
-    shariaSensitive: true,
-    patterns: [/(?:مخدر|حشيش|كبتاجون|هيروين|كوكايين|drug|cocaine|heroin|captagon)/i],
-  },
-  {
-    category: 'gambling',
-    shariaSensitive: true,
-    patterns: [/(?:قمار|مراهن|رهان|كازينو|casino|betting|gambling)/i],
-  },
-  {
-    category: 'lottery_or_raffle',
-    shariaSensitive: true,
-    patterns: [/(?:يانصيب|لوتري|سحب جوائز بمقابل|تذاكر سحب|lottery|raffle)/i],
-  },
-  {
-    category: 'adult_content',
-    shariaSensitive: true,
-    patterns: [/(?:اباحي|إباحي|جنسي|مخل|فاحش|عاري|صور فاضحة|sex|porn|adult toy|obscene|indecent|فاضح)/i],
-  },
-  {
-    category: 'magic_occult',
-    shariaSensitive: true,
-    patterns: [/(?:سحر|شعوذة|طلسم|تميمة|جلب الحبيب|صرف وعطف|magic spell|occult|sorcery|talisman)/i],
-  },
-  {
-    category: 'shirk_or_offensive_religious_items',
-    shariaSensitive: true,
-    patterns: [/(?:شرك|وثن|اصنام|أصنام|تمثال معبود|عبادة الاصنام|عبادة الأصنام|idol|idols|idolatry|shirk)/i],
-  },
-  {
-    category: 'real_weapons_or_ammunition',
-    shariaSensitive: false,
-    patterns: [
-      /(?:سلاح ناري|مسدس حقيقي|بندقية حقيقية|رشاش|كلاشنكوف|ذخيرة|رصاص حي|firearm|real gun|real pistol|rifle|live ammo|ammunition)/i,
-    ],
-  },
-  {
-    category: 'weapons',
-    shariaSensitive: false,
-    patterns: [/(?:سلاح|مسدس|ذخيرة|رصاص|بندقية|سكين قتالي|صاعق|weapon|gun|ammo|ammunition|stun gun)/i],
-  },
-  {
-    category: 'explosives_or_fireworks',
-    shariaSensitive: false,
-    patterns: [/(?:متفجرات|مفرقعات|ألعاب نارية|العاب نارية|بارود|explosive|explosives|fireworks|firecracker)/i],
-  },
-  {
-    category: 'secret_surveillance',
-    shariaSensitive: false,
-    patterns: [/(?:كاميرا مخفية|كاميرا تجسس|قلم كاميرا|ساعة كاميرا|secret camera|hidden camera|spy camera|surveillance pen)/i],
-  },
-  {
-    category: 'unlicensed_medicine',
-    shariaSensitive: false,
-    patterns: [/(?:دواء|وصفة طبية|حبوب تنحيف|منشط|مضاد حيوي|medicine|prescription|antibiotic)/i],
-  },
-  {
-    category: 'counterfeit_or_stolen',
-    shariaSensitive: true,
-    patterns: [/(?:مسروق|مقلد|تقليد درجة أولى|مزور|عملة مزيفة|وثيقة مزورة|fake|replica|stolen|counterfeit|forged|fake currency|fake document)/i],
-  },
-];
-
-const reviewProductRules: Array<{
-  category: string;
-  shariaSensitive: boolean;
-  patterns: RegExp[];
-}> = [
-  {
-    category: 'weapon_lookalike_or_airsoft',
-    shariaSensitive: false,
-    patterns: [
-      /(?=.*(?:مسدس|بندقية|سلاح|gun|pistol|rifle))(?=.*(?:خرز|لعبة|العاب|أطفال|اطفال|بلاستيك|ماء|هوائي|ايرسوفت|airsoft|bb|pellet|toy|plastic|water|nerf|gel blaster))/i,
-    ],
-  },
-  {
-    category: 'tobacco_or_vape',
-    shariaSensitive: true,
-    patterns: [/(?:دخان|تبغ|شيشة|فيب|vape|tobacco|cigarette)/i],
-  },
-  {
-    category: 'high_risk_financial_or_accounts',
-    shariaSensitive: true,
-    patterns: [/(?:حساب|اشتراك|كود|بطاقة).{0,30}(?:نتفلكس|بنك|بنكي|ائتمان|credit|bank|account)/i],
-  },
-];
-
 export function classifyMarketplaceIntent(text: string): MarketplaceIntentDecision {
   const normalized = text.trim();
 
@@ -234,52 +132,7 @@ export function classifyMarketplaceIntent(text: string): MarketplaceIntentDecisi
 }
 
 export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDecision {
-  const normalized = text.trim();
-  const hardBlockedRules = blockedProductRules.filter((rule) => rule.category === 'real_weapons_or_ammunition');
-  const regularBlockedRules = blockedProductRules.filter((rule) => rule.category !== 'real_weapons_or_ammunition');
-
-  for (const rule of hardBlockedRules) {
-    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
-      return {
-        decision: 'block',
-        reasons: ['prohibited_in_saudi_marketplace_policy'],
-        jurisdiction: 'SA',
-        shariaSensitive: rule.shariaSensitive,
-        prohibitedCategory: rule.category,
-      };
-    }
-  }
-
-  for (const rule of reviewProductRules) {
-    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
-      return {
-        decision: 'needs_review',
-        reasons: ['high_risk_or_regulated_product'],
-        jurisdiction: 'SA',
-        shariaSensitive: rule.shariaSensitive,
-        prohibitedCategory: rule.category,
-      };
-    }
-  }
-
-  for (const rule of regularBlockedRules) {
-    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
-      return {
-        decision: 'block',
-        reasons: ['prohibited_in_saudi_marketplace_policy'],
-        jurisdiction: 'SA',
-        shariaSensitive: rule.shariaSensitive,
-        prohibitedCategory: rule.category,
-      };
-    }
-  }
-
-  return {
-    decision: 'allow',
-    reasons: [],
-    jurisdiction: 'SA',
-    shariaSensitive: false,
-  };
+  return evaluateForbiddenMarketplaceTerms(text);
 }
 
 export function getAuthRequiredResponse(language: 'ar' | 'en') {

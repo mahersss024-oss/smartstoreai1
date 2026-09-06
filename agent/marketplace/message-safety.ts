@@ -1,3 +1,5 @@
+import { evaluateForbiddenMarketplaceTerms } from './forbidden-terms';
+
 export type ConversationMessageSafetyDecision = {
   decision: 'allow' | 'block';
   reasons: string[];
@@ -21,6 +23,7 @@ export function evaluateConversationMessageSafety(
   body: string,
 ): ConversationMessageSafetyDecision {
   const reasons: string[] = [];
+  const forbiddenTermsDecision = evaluateForbiddenMarketplaceTerms(body);
 
   if (externalContactPatterns.some((pattern) => pattern.test(body))) {
     reasons.push('external_contact_attempt');
@@ -28,6 +31,10 @@ export function evaluateConversationMessageSafety(
 
   if (externalDealPatterns.some((pattern) => pattern.test(body))) {
     reasons.push('external_deal_or_payment_attempt');
+  }
+
+  if (forbiddenTermsDecision.decision !== 'allow') {
+    reasons.push('forbidden_or_regulated_marketplace_terms');
   }
 
   return {

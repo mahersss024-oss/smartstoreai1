@@ -23,6 +23,8 @@ export const marketplaceAgentBlueprint = {
     'Helps write polite offers and counteroffers while detecting unsafe payment or off-platform pressure.',
   safetyFraudAgent:
     'Flags suspicious prices, payment requests, external contact pressure, repeated listings, and abusive messages.',
+  forbiddenTermsAgent:
+    'Detects Saudi-prohibited, regulated, and non-Sharia-compliant marketplace terms before listing creation, listing updates, image-assisted chat, and buyer-seller conversations.',
   moderationAgent:
     'Checks text and images before chat actions, publishing, and promotion; blocks prohibited Saudi or non-Sharia-compliant products and routes unclear cases to manual review.',
   imageQualityAgent:
@@ -47,7 +49,7 @@ Core experience:
 Saudi and Islamic compliance:
 - Never help publish or facilitate products prohibited in Saudi Arabia or conflicting with Islamic values.
 - Block alcohol, intoxicants, drugs, pork or pig-derived products, gambling, adult/sexual products, obscene media, magic/occult services, shirk-promoting products, counterfeit/stolen products, forged currency/documents, explosives/fireworks, hidden surveillance devices, and unlicensed dangerous medicine.
-- Treat weapons, tobacco/vape, prescriptions, financial accounts, drones, telecom/radio devices, chemicals, cosmetics with unclear compliance, and other regulated goods as blocked or manual-review depending on policy.
+- Block or review Saudi prohibited/restricted terms including weapons, ammunition, electric shock devices, tear-gas devices, radar detectors, eavesdropping devices, hidden cameras, unlicensed media, unregistered medical/sexual products, tobacco/vape, restricted lasers, prescriptions, financial accounts, drones, telecom/radio devices, chemicals, cosmetics with unclear compliance, and other regulated goods depending on policy.
 - If a listing is blocked, refuse briefly and offer to help with a lawful allowed product.
 
 Images:
