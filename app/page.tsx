@@ -131,6 +131,15 @@ const locationSettings: LocationSettings = {
   currency: 'SAR',
   language: 'ar',
 };
+const currentChatStorageKey = 'smartstore-current-chat-v1';
+const maxStoredChatMessages = 60;
+const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
+
+type StoredChatState = {
+  activeListingQuery: string;
+  messages: UIMessage[];
+  updatedAt: number;
+};
 
 const featuredListings: ListingCard[] = [
   {
@@ -373,6 +382,127 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function getStoredAttachmentLabel(part: UIMessage['parts'][number]) {
+  const filename =
+    'filename' in part && typeof part.filename === 'string'
+      ? part.filename
+      : '';
+  const mediaType =
+    'mediaType' in part && typeof part.mediaType === 'string'
+      ? part.mediaType
+      : '';
+
+  if (mediaType.startsWith('image/')) {
+    return filename
+      ? `صورة مرفقة محفوظة في السجل: ${filename}`
+      : 'صورة مرفقة محفوظة في السجل';
+  }
+
+  return filename
+    ? `ملف مرفق محفوظ في السجل: ${filename}`
+    : 'ملف مرفق محفوظ في السجل';
+}
+
+function sanitizeMessagesForStorage(messages: UIMessage[]) {
+  return messages
+    .filter((message) => message.role !== 'system')
+    .slice(-maxStoredChatMessages)
+    .map((message) => ({
+      ...message,
+      parts: message.parts.flatMap((part) => {
+        if (part.type === 'file') {
+          return [
+            {
+              type: 'text',
+              text: getStoredAttachmentLabel(part),
+            } satisfies UIMessage['parts'][number],
+          ];
+        }
+
+        return [part];
+      }),
+    }));
+}
+
+function compactMessagesForStorage(messages: UIMessage[]) {
+  return sanitizeMessagesForStorage(messages).map((message) => ({
+    ...message,
+    parts: message.parts.filter((part) => part.type === 'text'),
+  }));
+}
+
+function readStoredChatState(): StoredChatState | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawState = localStorage.getItem(currentChatStorageKey);
+
+    if (!rawState) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawState) as Partial<StoredChatState>;
+
+    if (
+      typeof parsed.updatedAt !== 'number' ||
+      Date.now() - parsed.updatedAt > storedChatMaxAgeMs ||
+      !Array.isArray(parsed.messages)
+    ) {
+      localStorage.removeItem(currentChatStorageKey);
+      return null;
+    }
+
+    return {
+      activeListingQuery:
+        typeof parsed.activeListingQuery === 'string'
+          ? parsed.activeListingQuery
+          : '',
+      messages: sanitizeMessagesForStorage(parsed.messages),
+      updatedAt: parsed.updatedAt,
+    };
+  } catch {
+    localStorage.removeItem(currentChatStorageKey);
+    return null;
+  }
+}
+
+function writeStoredChatState(messages: UIMessage[], activeListingQuery: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (messages.length === 0) {
+    localStorage.removeItem(currentChatStorageKey);
+    return;
+  }
+
+  const state: StoredChatState = {
+    activeListingQuery,
+    messages: sanitizeMessagesForStorage(messages),
+    updatedAt: Date.now(),
+  };
+
+  try {
+    localStorage.setItem(currentChatStorageKey, JSON.stringify(state));
+  } catch {
+    localStorage.setItem(
+      currentChatStorageKey,
+      JSON.stringify({
+        ...state,
+        messages: compactMessagesForStorage(messages),
+      }),
+    );
+  }
+}
+
+function clearStoredChatState() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(currentChatStorageKey);
+  }
+}
+
 function isSearchToolOutput(value: unknown): value is SearchToolOutput {
   return (
     isRecord(value) &&
@@ -591,6 +721,7 @@ export default function Page() {
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
   const [activeListingQuery, setActiveListingQuery] = useState('');
+  const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
@@ -653,6 +784,36 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const storedState = readStoredChatState();
+
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
+
+      if (storedState) {
+        setMessages(storedState.messages);
+        setActiveListingQuery(storedState.activeListingQuery);
+      }
+
+      setHasRestoredChat(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setMessages]);
+
+  useEffect(() => {
+    if (!hasRestoredChat) {
+      return;
+    }
+
+    writeStoredChatState(filteredMessages, activeListingQuery);
+  }, [activeListingQuery, filteredMessages, hasRestoredChat]);
+
+  useEffect(() => {
     let mounted = true;
 
     void fetch('/api/auth/session')
@@ -709,6 +870,10 @@ export default function Page() {
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
+      if (!hasRestoredChat) {
+        return;
+      }
+
       const hasText =
         message &&
         'text' in message &&
@@ -755,12 +920,12 @@ export default function Page() {
         },
       );
     },
-    [activeListingQuery, refreshMarketplaceListings, sendMessage],
+    [activeListingQuery, hasRestoredChat, refreshMarketplaceListings, sendMessage],
   );
 
   const sendStarter = useCallback(
     (prompt: string) => {
-      if (isLoading) {
+      if (isLoading || !hasRestoredChat) {
         return;
       }
 
@@ -791,7 +956,7 @@ export default function Page() {
         },
       );
     },
-    [activeListingQuery, isLoading, refreshMarketplaceListings, sendMessage],
+    [activeListingQuery, hasRestoredChat, isLoading, refreshMarketplaceListings, sendMessage],
   );
 
   const openListing = useCallback(
@@ -832,6 +997,12 @@ export default function Page() {
       setSession({ authenticated: false, user: null });
     });
   }, []);
+
+  const startNewChat = useCallback(() => {
+    setMessages([]);
+    setActiveListingQuery('');
+    clearStoredChatState();
+  }, [setMessages]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
@@ -945,7 +1116,7 @@ export default function Page() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={() => setMessages([])} aria-label="محادثة جديدة">
+                  <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
                     <MoreHorizontal className="size-4" />
                   </Button>
                 </div>
@@ -973,7 +1144,7 @@ export default function Page() {
                                 key={prompt}
                                 variant="outline"
                                 className="rounded-md"
-                                disabled={isLoading}
+                                disabled={isLoading || !hasRestoredChat}
                                 onClick={() => sendStarter(prompt)}
                               >
                                 {prompt}
