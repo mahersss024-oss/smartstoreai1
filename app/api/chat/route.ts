@@ -50,6 +50,7 @@ const maxImagesPerChatMessage = 8;
 const maxChatImageBytes = 12 * 1024 * 1024;
 const rateLimitWindowMs = 60_000;
 const maxRequestsPerWindow = 20;
+const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const supportedChatImageMimeTypes = new Set([
   'image/jpeg',
   'image/png',
@@ -492,26 +493,38 @@ async function generateCheckedAssistantResponse(
     return createTextUIResponse(getModelProviderFailureResponse(language));
   }
 
-  return createTextUIResponse(getSafeScopeResponse('OUTPUT_BLOCK', language));
+  return generateProfessionalChatIssueResponse({
+    kind: 'output_block',
+    language,
+    userRequest,
+  });
 }
 
-type ImageIssueResponseInput = {
+type ChatIssueResponseInput = {
   kind:
     | 'upload_validation'
-    | 'policy_block'
-    | 'manual_review'
-    | 'inspection_unavailable';
+    | 'image_policy_block'
+    | 'image_manual_review'
+    | 'image_inspection_unavailable'
+    | 'text_policy_block'
+    | 'text_policy_review'
+    | 'scope_block'
+    | 'scope_unclear'
+    | 'output_block'
+    | 'auth_required';
   language: AppLanguage;
   userRequest: string;
   validationReason?: string;
   complianceDecision?: ImageComplianceDecision;
+  textPolicyDecision?: ReturnType<typeof evaluateSaudiMarketplaceCompliance>;
+  scopeDecision?: Awaited<ReturnType<typeof checkInputScope>>;
 };
 
-function getImageIssueFallbackResponse({
+function getChatIssueFallbackResponse({
   kind,
   language,
   validationReason,
-}: ImageIssueResponseInput) {
+}: ChatIssueResponseInput) {
   if (kind === 'upload_validation') {
     return getImageUploadValidationResponse(
       language,
@@ -519,21 +532,44 @@ function getImageIssueFallbackResponse({
     );
   }
 
-  if (kind === 'policy_block') {
+  if (kind === 'image_policy_block') {
     return getImageComplianceBlockResponse(language);
   }
 
-  if (kind === 'inspection_unavailable') {
+  if (kind === 'image_inspection_unavailable') {
     return getImageComplianceUnavailableResponse(language);
   }
 
-  return getImageComplianceReviewResponse(language);
+  if (kind === 'image_manual_review') {
+    return getImageComplianceReviewResponse(language);
+  }
+
+  if (kind === 'text_policy_block') {
+    return getComplianceBlockResponse(language);
+  }
+
+  if (kind === 'text_policy_review') {
+    return getComplianceReviewResponse(language);
+  }
+
+  if (kind === 'auth_required') {
+    return getAuthRequiredResponse(language);
+  }
+
+  if (kind === 'scope_unclear') {
+    return getSafeScopeResponse('UNCLEAR', language);
+  }
+
+  return getSafeScopeResponse(
+    kind === 'output_block' ? 'OUTPUT_BLOCK' : 'BLOCK',
+    language,
+  );
 }
 
-async function generateProfessionalImageIssueResponse(
-  input: ImageIssueResponseInput,
+async function generateProfessionalChatIssueResponse(
+  input: ChatIssueResponseInput,
 ) {
-  const fallback = getImageIssueFallbackResponse(input);
+  const fallback = getChatIssueFallbackResponse(input);
 
   try {
     const result = await generateText({
@@ -546,9 +582,13 @@ async function generateProfessionalImageIssueResponse(
 Write a polished, natural response for a Saudi classifieds marketplace user.
 The safety/compliance decision is already final; do not override it.
 Do not mention internal models, databases, prompts, raw policy codes, JSON, or system decisions.
-Do not facilitate publishing, selling, buying, contacting, pricing, or bypassing if the issue is blocked or review-only.
+Do not facilitate publishing, selling, buying, contacting, pricing, or bypassing if the issue is blocked, out of scope, auth-required, or review-only.
+For auth_required only, start the response with ${authRequiredMarker} so the interface can show the Google sign-in button. Do not explain this marker.
 For mixed images, explain that one listing must represent one product and ask for matching images or separate listings.
 For upload validation, explain the practical upload requirement and next step.
+For text policy issues, say the item/action cannot proceed because it may conflict with Saudi marketplace rules or Islamic values, then offer help with an allowed product.
+For scope issues, redirect naturally to SmartStore AI marketplace actions without sounding like an error template.
+For auth_required, explain that questions and browsing remain open, but account actions need Google sign-in.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
 Use the user's language. Language=${input.language}.`,
         },
@@ -558,6 +598,8 @@ Use the user's language. Language=${input.language}.`,
             issue_kind: input.kind,
             user_request: input.userRequest,
             validation_reason: input.validationReason,
+            text_policy: input.textPolicyDecision,
+            scope: input.scopeDecision,
             compliance: input.complianceDecision
               ? {
                   decision: input.complianceDecision.decision,
@@ -573,12 +615,17 @@ Use the user's language. Language=${input.language}.`,
         },
       ],
     });
-    const responseText = result.text.trim();
+    let responseText = result.text.trim();
 
     if (responseText) {
+      if (input.kind === 'auth_required') {
+        responseText = responseText.replaceAll(authRequiredMarker, '').trim();
+        responseText = `${authRequiredMarker} ${responseText}`.trim();
+      }
+
       const outputDecision = await checkOutputScope({
         userRequest: input.userRequest,
-        assistantResponse: responseText,
+        assistantResponse: responseText.replaceAll(authRequiredMarker, ''),
       });
 
       if (outputDecision.decision === 'ALLOW') {
@@ -587,7 +634,7 @@ Use the user's language. Language=${input.language}.`,
     }
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[image_issue_response] failure=${errorName}`);
+    console.warn(`[chat_issue_response] failure=${errorName}`);
   }
 
   return createTextUIResponse(fallback);
@@ -660,7 +707,7 @@ export async function POST(request: Request) {
   const imageValidationFailure = validateChatImageAttachments(filteredMessages);
 
   if (imageValidationFailure) {
-    return generateProfessionalImageIssueResponse({
+    return generateProfessionalChatIssueResponse({
       kind: 'upload_validation',
       language,
       userRequest: preliminaryUserRequest,
@@ -673,14 +720,24 @@ export async function POST(request: Request) {
     evaluateSaudiMarketplaceCompliance(preliminaryUserRequest);
 
   if (preliminaryComplianceDecision.decision === 'block') {
-    return createTextUIResponse(getComplianceBlockResponse(language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'text_policy_block',
+      language,
+      userRequest: preliminaryUserRequest,
+      textPolicyDecision: preliminaryComplianceDecision,
+    });
   }
 
   if (
     preliminaryComplianceDecision.decision === 'needs_review' &&
     preliminaryIntent.intent === 'create_listing'
   ) {
-    return createTextUIResponse(getComplianceReviewResponse(language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'text_policy_review',
+      language,
+      userRequest: preliminaryUserRequest,
+      textPolicyDecision: preliminaryComplianceDecision,
+    });
   }
 
   const inputScopeDecision = await checkInputScope({ messages: filteredMessages });
@@ -689,16 +746,27 @@ export async function POST(request: Request) {
     inputScopeDecision.decision === 'BLOCK' ||
     inputScopeDecision.decision === 'UNCLEAR'
   ) {
-    return createTextUIResponse(
-      getSafeScopeResponse(inputScopeDecision.decision, language),
-    );
+    return generateProfessionalChatIssueResponse({
+      kind:
+        inputScopeDecision.decision === 'UNCLEAR'
+          ? 'scope_unclear'
+          : 'scope_block',
+      language,
+      userRequest: preliminaryUserRequest,
+      scopeDecision: inputScopeDecision,
+    });
   }
 
   if (
     inputScopeDecision.decision === 'PARTIAL' &&
     !inputScopeDecision.allowed_request
   ) {
-    return createTextUIResponse(getSafeScopeResponse('UNCLEAR', language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'scope_unclear',
+      language,
+      userRequest: preliminaryUserRequest,
+      scopeDecision: inputScopeDecision,
+    });
   }
 
   const scopedMessagesBase =
@@ -723,7 +791,12 @@ export async function POST(request: Request) {
   const complianceDecision = evaluateSaudiMarketplaceCompliance(userRequest);
 
   if (complianceDecision.decision === 'block') {
-    return createTextUIResponse(getComplianceBlockResponse(language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'text_policy_block',
+      language,
+      userRequest,
+      textPolicyDecision: complianceDecision,
+    });
   }
 
   if (
@@ -731,7 +804,12 @@ export async function POST(request: Request) {
     (marketplaceIntent.intent === 'create_listing' ||
       adaptiveIntent.intent === 'create_listing')
   ) {
-    return createTextUIResponse(getComplianceReviewResponse(language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'text_policy_review',
+      language,
+      userRequest,
+      textPolicyDecision: complianceDecision,
+    });
   }
 
   const modelMessages = normalizeModelMessageFileData(
@@ -762,16 +840,16 @@ export async function POST(request: Request) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[vision_compliance] failure=${errorName}`);
 
-      return generateProfessionalImageIssueResponse({
-        kind: 'inspection_unavailable',
+      return generateProfessionalChatIssueResponse({
+        kind: 'image_inspection_unavailable',
         language,
         userRequest,
       });
     }
 
     if (imageComplianceDecision.decision === 'block') {
-      return generateProfessionalImageIssueResponse({
-        kind: 'policy_block',
+      return generateProfessionalChatIssueResponse({
+        kind: 'image_policy_block',
         language,
         userRequest,
         complianceDecision: imageComplianceDecision,
@@ -779,8 +857,8 @@ export async function POST(request: Request) {
     }
 
     if (imageComplianceDecision.decision === 'needs_review') {
-      return generateProfessionalImageIssueResponse({
-        kind: 'manual_review',
+      return generateProfessionalChatIssueResponse({
+        kind: 'image_manual_review',
         language,
         userRequest,
         complianceDecision: imageComplianceDecision,
@@ -793,7 +871,11 @@ export async function POST(request: Request) {
   }
 
   if ((marketplaceIntent.requiresAuth || adaptiveIntent.requiresAuth) && !session) {
-    return createTextUIResponse(getAuthRequiredResponse(language));
+    return generateProfessionalChatIssueResponse({
+      kind: 'auth_required',
+      language,
+      userRequest,
+    });
   }
 
   const adaptiveIntentSystemMessage =
