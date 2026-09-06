@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server';
 
 import {
   clearOauthStateCookie,
+  commissionAgreementVersion,
   createSessionCookie,
+  getCommissionAgreement,
   getOauthState,
   type AuthSessionUser,
 } from '@/lib/auth/session';
+import { prisma } from '@/lib/db/prisma';
 
 type GoogleTokenResponse = {
   access_token?: string;
@@ -33,6 +36,48 @@ function redirectToHome(request: Request, cookie?: string) {
 
   response.headers.append('Set-Cookie', clearOauthStateCookie());
   return response;
+}
+
+function shouldPersistUserRegistration() {
+  return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
+}
+
+async function persistGoogleUserRegistration(
+  request: Request,
+  user: AuthSessionUser,
+) {
+  if (!shouldPersistUserRegistration()) {
+    return;
+  }
+
+  const commissionAgreement = getCommissionAgreement(request);
+
+  await prisma.user.upsert({
+    where: { id: user.id },
+    create: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      commissionAgreementVersion: commissionAgreement
+        ? commissionAgreementVersion
+        : undefined,
+      commissionAgreementAccepted: commissionAgreement
+        ? new Date(commissionAgreement.acceptedAt * 1000)
+        : undefined,
+    },
+    update: {
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      commissionAgreementVersion: commissionAgreement
+        ? commissionAgreementVersion
+        : undefined,
+      commissionAgreementAccepted: commissionAgreement
+        ? new Date(commissionAgreement.acceptedAt * 1000)
+        : undefined,
+    },
+  });
 }
 
 export async function GET(request: Request) {
@@ -94,6 +139,17 @@ export async function GET(request: Request) {
     name: userInfo.name,
     picture: userInfo.picture,
   };
+
+  try {
+    await persistGoogleUserRegistration(request, user);
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`[google_auth] registration_failed=${errorName}`);
+
+    return new Response('Google registration could not be completed.', {
+      status: 502,
+    });
+  }
 
   return redirectToHome(request, createSessionCookie(user));
 }
