@@ -104,6 +104,11 @@ const categoryMatchers: Array<{
     stopWords: ['لابتوب', 'كمبيوتر', 'laptop', 'computer'],
   },
   {
+    category: 'cameras',
+    patterns: [/(?:كاميرا|كاميره|كاميرات|كانون|نيكون|فوجي|سوني الفا|camera|cameras|canon|nikon|fujifilm|sony alpha)/i],
+    stopWords: ['كاميرا', 'كاميره', 'كاميرات', 'camera', 'cameras'],
+  },
+  {
     category: 'real_estate',
     patterns: [/(?:عقار|شقة|فيلا|بيت|ارض|أرض|real estate|apartment|villa|house)/i],
     stopWords: ['عقار', 'شقة', 'فيلا', 'بيت', 'ارض', 'أرض'],
@@ -149,6 +154,10 @@ const cityMatchers: Array<{ city: string; patterns: RegExp[]; stopWords: string[
 ];
 
 const termSynonyms = new Map([
+  ['كانون', ['كانون', 'canon']],
+  ['canon', ['canon', 'كانون']],
+  ['نيكون', ['نيكون', 'nikon']],
+  ['nikon', ['nikon', 'نيكون']],
   ['تايوتا', ['تايوتا', 'تويوتا', 'toyota']],
   ['تويوتا', ['تويوتا', 'تايوتا', 'toyota']],
   ['toyota', ['toyota', 'تويوتا', 'تايوتا']],

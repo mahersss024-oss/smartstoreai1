@@ -141,13 +141,14 @@ export function buildScopeContext(messages: unknown[], maxMessages = 8) {
 }
 
 const marketplaceContextPattern =
-  /(?:سوق|اعلان|إعلان|بيع|شراء|ابحث|أبحث|ادور|أدور|سيارة|سيارات|تويوتا|تايوتا|كامري|جوال|ايفون|آيفون|لابتوب|عقار|listing|marketplace|classified|car|cars|toyota|camry|iphone|laptop)/i;
+  /(?:سوق|اعلان|إعلان|بيع|شراء|ابحث|أبحث|ادور|أدور|سيارة|سيارات|تويوتا|تايوتا|كامري|جوال|ايفون|آيفون|لابتوب|عقار|كاميرا|كاميره|كانون|نيكون|سوني|listing|marketplace|classified|car|cars|toyota|camry|iphone|laptop|camera|canon|nikon|sony)/i;
 
 const marketplaceContinuationPatterns = [
   /^(?:19|20)\d{2}$/,
   /^[\d٠-٩\s,.٬]+(?:ر\.?س|ريال|sar)?$/i,
   /(?:ميزانية|ميزانيه|ميزانيتي|حدي|بحدود|حدود|تحت|اقل|أقل|اكثر|أكثر|اكبر|أكبر|فوق|حتى|الف|ألف|ريال|ر\.?س|sar)/i,
   /(?:تويوتا|تايوتا|كامري|كورولا|يارس|لاندكروزر|نيسان|هوندا|هيونداي|كيا|مازدا|لكزس|مرسيدس|بي ام|toyota|camry|corolla|nissan|honda|hyundai|kia|mazda|lexus|mercedes|bmw)/i,
+  /(?:كاميرا|كاميره|كانون|نيكون|فوجي|سوني|camera|canon|nikon|fujifilm|sony)/i,
   /(?:الرياض|جدة|الدمام|الخبر|مكة|المدينة|القصيم|ابها|أبها|تبوك|حائل|riyadh|jeddah|dammam|khobar)/i,
   /(?:لون|ابيض|أبيض|اسود|أسود|فضي|رمادي|ازرق|أزرق|احمر|أحمر|ذهبي|بيج|قير|اوتوماتيك|أوتوماتيك|عادي|ممشى|عداد|كيلو|كم|فل كامل|ستاندر|نص فل|بدون حوادث|مالك اول|مالك أول)/i,
   /(?:مستعمل|مستعملة|مستخدم|جديد|جديدة|نظيف|نظيفة|سيدان|هايبرد|بنزين|دفع رباعي|suv|sedan|hybrid|used|new)/i,
@@ -155,6 +156,28 @@ const marketplaceContinuationPatterns = [
 
 const unsafeContinuationPattern =
   /(?:سياسة|سياسي|حرب|اخبار|أخبار|مطعم|فندق|طبي|دواء|محامي|قانون|politics|news|restaurant|hotel|medical|legal)/i;
+
+const directMarketplaceActionPattern =
+  /(?:ابحث|أبحث|ادور|أدور|اريد|أريد|ابغى|أبغى|ابي|أبي|بيع|أبيع|اشتري|شراء|منتج|إعلان|اعلان|search|find|want|buy|sell|listing|product|marketplace)/i;
+
+const directMarketplaceProductPattern =
+  /(?:سيارة|سيارات|كامري|تويوتا|تايوتا|جوال|آيفون|ايفون|لابتوب|كمبيوتر|عقار|أثاث|اثاث|كرسي|كنب|ساعة|كاميرا|كاميره|كانون|نيكون|سوني|car|cars|toyota|camry|iphone|phone|laptop|computer|camera|canon|nikon|sony|chair|sofa|watch)/i;
+
+function getDirectMarketplaceScopeDecision(latestRequest: string) {
+  if (
+    !unsafeContinuationPattern.test(latestRequest) &&
+    directMarketplaceActionPattern.test(latestRequest) &&
+    directMarketplaceProductPattern.test(latestRequest)
+  ) {
+    return {
+      decision: 'ALLOW',
+      confidence: 0.95,
+      reason_code: 'direct_marketplace_request',
+    } satisfies ScopeDecision;
+  }
+
+  return null;
+}
 
 export function getMarketplaceContinuationScopeDecision(
   latestRequest: string,
@@ -264,6 +287,18 @@ export async function checkInputScope({ messages }: ScopeCheckInput) {
     }
 
     const context = buildScopeContext(messages);
+    const directMarketplaceDecision =
+      getDirectMarketplaceScopeDecision(latestRequest);
+
+    if (directMarketplaceDecision) {
+      logScopeDecision(
+        'input',
+        directMarketplaceDecision.decision,
+        directMarketplaceDecision.reason_code,
+      );
+      return directMarketplaceDecision;
+    }
+
     const continuationDecision = getMarketplaceContinuationScopeDecision(
       latestRequest,
       context,

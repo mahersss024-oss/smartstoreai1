@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   applyAllowedRequestToLatestUserMessage,
   buildScopeContext,
+  checkInputScope,
   getLatestUserRequest,
   getMarketplaceContinuationScopeDecision,
   getSafeScopeResponse,
@@ -157,6 +158,22 @@ test('does not allow unrelated short follow-ups through marketplace context', ()
   const decision = getMarketplaceContinuationScopeDecision('اخبار سياسية', context);
 
   assert.equal(decision, null);
+});
+
+test('allows direct marketplace camera searches without model scope fallback', async () => {
+  const decision = await checkInputScope({
+    messages: [
+      {
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'اريد كاميرا تصوير من نوع كانون' },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(decision.decision, 'ALLOW');
+  assert.equal(decision.reason_code, 'direct_marketplace_request');
 });
 
 test('rewrites only the latest user message for partial requests', () => {

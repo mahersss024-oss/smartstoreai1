@@ -4,9 +4,27 @@ services:
     runtime: node
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    startCommand: pnpm db:deploy && pnpm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
+      - key: DEEPSEEK_VISION_MODEL
+        value: deepseek-v4-flash-vision-exp
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SMARTSTORE_MARKETPLACE_STORE
+        value: database
+      - key: SMARTSTORE_ADMIN_EMAILS
         sync: false

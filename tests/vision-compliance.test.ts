@@ -106,6 +106,27 @@ test('parses tolerant image compliance values from vision', () => {
   assert.equal(decision.shariaSensitive, false);
 });
 
+test('parses professional model review wording without failing closed', () => {
+  const decision = parseImageComplianceDecision(`{
+  "status": "manual-review",
+  "confidence": "0.71",
+  "reason": "visible product needs closer marketplace review",
+  "detected_category": "cameras",
+  "category_match": "different",
+  "detected_product": "Canon camera",
+  "sharia_sensitive": "no"
+}`);
+
+  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.confidence, 0.71);
+  assert.deepEqual(decision.reasons, [
+    'visible product needs closer marketplace review',
+    'image_category_mismatch',
+  ]);
+  assert.equal(decision.categoryMatch, 'mismatch');
+  assert.equal(decision.shariaSensitive, false);
+});
+
 test('infers expected marketplace categories from user text', async () => {
   const { inferExpectedMarketplaceCategory } = await import(
     '@/agent/marketplace/vision-compliance'
@@ -118,6 +139,10 @@ test('infers expected marketplace categories from user text', async () => {
   assert.equal(
     inferExpectedMarketplaceCategory('كامري 2020 في الرياض'),
     'cars',
+  );
+  assert.equal(
+    inferExpectedMarketplaceCategory('اريد كاميرا تصوير من نوع كانون'),
+    'cameras',
   );
 });
 

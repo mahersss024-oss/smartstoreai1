@@ -17,7 +17,7 @@ import type { MarketplaceIntent } from './types';
 
 const adaptiveIntentTimeoutMs = 8_000;
 
-const adaptiveExecutionSchema = z.enum([
+const adaptiveExecutionValues = [
   'answer',
   'search_listings',
   'ask_clarifying_question',
@@ -29,7 +29,167 @@ const adaptiveExecutionSchema = z.enum([
   'report_listing',
   'analyze_images',
   'support',
+] as const;
+
+const adaptiveIntentValues = [
+  'general_info',
+  'search_listing',
+  'create_listing',
+  'update_listing',
+  'delete_listing',
+  'pause_listing',
+  'mark_sold',
+  'open_conversation',
+  'send_message',
+  'favorite_listing',
+  'report_listing',
+  'compare_listings',
+  'price_listing',
+  'negotiate',
+  'support',
+] as const;
+
+const normalizedExecutionAliases = new Map([
+  ['search_listing', 'search_listings'],
+  ['listing_search', 'search_listings'],
+  ['search_marketplace', 'search_listings'],
+  ['search_marketplace_listings', 'search_listings'],
+  ['search_marketplace_listing', 'search_listings'],
+  ['search_listings_in_marketplace', 'search_listings'],
+  ['search', 'search_listings'],
+  ['create_listing', 'create_listing_draft'],
+  ['create_draft', 'create_listing_draft'],
+  ['draft_listing', 'create_listing_draft'],
+  ['ask_clarification', 'ask_clarifying_question'],
+  ['clarify', 'ask_clarifying_question'],
+  ['delete_listing', 'set_listing_status'],
+  ['pause_listing', 'set_listing_status'],
+  ['mark_sold', 'set_listing_status'],
+  ['send_message', 'open_conversation'],
+  ['conversation', 'open_conversation'],
+  ['open_chat', 'open_conversation'],
+  ['compare_listings', 'search_listings'],
+  ['price_listing', 'ask_clarifying_question'],
+  ['negotiate', 'ask_clarifying_question'],
 ]);
+
+const normalizedIntentAliases = new Map([
+  ['search_listings', 'search_listing'],
+  ['listing_search', 'search_listing'],
+  ['product_search', 'search_listing'],
+  ['buyer_search_context', 'search_listing'],
+  ['marketplace_search', 'search_listing'],
+  ['search_marketplace', 'search_listing'],
+  ['search_marketplace_listings', 'search_listing'],
+  ['search_marketplace_listing', 'search_listing'],
+  ['search', 'search_listing'],
+  ['buyer_search', 'search_listing'],
+  ['create_listing_draft', 'create_listing'],
+  ['create_draft', 'create_listing'],
+  ['draft_listing', 'create_listing'],
+  ['set_listing_status', 'update_listing'],
+  ['open_chat', 'open_conversation'],
+  ['conversation', 'open_conversation'],
+  ['compare_listing', 'compare_listings'],
+  ['answer', 'general_info'],
+]);
+
+function normalizeModelEnumValue(
+  value: unknown,
+  aliases: Map<string, string>,
+) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value
+    .trim()
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/^marketplace_/, '');
+  return aliases.get(normalized) ?? normalized;
+}
+
+const adaptiveExecutionSchema = z.preprocess(
+  (value) => normalizeModelEnumValue(value, normalizedExecutionAliases),
+  z.enum(adaptiveExecutionValues),
+);
+
+const marketplaceIntentSchema = z.preprocess(
+  (value) => normalizeModelEnumValue(value, normalizedIntentAliases),
+  z.enum(adaptiveIntentValues),
+);
+
+const confidenceSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim().replace('%', ''));
+
+    if (Number.isFinite(parsed)) {
+      return parsed > 1 ? parsed / 100 : parsed;
+    }
+  }
+
+  if (typeof value === 'number' && value > 1 && value <= 100) {
+    return value / 100;
+  }
+
+  return value;
+}, z.number().min(0).max(1).default(0.6));
+
+const booleanSchema = z.preprocess((value) => {
+  if (value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (['true', 'yes', '1'].includes(normalized)) {
+      return true;
+    }
+
+    if (['false', 'no', '0'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean().optional());
+
+const missingFieldsSchema = z.preprocess((value) => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(/[,،]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean);
+  }
+
+  return value;
+}, z.array(z.string().trim().min(1).max(80)).max(12).optional());
+
+const optionalAdaptiveText = (maxLength: number) =>
+  z.preprocess((value) => {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() || undefined;
+    }
+
+    return value;
+  }, z.string().trim().min(1).max(maxLength).optional());
 
 export type AdaptiveMarketplaceIntent = {
   intent: MarketplaceIntent;
@@ -44,41 +204,57 @@ export type AdaptiveMarketplaceIntent = {
   requiresConfirmation: boolean;
 };
 
-const adaptiveIntentSchema = z
-  .object({
-  intent: z.enum([
-    'general_info',
-    'search_listing',
-    'create_listing',
-    'update_listing',
-    'delete_listing',
-    'pause_listing',
-    'mark_sold',
-    'open_conversation',
-    'send_message',
-    'favorite_listing',
-    'report_listing',
-    'compare_listings',
-    'price_listing',
-    'negotiate',
-    'support',
-  ]),
-  execution: adaptiveExecutionSchema,
-  confidence: z.number().min(0).max(1),
-    reasonCode: z.string().trim().min(1).max(80).optional(),
-    reason_code: z.string().trim().min(1).max(80).optional(),
-    normalizedRequest: z.string().trim().min(1).max(1_000).optional(),
-    normalized_request: z.string().trim().min(1).max(1_000).optional(),
-    searchQuery: z.string().trim().min(1).max(300).optional(),
-    search_query: z.string().trim().min(1).max(300).optional(),
-    targetListingId: z.string().trim().min(1).max(120).optional(),
-    target_listing_id: z.string().trim().min(1).max(120).optional(),
-    missingFields: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
-    missing_fields: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
-    requiresAuth: z.boolean().optional(),
-    requires_auth: z.boolean().optional(),
-    requiresConfirmation: z.boolean().optional(),
-    requires_confirmation: z.boolean().optional(),
+const adaptiveIntentSchema = z.preprocess((value) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return value;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    return {
+      ...candidate,
+      intent:
+        candidate.intent ??
+        candidate.action ??
+        candidate.task ??
+        candidate.route ??
+        candidate.operation,
+      execution:
+        candidate.execution ??
+        candidate.next_execution ??
+        candidate.nextExecution ??
+        candidate.action ??
+        candidate.task,
+      confidence:
+        candidate.confidence ?? candidate.score ?? candidate.probability,
+      reasonCode:
+        candidate.reasonCode ??
+        candidate.reason_code ??
+        candidate.reason ??
+        candidate.reasonCode,
+      searchQuery:
+        candidate.searchQuery ??
+        candidate.search_query ??
+        candidate.query ??
+        candidate.search_terms,
+    };
+  }, z.object({
+    intent: marketplaceIntentSchema,
+    execution: adaptiveExecutionSchema,
+    confidence: confidenceSchema,
+    reasonCode: optionalAdaptiveText(80),
+    reason_code: optionalAdaptiveText(80),
+    normalizedRequest: optionalAdaptiveText(1_000),
+    normalized_request: optionalAdaptiveText(1_000),
+    searchQuery: optionalAdaptiveText(300),
+    search_query: optionalAdaptiveText(300),
+    targetListingId: optionalAdaptiveText(120),
+    target_listing_id: optionalAdaptiveText(120),
+    missingFields: missingFieldsSchema,
+    missing_fields: missingFieldsSchema,
+    requiresAuth: booleanSchema,
+    requires_auth: booleanSchema,
+    requiresConfirmation: booleanSchema,
+    requires_confirmation: booleanSchema,
   })
   .transform((parsed) => {
     const normalized: AdaptiveMarketplaceIntent = {
@@ -115,7 +291,7 @@ const adaptiveIntentSchema = z
     }
 
     return normalized;
-  });
+  }));
 
 const authRequiredIntents = new Set<MarketplaceIntent>([
   'create_listing',

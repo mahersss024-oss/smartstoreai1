@@ -44,3 +44,11 @@ test('keeps car model year while extracting max price', () => {
   assert.equal(parsed.maxPrice, 80000);
   assert.deepEqual(parsed.terms, ['كامري', '2020']);
 });
+
+test('extracts camera category and brand from Arabic buyer search', () => {
+  const parsed = parseMarketplaceSearchQuery('اريد كاميرا تصوير من نوع كانون');
+
+  assert.equal(parsed.category, 'cameras');
+  assert.deepEqual(parsed.terms, ['تصوير', 'نوع', 'كانون']);
+  assert.deepEqual(parsed.termGroups.at(-1), ['كانون', 'canon']);
+});

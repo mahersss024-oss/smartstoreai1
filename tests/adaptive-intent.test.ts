@@ -28,6 +28,18 @@ test('parses adaptive marketplace intent JSON with snake case fields', () => {
   assert.equal(intent.normalizedRequest, 'افحص الصورة');
 });
 
+test('parses tolerant adaptive model enum and boolean values', () => {
+  const intent = parseAdaptiveMarketplaceIntent(
+    '{"intent":"search_listings","execution":"search_listing","confidence":"0.77","reasonCode":"buyer_search","searchQuery":"كاميرا كانون","requiresAuth":"false","requiresConfirmation":"false"}',
+  );
+
+  assert.equal(intent.intent, 'search_listing');
+  assert.equal(intent.execution, 'search_listings');
+  assert.equal(intent.confidence, 0.77);
+  assert.equal(intent.searchQuery, 'كاميرا كانون');
+  assert.equal(intent.requiresAuth, false);
+});
+
 test('uses conversation context for short marketplace follow-ups', () => {
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },

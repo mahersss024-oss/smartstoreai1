@@ -15,10 +15,35 @@ const optionalModelText = (maxLength: number) =>
     z.string().trim().min(1).max(maxLength).optional(),
   );
 
-const decisionSchema = z.preprocess(
-  (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
-  z.enum(['allow', 'block', 'needs_review']),
-);
+const decisionSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+
+  if (['allow', 'allowed', 'approve', 'approved', 'ok', 'pass'].includes(normalized)) {
+    return 'allow';
+  }
+
+  if (
+    ['block', 'blocked', 'reject', 'rejected', 'prohibited', 'not_allowed'].includes(
+      normalized,
+    )
+  ) {
+    return 'block';
+  }
+
+  if (
+    ['needs_review', 'need_review', 'manual_review', 'review', 'unclear', 'escalate'].includes(
+      normalized,
+    )
+  ) {
+    return 'needs_review';
+  }
+
+  return normalized;
+}, z.enum(['allow', 'block', 'needs_review']));
 
 const confidenceSchema = z.preprocess((value) => {
   if (typeof value === 'string') {
@@ -38,9 +63,19 @@ const categoryMatchSchema = z.preprocess(
 
     const normalized = value.trim().toLowerCase();
 
-    return ['match', 'mismatch', 'unclear'].includes(normalized)
-      ? normalized
-      : 'unclear';
+    if (['match', 'matched', 'same', 'true'].includes(normalized)) {
+      return 'match';
+    }
+
+    if (
+      ['mismatch', 'not_match', 'not_matching', 'different', 'false'].includes(
+        normalized,
+      )
+    ) {
+      return 'mismatch';
+    }
+
+    return 'unclear';
   },
   z.enum(['match', 'mismatch', 'unclear']).optional(),
 );
@@ -61,10 +96,33 @@ const booleanSchema = z.preprocess((value) => {
   return value;
 }, z.boolean().optional());
 
-const imageComplianceSchema = z.object({
+const reasonsSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    return value.trim() ? [value.trim()] : [];
+  }
+
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  return value;
+}, z.array(z.string().trim().min(1).max(600)).default([]));
+
+const imageComplianceSchema = z.preprocess((value) => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return {
+    ...candidate,
+    decision: candidate.decision ?? candidate.status ?? candidate.result,
+    reasons: candidate.reasons ?? candidate.reason ?? candidate.message,
+  };
+}, z.object({
   decision: decisionSchema,
   confidence: confidenceSchema,
-  reasons: z.array(z.string().trim().min(1).max(600)).default([]),
+  reasons: reasonsSchema,
   prohibited_category: optionalModelText(160),
   prohibitedCategory: optionalModelText(160),
   detected_category: optionalModelText(160),
@@ -77,7 +135,7 @@ const imageComplianceSchema = z.object({
   detectedProduct: optionalModelText(240),
   sharia_sensitive: booleanSchema,
   shariaSensitive: booleanSchema,
-});
+}));
 
 export type ImageComplianceDecision = {
   decision: 'allow' | 'block' | 'needs_review';
@@ -149,6 +207,10 @@ const categoryRules: Array<{
   {
     category: 'computers',
     patterns: [/(?:لابتوب|لاب توب|كمبيوتر|ماكبوك|شاشة|كيبورد|طابعة|macbook|laptop|computer|pc|monitor|keyboard|printer)/i],
+  },
+  {
+    category: 'cameras',
+    patterns: [/(?:كاميرا|كاميره|كاميرات|كانون|نيكون|فوجي|سوني الفا|camera|cameras|canon|nikon|fujifilm|sony alpha)/i],
   },
   {
     category: 'real_estate',
