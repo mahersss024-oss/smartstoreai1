@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 type Theme = 'light' | 'dark';
 
 const themeStorageKey = 'theme';
+const themeCookieName = 'theme';
 const themeChangeEvent = 'smartstore-theme-change';
 
 function isTheme(value: string | null): value is Theme {
@@ -23,6 +24,11 @@ function applyTheme(theme: Theme) {
 
   document.documentElement.classList.toggle('dark', theme === 'dark');
   document.documentElement.style.colorScheme = theme;
+}
+
+function persistTheme(theme: Theme) {
+  localStorage.setItem(themeStorageKey, theme);
+  document.cookie = `${themeCookieName}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
 function readTheme(): Theme {
@@ -73,7 +79,7 @@ function ThemeToggle({ language = 'ar' }: ThemeToggleProps) {
 
   const toggleTheme = useCallback(() => {
     const nextTheme: Theme = theme === 'light' ? 'dark' : 'light';
-    localStorage.setItem(themeStorageKey, nextTheme);
+    persistTheme(nextTheme);
     applyTheme(nextTheme);
     window.dispatchEvent(new Event(themeChangeEvent));
   }, [theme]);

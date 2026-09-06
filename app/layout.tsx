@@ -1,8 +1,13 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import Script from "next/script";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { appConfig } from "./app-config";
+
+type Theme = "light" | "dark";
+
+const themeStorageKey = "theme";
+const themeCookieName = "theme";
 
 export const metadata: Metadata = {
   title: appConfig.metadata.title,
@@ -37,12 +42,18 @@ const themeStyle: CSSProperties = {
 const themeInitScript = `
 (function() {
   try {
-    var savedTheme = window.localStorage.getItem('theme');
-    var theme = savedTheme === 'dark' || savedTheme === 'light'
-      ? savedTheme
-      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var storageTheme = window.localStorage.getItem('${themeStorageKey}');
+    var cookieMatch = document.cookie.match(/(?:^|; )${themeCookieName}=(dark|light)(?:;|$)/);
+    var cookieTheme = cookieMatch ? cookieMatch[1] : null;
+    var theme = storageTheme === 'dark' || storageTheme === 'light'
+      ? storageTheme
+      : (cookieTheme === 'dark' || cookieTheme === 'light'
+        ? cookieTheme
+        : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem('${themeStorageKey}', theme);
+    document.cookie = '${themeCookieName}=' + theme + '; Path=/; Max-Age=31536000; SameSite=Lax';
   } catch (error) {
     document.documentElement.classList.remove('dark');
     document.documentElement.style.colorScheme = 'light';
@@ -50,19 +61,36 @@ const themeInitScript = `
 })();
 `;
 
-export default function RootLayout({
+function getTheme(value: string | undefined): Theme | undefined {
+  return value === "dark" || value === "light" ? value : undefined;
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode | React.ReactElement;
 }>) {
+  const cookieStore = await cookies();
+  const initialTheme = getTheme(cookieStore.get(themeCookieName)?.value);
+
   return (
-    <html dir="rtl" lang="ar" style={themeStyle} suppressHydrationWarning>
-      <body className="antialiased">
-        <Script
+    <html
+      className={initialTheme === "dark" ? "dark" : undefined}
+      dir="rtl"
+      lang="ar"
+      style={{
+        ...themeStyle,
+        colorScheme: initialTheme ?? "light",
+      }}
+      suppressHydrationWarning
+    >
+      <head>
+        <script
           id="smartstore-theme-init"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
+      </head>
+      <body className="antialiased">
         {children}
       </body>
     </html>
