@@ -96,6 +96,15 @@ test('routes bead, airsoft, and toy guns to review instead of real weapon block'
   assert.equal(toyGun.decision, 'needs_review');
 });
 
+test('recognizes buyer searches for regulated products before scope routing', () => {
+  const intent = classifyMarketplaceIntent('ابي مسدس خرز');
+  const compliance = evaluateSaudiMarketplaceCompliance('ابي مسدس خرز');
+
+  assert.equal(intent.intent, 'search_listing');
+  assert.equal(compliance.decision, 'needs_review');
+  assert.equal(compliance.prohibitedCategory, 'weapon_lookalike_or_airsoft');
+});
+
 test('blocks clearly real firearms and ammunition', () => {
   const realGun = evaluateSaudiMarketplaceCompliance('مسدس حقيقي للبيع');
   const liveAmmo = evaluateSaudiMarketplaceCompliance('ذخيرة ورصاص حي للبيع');

@@ -51,6 +51,21 @@ const maxChatImageBytes = 12 * 1024 * 1024;
 const rateLimitWindowMs = 60_000;
 const maxRequestsPerWindow = 20;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
+const policyFacilitationIntents = new Set([
+  'search_listing',
+  'create_listing',
+  'update_listing',
+  'delete_listing',
+  'pause_listing',
+  'mark_sold',
+  'open_conversation',
+  'send_message',
+  'favorite_listing',
+  'report_listing',
+  'compare_listings',
+  'price_listing',
+  'negotiate',
+]);
 const supportedChatImageMimeTypes = new Set([
   'image/jpeg',
   'image/png',
@@ -111,6 +126,10 @@ function checkRateLimit(clientId: string) {
 
   bucket.count += 1;
   return null;
+}
+
+function isPolicyFacilitationIntent(intent: string) {
+  return policyFacilitationIntents.has(intent);
 }
 
 type ChatRequestBody = {
@@ -730,7 +749,7 @@ export async function POST(request: Request) {
 
   if (
     preliminaryComplianceDecision.decision === 'needs_review' &&
-    preliminaryIntent.intent === 'create_listing'
+    isPolicyFacilitationIntent(preliminaryIntent.intent)
   ) {
     return generateProfessionalChatIssueResponse({
       kind: 'text_policy_review',
@@ -801,8 +820,8 @@ export async function POST(request: Request) {
 
   if (
     complianceDecision.decision === 'needs_review' &&
-    (marketplaceIntent.intent === 'create_listing' ||
-      adaptiveIntent.intent === 'create_listing')
+    (isPolicyFacilitationIntent(marketplaceIntent.intent) ||
+      isPolicyFacilitationIntent(adaptiveIntent.intent))
   ) {
     return generateProfessionalChatIssueResponse({
       kind: 'text_policy_review',

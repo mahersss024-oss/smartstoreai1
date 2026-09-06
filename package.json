@@ -63,6 +63,7 @@
   "pnpm": {
     "overrides": {
       "@babel/core": "7.29.6",
+      "browserslist": "4.28.7",
       "mdast-util-to-hast": "13.2.1"
     }
   }
