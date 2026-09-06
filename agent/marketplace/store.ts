@@ -284,50 +284,6 @@ function ensureCommissionForSoldListing(listing: ListingRecord) {
 
 function seedListings() {
   loadStore();
-
-  if (listings.size > 0) {
-    return;
-  }
-
-  const samples: CreateListingDraftInput[] = [
-    {
-      id: 'seed-iphone-14-pro-256gb',
-      sellerId: 'seed:seller-1',
-      category: 'mobile_phones',
-      title: 'آيفون 14 برو 256GB',
-      description: 'جهاز نظيف مع الكرتون، مناسب للاستخدام اليومي.',
-      price: 3200,
-      city: 'الرياض',
-      condition: 'like_new',
-    },
-    {
-      id: 'seed-toyota-camry-2020',
-      sellerId: 'seed:seller-2',
-      category: 'cars',
-      title: 'تويوتا كامري 2020',
-      description: 'سيارة استخدام شخصي، القير والمكينة بحالة جيدة.',
-      price: 48500,
-      city: 'جدة',
-      condition: 'used',
-    },
-    {
-      id: 'seed-macbook-pro',
-      sellerId: 'seed:seller-3',
-      category: 'computers',
-      title: 'لابتوب ماك بوك برو',
-      description: 'لابتوب مناسب للعمل والدراسة.',
-      price: 3800,
-      city: 'الدمام',
-      condition: 'used',
-    },
-  ];
-
-  for (const sample of samples) {
-    const listing = createListingDraft(sample);
-    publishListing(listing.id);
-  }
-
-  persistStore();
 }
 
 export function createListingDraft(input: CreateListingDraftInput): ListingRecord {

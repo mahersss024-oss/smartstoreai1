@@ -141,52 +141,7 @@ type StoredChatState = {
   updatedAt: number;
 };
 
-const featuredListings: ListingCard[] = [
-  {
-    title: 'آيفون 14 برو 256GB',
-    price: '3,200 ر.س',
-    city: 'الرياض',
-    category: 'الجوالات',
-    description: 'نظيف مع الكرتون والملحقات',
-    image:
-      'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?auto=format&fit=crop&w=900&q=80',
-    stats: '124 مشاهدة · 6 رسائل',
-    status: 'موثق',
-  },
-  {
-    title: 'تويوتا كامري 2020',
-    price: '48,500 ر.س',
-    city: 'جدة',
-    category: 'السيارات',
-    description: 'استخدام شخصي وفحص حديث',
-    image:
-      'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=900&q=80',
-    stats: '310 مشاهدة · 14 رسائل',
-    status: 'موثق',
-  },
-  {
-    title: 'كاميرا فوجي فيلم',
-    price: '2,450 ر.س',
-    city: 'الخبر',
-    category: 'الأجهزة',
-    description: 'عدسة أصلية وحالة ممتازة',
-    image:
-      'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
-    stats: '76 مشاهدة · 4 رسائل',
-    status: 'موثق',
-  },
-  {
-    title: 'كرسي تصميم حديث',
-    price: '420 ر.س',
-    city: 'الرياض',
-    category: 'الأثاث',
-    description: 'مناسب للمكتب أو غرفة المعيشة',
-    image:
-      'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80',
-    stats: '53 مشاهدة · 2 رسائل',
-    status: 'موثق',
-  },
-];
+const featuredListings: ListingCard[] = [];
 
 const starters = [
   'أريد بيع منتج',
