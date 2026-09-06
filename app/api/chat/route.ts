@@ -43,6 +43,7 @@ import {
 } from '@/agent/vision-messages';
 import type { AppLanguage } from '@/app/i18n';
 import { getAuthSession } from '@/lib/auth/session';
+import { getSafeAssistantText } from '@/lib/chat-response-safety';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
@@ -471,7 +472,7 @@ async function generateCheckedAssistantResponse(
   try {
     const chatAgent = createChatAgent(session, options);
     const firstResult = await chatAgent.generate({ messages });
-    const firstText = firstResult.text.trim();
+    const firstText = getSafeAssistantText(firstResult.text);
 
     if (firstText) {
       const firstOutputDecision = await checkOutputScope({
@@ -494,7 +495,7 @@ async function generateCheckedAssistantResponse(
         ...messages,
       ],
     });
-    const retryText = retryResult.text.trim();
+    const retryText = getSafeAssistantText(retryResult.text);
 
     if (retryText) {
       const retryOutputDecision = await checkOutputScope({
@@ -634,7 +635,7 @@ Use the user's language. Language=${input.language}.`,
         },
       ],
     });
-    let responseText = result.text.trim();
+    let responseText = getSafeAssistantText(result.text);
 
     if (responseText) {
       if (input.kind === 'auth_required') {

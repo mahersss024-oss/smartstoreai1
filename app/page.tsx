@@ -58,6 +58,10 @@ import {
   PromptInputTools,
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
+import {
+  chatServiceUnavailableMessage,
+  isRawServiceErrorResponse,
+} from '@/lib/chat-response-safety';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
@@ -664,10 +668,49 @@ function AssistantMessageFrame({ children }: { children: ReactNode }) {
   );
 }
 
+const guardedChatFetch: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!response.ok) {
+    let text = '';
+
+    try {
+      text = await response.clone().text();
+    } catch {
+      text = '';
+    }
+
+    if (contentType.includes('text/html') || isRawServiceErrorResponse(text)) {
+      throw new Error(chatServiceUnavailableMessage);
+    }
+
+    throw new Error(chatServiceUnavailableMessage);
+  }
+
+  if (contentType.includes('text/html')) {
+    const text = await response.clone().text();
+
+    if (isRawServiceErrorResponse(text)) {
+      throw new Error(chatServiceUnavailableMessage);
+    }
+  }
+
+  return response;
+};
+
 export default function Page() {
   const router = useRouter();
+  const chatTransport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        fetch: guardedChatFetch,
+      }),
+    [],
+  );
   const { messages, sendMessage, status, error, setMessages } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    transport: chatTransport,
   });
   const [session, setSession] = useState<AuthSessionPayload>({
     authenticated: false,
