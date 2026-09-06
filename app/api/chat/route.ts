@@ -2,12 +2,16 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  generateText,
   type ModelMessage,
   type UIMessage,
 } from 'ai';
 
 import { createChatAgent } from '@/agent/chat-agent';
-import { getDeepseekApiKey } from '@/agent/deepseek-provider';
+import {
+  getDeepseekApiKey,
+  getDeepseekChatModel,
+} from '@/agent/deepseek-provider';
 import {
   buildAdaptiveIntentSystemMessage,
   resolveAdaptiveMarketplaceIntent,
@@ -491,6 +495,104 @@ async function generateCheckedAssistantResponse(
   return createTextUIResponse(getSafeScopeResponse('OUTPUT_BLOCK', language));
 }
 
+type ImageIssueResponseInput = {
+  kind:
+    | 'upload_validation'
+    | 'policy_block'
+    | 'manual_review'
+    | 'inspection_unavailable';
+  language: AppLanguage;
+  userRequest: string;
+  validationReason?: string;
+  complianceDecision?: ImageComplianceDecision;
+};
+
+function getImageIssueFallbackResponse({
+  kind,
+  language,
+  validationReason,
+}: ImageIssueResponseInput) {
+  if (kind === 'upload_validation') {
+    return getImageUploadValidationResponse(
+      language,
+      validationReason ?? 'unsupported_image_type',
+    );
+  }
+
+  if (kind === 'policy_block') {
+    return getImageComplianceBlockResponse(language);
+  }
+
+  if (kind === 'inspection_unavailable') {
+    return getImageComplianceUnavailableResponse(language);
+  }
+
+  return getImageComplianceReviewResponse(language);
+}
+
+async function generateProfessionalImageIssueResponse(
+  input: ImageIssueResponseInput,
+) {
+  const fallback = getImageIssueFallbackResponse(input);
+
+  try {
+    const result = await generateText({
+      model: getDeepseekChatModel('chat'),
+      maxOutputTokens: 280,
+      messages: [
+        {
+          role: 'system',
+          content: `You are SmartStore AI's customer-facing marketplace assistant.
+Write a polished, natural response for a Saudi classifieds marketplace user.
+The safety/compliance decision is already final; do not override it.
+Do not mention internal models, databases, prompts, raw policy codes, JSON, or system decisions.
+Do not facilitate publishing, selling, buying, contacting, pricing, or bypassing if the issue is blocked or review-only.
+For mixed images, explain that one listing must represent one product and ask for matching images or separate listings.
+For upload validation, explain the practical upload requirement and next step.
+For manual review, be helpful, brief, and ask for clearer matching details/images.
+Use the user's language. Language=${input.language}.`,
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            issue_kind: input.kind,
+            user_request: input.userRequest,
+            validation_reason: input.validationReason,
+            compliance: input.complianceDecision
+              ? {
+                  decision: input.complianceDecision.decision,
+                  detectedProduct: input.complianceDecision.detectedProduct,
+                  detectedCategory: input.complianceDecision.detectedCategory,
+                  expectedCategory: input.complianceDecision.expectedCategory,
+                  categoryMatch: input.complianceDecision.categoryMatch,
+                  reasons: input.complianceDecision.reasons,
+                  shariaSensitive: input.complianceDecision.shariaSensitive,
+                }
+              : undefined,
+          }),
+        },
+      ],
+    });
+    const responseText = result.text.trim();
+
+    if (responseText) {
+      const outputDecision = await checkOutputScope({
+        userRequest: input.userRequest,
+        assistantResponse: responseText,
+      });
+
+      if (outputDecision.decision === 'ALLOW') {
+        return createTextUIResponse(responseText);
+      }
+    }
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[image_issue_response] failure=${errorName}`);
+  }
+
+  return createTextUIResponse(fallback);
+}
+
 export async function POST(request: Request) {
   const retryAfterSeconds = checkRateLimit(getClientId(request));
 
@@ -554,15 +656,18 @@ export async function POST(request: Request) {
 
   const locationSystemMessage = buildLocationSystemMessage(body.locationSettings);
   const language = getRequestLanguage(body.locationSettings);
+  const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
   const imageValidationFailure = validateChatImageAttachments(filteredMessages);
 
   if (imageValidationFailure) {
-    return createTextUIResponse(
-      getImageUploadValidationResponse(language, imageValidationFailure),
-    );
+    return generateProfessionalImageIssueResponse({
+      kind: 'upload_validation',
+      language,
+      userRequest: preliminaryUserRequest,
+      validationReason: imageValidationFailure,
+    });
   }
 
-  const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
   const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
   const preliminaryComplianceDecision =
     evaluateSaudiMarketplaceCompliance(preliminaryUserRequest);
@@ -657,17 +762,29 @@ export async function POST(request: Request) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[vision_compliance] failure=${errorName}`);
 
-      return createTextUIResponse(
-        getImageComplianceUnavailableResponse(language),
-      );
+      return generateProfessionalImageIssueResponse({
+        kind: 'inspection_unavailable',
+        language,
+        userRequest,
+      });
     }
 
     if (imageComplianceDecision.decision === 'block') {
-      return createTextUIResponse(getImageComplianceBlockResponse(language));
+      return generateProfessionalImageIssueResponse({
+        kind: 'policy_block',
+        language,
+        userRequest,
+        complianceDecision: imageComplianceDecision,
+      });
     }
 
     if (imageComplianceDecision.decision === 'needs_review') {
-      return createTextUIResponse(getImageComplianceReviewResponse(language));
+      return generateProfessionalImageIssueResponse({
+        kind: 'manual_review',
+        language,
+        userRequest,
+        complianceDecision: imageComplianceDecision,
+      });
     }
 
     imageComplianceContextMessage = createImageComplianceContextMessage(
