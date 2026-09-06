@@ -3,6 +3,11 @@ import { z } from 'zod';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
 import {
+  saveUploadedListingImagesForSeller,
+  type UploadedListingImage,
+} from '@/agent/marketplace/listing-image-storage';
+import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
+import {
   createConversationForListing,
   createListingDraft,
   listMarketplaceListings,
@@ -46,7 +51,50 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
   };
 }
 
-export function createMarketplaceTools(session: AuthSession | null) {
+function buildListingText(input: {
+  category: string;
+  title?: string;
+  description?: string;
+  city?: string;
+  condition?: string;
+}) {
+  return [
+    input.category,
+    input.title,
+    input.description,
+    input.city,
+    input.condition,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function buildImageReviewMessages(
+  images: UploadedListingImage[],
+  listingText: string,
+) {
+  return [
+    {
+      role: 'user' as const,
+      content: [
+        {
+          type: 'text' as const,
+          text: `Listing text: ${listingText}`,
+        },
+        ...images.map((image) => ({
+          type: 'file' as const,
+          mediaType: image.mediaType,
+          data: image.data,
+        })),
+      ],
+    },
+  ];
+}
+
+export function createMarketplaceTools(
+  session: AuthSession | null,
+  options: { latestUploadedImages?: UploadedListingImage[] } = {},
+) {
   return {
     searchMarketplaceListings: tool({
       description:
@@ -88,7 +136,7 @@ export function createMarketplaceTools(session: AuthSession | null) {
           return authRequired();
         }
 
-        const listing = await createListingDraft(session.user, input);
+        let listing = await createListingDraft(session.user, input);
 
         if (listing.compliance.decision === 'block') {
           return {
@@ -99,12 +147,71 @@ export function createMarketplaceTools(session: AuthSession | null) {
           };
         }
 
+        if (options.latestUploadedImages?.length) {
+          const listingText = buildListingText(input);
+          let imageCompliance: Awaited<
+            ReturnType<typeof checkImageMarketplaceCompliance>
+          >;
+
+          try {
+            imageCompliance = await checkImageMarketplaceCompliance({
+              messages: buildImageReviewMessages(
+                options.latestUploadedImages,
+                listingText,
+              ),
+              userRequest: listingText,
+              language: 'ar',
+              expectedCategory: input.category,
+              listingText,
+            });
+          } catch {
+            return {
+              status: 'image_review_unavailable',
+              message:
+                'The draft was created, but the uploaded image could not be reviewed or saved. Do not publish until image review succeeds.',
+              listing,
+            };
+          }
+
+          if (imageCompliance.decision === 'block') {
+            return {
+              status: 'blocked',
+              message:
+                'The draft was created, but the uploaded image is blocked by Saudi marketplace and Islamic compliance policy. Do not publish.',
+              listing,
+              compliance: imageCompliance,
+            };
+          }
+
+          if (imageCompliance.decision === 'needs_review') {
+            return {
+              status: 'needs_review',
+              message:
+                'The draft was created, but the uploaded image needs manual review before publishing.',
+              listing,
+              compliance: imageCompliance,
+            };
+          }
+
+          const listingWithImages = await saveUploadedListingImagesForSeller({
+            listingId: listing.id,
+            sellerId: session.user.id,
+            images: options.latestUploadedImages,
+          });
+
+          if (listingWithImages) {
+            listing = listingWithImages;
+          }
+        }
+
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'draft_created',
           message:
             listing.status === 'pending'
               ? 'Draft created for manual review. Do not publish directly.'
-              : 'Draft created. Ask for missing details, images, and final confirmation before publishing.',
+              : listing.images.some((image) => image.status === 'approved')
+                ? 'Draft created with the uploaded product image. Ask for final confirmation before publishing.'
+                : 'Draft created. Ask for missing details, images, and final confirmation before publishing.',
           listing,
         };
       },

@@ -29,6 +29,10 @@ import {
   type ImageComplianceDecision,
 } from '@/agent/marketplace/vision-compliance';
 import {
+  extractLatestUploadedListingImages,
+  type UploadedListingImage,
+} from '@/agent/marketplace/listing-image-storage';
+import {
   applyAllowedRequestToLatestUserMessage,
   checkInputScope,
   checkOutputScope,
@@ -482,7 +486,10 @@ async function generateCheckedAssistantResponse(
   userRequest: string,
   language: AppLanguage,
   session: ReturnType<typeof getAuthSession>,
-  options: { hasVisionInput?: boolean } = {},
+  options: {
+    hasVisionInput?: boolean;
+    latestUploadedImages?: UploadedListingImage[];
+  } = {},
 ) {
   try {
     const chatAgent = createChatAgent(session, options);
@@ -850,6 +857,8 @@ export async function POST(request: Request) {
   const modelMessages = normalizeModelMessageFileData(
     convertToModelMessages(scopedMessages as UIMessage[]),
   );
+  const latestUploadedImages =
+    extractLatestUploadedListingImages(modelMessages);
   const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
   let imageComplianceContextMessage: ModelMessage | null = null;
 
@@ -935,6 +944,6 @@ export async function POST(request: Request) {
     userRequest,
     language,
     session,
-    { hasVisionInput: false },
+    { hasVisionInput: false, latestUploadedImages },
   );
 }
