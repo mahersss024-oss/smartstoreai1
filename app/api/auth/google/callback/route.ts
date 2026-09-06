@@ -47,37 +47,55 @@ async function persistGoogleUserRegistration(
   user: AuthSessionUser,
 ) {
   if (!shouldPersistUserRegistration()) {
-    return;
+    return user;
   }
 
   const commissionAgreement = getCommissionAgreement(request);
+  const registrationData = {
+    email: user.email,
+    name: user.name,
+    picture: user.picture,
+    commissionAgreementVersion: commissionAgreement
+      ? commissionAgreementVersion
+      : undefined,
+    commissionAgreementAccepted: commissionAgreement
+      ? new Date(commissionAgreement.acceptedAt * 1000)
+      : undefined,
+  };
 
-  await prisma.user.upsert({
+  const existingUserByEmail = await prisma.user.findUnique({
+    where: { email: user.email },
+  });
+
+  if (existingUserByEmail && existingUserByEmail.id !== user.id) {
+    const updatedUser = await prisma.user.update({
+      where: { email: user.email },
+      data: registrationData,
+    });
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name ?? undefined,
+      picture: updatedUser.picture ?? undefined,
+    };
+  }
+
+  const updatedUser = await prisma.user.upsert({
     where: { id: user.id },
     create: {
       id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      commissionAgreementVersion: commissionAgreement
-        ? commissionAgreementVersion
-        : undefined,
-      commissionAgreementAccepted: commissionAgreement
-        ? new Date(commissionAgreement.acceptedAt * 1000)
-        : undefined,
+      ...registrationData,
     },
-    update: {
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      commissionAgreementVersion: commissionAgreement
-        ? commissionAgreementVersion
-        : undefined,
-      commissionAgreementAccepted: commissionAgreement
-        ? new Date(commissionAgreement.acceptedAt * 1000)
-        : undefined,
-    },
+    update: registrationData,
   });
+
+  return {
+    id: updatedUser.id,
+    email: updatedUser.email,
+    name: updatedUser.name ?? undefined,
+    picture: updatedUser.picture ?? undefined,
+  };
 }
 
 export async function GET(request: Request) {
@@ -139,9 +157,10 @@ export async function GET(request: Request) {
     name: userInfo.name,
     picture: userInfo.picture,
   };
+  let registeredUser = user;
 
   try {
-    await persistGoogleUserRegistration(request, user);
+    registeredUser = await persistGoogleUserRegistration(request, user);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.error(`[google_auth] registration_failed=${errorName}`);
@@ -151,5 +170,5 @@ export async function GET(request: Request) {
     });
   }
 
-  return redirectToHome(request, createSessionCookie(user));
+  return redirectToHome(request, createSessionCookie(registeredUser));
 }
