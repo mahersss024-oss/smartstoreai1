@@ -12,12 +12,31 @@ type Theme = 'light' | 'dark';
 const themeStorageKey = 'theme';
 const themeChangeEvent = 'smartstore-theme-change';
 
+function isTheme(value: string | null): value is Theme {
+  return value === 'light' || value === 'dark';
+}
+
+function applyTheme(theme: Theme) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.documentElement.style.colorScheme = theme;
+}
+
 function readTheme(): Theme {
   if (typeof window === 'undefined') {
     return 'light';
   }
 
-  return (localStorage.getItem(themeStorageKey) as Theme | null) === 'dark'
+  const storedTheme = localStorage.getItem(themeStorageKey);
+
+  if (isTheme(storedTheme)) {
+    return storedTheme;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light';
 }
@@ -35,8 +54,8 @@ function subscribe(callback: () => void) {
   };
 }
 
-function useTheme() {
-  return useSyncExternalStore(subscribe, readTheme, () => 'light');
+function useTheme(): Theme {
+  return useSyncExternalStore<Theme>(subscribe, readTheme, () => 'light');
 }
 
 type ThemeToggleProps = {
@@ -49,13 +68,13 @@ function ThemeToggle({ language = 'ar' }: ThemeToggleProps) {
   const label = theme === 'light' ? copy.themeToDark : copy.themeToLight;
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    applyTheme(theme);
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
     const nextTheme: Theme = theme === 'light' ? 'dark' : 'light';
     localStorage.setItem(themeStorageKey, nextTheme);
-    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+    applyTheme(nextTheme);
     window.dispatchEvent(new Event(themeChangeEvent));
   }, [theme]);
 

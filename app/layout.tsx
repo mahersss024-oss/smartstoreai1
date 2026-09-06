@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { appConfig } from "./app-config";
 
@@ -33,14 +34,35 @@ const themeStyle: CSSProperties = {
   ),
 };
 
+const themeInitScript = `
+(function() {
+  try {
+    var savedTheme = window.localStorage.getItem('theme');
+    var theme = savedTheme === 'dark' || savedTheme === 'light'
+      ? savedTheme
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.style.colorScheme = theme;
+  } catch (error) {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.style.colorScheme = 'light';
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode | React.ReactElement;
 }>) {
   return (
-    <html dir="rtl" lang="ar" style={themeStyle}>
+    <html dir="rtl" lang="ar" style={themeStyle} suppressHydrationWarning>
       <body className="antialiased">
+        <Script
+          id="smartstore-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
         {children}
       </body>
     </html>
