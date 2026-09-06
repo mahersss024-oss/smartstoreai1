@@ -99,6 +99,7 @@ type ApiListingRecord = {
   description?: string;
   price?: number | 'bid' | 'negotiable';
   city?: string;
+  image?: string;
   status?: string;
   views?: number;
   messageCount?: number;
@@ -363,6 +364,59 @@ function formatCategory(category: string) {
   return labels[category] ?? category;
 }
 
+type SearchToolOutput = {
+  status?: unknown;
+  listings?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isSearchToolOutput(value: unknown): value is SearchToolOutput {
+  return (
+    isRecord(value) &&
+    value.status === 'searched' &&
+    Array.isArray(value.listings)
+  );
+}
+
+function getLatestSearchToolOutput(messages: UIMessage[]) {
+  const latestUserMessageIndex = messages.findLastIndex(
+    (message) => message.role === 'user',
+  );
+  const firstEligibleAssistantIndex =
+    latestUserMessageIndex === -1 ? 0 : latestUserMessageIndex + 1;
+
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    if (messageIndex < firstEligibleAssistantIndex) {
+      break;
+    }
+
+    const message = messages[messageIndex];
+
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+
+      if (
+        part.type === 'tool-searchMarketplaceListings' &&
+        'state' in part &&
+        part.state === 'output-available' &&
+        'output' in part &&
+        isSearchToolOutput(part.output)
+      ) {
+        return part.output;
+      }
+    }
+  }
+
+  return null;
+}
+
 function listingRecordToCard(listing: ApiListingRecord, index: number): ListingCard {
   const primaryImage = listing.images?.find(
     (image) => image.status === 'approved',
@@ -376,6 +430,7 @@ function listingRecordToCard(listing: ApiListingRecord, index: number): ListingC
     category: formatCategory(listing.category),
     description: listing.description,
     image:
+      listing.image ??
       primaryImage?.thumbnailUrl ??
       primaryImage?.displayUrl ??
       primaryImage?.originalUrl ??
@@ -553,6 +608,19 @@ export default function Page() {
 
     return `${status}-${filteredMessages.length}-${lastMessage?.id ?? 'empty'}-${lastTextLength}`;
   }, [filteredMessages, status]);
+  const latestSearchToolOutput = useMemo(
+    () => getLatestSearchToolOutput(filteredMessages),
+    [filteredMessages],
+  );
+  const displayedMarketplaceListings = useMemo(() => {
+    if (latestSearchToolOutput) {
+      return (latestSearchToolOutput.listings as ApiListingRecord[]).map(
+        listingRecordToCard,
+      );
+    }
+
+    return marketplaceListings;
+  }, [latestSearchToolOutput, marketplaceListings]);
 
   const refreshMarketplaceListings = useCallback((query?: string) => {
     const params = new URLSearchParams();
@@ -614,6 +682,10 @@ export default function Page() {
       return;
     }
 
+    if (latestSearchToolOutput) {
+      return;
+    }
+
     const lastAssistantMessage = [...filteredMessages]
       .reverse()
       .find((message) => message.role === 'assistant');
@@ -630,6 +702,7 @@ export default function Page() {
   }, [
     activeListingQuery,
     filteredMessages,
+    latestSearchToolOutput,
     refreshMarketplaceListings,
     status,
   ]);
@@ -833,7 +906,7 @@ export default function Page() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {marketplaceListings.map((listing) => (
+                {displayedMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
                     listing={listing}
@@ -844,7 +917,7 @@ export default function Page() {
                 ))}
               </div>
 
-              {marketplaceListings.length === 0 && (
+              {displayedMarketplaceListings.length === 0 && (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed bg-white p-6 text-center dark:bg-card">
                   <div className="grid max-w-sm gap-3">
                     <Sparkles className="mx-auto size-9 text-blue-600" />
