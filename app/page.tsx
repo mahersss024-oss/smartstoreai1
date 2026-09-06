@@ -705,6 +705,7 @@ export default function Page() {
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
+        credentials: 'include',
         fetch: guardedChatFetch,
       }),
     [],

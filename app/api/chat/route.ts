@@ -322,6 +322,21 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
   } satisfies ModelMessage;
 }
 
+function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
+  if (!session) {
+    return {
+      role: 'system',
+      content:
+        'Authenticated user context: signed_in=false. Account-bound marketplace actions require Google sign-in before tools can create, publish, edit, favorite, report, message, or mark listings sold.',
+    } satisfies ModelMessage;
+  }
+
+  return {
+    role: 'system',
+    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
+  } satisfies ModelMessage;
+}
+
 function getRequestLanguage(settings: LocationSettings | undefined): AppLanguage {
   return settings?.language === 'en' ? 'en' : 'ar';
 }
@@ -900,10 +915,12 @@ export async function POST(request: Request) {
 
   const adaptiveIntentSystemMessage =
     buildAdaptiveIntentSystemMessage(adaptiveIntent);
+  const authSystemMessage = buildAuthSystemMessage(session);
   const assistantModelMessages = hasVisionInput
     ? stripImageAttachmentsFromModelMessages(modelMessages)
     : modelMessages;
   const internalContextMessages = [
+    authSystemMessage,
     ...(locationSystemMessage ? [locationSystemMessage] : []),
     adaptiveIntentSystemMessage,
     ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),

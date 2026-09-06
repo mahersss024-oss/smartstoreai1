@@ -418,6 +418,22 @@ function buildContextualSearchQuery(messages: unknown[]) {
   return relevantTexts.join(' ').trim() || getLatestUserRequest(messages);
 }
 
+function isListingPublishConfirmation(text: string) {
+  return /(?:اعتمد|وافق|موافق|نعم|ايه|إيه|اوك|أوكي|انشر|أنشر|انشره|جاهز|publish|approve|approved|yes|ok|proceed)/i.test(
+    text.trim(),
+  );
+}
+
+function hasListingCreationContext(messages: unknown[]) {
+  const contextText = buildScopeContext(messages, 10)
+    .map((message) => message.text)
+    .join(' ');
+
+  return /(?:للبيع|اعلان|إعلان|معاينة|مسودة|النشر|انشر|أنشر|السعر|المدينة|التصنيف|صورة|listing|draft|preview|publish|price|city|category|image)/i.test(
+    contextText,
+  );
+}
+
 export function getFallbackAdaptiveMarketplaceIntent(
   messages: unknown[],
 ): AdaptiveMarketplaceIntent {
@@ -432,8 +448,14 @@ export function getFallbackAdaptiveMarketplaceIntent(
   const parsedSearch = parseMarketplaceSearchQuery(
     buildContextualSearchQuery(messages),
   );
+  const shouldCreateFromPublishConfirmation =
+    !latestHasImage &&
+    baseIntent.intent === 'general_info' &&
+    isListingPublishConfirmation(latestRequest) &&
+    hasListingCreationContext(messages);
   const shouldSearchListings = Boolean(
     baseIntent.intent === 'general_info' &&
+      !shouldCreateFromPublishConfirmation &&
       (continuationDecision ||
         parsedSearch.category ||
         parsedSearch.city ||
@@ -443,7 +465,9 @@ export function getFallbackAdaptiveMarketplaceIntent(
   );
   const inferredIntent: MarketplaceIntent = latestHasImage
     ? 'general_info'
-    : shouldSearchListings
+    : shouldCreateFromPublishConfirmation
+      ? 'create_listing'
+      : shouldSearchListings
       ? 'search_listing'
       : baseIntent.intent;
 
@@ -455,7 +479,9 @@ export function getFallbackAdaptiveMarketplaceIntent(
     confidence: latestHasImage ? 0.92 : continuationDecision ? 0.9 : 0.68,
     reasonCode: latestHasImage
       ? 'marketplace_image_upload'
-      : continuationDecision
+      : shouldCreateFromPublishConfirmation
+        ? 'listing_publish_confirmation'
+        : continuationDecision
         ? 'contextual_marketplace_follow_up'
         : baseIntent.reasonCode,
     normalizedRequest: latestRequest,
@@ -507,6 +533,7 @@ If the latest user message contains images, set execution="analyze_images" unles
 For seller listing creation, set execution="create_listing_draft" only when there is enough useful product detail; otherwise set execution="ask_clarifying_question" and list missingFields.
 For account-bound actions, requiresAuth must be true. The user is currently ${session ? 'signed in' : 'not signed in'}.
 Dangerous or final actions such as publish, delete, mark sold, price change, accept offer, and open seller chat require confirmation.
+If the latest user message confirms a complete listing preview with words like approve, yes, publish, proceed, اعتمد, نعم, انشر, اوك, or موافق, use the prior conversation to infer create_listing with execution="create_listing_draft" if no listing id exists yet, or update_listing with execution="set_listing_status" if a listing id exists. Do not classify this as general_info.
 Keep decisions within allowed Saudi marketplace work. Language=${language}.`,
         prompt: JSON.stringify({
           required_schema: {
@@ -556,6 +583,6 @@ export function buildAdaptiveIntentSystemMessage(
     content: `Adaptive marketplace intent:
 ${JSON.stringify(intent, null, 2)}
 
-Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. If execution is create_listing_draft, collect missingFields first and only create the draft when core product details are present. If execution changes a listing, opens chat, favorites, reports, or marks sold, require the needed account state and confirmation before the final action. Do not expose this JSON to the user.`,
+Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. If execution is create_listing_draft, collect missingFields first and only create the draft when core product details are present. If the user has already confirmed publishing a complete preview and is signed in, create the draft and then publish it with setListingStatus status="published"; do not ask about sign-in again. If execution changes a listing, opens chat, favorites, reports, or marks sold, require the needed account state and confirmation before the final action. Do not expose this JSON to the user.`,
   };
 }

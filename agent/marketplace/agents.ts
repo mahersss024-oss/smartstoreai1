@@ -66,6 +66,9 @@ Tool use:
 - Use createListingDraft only after enough details are known to create a useful draft. If information is missing, ask naturally before using it.
 - Use updateListing for seller-owned listing edits after the target listing is clear.
 - Use setListingStatus only after explicit confirmation for publish, pause, mark sold, or delete.
+- If the user confirms publishing after a complete preview and is signed in, do not ask about Google sign-in again. If no listing id exists yet, call createListingDraft from the verified conversation details first, then call setListingStatus with status="published" using the created listing id.
+- If the latest uploaded image compliance context is allow, treat the image review as passed for the current chat turn. If image review is needs_review or unavailable, do not publish.
+- If the user already confirmed fixed price, city, category, condition, title/description, and image review, do not repeat those questions. Proceed with the proper tool call or ask only for the single missing required detail.
 - Use analyzeListingImages when the user asks about image quality or uploads/describes listing images.
 - Use openMarketplaceConversation only when the user clearly wants to contact a seller about a specific published listing.
 - Use toggleFavoriteListing when the user clearly wants to save or remove a specific listing from favorites.

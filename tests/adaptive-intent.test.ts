@@ -68,6 +68,35 @@ test('routes seller listing requests to authenticated draft creation', () => {
   assert.equal(intent.requiresConfirmation, true);
 });
 
+test('routes listing approval follow-ups to draft creation', () => {
+  const intent = getFallbackAdaptiveMarketplaceIntent([
+    {
+      role: 'user',
+      parts: [
+        {
+          type: 'text',
+          text: 'للنشر، كرسي مكتب مستعمل في تبوك سعره ثابت 30 ريال',
+        },
+      ],
+    },
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'text',
+          text: 'معاينة الإعلان: كرسي مكتب، السعر 30 ريال، المدينة تبوك، التصنيف أثاث. هل توافق على النشر؟',
+        },
+      ],
+    },
+    { role: 'user', parts: [{ type: 'text', text: 'اعتمد الإعلان' }] },
+  ]);
+
+  assert.equal(intent.intent, 'create_listing');
+  assert.equal(intent.execution, 'create_listing_draft');
+  assert.equal(intent.reasonCode, 'listing_publish_confirmation');
+  assert.equal(intent.requiresAuth, true);
+});
+
 test('routes image-only messages to listing image analysis', () => {
   const intent = getFallbackAdaptiveMarketplaceIntent([
     {
