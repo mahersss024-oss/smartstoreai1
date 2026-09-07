@@ -10,6 +10,7 @@ import {
   listModerationQueue,
   listMarketplaceListings,
   listAdminCommissions,
+  listSellerListings,
   listSellerCommissions,
   listUserConversations,
   listUserFavorites,
@@ -315,6 +316,24 @@ test('searches published marketplace listings by buyer query', () => {
   const results = listMarketplaceListings({ query: 'أبحث عن ساعة زرقاء في الرياض' });
 
   assert.equal(results.some((result) => result.id === listing.id), true);
+});
+
+test('hides deleted seller listings from account views', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:deleted-list',
+    category: 'furniture',
+    title: 'كرسي مكتب',
+    price: 30,
+  });
+
+  setListingStatusForSeller(listing.id, 'seller:deleted-list', 'deleted');
+
+  assert.equal(
+    listSellerListings('seller:deleted-list').some(
+      (result) => result.id === listing.id,
+    ),
+    false,
+  );
 });
 
 test('flags low resolution images for retake', () => {

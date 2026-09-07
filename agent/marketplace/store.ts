@@ -524,7 +524,9 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
 export function listSellerListings(sellerId: string) {
   seedListings();
   return [...listings.values()]
-    .filter((listing) => listing.sellerId === sellerId)
+    .filter(
+      (listing) => listing.sellerId === sellerId && listing.status !== 'deleted',
+    )
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 

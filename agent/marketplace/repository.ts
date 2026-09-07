@@ -442,7 +442,10 @@ export async function listSellerListings(sellerId: string) {
   }
 
   const listings = await prisma.listing.findMany({
-    where: { sellerId },
+    where: {
+      sellerId,
+      status: { not: 'deleted' },
+    },
     include: {
       images: {
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],

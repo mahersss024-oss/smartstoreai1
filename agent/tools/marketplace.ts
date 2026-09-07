@@ -15,6 +15,7 @@ import {
   setListingStatusForSeller,
   toggleFavoriteListing,
   updateListingForSeller,
+  type CreateListingInput,
 } from '@/agent/marketplace/repository';
 import type { AuthSession } from '@/lib/auth/session';
 
@@ -57,6 +58,7 @@ function buildListingText(input: {
   description?: string;
   city?: string;
   condition?: string;
+  attributes?: Record<string, unknown>;
 }) {
   return [
     input.category,
@@ -64,9 +66,78 @@ function buildListingText(input: {
     input.description,
     input.city,
     input.condition,
+    Object.values(input.attributes ?? {}).join(' '),
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+const listingDetailsSchema = {
+  category: z.string().min(2),
+  title: z.string().min(2).optional(),
+  description: z.string().min(2).optional(),
+  price: z
+    .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
+    .optional(),
+  city: z.string().min(2).optional(),
+  condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
+  saleTerms: z
+    .enum(['fixed', 'negotiable', 'auction', 'open_to_offers'])
+    .describe(
+      'Use fixed when the seller says the numeric price is not negotiable.',
+    )
+    .optional(),
+  usageNotes: z
+    .string()
+    .min(2)
+    .describe('Short honest usage details confirmed by the seller.')
+    .optional(),
+  defects: z
+    .string()
+    .min(2)
+    .describe('Known defects, or a clear statement such as no defects.')
+    .optional(),
+  color: z.string().min(2).optional(),
+  material: z.string().min(2).optional(),
+  brand: z.string().min(2).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
+};
+
+const listingDetailsInputSchema = z.object(listingDetailsSchema);
+const updateListingDetailsInputSchema = listingDetailsInputSchema
+  .partial()
+  .extend({
+    listingId: z.string().min(1),
+  });
+
+type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
+
+function normalizeListingDetailsInput(
+  input: Partial<ListingDetailsInput>,
+): Partial<CreateListingInput> {
+  const {
+    saleTerms,
+    usageNotes,
+    defects,
+    color,
+    material,
+    brand,
+    attributes,
+    ...listingInput
+  } = input;
+
+  return {
+    ...listingInput,
+    attributes: {
+      ...(attributes ?? {}),
+      ...(saleTerms ? { saleTerms } : {}),
+      ...(usageNotes ? { usageNotes } : {}),
+      ...(defects ? { defects } : {}),
+      ...(color ? { color } : {}),
+      ...(material ? { material } : {}),
+      ...(brand ? { brand } : {}),
+    },
+  };
 }
 
 function buildImageReviewMessages(
@@ -117,26 +188,17 @@ export function createMarketplaceTools(
 
     createListingDraft: tool({
       description:
-        'Create a structured marketplace listing draft from a natural seller conversation. Use only after the user wants to sell or publish an allowed marketplace item. Do not use for prohibited Saudi or Islamic-policy items.',
-      inputSchema: z.object({
-        category: z.string().min(2),
-        title: z.string().min(2).optional(),
-        description: z.string().min(2).optional(),
-        price: z
-          .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
-          .optional(),
-        city: z.string().min(2).optional(),
-        condition: z
-          .enum(['new', 'used', 'like_new', 'damaged'])
-          .optional(),
-        attributes: z.record(z.string(), z.unknown()).optional(),
-      }),
+        'Create a structured marketplace listing draft from a natural seller conversation. Use only after the user wants to sell or publish an allowed marketplace item. Include confirmed sale terms, usage notes, defects/no-defects, color, material, and brand when the seller provides them. Do not use for prohibited Saudi or Islamic-policy items.',
+      inputSchema: listingDetailsInputSchema,
       execute: async (input) => {
         if (!session) {
           return authRequired();
         }
 
-        let listing = await createListingDraft(session.user, input);
+        const listingInput = normalizeListingDetailsInput(
+          input,
+        ) as CreateListingInput;
+        let listing = await createListingDraft(session.user, listingInput);
 
         if (listing.compliance.decision === 'block') {
           return {
@@ -148,7 +210,7 @@ export function createMarketplaceTools(
         }
 
         if (options.latestUploadedImages?.length) {
-          const listingText = buildListingText(input);
+          const listingText = buildListingText(listingInput);
           let imageCompliance: Awaited<
             ReturnType<typeof checkImageMarketplaceCompliance>
           >;
@@ -161,7 +223,7 @@ export function createMarketplaceTools(
               ),
               userRequest: listingText,
               language: 'ar',
-              expectedCategory: input.category,
+              expectedCategory: listingInput.category,
               listingText,
             });
           } catch {
@@ -219,21 +281,8 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change. Requires Google sign-in. Price changes and destructive actions must be confirmed by the user before using this tool.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        title: z.string().min(2).optional(),
-        description: z.string().min(2).optional(),
-        price: z
-          .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
-          .optional(),
-        city: z.string().min(2).optional(),
-        category: z.string().min(2).optional(),
-        condition: z
-          .enum(['new', 'used', 'like_new', 'damaged'])
-          .optional(),
-        attributes: z.record(z.string(), z.unknown()).optional(),
-      }),
+        'Update a seller-owned listing after the user clearly requests a change. Requires Google sign-in. Preserve confirmed sale terms, usage notes, defects/no-defects, color, material, and brand as structured attributes. Price changes and destructive actions must be confirmed by the user before using this tool.',
+      inputSchema: updateListingDetailsInputSchema,
       execute: async ({ listingId, ...updates }) => {
         if (!session) {
           return authRequired();
@@ -242,7 +291,7 @@ export function createMarketplaceTools(
         const listing = await updateListingForSeller(
           listingId,
           session.user.id,
-          updates,
+          normalizeListingDetailsInput(updates),
         );
 
         if (!listing) {

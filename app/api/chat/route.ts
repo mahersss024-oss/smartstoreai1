@@ -42,6 +42,7 @@ import {
   messageHasImageAttachment,
 } from '@/agent/scope-guard';
 import {
+  dataUrlToBytes,
   normalizeModelMessageFileData,
   stripImageAttachmentsFromModelMessages,
 } from '@/agent/vision-messages';
@@ -141,6 +142,7 @@ type ChatRequestBody = {
   messages: Array<unknown>;
   model?: string;
   locationSettings?: LocationSettings;
+  retainedListingImages?: unknown;
   data?: {
     model?: string;
     [key: string]: unknown;
@@ -158,6 +160,7 @@ type ChatFilePart = {
   mediaType?: unknown;
   url?: unknown;
   data?: unknown;
+  filename?: unknown;
 };
 
 type LocationSettings = {
@@ -297,6 +300,73 @@ function validateChatImageAttachments(messages: unknown[]) {
   }
 
   return null;
+}
+
+function getRetainedImageParts(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((part): part is ChatFilePart => {
+    return (
+      isFilePart(part) &&
+      typeof part.mediaType === 'string' &&
+      part.mediaType.startsWith('image/')
+    );
+  });
+}
+
+function validateRetainedListingImages(value: unknown) {
+  const imageParts = getRetainedImageParts(value);
+
+  if (imageParts.length > maxImagesPerChatMessage) {
+    return 'too_many_images';
+  }
+
+  for (const part of imageParts) {
+    if (
+      typeof part.mediaType !== 'string' ||
+      !supportedChatImageMimeTypes.has(part.mediaType)
+    ) {
+      return 'unsupported_image_type';
+    }
+
+    const payload = getFilePartPayload(part);
+    const byteLength = payload ? getDataUrlByteLength(payload) : null;
+
+    if (byteLength === null) {
+      return 'unsupported_image_type';
+    }
+
+    if (byteLength > maxChatImageBytes) {
+      return 'image_too_large';
+    }
+  }
+
+  return null;
+}
+
+function extractRetainedUploadedListingImages(
+  value: unknown,
+): UploadedListingImage[] {
+  const images: UploadedListingImage[] = [];
+
+  for (const part of getRetainedImageParts(value)) {
+    const payload = getFilePartPayload(part);
+    const bytes = payload ? dataUrlToBytes(payload) : null;
+
+    if (!bytes || !supportedChatImageMimeTypes.has(bytes.mediaType)) {
+      continue;
+    }
+
+    images.push({
+      data: bytes.data,
+      mediaType: bytes.mediaType,
+      fileName: typeof part.filename === 'string' ? part.filename : undefined,
+    });
+  }
+
+  return images.slice(0, maxImagesPerChatMessage);
 }
 
 function countMessageCharacters(message: unknown) {
@@ -747,13 +817,17 @@ export async function POST(request: Request) {
   const language = getRequestLanguage(body.locationSettings);
   const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
   const imageValidationFailure = validateChatImageAttachments(filteredMessages);
+  const retainedImageValidationFailure = validateRetainedListingImages(
+    body.retainedListingImages,
+  );
 
-  if (imageValidationFailure) {
+  if (imageValidationFailure || retainedImageValidationFailure) {
     return generateProfessionalChatIssueResponse({
       kind: 'upload_validation',
       language,
       userRequest: preliminaryUserRequest,
-      validationReason: imageValidationFailure,
+      validationReason:
+        imageValidationFailure ?? retainedImageValidationFailure ?? undefined,
     });
   }
 
@@ -857,8 +931,14 @@ export async function POST(request: Request) {
   const modelMessages = normalizeModelMessageFileData(
     convertToModelMessages(scopedMessages as UIMessage[]),
   );
-  const latestUploadedImages =
+  const uploadedImagesFromMessages =
     extractLatestUploadedListingImages(modelMessages);
+  const retainedUploadedImages = extractRetainedUploadedListingImages(
+    body.retainedListingImages,
+  );
+  const latestUploadedImages = uploadedImagesFromMessages.length
+    ? uploadedImagesFromMessages
+    : retainedUploadedImages;
   const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
   let imageComplianceContextMessage: ModelMessage | null = null;
 

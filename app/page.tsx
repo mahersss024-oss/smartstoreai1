@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { DefaultChatTransport, type UIMessage } from 'ai';
+import { DefaultChatTransport, type FileUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -129,6 +129,11 @@ type ClientIntentState = {
   label: string;
 };
 
+type RetainedListingImage = Pick<
+  FileUIPart,
+  'type' | 'url' | 'mediaType' | 'filename'
+>;
+
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const locationSettings: LocationSettings = {
   country: 'SA',
@@ -136,12 +141,21 @@ const locationSettings: LocationSettings = {
   language: 'ar',
 };
 const currentChatStorageKey = 'smartstore-current-chat-v1';
+const retainedListingImagesDatabaseName = 'smartstore-listing-images-v1';
+const retainedListingImagesStoreName = 'listing-images';
+const retainedListingImagesRecordKey = 'latest';
 const maxStoredChatMessages = 60;
 const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
 
 type StoredChatState = {
   activeListingQuery: string;
   messages: UIMessage[];
+  updatedAt: number;
+};
+
+type StoredListingImagesState = {
+  id: string;
+  images: RetainedListingImage[];
   updatedAt: number;
 };
 
@@ -239,6 +253,63 @@ function getNextListingQuery(
   }
 
   return '';
+}
+
+function isRetainableListingImage(file: unknown): file is FileUIPart {
+  return (
+    isRecord(file) &&
+    file.type === 'file' &&
+    typeof file.url === 'string' &&
+    typeof file.mediaType === 'string' &&
+    file.mediaType.startsWith('image/')
+  );
+}
+
+function toRetainedListingImages(files: unknown) {
+  if (!Array.isArray(files)) {
+    return [];
+  }
+
+  return files.filter(isRetainableListingImage).slice(0, 8).map((file) => ({
+    type: 'file' as const,
+    url: file.url,
+    mediaType: file.mediaType,
+    filename: file.filename,
+  }));
+}
+
+function shouldSendRetainedListingImages({
+  activeListingQuery,
+  hasCurrentImages,
+  intent,
+  retainedImages,
+  text,
+}: {
+  activeListingQuery: string;
+  hasCurrentImages: boolean;
+  intent: ClientIntentState;
+  retainedImages: RetainedListingImage[];
+  text: string;
+}) {
+  if (retainedImages.length === 0) {
+    return false;
+  }
+
+  if (hasCurrentImages) {
+    return true;
+  }
+
+  if (intent.kind === 'create_listing' || intent.kind === 'image_review') {
+    return true;
+  }
+
+  if (activeListingQuery) {
+    return false;
+  }
+
+  return /(?:نعم|ايه|اعتمد|انشر|نشر|موافق|اوك|تمام|اكمل|جاهز|yes|ok|publish|approve)/i.test(
+    text,
+  );
 }
 
 function getFallbackImage(category: string, index = 0) {
@@ -460,6 +531,102 @@ function clearStoredChatState() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(currentChatStorageKey);
   }
+}
+
+function openRetainedListingImagesDatabase() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB is not available.'));
+      return;
+    }
+
+    const request = indexedDB.open(retainedListingImagesDatabaseName, 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(retainedListingImagesStoreName)) {
+        database.createObjectStore(retainedListingImagesStoreName, {
+          keyPath: 'id',
+        });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readRetainedListingImages() {
+  const database = await openRetainedListingImagesDatabase();
+
+  return new Promise<RetainedListingImage[]>((resolve, reject) => {
+    const transaction = database.transaction(
+      retainedListingImagesStoreName,
+      'readonly',
+    );
+    const store = transaction.objectStore(retainedListingImagesStoreName);
+    const request = store.get(retainedListingImagesRecordKey);
+
+    request.onsuccess = () => {
+      const record = request.result as StoredListingImagesState | undefined;
+
+      if (
+        !record ||
+        Date.now() - record.updatedAt > storedChatMaxAgeMs ||
+        !Array.isArray(record.images)
+      ) {
+        resolve([]);
+        return;
+      }
+
+      resolve(record.images.filter(isRetainableListingImage).slice(0, 8));
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => database.close();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function writeRetainedListingImages(images: RetainedListingImage[]) {
+  const database = await openRetainedListingImagesDatabase();
+
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(
+      retainedListingImagesStoreName,
+      'readwrite',
+    );
+    const store = transaction.objectStore(retainedListingImagesStoreName);
+
+    store.put({
+      id: retainedListingImagesRecordKey,
+      images: images.slice(0, 8),
+      updatedAt: Date.now(),
+    } satisfies StoredListingImagesState);
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function clearRetainedListingImages() {
+  const database = await openRetainedListingImagesDatabase();
+
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(
+      retainedListingImagesStoreName,
+      'readwrite',
+    );
+    transaction
+      .objectStore(retainedListingImagesStoreName)
+      .delete(retainedListingImagesRecordKey);
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => reject(transaction.error);
+  });
 }
 
 function isSearchToolOutput(value: unknown): value is SearchToolOutput {
@@ -721,6 +888,7 @@ export default function Page() {
     useState<ListingCard[]>(featuredListings);
   const [activeListingQuery, setActiveListingQuery] = useState('');
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
+  const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
@@ -813,6 +981,22 @@ export default function Page() {
   }, [activeListingQuery, filteredMessages, hasRestoredChat]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void readRetainedListingImages()
+      .then((images) => {
+        if (!cancelled && images.length) {
+          retainedListingImagesRef.current = images;
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     void fetch('/api/auth/session')
@@ -891,9 +1075,15 @@ export default function Page() {
 
       const text = hasText && 'text' in message ? message.text : '';
       const files = hasFiles && 'files' in message ? message.files : undefined;
+      const currentListingImages = toRetainedListingImages(files);
 
       const intent = inferClientIntent(text, Boolean(files));
       setClientIntent(intent);
+
+      if (currentListingImages.length) {
+        retainedListingImagesRef.current = currentListingImages;
+        void writeRetainedListingImages(currentListingImages).catch(() => {});
+      }
 
       const nextListingQuery = getNextListingQuery(
         text,
@@ -912,10 +1102,20 @@ export default function Page() {
         setActiveListingQuery('');
       }
 
+      const retainedListingImages = shouldSendRetainedListingImages({
+        activeListingQuery,
+        hasCurrentImages: currentListingImages.length > 0,
+        intent,
+        retainedImages: retainedListingImagesRef.current,
+        text,
+      })
+        ? retainedListingImagesRef.current
+        : [];
+
       void sendMessage(
         { text, files },
         {
-          body: { locationSettings },
+          body: { locationSettings, retainedListingImages },
         },
       );
     },
@@ -1000,7 +1200,9 @@ export default function Page() {
   const startNewChat = useCallback(() => {
     setMessages([]);
     setActiveListingQuery('');
+    retainedListingImagesRef.current = [];
     clearStoredChatState();
+    void clearRetainedListingImages().catch(() => {});
   }, [setMessages]);
 
   return (

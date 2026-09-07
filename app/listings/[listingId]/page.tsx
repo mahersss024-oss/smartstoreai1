@@ -95,6 +95,64 @@ function formatCondition(condition: ListingCondition | undefined) {
   return condition ? labels[condition] : 'غير محددة';
 }
 
+function formatSaleTerms(
+  price: number | 'bid' | 'negotiable' | undefined,
+  attributes: Record<string, unknown>,
+) {
+  const saleTerms = String(attributes.saleTerms ?? '').toLowerCase();
+
+  if (price === 'bid' || saleTerms === 'auction') {
+    return 'على السوم';
+  }
+
+  if (price === 'negotiable' || saleTerms === 'negotiable') {
+    return 'قابل للتفاوض';
+  }
+
+  if (saleTerms === 'open_to_offers') {
+    return 'يقبل العروض';
+  }
+
+  if (typeof price === 'number' || saleTerms === 'fixed') {
+    return 'سعر ثابت';
+  }
+
+  return 'غير محددة';
+}
+
+function formatAttributeLabel(key: string) {
+  const labels: Record<string, string> = {
+    saleTerms: 'طريقة البيع',
+    usageNotes: 'الاستخدام',
+    defects: 'الملاحظات',
+    color: 'اللون',
+    material: 'الخامة',
+    brand: 'العلامة',
+  };
+
+  return labels[key] ?? key;
+}
+
+function formatAttributeValue(key: string, value: unknown) {
+  if (key === 'saleTerms') {
+    return formatSaleTerms(undefined, { saleTerms: value });
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'نعم' : 'لا';
+  }
+
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join('، ');
+  }
+
+  if (value && typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('ar-SA', {
     dateStyle: 'medium',
@@ -116,7 +174,10 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   const images = approvedImages.length
     ? approvedImages.map((image) => image.displayUrl || image.originalUrl)
     : [getFallbackImage(listing.category)];
-  const attributes = Object.entries(listing.attributes);
+  const attributes = Object.entries(listing.attributes).filter(([, value]) => {
+    return value !== null && value !== undefined && String(value).trim() !== '';
+  });
+  const saleTerms = formatSaleTerms(listing.price, listing.attributes);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -195,6 +256,10 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   <div className="mt-1 text-sm font-bold">{formatCondition(listing.condition)}</div>
                 </div>
                 <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">طريقة البيع</div>
+                  <div className="mt-1 text-sm font-bold">{saleTerms}</div>
+                </div>
+                <div className="rounded-md border p-3">
                   <div className="text-xs text-muted-foreground">رقم الإعلان</div>
                   <div className="mt-1 truncate text-sm font-bold">{listing.id}</div>
                 </div>
@@ -210,8 +275,10 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                 <div className="grid gap-2 sm:grid-cols-2">
                   {attributes.map(([key, value]) => (
                     <div key={key} className="rounded-md border p-3">
-                      <div className="text-xs text-muted-foreground">{key}</div>
-                      <div className="mt-1 break-words text-sm font-semibold">{String(value)}</div>
+                      <div className="text-xs text-muted-foreground">{formatAttributeLabel(key)}</div>
+                      <div className="mt-1 break-words text-sm font-semibold">
+                        {formatAttributeValue(key, value)}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -64,6 +64,7 @@ Tool use:
 - If searchMarketplaceListings returns listings, mention the best matches briefly and tell the user they can open the visible listing cards for full details.
 - Do not say SmartStore AI cannot show marketplace listings before using searchMarketplaceListings.
 - Use createListingDraft only after enough details are known to create a useful draft. If information is missing, ask naturally before using it.
+- When creating or updating a listing, preserve every confirmed seller detail in structured fields or attributes: fixed/non-negotiable sale terms, condition details, usage level, no-defects statements, color, material, brand, and honest notes. Do not drop these details after the preview.
 - Use updateListing for seller-owned listing edits after the target listing is clear.
 - Use setListingStatus only after explicit confirmation for publish, pause, mark sold, or delete.
 - If the user confirms publishing after a complete preview and is signed in, do not ask about Google sign-in again. If no listing id exists yet, call createListingDraft from the verified conversation details first, then call setListingStatus with status="published" using the created listing id.
