@@ -1284,7 +1284,7 @@ export default function Page() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-4 py-3 sm:px-6 lg:h-full lg:min-h-0">
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card">
+        <section className="flex min-h-0 flex-col rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card lg:overflow-hidden">
           <header className="flex h-14 items-center justify-between border-b bg-[#f7f9fc] px-4 dark:bg-background">
             <div className="flex min-w-0 items-center gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
@@ -1337,8 +1337,8 @@ export default function Page() {
             </div>
           </header>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_25rem]">
-            <section className="min-w-0 overflow-y-auto border-b bg-[#eef4fb] p-4 dark:bg-background lg:border-b-0 lg:border-l">
+          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden">
+            <section className="min-w-0 border-b bg-[#eef4fb] p-3 pb-[calc(46dvh+2rem)] dark:bg-background sm:p-4 sm:pb-[calc(46dvh+2rem)] lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
@@ -1392,7 +1392,7 @@ export default function Page() {
 
             </section>
 
-            <section className="flex min-h-[32rem] flex-col bg-white dark:bg-card lg:min-h-0">
+            <section className="fixed inset-x-3 bottom-3 z-40 flex h-[46dvh] min-h-64 max-h-[30rem] flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/20 dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none">
               <header className="shrink-0 border-b px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
