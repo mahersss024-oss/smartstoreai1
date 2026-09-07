@@ -33,6 +33,10 @@ import {
   type UploadedListingImage,
 } from '@/agent/marketplace/listing-image-storage';
 import {
+  listSellerListings,
+  setListingStatusForSeller,
+} from '@/agent/marketplace/repository';
+import {
   applyAllowedRequestToLatestUserMessage,
   checkInputScope,
   checkOutputScope,
@@ -430,6 +434,126 @@ function createTextUIResponse(text: string) {
       },
     }),
   });
+}
+
+function isDirectPublishConfirmation(userRequest: string) {
+  const normalized = userRequest
+    .trim()
+    .replace(/[ـًٌٍَُِّْ]/g, '')
+    .replace(/\s+/g, ' ');
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (/(^|\s)(لا|لات|مو|ليس|بدون)\s+(تنشر|انشر|نشر|اعتمد)/.test(normalized)) {
+    return false;
+  }
+
+  return [
+    'نشر',
+    'انشر',
+    'انشره',
+    'انشر الإعلان',
+    'انشر الاعلان',
+    'نشر الإعلان',
+    'نشر الاعلان',
+    'اعتمد الإعلان',
+    'اعتمد الاعلان',
+    'نشر إعلان',
+    'نشر اعلان',
+  ].includes(normalized);
+}
+
+function formatListingPriceForChat(price: unknown, language: AppLanguage) {
+  if (typeof price === 'number') {
+    const locale = language === 'en' ? 'en-US' : 'ar-SA';
+    return `${new Intl.NumberFormat(locale).format(price)} ر.س`;
+  }
+
+  if (price === 'bid') {
+    return language === 'en' ? 'Best offer' : 'على السوم';
+  }
+
+  if (price === 'negotiable') {
+    return language === 'en' ? 'Negotiable' : 'قابل للتفاوض';
+  }
+
+  return language === 'en' ? 'Not specified' : 'غير محدد';
+}
+
+async function publishLatestReadyDraftFromConfirmation({
+  userRequest,
+  language,
+  session,
+}: {
+  userRequest: string;
+  language: AppLanguage;
+  session: ReturnType<typeof getAuthSession>;
+}) {
+  if (!isDirectPublishConfirmation(userRequest)) {
+    return null;
+  }
+
+  if (!session) {
+    return createTextUIResponse(
+      language === 'en'
+        ? `${authRequiredMarker} Sign in with Google first, then send "publish" again and I will publish the ready listing.`
+        : `${authRequiredMarker} سجّل دخولك عبر Google أولًا، ثم اكتب "انشر" مرة أخرى وسأنشر الإعلان الجاهز.`,
+    );
+  }
+
+  try {
+    const listings = await listSellerListings(session.user.id);
+    const draft = listings.find(
+      (listing) =>
+        listing.status === 'draft' &&
+        listing.compliance.decision === 'allow' &&
+        listing.title &&
+        listing.description &&
+        listing.price !== undefined &&
+        listing.city &&
+        listing.condition &&
+        listing.images.some((image) => image.status === 'approved'),
+    );
+
+    if (!draft) {
+      return createTextUIResponse(
+        language === 'en'
+          ? 'I could not find a ready draft to publish. Please complete the listing details and approved product image first.'
+          : 'لم أجد مسودة جاهزة للنشر. أكمل بيانات الإعلان وصورة المنتج المعتمدة أولًا، ثم أرسل أمر النشر.',
+      );
+    }
+
+    const published = await setListingStatusForSeller(
+      draft.id,
+      session.user.id,
+      'published',
+    );
+
+    if (!published || published.status !== 'published') {
+      return createTextUIResponse(
+        language === 'en'
+          ? 'The listing was not published because it still needs review or is no longer available in your account.'
+          : 'لم يتم نشر الإعلان لأنه لا يزال يحتاج مراجعة أو لم يعد متاحًا ضمن حسابك.',
+      );
+    }
+
+    return createTextUIResponse(
+      language === 'en'
+        ? `Published successfully.\n\n${published.title ?? 'Listing'}\nPrice: ${formatListingPriceForChat(published.price, language)}\nCity: ${published.city ?? 'Not specified'}`
+        : `تم نشر الإعلان بنجاح.\n\n${published.title ?? 'إعلانك'}\nالسعر: ${formatListingPriceForChat(published.price, language)}\nالمدينة: ${published.city ?? 'غير محددة'}`,
+    );
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[direct_publish] failure=${errorName}`);
+
+    return createTextUIResponse(
+      language === 'en'
+        ? 'I could not publish the listing right now because the marketplace record could not be updated. Please try again shortly.'
+        : 'تعذر نشر الإعلان الآن لأن سجل الإعلان لم يتم تحديثه في السوق. أعد المحاولة بعد لحظات.',
+    );
+  }
 }
 
 function getDefaultImageAnalysisRequest(language: AppLanguage) {
@@ -870,6 +994,17 @@ export async function POST(request: Request) {
     });
   }
 
+  const session = getAuthSession(request);
+  const directPublishResponse = await publishLatestReadyDraftFromConfirmation({
+    userRequest: preliminaryUserRequest,
+    language,
+    session,
+  });
+
+  if (directPublishResponse) {
+    return directPublishResponse;
+  }
+
   const inputScopeDecision = await checkInputScope({ messages: filteredMessages });
 
   if (
@@ -911,7 +1046,6 @@ export async function POST(request: Request) {
     language,
   );
   const userRequest = getLatestUserRequest(scopedMessages);
-  const session = getAuthSession(request);
   const adaptiveIntent = await resolveAdaptiveMarketplaceIntent({
     messages: scopedMessages,
     language,
