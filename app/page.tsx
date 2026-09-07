@@ -116,6 +116,16 @@ type ApiListingRecord = {
   }>;
 };
 
+type ListingsResponsePayload = {
+  listings?: ApiListingRecord[];
+  pagination?: {
+    page?: number;
+    limit?: number;
+    hasMore?: boolean;
+    nextPage?: number | null;
+  };
+};
+
 type ClientIntentKind =
   | 'general_info'
   | 'search_listing'
@@ -886,6 +896,11 @@ export default function Page() {
   });
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
+  const [listingPagination, setListingPagination] = useState({
+    page: 1,
+    hasMore: false,
+  });
+  const [isLoadingListings, setIsLoadingListings] = useState(false);
   const [activeListingQuery, setActiveListingQuery] = useState('');
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
@@ -919,29 +934,60 @@ export default function Page() {
 
     return marketplaceListings;
   }, [latestSearchToolOutput, marketplaceListings]);
+  const canLoadMoreListings =
+    !latestSearchToolOutput &&
+    listingPagination.hasMore &&
+    displayedMarketplaceListings.length > 0;
 
-  const refreshMarketplaceListings = useCallback((query?: string) => {
+  const refreshMarketplaceListings = useCallback((query?: string, page = 1) => {
     const params = new URLSearchParams();
 
     if (query?.trim()) {
       params.set('q', query.trim());
     }
 
-    const endpoint = params.size
-      ? `/api/marketplace/listings?${params.toString()}`
-      : '/api/marketplace/listings';
+    params.set('page', String(page));
+    params.set('limit', '24');
+
+    const endpoint = `/api/marketplace/listings?${params.toString()}`;
 
     return fetch(endpoint)
       .then((response) =>
-        response.json() as Promise<{ listings?: ApiListingRecord[] }>,
+        response.json() as Promise<ListingsResponsePayload>,
       )
       .then((payload) => {
         if (payload.listings) {
-          setMarketplaceListings(payload.listings.map(listingRecordToCard));
+          const nextListings = payload.listings.map(listingRecordToCard);
+
+          setMarketplaceListings((currentListings) => {
+            if (page <= 1) {
+              return nextListings;
+            }
+
+            const existingIds = new Set(
+              currentListings.map((listing) => listing.id).filter(Boolean),
+            );
+            const uniqueNextListings = nextListings.filter(
+              (listing) => !listing.id || !existingIds.has(listing.id),
+            );
+
+            return [...currentListings, ...uniqueNextListings];
+          });
         }
+
+        setListingPagination({
+          page: payload.pagination?.page ?? page,
+          hasMore: Boolean(payload.pagination?.hasMore),
+        });
       })
       .catch(() => {
-        setMarketplaceListings(featuredListings);
+        if (page <= 1) {
+          setMarketplaceListings(featuredListings);
+        }
+        setListingPagination({ page: 1, hasMore: false });
+      })
+      .finally(() => {
+        setIsLoadingListings(false);
       });
   }, []);
 
@@ -1197,6 +1243,24 @@ export default function Page() {
     });
   }, []);
 
+  const loadMoreListings = useCallback(() => {
+    if (!canLoadMoreListings || isLoadingListings) {
+      return;
+    }
+
+    setIsLoadingListings(true);
+    void refreshMarketplaceListings(
+      activeListingQuery,
+      listingPagination.page + 1,
+    );
+  }, [
+    activeListingQuery,
+    canLoadMoreListings,
+    isLoadingListings,
+    listingPagination.page,
+    refreshMarketplaceListings,
+  ]);
+
   const startNewChat = useCallback(() => {
     setMessages([]);
     setActiveListingQuery('');
@@ -1277,7 +1341,7 @@ export default function Page() {
                 </Button>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                 {displayedMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
@@ -1288,6 +1352,19 @@ export default function Page() {
                   />
                 ))}
               </div>
+
+              {canLoadMoreListings && (
+                <div className="mt-4 grid place-items-center">
+                  <Button
+                    variant="outline"
+                    className="h-10 min-w-40 rounded-md"
+                    disabled={isLoadingListings}
+                    onClick={loadMoreListings}
+                  >
+                    {isLoadingListings ? 'جاري التحميل...' : 'عرض المزيد'}
+                  </Button>
+                </div>
+              )}
 
               {displayedMarketplaceListings.length === 0 && (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed bg-white p-6 text-center dark:bg-card">

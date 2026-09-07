@@ -108,6 +108,8 @@ type DatabaseCommissionRecord = {
 
 export type MarketplaceListingFilters = {
   query?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type CreateListingInput = {
@@ -196,6 +198,17 @@ function getActorId(actor: Actor) {
 
 function getPlaceholderEmail(userId: string) {
   return `${userId.replace(/[^a-zA-Z0-9._-]/g, '_')}@smartstore.local`;
+}
+
+function getListingPagination(filters: MarketplaceListingFilters) {
+  const limit = Math.min(Math.max(Math.floor(filters.limit ?? 24), 1), 80);
+  const page = Math.max(Math.floor(filters.page ?? 1), 1);
+
+  return {
+    limit,
+    page,
+    skip: (page - 1) * limit,
+  };
 }
 
 function asCompliance(value: unknown): ComplianceDecision {
@@ -363,6 +376,7 @@ export async function listMarketplaceListings(
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
+  const pagination = getListingPagination(filters);
   const searchConditions: Prisma.ListingWhereInput[] = [];
 
   if (parsedQuery.category) {
@@ -413,7 +427,8 @@ export async function listMarketplaceListings(
       },
     },
     orderBy: { updatedAt: 'desc' },
-    take: 80,
+    skip: pagination.skip,
+    take: pagination.limit,
   });
 
   return listings.map(toListingRecord);

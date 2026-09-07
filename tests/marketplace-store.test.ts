@@ -318,6 +318,35 @@ test('searches published marketplace listings by buyer query', () => {
   assert.equal(results.some((result) => result.id === listing.id), true);
 });
 
+test('paginates published marketplace listings', () => {
+  for (let index = 0; index < 30; index += 1) {
+    const listing = createListingDraft({
+      sellerId: `seller:pagination-${index}`,
+      category: 'furniture',
+      title: `منتجصفحات ${index}`,
+      city: 'تبوك',
+    });
+
+    publishListing(listing.id);
+  }
+
+  const firstPage = listMarketplaceListings({
+    query: 'منتجصفحات',
+    page: 1,
+    limit: 10,
+  });
+  const secondPage = listMarketplaceListings({
+    query: 'منتجصفحات',
+    page: 2,
+    limit: 10,
+  });
+  const firstPageIds = new Set(firstPage.map((listing) => listing.id));
+
+  assert.equal(firstPage.length, 10);
+  assert.equal(secondPage.length, 10);
+  assert.equal(secondPage.some((listing) => firstPageIds.has(listing.id)), false);
+});
+
 test('hides deleted seller listings from account views', () => {
   const listing = createListingDraft({
     sellerId: 'seller:deleted-list',

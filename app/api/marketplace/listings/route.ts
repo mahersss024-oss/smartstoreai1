@@ -18,12 +18,39 @@ const createListingSchema = z.object({
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
+function parsePositiveInteger(value: string | null, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get('q') ?? undefined;
+  const page = parsePositiveInteger(url.searchParams.get('page'), 1);
+  const limit = Math.min(
+    Math.max(parsePositiveInteger(url.searchParams.get('limit'), 24), 1),
+    48,
+  );
+  const listings = await listMarketplaceListings({
+    query,
+    page,
+    limit: limit + 1,
+  });
+  const hasMore = listings.length > limit;
 
   return Response.json({
-    listings: await listMarketplaceListings({ query }),
+    listings: listings.slice(0, limit),
+    pagination: {
+      page,
+      limit,
+      hasMore,
+      nextPage: hasMore ? page + 1 : null,
+    },
   });
 }
 

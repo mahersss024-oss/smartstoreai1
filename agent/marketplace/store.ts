@@ -61,6 +61,8 @@ type PersistedMarketplaceStore = {
 
 export type MarketplaceListingFilters = {
   query?: string;
+  page?: number;
+  limit?: number;
 };
 
 const searchStopWords = new Set([
@@ -100,6 +102,22 @@ function shouldPersistStore() {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function getListingPagination(filters: MarketplaceListingFilters) {
+  const limit = Math.min(Math.max(Math.floor(filters.limit ?? 24), 1), 80);
+  const page = Math.max(Math.floor(filters.page ?? 1), 1);
+
+  return {
+    limit,
+    skip: (page - 1) * limit,
+  };
+}
+
+function paginateListings<T>(listings: T[], filters: MarketplaceListingFilters) {
+  const pagination = getListingPagination(filters);
+
+  return listings.slice(pagination.skip, pagination.skip + pagination.limit);
 }
 
 function persistStore() {
@@ -456,7 +474,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
   if (!filters.query?.trim()) {
-    return publishedListings;
+    return paginateListings(publishedListings, filters);
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
@@ -502,10 +520,10 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
   const tokens = getSearchTokens(filters.query);
 
   if (tokens.length === 0) {
-    return filteredListings;
+    return paginateListings(filteredListings, filters);
   }
 
-  return filteredListings
+  const scoredListings = filteredListings
     .map((listing) => ({
       listing,
       score: scoreListingForQuery(listing, tokens),
@@ -519,6 +537,8 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
       return right.listing.updatedAt.localeCompare(left.listing.updatedAt);
     })
     .map((result) => result.listing);
+
+  return paginateListings(scoredListings, filters);
 }
 
 export function listSellerListings(sellerId: string) {
