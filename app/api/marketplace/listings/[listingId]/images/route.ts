@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { createPersistentImageDataUrl } from '@/agent/marketplace/listing-image-storage';
 import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
   addListingImageForSeller,
@@ -11,11 +10,7 @@ import {
 import type { ListingImage } from '@/agent/marketplace/types';
 import { getAuthSession } from '@/lib/auth/session';
 
-const supportedMimeTypes = new Map([
-  ['image/jpeg', '.jpg'],
-  ['image/png', '.png'],
-  ['image/webp', '.webp'],
-]);
+const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maxImageBytes = 12 * 1024 * 1024;
 
 type RouteContext = {
@@ -23,14 +18,6 @@ type RouteContext = {
     listingId: string;
   }>;
 };
-
-function getSafeExtension(file: File) {
-  return supportedMimeTypes.get(file.type) ?? extname(file.name).toLowerCase();
-}
-
-function getPublicUploadUrl(listingId: string, imageId: string, extension: string) {
-  return `/uploads/listings/${encodeURIComponent(listingId)}/${imageId}${extension}`;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
@@ -129,18 +116,16 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const extension = getSafeExtension(file);
   const imageId = randomUUID();
-  const safeListingPathSegment = listingId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const uploadDirectory = join(
-    process.cwd(),
-    'public',
-    'uploads',
-    'listings',
-    safeListingPathSegment,
+  const imageUrl = createPersistentImageDataUrl(
+    new Uint8Array(fileBuffer),
+    file.type,
   );
-  const uploadPath = join(uploadDirectory, `${imageId}${extension}`);
-  const uploadUrl = getPublicUploadUrl(safeListingPathSegment, imageId, extension);
+
+  if (!imageUrl) {
+    return Response.json({ error: 'unsupported_image_type' }, { status: 415 });
+  }
+
   const quality = analyzeImageQuality({
     fileName: file.name,
     mimeType: file.type,
@@ -155,9 +140,9 @@ export async function POST(request: Request, context: RouteContext) {
   const image: ListingImage = {
     id: imageId,
     listingId,
-    originalUrl: uploadUrl,
-    displayUrl: uploadUrl,
-    thumbnailUrl: uploadUrl,
+    originalUrl: imageUrl,
+    displayUrl: imageUrl,
+    thumbnailUrl: imageUrl,
     isPrimary: false,
     qualityScore: quality.qualityScore,
     status:
@@ -166,9 +151,6 @@ export async function POST(request: Request, context: RouteContext) {
         : quality.listingImageStatus,
     enhancements: quality.enhancements,
   };
-
-  await mkdir(uploadDirectory, { recursive: true });
-  await writeFile(uploadPath, fileBuffer);
 
   const listing = await addListingImageForSeller(listingId, session.user.id, image);
 

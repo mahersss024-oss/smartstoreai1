@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
 
 import type { ModelMessage } from 'ai';
 
@@ -8,11 +6,7 @@ import { analyzeImageQuality } from './image-quality';
 import { addListingImageForSeller } from './repository';
 import type { ListingImage } from './types';
 
-const supportedMimeTypes = new Map([
-  ['image/jpeg', '.jpg'],
-  ['image/png', '.png'],
-  ['image/webp', '.webp'],
-]);
+const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export type UploadedListingImage = {
   data: Uint8Array;
@@ -49,20 +43,15 @@ function toBytes(data: unknown) {
   return null;
 }
 
-function getSafeExtension(mediaType: string, fileName?: string) {
-  return (
-    supportedMimeTypes.get(mediaType) ??
-    (fileName ? extname(fileName).toLowerCase() : '') ??
-    '.jpg'
-  );
-}
-
-function getPublicUploadUrl(
-  listingId: string,
-  imageId: string,
-  extension: string,
+export function createPersistentImageDataUrl(
+  data: Uint8Array,
+  mediaType: string,
 ) {
-  return `/uploads/listings/${encodeURIComponent(listingId)}/${imageId}${extension}`;
+  if (!supportedMimeTypes.has(mediaType)) {
+    return null;
+  }
+
+  return `data:${mediaType};base64,${Buffer.from(data).toString('base64')}`;
 }
 
 export function extractLatestUploadedListingImages(
@@ -115,29 +104,18 @@ export async function saveUploadedListingImagesForSeller({
   images: UploadedListingImage[];
 }) {
   let latestListing = null;
-  const safeListingPathSegment = listingId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const uploadDirectory = join(
-    process.cwd(),
-    'public',
-    'uploads',
-    'listings',
-    safeListingPathSegment,
-  );
-
-  await mkdir(uploadDirectory, { recursive: true });
 
   for (const uploadedImage of images.slice(0, 8)) {
     const imageId = randomUUID();
-    const extension = getSafeExtension(
+    const imageUrl = createPersistentImageDataUrl(
+      uploadedImage.data,
       uploadedImage.mediaType,
-      uploadedImage.fileName,
     );
-    const uploadPath = join(uploadDirectory, `${imageId}${extension}`);
-    const uploadUrl = getPublicUploadUrl(
-      safeListingPathSegment,
-      imageId,
-      extension,
-    );
+
+    if (!imageUrl) {
+      continue;
+    }
+
     const quality = analyzeImageQuality({
       fileName: uploadedImage.fileName,
       mimeType: uploadedImage.mediaType,
@@ -146,16 +124,15 @@ export async function saveUploadedListingImagesForSeller({
     const image: ListingImage = {
       id: imageId,
       listingId,
-      originalUrl: uploadUrl,
-      displayUrl: uploadUrl,
-      thumbnailUrl: uploadUrl,
+      originalUrl: imageUrl,
+      displayUrl: imageUrl,
+      thumbnailUrl: imageUrl,
       isPrimary: false,
       qualityScore: quality.qualityScore,
       status: quality.listingImageStatus,
       enhancements: quality.enhancements,
     };
 
-    await writeFile(uploadPath, Buffer.from(uploadedImage.data));
     latestListing = await addListingImageForSeller(listingId, sellerId, image);
   }
 

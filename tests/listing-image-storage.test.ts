@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import type { ModelMessage } from 'ai';
 
-import { extractLatestUploadedListingImages } from '@/agent/marketplace/listing-image-storage';
+import {
+  createPersistentImageDataUrl,
+  extractLatestUploadedListingImages,
+} from '@/agent/marketplace/listing-image-storage';
 
 test('extracts the latest uploaded product images from prior chat context', () => {
   const messages: ModelMessage[] = [
@@ -54,4 +57,13 @@ test('ignores unsupported image payloads', () => {
   ];
 
   assert.deepEqual(extractLatestUploadedListingImages(messages), []);
+});
+
+test('creates a persistent image data URL for database-backed listings', () => {
+  const url = createPersistentImageDataUrl(
+    new Uint8Array([1, 2, 3]),
+    'image/png',
+  );
+
+  assert.equal(url, 'data:image/png;base64,AQID');
 });

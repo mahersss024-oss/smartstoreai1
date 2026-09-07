@@ -360,6 +360,16 @@ function getFallbackImage(category: string, index = 0) {
   return images[category as keyof typeof images] ?? values[index % values.length];
 }
 
+function getDurableImageUrl(...urls: Array<string | undefined>) {
+  return urls.find((url) => {
+    return (
+      typeof url === 'string' &&
+      url.length > 0 &&
+      !url.startsWith('/uploads/listings/')
+    );
+  });
+}
+
 function formatListingPrice(price: ApiListingRecord['price']) {
   if (typeof price === 'number') {
     return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
@@ -696,10 +706,12 @@ function listingRecordToCard(listing: ApiListingRecord, index: number): ListingC
     category: formatCategory(listing.category),
     description: listing.description,
     image:
-      listing.image ??
-      primaryImage?.thumbnailUrl ??
-      primaryImage?.displayUrl ??
-      primaryImage?.originalUrl ??
+      getDurableImageUrl(
+        listing.image,
+        primaryImage?.thumbnailUrl,
+        primaryImage?.displayUrl,
+        primaryImage?.originalUrl,
+      ) ??
       getFallbackImage(listing.category, index),
     status: formatListingStatus(listing.status),
     stats:

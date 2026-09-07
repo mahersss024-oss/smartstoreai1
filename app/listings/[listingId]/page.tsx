@@ -45,6 +45,16 @@ function getFallbackImage(category: string) {
   return images[category as keyof typeof images] ?? values[0];
 }
 
+function getDurableImageUrl(...urls: Array<string | undefined>) {
+  return urls.find((url) => {
+    return (
+      typeof url === 'string' &&
+      url.length > 0 &&
+      !url.startsWith('/uploads/listings/')
+    );
+  });
+}
+
 function formatPrice(price: number | 'bid' | 'negotiable' | undefined) {
   if (typeof price === 'number') {
     return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
@@ -171,8 +181,17 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
   );
-  const images = approvedImages.length
-    ? approvedImages.map((image) => image.displayUrl || image.originalUrl)
+  const durableApprovedImages = approvedImages
+    .map((image) =>
+      getDurableImageUrl(
+        image.displayUrl,
+        image.originalUrl,
+        image.thumbnailUrl,
+      ),
+    )
+    .filter((image): image is string => Boolean(image));
+  const images = durableApprovedImages.length
+    ? durableApprovedImages
     : [getFallbackImage(listing.category)];
   const attributes = Object.entries(listing.attributes).filter(([, value]) => {
     return value !== null && value !== undefined && String(value).trim() !== '';

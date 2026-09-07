@@ -50,6 +50,7 @@ type ApiListingRecord = {
     displayUrl?: string;
     originalUrl?: string;
     thumbnailUrl?: string;
+    status?: string;
   }>;
 };
 
@@ -156,8 +157,20 @@ function formatCategory(category: string) {
   return labels[category] ?? category;
 }
 
+function getDurableImageUrl(...urls: Array<string | undefined>) {
+  return urls.find((url) => {
+    return (
+      typeof url === 'string' &&
+      url.length > 0 &&
+      !url.startsWith('/uploads/listings/')
+    );
+  });
+}
+
 function listingRecordToCard(listing: ApiListingRecord, index: number): ListingCard {
-  const primaryImage = listing.images?.[0];
+  const primaryImage =
+    listing.images?.find((image) => image.status === 'approved') ??
+    listing.images?.[0];
 
   return {
     id: listing.id,
@@ -167,9 +180,11 @@ function listingRecordToCard(listing: ApiListingRecord, index: number): ListingC
     category: formatCategory(listing.category),
     description: listing.description,
     image:
-      primaryImage?.thumbnailUrl ??
-      primaryImage?.displayUrl ??
-      primaryImage?.originalUrl ??
+      getDurableImageUrl(
+        primaryImage?.thumbnailUrl,
+        primaryImage?.displayUrl,
+        primaryImage?.originalUrl,
+      ) ??
       getFallbackImage(listing.category, index),
     status: formatListingStatus(listing.status),
     stats: `${listing.views ?? 0} مشاهدة · ${listing.messageCount ?? 0} رسائل · ${
