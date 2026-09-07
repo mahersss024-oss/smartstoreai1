@@ -771,7 +771,7 @@ function ListingCardView({
 }) {
   return (
     <article
-      className="cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card"
+      className="min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card"
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -782,63 +782,63 @@ function ListingCardView({
       role="button"
       tabIndex={0}
     >
-      <div className="relative aspect-square bg-slate-100">
+      <div className="relative aspect-[4/3] bg-slate-100">
         <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
         <Button
           size="icon-sm"
           variant="ghost"
-          className="absolute left-2 top-2 rounded-md border border-white/80 bg-white/95 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-white hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100"
+          className="absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-white hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100 sm:left-2 sm:top-2 sm:size-8"
           aria-label="حفظ الإعلان"
           onClick={(event) => {
             event.stopPropagation();
             onFavorite(listing);
           }}
         >
-          <Heart className="size-4" />
+          <Heart className="size-3.5 sm:size-4" />
         </Button>
       </div>
-      <div className="grid gap-2 p-2.5 text-right">
-        <h3 className="line-clamp-1 text-xs font-bold">{listing.title}</h3>
-        <div className="text-sm font-bold text-slate-950 dark:text-card-foreground">{listing.price}</div>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+      <div className="grid gap-1.5 p-2 text-right sm:p-2.5">
+        <h3 className="line-clamp-1 text-[11px] font-bold sm:text-xs">{listing.title}</h3>
+        <div className="text-xs font-bold text-slate-950 dark:text-card-foreground sm:text-sm">{listing.price}</div>
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-[11px]">
           <MapPin className="size-3" />
           {listing.city}
         </div>
         {listing.description && (
-          <p className="line-clamp-1 text-[11px] leading-5 text-muted-foreground">
+          <p className="line-clamp-1 text-[10px] leading-5 text-muted-foreground sm:text-[11px]">
             {listing.description}
           </p>
         )}
         <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200 sm:py-1">
             <BadgeCheck className="size-3" />
             {listing.status ?? 'موثق'}
           </span>
-          <span className="truncate text-[10px] text-muted-foreground">{listing.stats}</span>
+          <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">{listing.stats}</span>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-2">
+        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-1.5 sm:pt-2">
           <Button
             size="sm"
-            className="h-8 rounded-md bg-blue-600 text-xs hover:bg-blue-700"
+            className="h-7 rounded-md bg-blue-600 text-[11px] hover:bg-blue-700 sm:h-8 sm:text-xs"
             onClick={(event) => {
               event.stopPropagation();
               onAsk(`أريد التواصل بخصوص ${listing.title}`);
             }}
           >
-            <MessageCircle className="size-3.5" />
+            <MessageCircle className="size-3 sm:size-3.5" />
             تواصل
           </Button>
           <Button
             size="icon-sm"
             variant="outline"
-            className="rounded-md"
+            className="size-7 rounded-md sm:size-8"
             aria-label="مقارنة الإعلان"
             onClick={(event) => {
               event.stopPropagation();
               onAsk(`قارن لي إعلان ${listing.title} بالسوق`);
             }}
           >
-            <Sparkles className="size-3.5" />
+            <Sparkles className="size-3 sm:size-3.5" />
           </Button>
         </div>
       </div>
@@ -1353,7 +1353,7 @@ export default function Page() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                 {displayedMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}

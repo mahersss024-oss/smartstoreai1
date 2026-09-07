@@ -422,26 +422,28 @@ export default function AccountPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {listings.map((listing) => (
-                    <article key={listing.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[7rem_1fr_auto]">
-                      <img alt={listing.title} className="aspect-square w-full rounded-md object-cover md:size-28" src={listing.image} />
+                    <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background">
+                      <img alt={listing.title} className="aspect-[4/3] w-full object-cover" src={listing.image} />
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-base font-bold">{listing.title}</h3>
+                        <div className="grid gap-2 p-3">
+                          <div className="flex min-w-0 items-center justify-between gap-2">
+                            <h3 className="truncate text-sm font-bold">{listing.title}</h3>
                           <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                             {listing.status}
                           </span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-sm leading-7 text-muted-foreground">{listing.description}</p>
-                        <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                          <span>{listing.price}</span>
-                          <span>{listing.category}</span>
-                          <span>{listing.city}</span>
-                          <span>{listing.stats}</span>
+                          </div>
+                          <p className="line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{listing.description}</p>
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                            <span className="truncate font-semibold text-slate-950 dark:text-card-foreground">{listing.price}</span>
+                            <span className="truncate">{listing.city}</span>
+                            <span className="truncate">{listing.category}</span>
+                            <span className="truncate">{listing.stats}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5 md:w-40 md:grid-cols-2">
+                      <div className="grid grid-cols-4 gap-1.5 border-t p-2">
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'publish')}>
                           <Megaphone className="size-3.5" />
                           نشر
