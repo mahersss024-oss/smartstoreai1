@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
@@ -18,6 +19,7 @@ import {
   ShieldCheck,
   Store,
   Trash2,
+  Upload,
   User,
 } from 'lucide-react';
 
@@ -163,6 +165,7 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
 }
 
 export default function AccountPage() {
+  const router = useRouter();
   const [session, setSession] = useState<AuthSessionPayload>({
     authenticated: false,
     user: null,
@@ -171,6 +174,9 @@ export default function AccountPage() {
   const [listingsPagination, setListingsPagination] =
     useState<PaginationMeta | null>(null);
   const [isListingsLoading, setIsListingsLoading] = useState(false);
+  const [uploadingListingId, setUploadingListingId] = useState<string | null>(
+    null,
+  );
 
   const stats = useMemo(() => {
     return {
@@ -257,6 +263,52 @@ export default function AccountPage() {
       });
     },
     [refreshListings],
+  );
+
+  const uploadListingImage = useCallback(
+    async (listing: ListingCard, file: File | null) => {
+      if (!file) {
+        return;
+      }
+
+      setUploadingListingId(listing.id);
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(
+          `/api/marketplace/listings/${listing.id}/images`,
+          {
+            method: 'POST',
+            body: formData,
+          },
+        );
+
+        if (response.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            error?: string;
+            message?: string;
+          } | null;
+          window.alert(
+            payload?.message ??
+              payload?.error ??
+              'تعذر رفع الصورة. تأكد من إعداد تخزين الصور ثم حاول مرة أخرى.',
+          );
+          return;
+        }
+
+        void refreshListings(1);
+      } finally {
+        setUploadingListingId(null);
+      }
+    },
+    [refreshListings, router],
   );
 
   return (
@@ -444,7 +496,24 @@ export default function AccountPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5 border-t p-2">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-5">
+                        <Button asChild size="sm" variant="outline" className="rounded-md">
+                          <label>
+                            <Upload className="size-3.5" />
+                            {uploadingListingId === listing.id ? 'رفع...' : 'صورة'}
+                            <input
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              disabled={uploadingListingId === listing.id}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0] ?? null;
+                                void uploadListingImage(listing, file);
+                                event.currentTarget.value = '';
+                              }}
+                              type="file"
+                            />
+                          </label>
+                        </Button>
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'publish')}>
                           <Megaphone className="size-3.5" />
                           نشر
