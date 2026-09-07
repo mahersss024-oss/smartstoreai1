@@ -4,10 +4,21 @@ function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');
 }
 
+function isRenderUrl(value: string) {
+  try {
+    return new URL(value).hostname.endsWith('.onrender.com');
+  } catch {
+    return false;
+  }
+}
+
 export function getAppBaseUrl(request?: Request) {
   const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 
-  if (configuredUrl) {
+  if (
+    configuredUrl &&
+    !(process.env.NODE_ENV === 'production' && isRenderUrl(configuredUrl))
+  ) {
     return normalizeBaseUrl(configuredUrl);
   }
 

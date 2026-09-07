@@ -2,10 +2,22 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const productionCanonicalUrl = 'https://www.smartstore-ai.com';
 
+function getCanonicalUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (!configuredUrl) {
+    return new URL(productionCanonicalUrl);
+  }
+
+  const canonicalUrl = new URL(configuredUrl);
+
+  return canonicalUrl.hostname.endsWith('.onrender.com')
+    ? new URL(productionCanonicalUrl)
+    : canonicalUrl;
+}
+
 export function proxy(request: NextRequest) {
-  const canonicalUrl = new URL(
-    process.env.NEXT_PUBLIC_APP_URL?.trim() || productionCanonicalUrl,
-  );
+  const canonicalUrl = getCanonicalUrl();
 
   if (
     process.env.NODE_ENV === 'production' &&
