@@ -108,16 +108,61 @@ export function normalizeDeepseekChatBody(body: string) {
   });
 }
 
+export function isTransientDeepseekResponse(status: number) {
+  return [408, 409, 425, 429, 500, 502, 503, 504].includes(status);
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function fetchDeepseekWithRetry(
+  input: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+  attempts = 3,
+) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+
+      if (
+        !isTransientDeepseekResponse(response.status) ||
+        attempt === attempts - 1
+      ) {
+        return response;
+      }
+    } catch (error) {
+      if (isAbortError(error) || attempt === attempts - 1) {
+        throw error;
+      }
+
+      lastError = error;
+    }
+
+    await wait(250 * (attempt + 1));
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('DeepSeek request failed.');
+}
+
 export const deepseek = createOpenAI({
   name: 'deepseek',
   baseURL: 'https://api.deepseek.com',
   apiKey: getDeepseekApiKey(),
   fetch: async (input, init) => {
     if (typeof init?.body !== 'string') {
-      return fetch(input, init);
+      return fetchDeepseekWithRetry(input, init);
     }
 
-    return fetch(input, {
+    return fetchDeepseekWithRetry(input, {
       ...init,
       body: normalizeDeepseekChatBody(init.body),
     });

@@ -551,6 +551,12 @@ function addDefaultTextToLatestImageOnlyMessage(
   return nextMessages;
 }
 
+function isOutputCheckerProviderFailure(
+  decision: Awaited<ReturnType<typeof checkOutputScope>>,
+) {
+  return decision.reason_code === 'output_checker_failure';
+}
+
 async function generateCheckedAssistantResponse(
   messages: ModelMessage[],
   userRequest: string,
@@ -575,6 +581,10 @@ async function generateCheckedAssistantResponse(
       if (firstOutputDecision.decision === 'ALLOW') {
         return createTextUIResponse(firstText);
       }
+
+      if (isOutputCheckerProviderFailure(firstOutputDecision)) {
+        return createTextUIResponse(firstText);
+      }
     }
 
     const retryResult = await chatAgent.generate({
@@ -596,6 +606,10 @@ async function generateCheckedAssistantResponse(
       });
 
       if (retryOutputDecision.decision === 'ALLOW') {
+        return createTextUIResponse(retryText);
+      }
+
+      if (isOutputCheckerProviderFailure(retryOutputDecision)) {
         return createTextUIResponse(retryText);
       }
     }

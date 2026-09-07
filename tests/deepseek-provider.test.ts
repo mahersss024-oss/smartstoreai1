@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  fetchDeepseekWithRetry,
   getDeepseekApiKey,
   getDeepseekModelName,
+  isTransientDeepseekResponse,
   normalizeDeepseekChatBody,
 } from '@/agent/deepseek-provider';
 import { appConfig } from '@/app/app-config';
@@ -132,4 +134,35 @@ test('normalizes DeepSeek requests for non-thinking marketplace responses', () =
   assert.deepEqual(normalized.thinking, { type: 'disabled' });
   assert.equal(normalized.messages[0]?.role, 'system');
   assert.equal(normalized.messages[1]?.role, 'user');
+});
+
+test('recognizes transient DeepSeek response statuses', () => {
+  assert.equal(isTransientDeepseekResponse(429), true);
+  assert.equal(isTransientDeepseekResponse(502), true);
+  assert.equal(isTransientDeepseekResponse(401), false);
+  assert.equal(isTransientDeepseekResponse(400), false);
+});
+
+test('retries transient DeepSeek fetch responses', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+
+  try {
+    globalThis.fetch = (async () => {
+      calls += 1;
+
+      return new Response(calls === 1 ? 'temporary' : 'ok', {
+        status: calls === 1 ? 502 : 200,
+      });
+    }) as typeof fetch;
+
+    const response = await fetchDeepseekWithRetry('https://api.deepseek.test', {
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
