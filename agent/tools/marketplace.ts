@@ -10,6 +10,7 @@ import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-comp
 import {
   createConversationForListing,
   createListingDraft,
+  getListing,
   listMarketplaceListings,
   reportListing,
   setListingStatusForSeller,
@@ -42,6 +43,7 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
     city: listing.city,
     condition: listing.condition,
     description: listing.description,
+    attributes: listing.attributes,
     image:
       primaryImage?.thumbnailUrl ??
       primaryImage?.displayUrl ??
@@ -50,6 +52,18 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
     messageCount: listing.messageCount,
     favoriteCount: listing.favoriteCount,
   };
+}
+
+function buildComparableListingQuery(listing: MarketplaceListingResult) {
+  return [
+    listing.category,
+    listing.title,
+    listing.city,
+    listing.condition,
+    typeof listing.price === 'number' ? String(listing.price) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function buildListingText(input: {
@@ -182,6 +196,46 @@ export function createMarketplaceTools(
           listings: listings.slice(0, 8).map(getListingSearchSummary),
           note:
             'Search words such as أبحث or أريد are treated as intent only, not stored as listing data.',
+        };
+      },
+    }),
+
+    compareMarketplaceListings: tool({
+      description:
+        'Compare one specific published listing against similar SmartStore AI marketplace listings. Use this when the user asks to compare a selected listing, especially if a listingId is provided. Return the target listing and comparable alternatives from real marketplace data only.',
+      inputSchema: z.object({
+        listingId: z.string().min(1),
+        query: z.string().trim().min(1).max(300).optional(),
+        limit: z.number().int().min(2).max(12).optional(),
+      }),
+      execute: async ({ listingId, query, limit = 8 }) => {
+        const targetListing = await getListing(listingId);
+
+        if (!targetListing || targetListing.status !== 'published') {
+          return {
+            status: 'not_found',
+            message:
+              'The listing was not found, deleted, or is not currently published.',
+            listings: [],
+          };
+        }
+
+        const comparisonQuery = query?.trim() || buildComparableListingQuery(targetListing);
+        const listings = await listMarketplaceListings({
+          query: comparisonQuery,
+          limit: Math.max(limit + 1, 4),
+        });
+        const alternatives = listings
+          .filter((listing) => listing.id !== targetListing.id)
+          .slice(0, limit);
+
+        return {
+          status: 'compared',
+          target: getListingSearchSummary(targetListing),
+          count: alternatives.length,
+          listings: alternatives.map(getListingSearchSummary),
+          comparisonBasis:
+            'Compare price, condition, city, description/specs, image availability, views, message count, and favorite count. Do not invent market data.',
         };
       },
     }),

@@ -652,7 +652,7 @@ async function clearRetainedListingImages() {
 function isSearchToolOutput(value: unknown): value is SearchToolOutput {
   return (
     isRecord(value) &&
-    value.status === 'searched' &&
+    (value.status === 'searched' || value.status === 'compared') &&
     Array.isArray(value.listings)
   );
 }
@@ -680,6 +680,16 @@ function getLatestSearchToolOutput(messages: UIMessage[]) {
 
       if (
         part.type === 'tool-searchMarketplaceListings' &&
+        'state' in part &&
+        part.state === 'output-available' &&
+        'output' in part &&
+        isSearchToolOutput(part.output)
+      ) {
+        return part.output;
+      }
+
+      if (
+        part.type === 'tool-compareMarketplaceListings' &&
         'state' in part &&
         part.state === 'output-available' &&
         'output' in part &&
@@ -835,7 +845,11 @@ function ListingCardView({
             aria-label="مقارنة الإعلان"
             onClick={(event) => {
               event.stopPropagation();
-              onAsk(`قارن لي إعلان ${listing.title} بالسوق`);
+              onAsk(
+                listing.id
+                  ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
+                  : `قارن لي إعلان ${listing.title} بالسوق`,
+              );
             }}
           >
             <Sparkles className="size-3 sm:size-3.5" />
