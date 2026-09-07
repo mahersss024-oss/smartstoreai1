@@ -27,6 +27,7 @@ import {
   Sparkles,
   Store,
   User,
+  X,
 } from 'lucide-react';
 
 import {
@@ -929,6 +930,7 @@ export default function Page() {
   const [isLoadingListings, setIsLoadingListings] = useState(false);
   const [activeListingQuery, setActiveListingQuery] = useState('');
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
+  const [isMobileChatVisible, setIsMobileChatVisible] = useState(true);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
@@ -1145,6 +1147,8 @@ export default function Page() {
         return;
       }
 
+      setIsMobileChatVisible(true);
+
       const text = hasText && 'text' in message ? message.text : '';
       const files = hasFiles && 'files' in message ? message.files : undefined;
       const currentListingImages = toRetainedListingImages(files);
@@ -1202,6 +1206,7 @@ export default function Page() {
 
       const intent = inferClientIntent(prompt);
       setClientIntent(intent);
+      setIsMobileChatVisible(true);
 
       const nextListingQuery = getNextListingQuery(
         prompt,
@@ -1352,7 +1357,13 @@ export default function Page() {
           </header>
 
           <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden">
-            <section className="min-w-0 border-b bg-[#eef4fb] p-3 pb-[calc(46dvh+2rem)] dark:bg-background sm:p-4 sm:pb-[calc(46dvh+2rem)] lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4">
+            <section
+              className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
+                isMobileChatVisible
+                  ? 'pb-[calc(46dvh+2rem)] sm:pb-[calc(46dvh+2rem)]'
+                  : 'pb-20 sm:pb-20'
+              }`}
+            >
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
@@ -1406,7 +1417,11 @@ export default function Page() {
 
             </section>
 
-            <section className="fixed inset-x-3 bottom-3 z-40 flex h-[46dvh] min-h-64 max-h-[30rem] flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/20 dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none">
+            <section
+              className={`inset-x-3 bottom-3 z-40 h-[46dvh] min-h-64 max-h-[30rem] flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/20 dark:bg-card lg:static lg:flex lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
+                isMobileChatVisible ? 'fixed flex' : 'hidden'
+              }`}
+            >
               <header className="shrink-0 border-b px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1420,9 +1435,20 @@ export default function Page() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
-                    <MoreHorizontal className="size-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-md lg:hidden"
+                      onClick={() => setIsMobileChatVisible(false)}
+                      aria-label="إخفاء الشات"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </header>
 
@@ -1538,6 +1564,15 @@ export default function Page() {
           </div>
         </section>
 
+        {!isMobileChatVisible && (
+          <Button
+            className="fixed bottom-4 right-4 z-40 h-11 rounded-md bg-blue-600 px-4 shadow-2xl shadow-slate-950/25 hover:bg-blue-700 lg:hidden"
+            onClick={() => setIsMobileChatVisible(true)}
+          >
+            <MessageCircle className="size-4" />
+            إظهار الشات
+          </Button>
+        )}
       </div>
     </main>
   );
