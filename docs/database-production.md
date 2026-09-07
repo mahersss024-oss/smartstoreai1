@@ -53,7 +53,35 @@ When the database store is enabled, listings, images, conversations, messages, f
 
 ## Production Notes
 
-- Use hosted object storage for listing images before public launch; local `public/uploads` is not durable on most hosting providers.
+- Use hosted object storage for listing images before public launch; database `data:` image URLs are only a development fallback.
 - Run `pnpm db:deploy` during deployment after setting `DATABASE_URL`.
 - Set `SMARTSTORE_MARKETPLACE_STORE=database` in production.
 - Keep `SMARTSTORE_ADMIN_EMAILS` restricted to trusted admin Google accounts.
+
+## Listing Image Storage
+
+For production, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
+
+```env
+SMARTSTORE_IMAGE_STORAGE=object
+SMARTSTORE_OBJECT_STORAGE_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+SMARTSTORE_OBJECT_STORAGE_BUCKET=smartstore-listings
+SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID=...
+SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY=...
+SMARTSTORE_OBJECT_STORAGE_REGION=auto
+SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL=https://PUBLIC_BUCKET_OR_CDN_DOMAIN
+```
+
+`SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL` must be a public bucket URL or CDN URL that can serve uploaded listing images in the browser. If `SMARTSTORE_IMAGE_STORAGE` is empty, the app keeps the local development fallback.
+
+## Shared Chat Rate Limiting
+
+For multi-instance production deployments, add Upstash Redis REST credentials:
+
+```env
+SMARTSTORE_RATE_LIMIT_BACKEND=redis
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+Without Redis credentials, the app still rate-limits chat requests in memory, which is acceptable for local development and single-instance testing.

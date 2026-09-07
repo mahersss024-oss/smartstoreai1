@@ -41,6 +41,13 @@ type FavoriteRecord = {
   listing: FavoriteListing | null;
 };
 
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
+};
+
 function getListingImage(listing: FavoriteListing | null, index: number) {
   const image = listing?.images?.[0];
   const fallbacks = [
@@ -79,15 +86,17 @@ export default function FavoritesPage() {
     user: null,
   });
   const [favorites, setFavorites] = useState<FavoriteRecord[]>([]);
+  const [favoritesPagination, setFavoritesPagination] =
+    useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshFavorites = useCallback(async () => {
+  const refreshFavorites = useCallback(async (page = 1) => {
     setIsLoading(true);
 
     try {
       const [sessionResponse, favoritesResponse] = await Promise.all([
         fetch('/api/auth/session'),
-        fetch('/api/marketplace/me/favorites'),
+        fetch(`/api/marketplace/me/favorites?page=${page}&limit=24`),
       ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
@@ -100,8 +109,14 @@ export default function FavoritesPage() {
 
       const payload = (await favoritesResponse.json()) as {
         favorites?: FavoriteRecord[];
+        pagination?: PaginationMeta;
       };
-      setFavorites(payload.favorites ?? []);
+      setFavorites((currentFavorites) =>
+        page === 1
+          ? (payload.favorites ?? [])
+          : [...currentFavorites, ...(payload.favorites ?? [])],
+      );
+      setFavoritesPagination(payload.pagination ?? null);
     } finally {
       setIsLoading(false);
     }
@@ -184,9 +199,10 @@ export default function FavoritesPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {favorites.map((favorite, index) => (
-                  <Link
+              <div className="grid gap-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {favorites.map((favorite, index) => (
+                    <Link
                     key={favorite.id}
                     className="overflow-hidden rounded-md border transition hover:border-blue-400 hover:shadow-md"
                     href={`/listings/${favorite.listingId}`}
@@ -212,8 +228,21 @@ export default function FavoritesPage() {
                         {favorite.listing?.city ?? 'السعودية'}
                       </div>
                     </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))}
+                </div>
+                {favoritesPagination?.hasMore && (
+                  <Button
+                    variant="outline"
+                    className="mx-auto rounded-md"
+                    disabled={isLoading}
+                    onClick={() =>
+                      void refreshFavorites(favoritesPagination.nextPage ?? 1)
+                    }
+                  >
+                    {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                  </Button>
+                )}
               </div>
             )}
           </section>

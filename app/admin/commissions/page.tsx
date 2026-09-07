@@ -24,6 +24,13 @@ type CommissionRecord = {
   } | null;
 };
 
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
+};
+
 function formatMoney(value: number | null) {
   if (typeof value !== 'number') {
     return 'غير محدد';
@@ -47,6 +54,8 @@ function formatStatus(status: CommissionRecord['status']) {
 export default function AdminCommissionsPage() {
   const router = useRouter();
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
+  const [commissionsPagination, setCommissionsPagination] =
+    useState<PaginationMeta | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -65,12 +74,12 @@ export default function AdminCommissionsPage() {
     [commissions],
   );
 
-  const refreshCommissions = useCallback(async () => {
+  const refreshCommissions = useCallback(async (page = 1) => {
     setIsLoading(true);
     setNotice('');
 
     try {
-      const response = await fetch('/api/admin/commissions');
+      const response = await fetch(`/api/admin/commissions?page=${page}&limit=20`);
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -90,8 +99,14 @@ export default function AdminCommissionsPage() {
 
       const payload = (await response.json()) as {
         commissions?: CommissionRecord[];
+        pagination?: PaginationMeta;
       };
-      setCommissions(payload.commissions ?? []);
+      setCommissions((currentCommissions) =>
+        page === 1
+          ? (payload.commissions ?? [])
+          : [...currentCommissions, ...(payload.commissions ?? [])],
+      );
+      setCommissionsPagination(payload.pagination ?? null);
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +134,7 @@ export default function AdminCommissionsPage() {
         return;
       }
 
-      await refreshCommissions();
+      await refreshCommissions(1);
     },
     [refreshCommissions],
   );
@@ -183,9 +198,10 @@ export default function AdminCommissionsPage() {
               لا توجد عمولات حتى الآن.
             </div>
           ) : (
-            <div className="grid gap-3">
-              {commissions.map((commission) => (
-                <article key={commission.id} className="grid gap-3 rounded-md border p-3">
+            <div className="grid gap-4">
+              <div className="grid gap-3">
+                {commissions.map((commission) => (
+                  <article key={commission.id} className="grid gap-3 rounded-md border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-base font-bold">
@@ -235,8 +251,23 @@ export default function AdminCommissionsPage() {
                       إعفاء
                     </Button>
                   </div>
-                </article>
-              ))}
+                  </article>
+                ))}
+              </div>
+              {commissionsPagination?.hasMore && (
+                <Button
+                  variant="outline"
+                  className="mx-auto rounded-md"
+                  disabled={isLoading}
+                  onClick={() =>
+                    void refreshCommissions(
+                      commissionsPagination.nextPage ?? 1,
+                    )
+                  }
+                >
+                  {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                </Button>
+              )}
             </div>
           )}
         </section>

@@ -48,6 +48,17 @@ type ReportRecord = {
 type ModerationQueue = {
   listings: ListingRecord[];
   reports: ReportRecord[];
+  pagination?: {
+    listings: PaginationMeta;
+    reports: PaginationMeta;
+  };
+};
+
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
 };
 
 function formatPrice(price: ListingRecord['price']) {
@@ -82,6 +93,7 @@ export default function AdminModerationPage() {
     listings: [],
     reports: [],
   });
+  const [nextPage, setNextPage] = useState(1);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -89,13 +101,16 @@ export default function AdminModerationPage() {
     () => queue.reports.filter((report) => report.status === 'open').length,
     [queue.reports],
   );
+  const hasMoreQueue =
+    Boolean(queue.pagination?.listings.hasMore) ||
+    Boolean(queue.pagination?.reports.hasMore);
 
-  const refreshQueue = useCallback(async () => {
+  const refreshQueue = useCallback(async (page = 1) => {
     setIsLoading(true);
     setNotice('');
 
     try {
-      const response = await fetch('/api/admin/moderation');
+      const response = await fetch(`/api/admin/moderation?page=${page}&limit=20`);
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -113,7 +128,18 @@ export default function AdminModerationPage() {
         return;
       }
 
-      setQueue((await response.json()) as ModerationQueue);
+      const payload = (await response.json()) as ModerationQueue;
+
+      setQueue((currentQueue) =>
+        page === 1
+          ? payload
+          : {
+              ...payload,
+              listings: [...currentQueue.listings, ...payload.listings],
+              reports: [...currentQueue.reports, ...payload.reports],
+            },
+      );
+      setNextPage(page + 1);
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +167,7 @@ export default function AdminModerationPage() {
         return;
       }
 
-      void refreshQueue();
+      void refreshQueue(1);
     },
     [refreshQueue],
   );
@@ -162,7 +188,7 @@ export default function AdminModerationPage() {
         return;
       }
 
-      void refreshQueue();
+      void refreshQueue(1);
     },
     [refreshQueue],
   );
@@ -348,6 +374,16 @@ export default function AdminModerationPage() {
             )}
           </section>
         </section>
+        {hasMoreQueue && (
+          <Button
+            variant="outline"
+            className="mx-auto rounded-md"
+            disabled={isLoading}
+            onClick={() => void refreshQueue(nextPage)}
+          >
+            {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+          </Button>
+        )}
       </div>
     </main>
   );

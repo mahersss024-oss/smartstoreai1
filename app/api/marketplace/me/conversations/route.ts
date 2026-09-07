@@ -1,5 +1,6 @@
-import { listUserConversations } from '@/agent/marketplace/repository';
+import { listUserConversationsPage } from '@/agent/marketplace/repository';
 import { getAuthSession } from '@/lib/auth/session';
+import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
@@ -14,7 +15,13 @@ export async function GET(request: Request) {
     );
   }
 
+  const conversationsPage = await listUserConversationsPage(
+    session.user.id,
+    parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 }),
+  );
+
   return Response.json({
-    conversations: await listUserConversations(session.user.id),
+    conversations: conversationsPage.items,
+    pagination: conversationsPage.pagination,
   });
 }

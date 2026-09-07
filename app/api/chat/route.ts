@@ -53,13 +53,12 @@ import {
 import type { AppLanguage } from '@/app/i18n';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
+import { checkChatRateLimit } from '@/lib/rate-limit';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
 const maxImagesPerChatMessage = 8;
 const maxChatImageBytes = 12 * 1024 * 1024;
-const rateLimitWindowMs = 60_000;
-const maxRequestsPerWindow = 20;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const policyFacilitationIntents = new Set([
   'search_listing',
@@ -81,8 +80,6 @@ const supportedChatImageMimeTypes = new Set([
   'image/png',
   'image/webp',
 ]);
-
-const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function hasDeepseekApiKey() {
   return Boolean(getDeepseekApiKey());
@@ -108,34 +105,6 @@ function getClientId(request: Request) {
     request.headers.get('cf-connecting-ip') ||
     'anonymous'
   );
-}
-
-function checkRateLimit(clientId: string) {
-  const now = Date.now();
-
-  for (const [bucketClientId, bucket] of requestBuckets) {
-    if (bucket.resetAt <= now) {
-      requestBuckets.delete(bucketClientId);
-    }
-  }
-
-  const bucket = requestBuckets.get(clientId);
-
-  if (!bucket || bucket.resetAt <= now) {
-    requestBuckets.set(clientId, {
-      count: 1,
-      resetAt: now + rateLimitWindowMs,
-    });
-
-    return null;
-  }
-
-  if (bucket.count >= maxRequestsPerWindow) {
-    return Math.ceil((bucket.resetAt - now) / 1000);
-  }
-
-  bucket.count += 1;
-  return null;
 }
 
 function isPolicyFacilitationIntent(intent: string) {
@@ -891,7 +860,7 @@ Use the user's language. Language=${input.language}.`,
 }
 
 export async function POST(request: Request) {
-  const retryAfterSeconds = checkRateLimit(getClientId(request));
+  const retryAfterSeconds = await checkChatRateLimit(getClientId(request));
 
   if (retryAfterSeconds !== null) {
     return new Response('Too many requests. Please try again shortly.', {

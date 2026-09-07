@@ -1,5 +1,10 @@
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import {
+  type PaginationInput,
+  normalizePagination,
+  toPaginatedResponse,
+} from '@/lib/pagination';
 import type { Prisma } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
@@ -472,6 +477,42 @@ export async function listSellerListings(sellerId: string) {
   return listings.map(toListingRecord);
 }
 
+export async function listSellerListingsPage(
+  sellerId: string,
+  filters: PaginationInput = {},
+) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 24,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    return toPaginatedResponse(
+      memoryStore
+        .listSellerListings(sellerId)
+        .slice(pagination.skip, pagination.skip + pagination.take),
+      pagination,
+    );
+  }
+
+  const listings = await prisma.listing.findMany({
+    where: {
+      sellerId,
+      status: { not: 'deleted' },
+    },
+    include: {
+      images: {
+        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+
+  return toPaginatedResponse(listings.map(toListingRecord), pagination);
+}
+
 export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,
@@ -689,6 +730,47 @@ export async function listUserConversations(userId: string) {
   });
 
   return conversations.map(toConversationRecord);
+}
+
+export async function listUserConversationsPage(
+  userId: string,
+  filters: PaginationInput = {},
+) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 20,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    return toPaginatedResponse(
+      memoryStore
+        .listUserConversations(userId)
+        .slice(pagination.skip, pagination.skip + pagination.take),
+      pagination,
+    );
+  }
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      OR: [{ buyerId: userId }, { sellerId: userId }],
+    },
+    include: {
+      messages: { orderBy: { createdAt: 'asc' }, take: 10 },
+      listing: {
+        include: {
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+
+  return toPaginatedResponse(conversations.map(toConversationRecord), pagination);
 }
 
 export async function getConversationForUser(
@@ -913,6 +995,44 @@ export async function listUserFavorites(userId: string) {
   return favorites.map(toFavoriteRecord);
 }
 
+export async function listUserFavoritesPage(
+  userId: string,
+  filters: PaginationInput = {},
+) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 24,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    return toPaginatedResponse(
+      memoryStore
+        .listUserFavorites(userId)
+        .slice(pagination.skip, pagination.skip + pagination.take),
+      pagination,
+    );
+  }
+
+  const favorites = await prisma.favorite.findMany({
+    where: { userId },
+    include: {
+      listing: {
+        include: {
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+
+  return toPaginatedResponse(favorites.map(toFavoriteRecord), pagination);
+}
+
 export async function toggleFavoriteListing(listingId: string, actor: Actor) {
   const userId = getActorId(actor);
 
@@ -1086,6 +1206,82 @@ export async function listModerationQueue() {
   };
 }
 
+export async function listModerationQueuePage(filters: PaginationInput = {}) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 20,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    const queue = memoryStore.listModerationQueue();
+
+    return {
+      listings: toPaginatedResponse(
+        queue.listings.slice(pagination.skip, pagination.skip + pagination.take),
+        pagination,
+      ).items,
+      reports: toPaginatedResponse(
+        queue.reports.slice(pagination.skip, pagination.skip + pagination.take),
+        pagination,
+      ).items,
+      pagination: {
+        listings: toPaginatedResponse(
+          queue.listings.slice(
+            pagination.skip,
+            pagination.skip + pagination.take,
+          ),
+          pagination,
+        ).pagination,
+        reports: toPaginatedResponse(
+          queue.reports.slice(pagination.skip, pagination.skip + pagination.take),
+          pagination,
+        ).pagination,
+      },
+    };
+  }
+
+  const [listings, reports] = await Promise.all([
+    prisma.listing.findMany({
+      where: { status: { in: ['pending', 'rejected'] } },
+      include: {
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 4,
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      skip: pagination.skip,
+      take: pagination.take,
+    }),
+    prisma.report.findMany({
+      include: {
+        listing: {
+          include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+              take: 4,
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: pagination.skip,
+      take: pagination.take,
+    }),
+  ]);
+  const listingPage = toPaginatedResponse(listings.map(toListingRecord), pagination);
+  const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
+
+  return {
+    listings: listingPage.items,
+    reports: reportPage.items,
+    pagination: {
+      listings: listingPage.pagination,
+      reports: reportPage.pagination,
+    },
+  };
+}
+
 export async function setListingModerationStatus(
   listingId: string,
   status: Extract<ListingStatus, 'published' | 'rejected' | 'deleted'>,
@@ -1183,6 +1379,44 @@ export async function listSellerCommissions(sellerId: string) {
   return commissions.map(toCommissionRecord);
 }
 
+export async function listSellerCommissionsPage(
+  sellerId: string,
+  filters: PaginationInput = {},
+) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 20,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    return toPaginatedResponse(
+      memoryStore
+        .listSellerCommissions(sellerId)
+        .slice(pagination.skip, pagination.skip + pagination.take),
+      pagination,
+    );
+  }
+
+  const commissions = await prisma.commission.findMany({
+    where: { sellerId },
+    include: {
+      listing: {
+        include: {
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+
+  return toPaginatedResponse(commissions.map(toCommissionRecord), pagination);
+}
+
 export async function listAdminCommissions() {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.listAdminCommissions();
@@ -1202,6 +1436,40 @@ export async function listAdminCommissions() {
   });
 
   return commissions.map(toCommissionRecord);
+}
+
+export async function listAdminCommissionsPage(filters: PaginationInput = {}) {
+  const pagination = normalizePagination(filters, {
+    defaultLimit: 20,
+    maxLimit: 48,
+  });
+
+  if (!shouldUseDatabaseStore()) {
+    return toPaginatedResponse(
+      memoryStore
+        .listAdminCommissions()
+        .slice(pagination.skip, pagination.skip + pagination.take),
+      pagination,
+    );
+  }
+
+  const commissions = await prisma.commission.findMany({
+    include: {
+      listing: {
+        include: {
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            take: 4,
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip: pagination.skip,
+    take: pagination.take,
+  });
+
+  return toPaginatedResponse(commissions.map(toCommissionRecord), pagination);
 }
 
 export async function updateCommissionSaleAmountForSeller(

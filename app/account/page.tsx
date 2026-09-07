@@ -66,6 +66,13 @@ type ListingCard = {
   description?: string;
 };
 
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
+};
+
 function getFallbackImage(category: string, index = 0) {
   const images = {
     mobile_phones:
@@ -199,6 +206,9 @@ export default function AccountPage() {
     user: null,
   });
   const [listings, setListings] = useState<ListingCard[]>([]);
+  const [listingsPagination, setListingsPagination] =
+    useState<PaginationMeta | null>(null);
+  const [isListingsLoading, setIsListingsLoading] = useState(false);
 
   const stats = useMemo(() => {
     return {
@@ -216,17 +226,31 @@ export default function AccountPage() {
       .catch(() => setSession({ authenticated: false, user: null }));
   }, []);
 
-  const refreshListings = useCallback(() => {
-    return fetch('/api/marketplace/me/listings')
-      .then((response) =>
-        response.ok
-          ? (response.json() as Promise<{ listings?: ApiListingRecord[] }>)
-          : Promise.resolve({ listings: [] }),
-      )
-      .then((payload) => {
-        setListings(payload.listings?.map(listingRecordToCard) ?? []);
-      })
-      .catch(() => setListings([]));
+  const refreshListings = useCallback(async (page = 1) => {
+    await Promise.resolve();
+    setIsListingsLoading(true);
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/me/listings?page=${page}&limit=24`,
+      );
+      const payload: {
+        listings?: ApiListingRecord[];
+        pagination?: PaginationMeta | null;
+      } = response.ok ? await response.json() : { listings: [] };
+      const nextListings = payload.listings?.map(listingRecordToCard) ?? [];
+
+      setListings((currentListings) =>
+        page === 1 ? nextListings : [...currentListings, ...nextListings],
+      );
+      setListingsPagination(payload.pagination ?? null);
+    } catch {
+      if (page === 1) {
+        setListings([]);
+      }
+    } finally {
+      setIsListingsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -244,6 +268,7 @@ export default function AccountPage() {
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       setListings([]);
+      setListingsPagination(null);
       setSession({ authenticated: false, user: null });
     });
   }, []);
@@ -266,7 +291,7 @@ export default function AccountPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       }).then(() => {
-        void refreshListings();
+        void refreshListings(1);
       });
     },
     [refreshListings],
@@ -411,7 +436,11 @@ export default function AccountPage() {
                 </Button>
               </div>
 
-              {listings.length === 0 ? (
+              {isListingsLoading && listings.length === 0 ? (
+                <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
+                  ط¬ط§ط± طھط­ظ…ظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ...
+                </div>
+              ) : listings.length === 0 ? (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed p-6 text-center">
                   <div className="grid max-w-sm gap-3">
                     <Megaphone className="mx-auto size-9 text-blue-600" />
@@ -422,9 +451,10 @@ export default function AccountPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {listings.map((listing) => (
-                    <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background">
+                <div className="grid gap-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {listings.map((listing) => (
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background">
                       <img alt={listing.title} className="aspect-[4/3] w-full object-cover" src={listing.image} />
                       <div className="min-w-0">
                         <div className="grid gap-2 p-3">
@@ -461,8 +491,21 @@ export default function AccountPage() {
                           حذف
                         </Button>
                       </div>
-                    </article>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
+                  {listingsPagination?.hasMore && (
+                    <Button
+                      variant="outline"
+                      className="mx-auto rounded-md"
+                      disabled={isListingsLoading}
+                      onClick={() =>
+                        void refreshListings(listingsPagination.nextPage ?? 1)
+                      }
+                    >
+                      {isListingsLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                    </Button>
+                  )}
                 </div>
               )}
             </section>

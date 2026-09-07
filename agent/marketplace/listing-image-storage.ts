@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { ModelMessage } from 'ai';
 
 import { analyzeImageQuality } from './image-quality';
+import { storeListingObject } from './object-storage';
 import { addListingImageForSeller } from './repository';
 import type { ListingImage } from './types';
 
@@ -52,6 +53,31 @@ export function createPersistentImageDataUrl(
   }
 
   return `data:${mediaType};base64,${Buffer.from(data).toString('base64')}`;
+}
+
+export async function createPersistentListingImageUrl({
+  data,
+  mediaType,
+  imageId,
+  fileName,
+}: {
+  data: Uint8Array;
+  mediaType: string;
+  imageId: string;
+  fileName?: string;
+}) {
+  if (!supportedMimeTypes.has(mediaType)) {
+    return null;
+  }
+
+  const storedObject = await storeListingObject({
+    data,
+    mediaType,
+    imageId,
+    fileName,
+  });
+
+  return storedObject?.url ?? createPersistentImageDataUrl(data, mediaType);
 }
 
 export function extractLatestUploadedListingImages(
@@ -107,10 +133,12 @@ export async function saveUploadedListingImagesForSeller({
 
   for (const uploadedImage of images.slice(0, 8)) {
     const imageId = randomUUID();
-    const imageUrl = createPersistentImageDataUrl(
-      uploadedImage.data,
-      uploadedImage.mediaType,
-    );
+    const imageUrl = await createPersistentListingImageUrl({
+      data: uploadedImage.data,
+      mediaType: uploadedImage.mediaType,
+      imageId,
+      fileName: uploadedImage.fileName,
+    });
 
     if (!imageUrl) {
       continue;

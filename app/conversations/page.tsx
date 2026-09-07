@@ -55,6 +55,13 @@ type ConversationRecord = {
   listing: ConversationListing | null;
 };
 
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
+};
+
 function getListingImage(listing: ConversationListing | null) {
   const image = listing?.images?.[0];
 
@@ -95,6 +102,8 @@ export default function ConversationsPage() {
     user: null,
   });
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
+  const [conversationsPagination, setConversationsPagination] =
+    useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const conversationsCount = conversations.length;
@@ -105,13 +114,13 @@ export default function ConversationsPage() {
     [conversations],
   );
 
-  const refreshConversations = useCallback(async () => {
+  const refreshConversations = useCallback(async (page = 1) => {
     setIsLoading(true);
 
     try {
       const [sessionResponse, conversationsResponse] = await Promise.all([
         fetch('/api/auth/session'),
-        fetch('/api/marketplace/me/conversations'),
+        fetch(`/api/marketplace/me/conversations?page=${page}&limit=20`),
       ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
@@ -124,8 +133,14 @@ export default function ConversationsPage() {
 
       const payload = (await conversationsResponse.json()) as {
         conversations?: ConversationRecord[];
+        pagination?: PaginationMeta;
       };
-      setConversations(payload.conversations ?? []);
+      setConversations((currentConversations) =>
+        page === 1
+          ? (payload.conversations ?? [])
+          : [...currentConversations, ...(payload.conversations ?? [])],
+      );
+      setConversationsPagination(payload.pagination ?? null);
     } finally {
       setIsLoading(false);
     }
@@ -220,8 +235,9 @@ export default function ConversationsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-3">
-                  {conversations.map((conversation) => {
+                <div className="grid gap-4">
+                  <div className="grid gap-3">
+                    {conversations.map((conversation) => {
                     const lastMessage = [...conversation.messages]
                       .reverse()
                       .find((message) => message.status === 'sent');
@@ -262,7 +278,22 @@ export default function ConversationsPage() {
                         </div>
                       </Link>
                     );
-                  })}
+                    })}
+                  </div>
+                  {conversationsPagination?.hasMore && (
+                    <Button
+                      variant="outline"
+                      className="mx-auto rounded-md"
+                      disabled={isLoading}
+                      onClick={() =>
+                        void refreshConversations(
+                          conversationsPagination.nextPage ?? 1,
+                        )
+                      }
+                    >
+                      {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                    </Button>
+                  )}
                 </div>
               )}
             </section>

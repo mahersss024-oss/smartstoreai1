@@ -36,6 +36,13 @@ type CommissionRecord = {
   } | null;
 };
 
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextPage: number | null;
+};
+
 function formatMoney(value: number | null) {
   if (typeof value !== 'number') {
     return 'غير محدد';
@@ -62,6 +69,8 @@ export default function CommissionsPage() {
     user: null,
   });
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
+  const [commissionsPagination, setCommissionsPagination] =
+    useState<PaginationMeta | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -74,14 +83,14 @@ export default function CommissionsPage() {
     [commissions],
   );
 
-  const refreshCommissions = useCallback(async () => {
+  const refreshCommissions = useCallback(async (page = 1) => {
     setIsLoading(true);
     setNotice('');
 
     try {
       const [sessionResponse, commissionsResponse] = await Promise.all([
         fetch('/api/auth/session'),
-        fetch('/api/marketplace/me/commissions'),
+        fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`),
       ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
@@ -94,8 +103,14 @@ export default function CommissionsPage() {
 
       const payload = (await commissionsResponse.json()) as {
         commissions?: CommissionRecord[];
+        pagination?: PaginationMeta;
       };
-      setCommissions(payload.commissions ?? []);
+      setCommissions((currentCommissions) =>
+        page === 1
+          ? (payload.commissions ?? [])
+          : [...currentCommissions, ...(payload.commissions ?? [])],
+      );
+      setCommissionsPagination(payload.pagination ?? null);
     } finally {
       setIsLoading(false);
     }
@@ -208,9 +223,10 @@ export default function CommissionsPage() {
                   لا توجد عمولات حتى الآن.
                 </div>
               ) : (
-                <div className="grid gap-3">
-                  {commissions.map((commission) => (
-                    <article key={commission.id} className="grid gap-3 rounded-md border p-3">
+                <div className="grid gap-4">
+                  <div className="grid gap-3">
+                    {commissions.map((commission) => (
+                      <article key={commission.id} className="grid gap-3 rounded-md border p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h2 className="text-base font-bold">
@@ -251,8 +267,23 @@ export default function CommissionsPage() {
                           </Button>
                         </form>
                       )}
-                    </article>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
+                  {commissionsPagination?.hasMore && (
+                    <Button
+                      variant="outline"
+                      className="mx-auto rounded-md"
+                      disabled={isLoading}
+                      onClick={() =>
+                        void refreshCommissions(
+                          commissionsPagination.nextPage ?? 1,
+                        )
+                      }
+                    >
+                      {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                    </Button>
+                  )}
                 </div>
               )}
             </section>

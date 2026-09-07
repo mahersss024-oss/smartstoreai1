@@ -1,5 +1,6 @@
-import { listModerationQueue } from '@/agent/marketplace/repository';
+import { listModerationQueuePage } from '@/agent/marketplace/repository';
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
@@ -12,5 +13,9 @@ export async function GET(request: Request) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 
-  return Response.json(await listModerationQueue());
+  return Response.json(
+    await listModerationQueuePage(
+      parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 }),
+    ),
+  );
 }

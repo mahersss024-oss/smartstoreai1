@@ -1,5 +1,6 @@
-import { listSellerListings } from '@/agent/marketplace/repository';
+import { listSellerListingsPage } from '@/agent/marketplace/repository';
 import { getAuthSession } from '@/lib/auth/session';
+import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
@@ -14,7 +15,13 @@ export async function GET(request: Request) {
     );
   }
 
+  const listingsPage = await listSellerListingsPage(
+    session.user.id,
+    parsePaginationFromRequest(request, { defaultLimit: 24, maxLimit: 48 }),
+  );
+
   return Response.json({
-    listings: await listSellerListings(session.user.id),
+    listings: listingsPage.items,
+    pagination: listingsPage.pagination,
   });
 }

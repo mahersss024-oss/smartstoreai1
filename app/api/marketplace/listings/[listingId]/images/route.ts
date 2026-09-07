@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
-import { createPersistentImageDataUrl } from '@/agent/marketplace/listing-image-storage';
+import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
 import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
   addListingImageForSeller,
@@ -117,10 +117,28 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const imageId = randomUUID();
-  const imageUrl = createPersistentImageDataUrl(
-    new Uint8Array(fileBuffer),
-    file.type,
-  );
+  let imageUrl: string | null;
+
+  try {
+    imageUrl = await createPersistentListingImageUrl({
+      data: new Uint8Array(fileBuffer),
+      mediaType: file.type,
+      imageId,
+      fileName: file.name,
+    });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[listing_image_storage] failure=${errorName}`);
+
+    return Response.json(
+      {
+        error: 'image_storage_unavailable',
+        message:
+          'Image storage is unavailable. The image was not saved.',
+      },
+      { status: 503 },
+    );
+  }
 
   if (!imageUrl) {
     return Response.json({ error: 'unsupported_image_type' }, { status: 415 });
