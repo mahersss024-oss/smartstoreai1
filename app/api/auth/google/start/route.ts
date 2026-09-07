@@ -5,14 +5,11 @@ import {
   createOauthStateCookie,
   hasCommissionAgreement,
 } from '@/lib/auth/session';
-
-function getBaseUrl(request: Request) {
-  return process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin;
-}
+import { getAppBaseUrl } from '@/lib/app-url';
 
 export async function GET(request: Request) {
   if (!hasCommissionAgreement(request)) {
-    return NextResponse.redirect(new URL('/commission-agreement', getBaseUrl(request)));
+    return NextResponse.redirect(new URL('/commission-agreement', getAppBaseUrl(request)));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -22,7 +19,7 @@ export async function GET(request: Request) {
   }
 
   const state = createOauthState();
-  const callbackUrl = new URL('/api/auth/google/callback', getBaseUrl(request));
+  const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 
   authorizationUrl.searchParams.set('client_id', clientId);

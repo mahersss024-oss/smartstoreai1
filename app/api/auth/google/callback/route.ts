@@ -8,6 +8,7 @@ import {
   getOauthState,
   type AuthSessionUser,
 } from '@/lib/auth/session';
+import { getAppBaseUrl } from '@/lib/app-url';
 import { prisma } from '@/lib/db/prisma';
 
 type GoogleTokenResponse = {
@@ -23,12 +24,8 @@ type GoogleUserInfo = {
   picture?: string;
 };
 
-function getBaseUrl(request: Request) {
-  return process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin;
-}
-
 function redirectToHome(request: Request, cookie?: string) {
-  const response = NextResponse.redirect(new URL('/', getBaseUrl(request)));
+  const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
 
   if (cookie) {
     response.headers.append('Set-Cookie', cookie);
@@ -118,7 +115,7 @@ export async function GET(request: Request) {
     return new Response('Google OAuth is not configured.', { status: 500 });
   }
 
-  const redirectUri = new URL('/api/auth/google/callback', getBaseUrl(request));
+  const redirectUri = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
