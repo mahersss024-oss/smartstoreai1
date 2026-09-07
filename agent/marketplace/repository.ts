@@ -5,10 +5,13 @@ import {
   normalizePagination,
   toPaginatedResponse,
 } from '@/lib/pagination';
-import type { Prisma } from '@prisma/client';
+import type { AdminAuditAction, Prisma } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
-import { parseMarketplaceSearchQuery } from './search';
+import {
+  normalizeMarketplaceSearchText,
+  parseMarketplaceSearchQuery,
+} from './search';
 import * as memoryStore from './store';
 import type {
   ComplianceDecision,
@@ -113,6 +116,16 @@ type DatabaseCommissionRecord = {
 
 export type MarketplaceListingFilters = {
   query?: string;
+  category?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  condition?: ListingCondition;
+  yearMin?: number;
+  yearMax?: number;
+  terms?: string[];
+  termGroups?: string[][];
+  excludedTerms?: string[];
   page?: number;
   limit?: number;
 };
@@ -137,10 +150,15 @@ function toSearchText(input: CreateListingInput) {
     input.title,
     input.description,
     input.city,
+    input.condition,
     Object.values(input.attributes ?? {}).join(' '),
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+function toNormalizedListingSearchText(input: CreateListingInput) {
+  return normalizeMarketplaceSearchText(toSearchText(input));
 }
 
 function chooseInitialStatus(compliance: ComplianceDecision): ListingStatus {
@@ -299,6 +317,40 @@ async function ensureActorUser(actor: Actor) {
   });
 }
 
+async function getAdminAuditActorId(actor?: Actor) {
+  if (!actor) {
+    return null;
+  }
+
+  await ensureActorUser(actor);
+  return getActorId(actor);
+}
+
+async function createAdminAuditLog(
+  tx: Prisma.TransactionClient,
+  input: {
+    adminId: string | null;
+    action: AdminAuditAction;
+    targetType: string;
+    targetId: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  if (!input.adminId) {
+    return;
+  }
+
+  await tx.adminAuditLog.create({
+    data: {
+      adminId: input.adminId,
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      metadata: toPrismaJsonObject(input.metadata ?? {}),
+    },
+  });
+}
+
 function toConversationRecord(
   conversation: DatabaseConversationRecord,
 ): Conversation & { listing: memoryStore.ListingRecord | null } {
@@ -383,41 +435,85 @@ export async function listMarketplaceListings(
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
   const pagination = getListingPagination(filters);
   const searchConditions: Prisma.ListingWhereInput[] = [];
+  const category = filters.category ?? parsedQuery.category;
+  const city = filters.city ?? parsedQuery.city;
+  const minPrice = filters.minPrice ?? parsedQuery.minPrice;
+  const maxPrice = filters.maxPrice ?? parsedQuery.maxPrice;
+  const yearMin = filters.yearMin ?? parsedQuery.yearMin;
+  const yearMax = filters.yearMax ?? parsedQuery.yearMax;
+  const termGroups =
+    filters.termGroups ??
+    (filters.terms?.length ? filters.terms : parsedQuery.terms).map(
+      (term) => parseMarketplaceSearchQuery(term).termGroups[0] ?? [term],
+    );
 
-  if (parsedQuery.category) {
-    searchConditions.push({ category: parsedQuery.category });
+  if (category) {
+    searchConditions.push({ category });
   }
 
-  if (parsedQuery.city) {
+  if (city) {
     searchConditions.push({
-      city: { contains: parsedQuery.city, mode: 'insensitive' },
+      city: { contains: city, mode: 'insensitive' },
     });
   }
 
-  if (
-    parsedQuery.minPrice !== undefined ||
-    parsedQuery.maxPrice !== undefined
-  ) {
+  if (filters.condition) {
+    searchConditions.push({ condition: filters.condition });
+  }
+
+  if (minPrice !== undefined || maxPrice !== undefined) {
     searchConditions.push({
       price: {
-        ...(parsedQuery.minPrice !== undefined
-          ? { gte: parsedQuery.minPrice }
+        ...(minPrice !== undefined
+          ? { gte: minPrice }
           : {}),
-        ...(parsedQuery.maxPrice !== undefined
-          ? { lte: parsedQuery.maxPrice }
+        ...(maxPrice !== undefined
+          ? { lte: maxPrice }
           : {}),
       },
     });
   }
 
-  for (const termGroup of parsedQuery.termGroups) {
+  if (yearMin !== undefined || yearMax !== undefined) {
+    const currentYear = new Date().getFullYear() + 1;
+    const lowerYear = yearMin ?? 1900;
+    const upperYear = yearMax ?? currentYear;
+    const years = Array.from(
+      { length: Math.max(0, upperYear - lowerYear + 1) },
+      (_, index) => String(lowerYear + index),
+    ).slice(0, 80);
+
+    if (years.length) {
+      searchConditions.push({
+        OR: years.flatMap((year) => [
+          { title: { contains: year, mode: 'insensitive' } },
+          { description: { contains: year, mode: 'insensitive' } },
+          { searchText: { contains: year, mode: 'insensitive' } },
+        ]),
+      });
+    }
+  }
+
+  for (const termGroup of termGroups) {
     searchConditions.push({
       OR: termGroup.flatMap((term) => [
         { title: { contains: term, mode: 'insensitive' } },
         { description: { contains: term, mode: 'insensitive' } },
         { city: { contains: term, mode: 'insensitive' } },
         { category: { contains: term, mode: 'insensitive' } },
+        { searchText: { contains: term, mode: 'insensitive' } },
       ]),
+    });
+  }
+
+  for (const excludedTerm of filters.excludedTerms ?? []) {
+    searchConditions.push({
+      NOT: {
+        searchText: {
+          contains: normalizeMarketplaceSearchText(excludedTerm),
+          mode: 'insensitive',
+        },
+      },
     });
   }
 
@@ -538,6 +634,7 @@ export async function createListingDraft(
       city: input.city,
       condition: input.condition,
       attributes: toPrismaJsonObject(input.attributes ?? {}),
+      searchText: toNormalizedListingSearchText(input),
       compliance: toPrismaJsonObject(
         compliance as unknown as Record<string, unknown>,
       ),
@@ -589,6 +686,7 @@ export async function updateListingForSeller(
       city: updates.city,
       condition: updates.condition,
       attributes: toPrismaJsonObject(nextInput.attributes ?? {}),
+      searchText: toNormalizedListingSearchText(nextInput),
       compliance: toPrismaJsonObject(
         compliance as unknown as Record<string, unknown>,
       ),
@@ -626,19 +724,25 @@ export async function setListingStatusForSeller(
         ? 'rejected'
         : 'pending'
       : status;
-  const listing = await prisma.listing.update({
-    where: { id: listingId },
-    data: { status: nextStatus },
-    include: { images: true },
-  });
+  const listing = await prisma.$transaction(async (tx) => {
+    const updatedListing = await tx.listing.update({
+      where: { id: listingId },
+      data: { status: nextStatus },
+      include: { images: true },
+    });
 
-  if (listing.status === 'sold') {
+    if (updatedListing.status !== 'sold') {
+      return updatedListing;
+    }
+
     const productValue =
-      listing.price && typeof listing.price === 'object' && 'toNumber' in listing.price
-        ? listing.price.toNumber()
+      updatedListing.price &&
+      typeof updatedListing.price === 'object' &&
+      'toNumber' in updatedListing.price
+        ? updatedListing.price.toNumber()
         : null;
 
-    await prisma.commission.upsert({
+    await tx.commission.upsert({
       where: { listingId },
       create: {
         listingId,
@@ -653,7 +757,9 @@ export async function setListingStatusForSeller(
       },
       update: {},
     });
-  }
+
+    return updatedListing;
+  });
 
   return toListingRecord(listing);
 }
@@ -1285,6 +1391,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
 export async function setListingModerationStatus(
   listingId: string,
   status: Extract<ListingStatus, 'published' | 'rejected' | 'deleted'>,
+  admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.setListingModerationStatus(listingId, status);
@@ -1306,14 +1413,36 @@ export async function setListingModerationStatus(
     };
   }
 
-  const listing = await prisma.listing.update({
-    where: { id: listingId },
-    data: { status },
-    include: {
-      images: {
-        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  const adminId = await getAdminAuditActorId(admin);
+  const action: AdminAuditAction =
+    status === 'published'
+      ? 'approve_listing'
+      : status === 'deleted'
+        ? 'delete_listing'
+        : 'reject_listing';
+  const listing = await prisma.$transaction(async (tx) => {
+    const updatedListing = await tx.listing.update({
+      where: { id: listingId },
+      data: { status },
+      include: {
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
       },
-    },
+    });
+
+    await createAdminAuditLog(tx, {
+      adminId,
+      action,
+      targetType: 'listing',
+      targetId: listingId,
+      metadata: {
+        previousStatus: existing.status,
+        nextStatus: status,
+      },
+    });
+
+    return updatedListing;
   });
 
   return {
@@ -1325,23 +1454,37 @@ export async function setListingModerationStatus(
 export async function setReportModerationStatus(
   reportId: string,
   status: Extract<ReportRecord['status'], 'reviewed' | 'dismissed'>,
+  admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.setReportModerationStatus(reportId, status);
   }
 
-  const report = await prisma.report.update({
-    where: { id: reportId },
-    data: { status },
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  const adminId = await getAdminAuditActorId(admin);
+  const report = await prisma.$transaction(async (tx) => {
+    const updatedReport = await tx.report.update({
+      where: { id: reportId },
+      data: { status },
+      include: {
+        listing: {
+          include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
           },
         },
       },
-    },
+    });
+
+    await createAdminAuditLog(tx, {
+      adminId,
+      action: status === 'reviewed' ? 'review_report' : 'dismiss_report',
+      targetType: 'report',
+      targetId: reportId,
+      metadata: { nextStatus: status },
+    });
+
+    return updatedReport;
   }).catch(() => null);
 
   if (!report) {
@@ -1541,26 +1684,40 @@ export async function updateCommissionSaleAmountForSeller(
 export async function setCommissionStatusForAdmin(
   commissionId: string,
   status: Extract<CommissionStatus, 'due' | 'paid' | 'waived' | 'disputed'>,
+  admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.setCommissionStatusForAdmin(commissionId, status);
   }
 
-  const updated = await prisma.commission.update({
-    where: { id: commissionId },
-    data: {
-      status,
-      paidAt: status === 'paid' ? new Date() : undefined,
-    },
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  const adminId = await getAdminAuditActorId(admin);
+  const updated = await prisma.$transaction(async (tx) => {
+    const commission = await tx.commission.update({
+      where: { id: commissionId },
+      data: {
+        status,
+        paidAt: status === 'paid' ? new Date() : undefined,
+      },
+      include: {
+        listing: {
+          include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
           },
         },
       },
-    },
+    });
+
+    await createAdminAuditLog(tx, {
+      adminId,
+      action: 'update_commission',
+      targetType: 'commission',
+      targetId: commissionId,
+      metadata: { nextStatus: status },
+    });
+
+    return commission;
   }).catch(() => null);
 
   if (!updated) {

@@ -3,6 +3,8 @@ export type ParsedMarketplaceSearchQuery = {
   city?: string;
   minPrice?: number;
   maxPrice?: number;
+  yearMin?: number;
+  yearMax?: number;
   terms: string[];
   termGroups: string[][];
 };
@@ -51,6 +53,15 @@ const searchStopWords = new Set([
   'ميزانيه',
   'ميزانيتي',
   'حدي',
+  'خل',
+  'خلي',
+  'غير',
+  'الاهم',
+  'الأهم',
+  'اهم',
+  'أهم',
+  'شي',
+  'شيء',
   'بحدود',
   'حدود',
   'بين',
@@ -67,6 +78,18 @@ const searchStopWords = new Set([
   'اعلى',
   'أعلى',
   'حتى',
+  'وفوق',
+  'او',
+  'أو',
+  'احدث',
+  'أحدث',
+  'موديل',
+  'ممشى',
+  'ممشاها',
+  'ماشيه',
+  'ماشية',
+  'كيلو',
+  'كم',
   'الف',
   'ألف',
   'ريال',
@@ -150,6 +173,56 @@ const cityMatchers: Array<{ city: string; patterns: RegExp[]; stopWords: string[
     city: 'المدينة',
     patterns: [/(?:المدينة|المدينه|medina)/i],
     stopWords: ['المدينة', 'المدينه', 'medina'],
+  },
+  {
+    city: 'تبوك',
+    patterns: [/(?:تبوك|tabuk)/i],
+    stopWords: ['تبوك', 'tabuk'],
+  },
+  {
+    city: 'أبها',
+    patterns: [/(?:ابها|أبها|abha)/i],
+    stopWords: ['ابها', 'أبها', 'abha'],
+  },
+  {
+    city: 'الطائف',
+    patterns: [/(?:الطائف|طايف|taif)/i],
+    stopWords: ['الطائف', 'طايف', 'taif'],
+  },
+  {
+    city: 'جازان',
+    patterns: [/(?:جازان|جيزان|jazan|gizan)/i],
+    stopWords: ['جازان', 'جيزان', 'jazan', 'gizan'],
+  },
+  {
+    city: 'حائل',
+    patterns: [/(?:حائل|حايل|hail|ha'il)/i],
+    stopWords: ['حائل', 'حايل', 'hail'],
+  },
+  {
+    city: 'بريدة',
+    patterns: [/(?:بريدة|بريده|buraydah|buraidah)/i],
+    stopWords: ['بريدة', 'بريده', 'buraydah', 'buraidah'],
+  },
+  {
+    city: 'نجران',
+    patterns: [/(?:نجران|najran)/i],
+    stopWords: ['نجران', 'najran'],
+  },
+  {
+    city: 'ينبع',
+    patterns: [/(?:ينبع|yanbu)/i],
+    stopWords: ['ينبع', 'yanbu'],
+  },
+  {
+    city: 'الجبيل',
+    patterns: [/(?:الجبيل|جبيل|jubail)/i],
+    stopWords: ['الجبيل', 'جبيل', 'jubail'],
+  },
+  {
+    city: 'الأحساء',
+    patterns: [/(?:الاحساء|الأحساء|احساء|هفوف|hofuf|ahsa)/i],
+    stopWords: ['الاحساء', 'الأحساء', 'احساء', 'هفوف', 'hofuf', 'ahsa'],
   },
 ];
 
@@ -340,6 +413,36 @@ function getSearchTermVariants(term: string) {
   return uniqueValues(variants.map(normalizeMarketplaceSearchText).concat(variants));
 }
 
+function getYearBounds(normalizedQuery: string) {
+  const consumedTokens = new Set<string>();
+  const yearPattern = '((?:19|20)\\d{2})';
+  const minYearMatch = normalizedQuery.match(
+    new RegExp(
+      `${yearPattern}\\s*(?:(?:و|او)\\s*)?(?:فوق|احدث|اعلى|اكبر|بعد)`,
+      'iu',
+    ),
+  );
+  const maxYearMatch = normalizedQuery.match(
+    new RegExp(`(?:قبل|اقدم|اقل من|تحت)\\s*${yearPattern}`, 'iu'),
+  );
+  const yearMin = minYearMatch ? Number.parseInt(minYearMatch[1] ?? '', 10) : undefined;
+  const yearMax = maxYearMatch ? Number.parseInt(maxYearMatch[1] ?? '', 10) : undefined;
+
+  if (yearMin) {
+    addConsumedTokens(consumedTokens, minYearMatch?.[1]);
+  }
+
+  if (yearMax) {
+    addConsumedTokens(consumedTokens, maxYearMatch?.[1]);
+  }
+
+  return {
+    yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+    yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
+    consumedTokens,
+  };
+}
+
 export function parseMarketplaceSearchQuery(
   query: string | null | undefined,
 ): ParsedMarketplaceSearchQuery {
@@ -360,6 +463,7 @@ export function parseMarketplaceSearchQuery(
     rule.patterns.some((pattern) => pattern.test(normalizedQuery)),
   );
   const priceBounds = getPriceBounds(normalizedQuery);
+  const yearBounds = getYearBounds(normalizedQuery);
   const ignoredTokens = new Set(
     [
       ...searchStopWords,
@@ -373,7 +477,8 @@ export function parseMarketplaceSearchQuery(
       (token) =>
         token.length > 1 &&
         !ignoredTokens.has(token) &&
-        !priceBounds.consumedTokens.has(token),
+        !priceBounds.consumedTokens.has(token) &&
+        !yearBounds.consumedTokens.has(token),
     ),
   );
 
@@ -382,6 +487,8 @@ export function parseMarketplaceSearchQuery(
     city: cityRule?.city,
     minPrice: priceBounds.minPrice,
     maxPrice: priceBounds.maxPrice,
+    yearMin: yearBounds.yearMin,
+    yearMax: yearBounds.yearMax,
     terms,
     termGroups: terms.map(getSearchTermVariants),
   };

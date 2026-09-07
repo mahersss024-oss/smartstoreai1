@@ -13,6 +13,7 @@ export function createChatAgent(
   options: {
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
+    searchOwnerKey?: string;
   } = {},
 ) {
   return new ToolLoopAgent({
@@ -22,6 +23,7 @@ export function createChatAgent(
     tools: {
       ...createMarketplaceTools(session, {
         latestUploadedImages: options.latestUploadedImages,
+        searchOwnerKey: options.searchOwnerKey,
       }),
     },
   });

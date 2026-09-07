@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { getAuthSession, isModeratorSession } from '@/lib/auth/session';
 
 const reportActionSchema = z.object({
   action: z.enum(['review', 'dismiss']),
@@ -24,7 +24,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!isModeratorSession(session)) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 
@@ -49,6 +49,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const result = await setReportModerationStatus(
     reportId,
     getReportStatus(parsed.data.action),
+    session.user,
   );
 
   if (result.status === 'not_found') {

@@ -5,6 +5,7 @@ export type AuthSessionUser = {
   email: string;
   name?: string;
   picture?: string;
+  role?: 'user' | 'moderator' | 'admin' | string;
 };
 
 export type AuthSession = {
@@ -215,13 +216,40 @@ export function hasCommissionAgreement(request: Request) {
   return Boolean(getCommissionAgreement(request));
 }
 
-export function isAdminSession(session: AuthSession | null) {
-  const adminEmails = (process.env.SMARTSTORE_ADMIN_EMAILS ?? '')
+function getConfiguredAdminEmails() {
+  return (process.env.SMARTSTORE_ADMIN_EMAILS ?? '')
     .split(',')
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+}
 
-  return adminEmails.includes(session?.user.email.toLowerCase() ?? '');
+export function getConfiguredRoleForEmail(email: string) {
+  return getConfiguredAdminEmails().includes(email.toLowerCase())
+    ? 'admin'
+    : 'user';
+}
+
+export function isAdminSession(session: AuthSession | null) {
+  if (!session) {
+    return false;
+  }
+
+  return (
+    session.user.role === 'admin' ||
+    getConfiguredAdminEmails().includes(session.user.email.toLowerCase())
+  );
+}
+
+export function isModeratorSession(session: AuthSession | null) {
+  if (!session) {
+    return false;
+  }
+
+  return (
+    session.user.role === 'moderator' ||
+    session.user.role === 'admin' ||
+    isAdminSession(session)
+  );
 }
 
 export function createOauthState() {

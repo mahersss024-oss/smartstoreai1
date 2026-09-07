@@ -45,6 +45,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const result = await setCommissionStatusForAdmin(
     commissionId,
     parsed.data.status,
+    session.user,
   );
 
   if (result.status === 'not_found') {

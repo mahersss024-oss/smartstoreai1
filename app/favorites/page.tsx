@@ -48,19 +48,17 @@ type PaginationMeta = {
   nextPage: number | null;
 };
 
-function getListingImage(listing: FavoriteListing | null, index: number) {
+const missingListingImageDataUrl =
+  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22900%22 height=%22675%22 viewBox=%220 0 900 675%22%3E%3Crect width=%22900%22 height=%22675%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M382 291h136a28 28 0 0 1 28 28v95a28 28 0 0 1-28 28H382a28 28 0 0 1-28-28v-95a28 28 0 0 1 28-28z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22/%3E%3Ccircle cx=%22417%22 cy=%22342%22 r=%2220%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m382 414 53-55 43 43 25-27 43 39%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22450%22 y=%22492%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
+
+function getListingImage(listing: FavoriteListing | null) {
   const image = listing?.images?.[0];
-  const fallbacks = [
-    'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?auto=format&fit=crop&w=900&q=80',
-    'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=900&q=80',
-    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80',
-  ];
 
   return (
     image?.thumbnailUrl ??
     image?.displayUrl ??
     image?.originalUrl ??
-    fallbacks[index % fallbacks.length]
+    missingListingImageDataUrl
   );
 }
 
@@ -201,7 +199,7 @@ export default function FavoritesPage() {
             ) : (
               <div className="grid gap-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {favorites.map((favorite, index) => (
+                  {favorites.map((favorite) => (
                     <Link
                     key={favorite.id}
                     className="overflow-hidden rounded-md border transition hover:border-blue-400 hover:shadow-md"
@@ -210,7 +208,7 @@ export default function FavoritesPage() {
                     <img
                       alt={favorite.listing?.title ?? 'صورة الإعلان'}
                       className="aspect-[4/3] w-full object-cover"
-                      src={getListingImage(favorite.listing, index)}
+                      src={getListingImage(favorite.listing)}
                     />
                     <div className="grid gap-2 p-3">
                       <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">

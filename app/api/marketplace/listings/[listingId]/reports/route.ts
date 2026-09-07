@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { reportListing } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const reportSchema = z.object({
@@ -35,6 +37,17 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'report',
+    actorId: session.user.id,
+    maxRequests: 8,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   let payload: unknown;
 
   try {
@@ -53,6 +66,15 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { listingId } = await context.params;
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'report_create',
+    actorKey: `${session.user.id}:${listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const result = await reportListing(
     listingId,
     session.user,
@@ -61,8 +83,14 @@ export async function POST(request: Request, context: RouteContext) {
   );
 
   if (result.status === 'not_found') {
-    return Response.json({ error: 'listing_not_found' }, { status: 404 });
+    const responseBody = { error: 'listing_not_found' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 404)
+      : Response.json(responseBody, { status: 404 });
   }
 
-  return Response.json(result, { status: 201 });
+  return idempotency
+    ? idempotency.complete(result, 201)
+    : Response.json(result, { status: 201 });
 }

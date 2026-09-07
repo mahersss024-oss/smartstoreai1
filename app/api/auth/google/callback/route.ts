@@ -4,6 +4,7 @@ import {
   clearOauthStateCookie,
   commissionAgreementVersion,
   createSessionCookie,
+  getConfiguredRoleForEmail,
   getCommissionAgreement,
   getOauthState,
   type AuthSessionUser,
@@ -79,6 +80,7 @@ async function persistGoogleUserRegistration(
       email: updatedUser.email,
       name: updatedUser.name ?? undefined,
       picture: updatedUser.picture ?? undefined,
+      role: updatedUser.role,
     };
   }
 
@@ -86,6 +88,7 @@ async function persistGoogleUserRegistration(
     where: { id: user.id },
     create: {
       id: user.id,
+      role: getConfiguredRoleForEmail(user.email),
       ...registrationData,
     },
     update: registrationData,
@@ -96,6 +99,7 @@ async function persistGoogleUserRegistration(
     email: updatedUser.email,
     name: updatedUser.name ?? undefined,
     picture: updatedUser.picture ?? undefined,
+    role: updatedUser.role,
   };
 }
 

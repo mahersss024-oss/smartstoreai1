@@ -1,5 +1,5 @@
 import { listModerationQueuePage } from '@/agent/marketplace/repository';
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { getAuthSession, isModeratorSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export async function GET(request: Request) {
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!isModeratorSession(session)) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

@@ -8,6 +8,8 @@ import {
   getListing,
 } from '@/agent/marketplace/repository';
 import type { ListingImage } from '@/agent/marketplace/types';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -32,6 +34,17 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'image_upload',
+    actorId: session.user.id,
+    maxRequests: 10,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const { listingId } = await context.params;
   const existingListing = await getListing(listingId);
 
@@ -52,6 +65,15 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (file.size > maxImageBytes) {
     return Response.json({ error: 'image_too_large' }, { status: 413 });
+  }
+
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'image_upload',
+    actorKey: `${session.user.id}:${listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -94,26 +116,27 @@ export async function POST(request: Request, context: RouteContext) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[listing_image_compliance] failure=${errorName}`);
 
-    return Response.json(
-      {
-        error: 'image_compliance_unavailable',
-        message:
-          'Image compliance review is unavailable. The image was not accepted.',
-      },
-      { status: 503 },
-    );
+    const responseBody = {
+      error: 'image_compliance_unavailable',
+      message:
+        'Image compliance review is unavailable. The image was not accepted.',
+    };
+
+    await idempotency?.abandon();
+    return Response.json(responseBody, { status: 503 });
   }
 
   if (imageCompliance.decision === 'block') {
-    return Response.json(
-      {
-        error: 'image_policy_blocked',
-        message:
-          'Image appears to show a product prohibited by Saudi marketplace or Islamic compliance policy.',
-        compliance: imageCompliance,
-      },
-      { status: 422 },
-    );
+    const responseBody = {
+      error: 'image_policy_blocked',
+      message:
+        'Image appears to show a product prohibited by Saudi marketplace or Islamic compliance policy.',
+      compliance: imageCompliance,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 422)
+      : Response.json(responseBody, { status: 422 });
   }
 
   const imageId = randomUUID();
@@ -130,18 +153,22 @@ export async function POST(request: Request, context: RouteContext) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[listing_image_storage] failure=${errorName}`);
 
-    return Response.json(
-      {
-        error: 'image_storage_unavailable',
-        message:
-          'Image storage is unavailable. The image was not saved.',
-      },
-      { status: 503 },
-    );
+    const responseBody = {
+      error: 'image_storage_unavailable',
+      message:
+        'Image storage is unavailable. The image was not saved.',
+    };
+
+    await idempotency?.abandon();
+    return Response.json(responseBody, { status: 503 });
   }
 
   if (!imageUrl) {
-    return Response.json({ error: 'unsupported_image_type' }, { status: 415 });
+    const responseBody = { error: 'unsupported_image_type' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 415)
+      : Response.json(responseBody, { status: 415 });
   }
 
   const quality = analyzeImageQuality({
@@ -172,13 +199,15 @@ export async function POST(request: Request, context: RouteContext) {
 
   const listing = await addListingImageForSeller(listingId, session.user.id, image);
 
-  return Response.json(
-    {
-      image,
-      quality,
-      compliance: imageCompliance,
-      listing,
-    },
-    { status: image.status === 'pending_review' ? 202 : 201 },
-  );
+  const responseBody = {
+    image,
+    quality,
+    compliance: imageCompliance,
+    listing,
+  };
+  const responseStatus = image.status === 'pending_review' ? 202 : 201;
+
+  return idempotency
+    ? idempotency.complete(responseBody, responseStatus)
+    : Response.json(responseBody, { status: responseStatus });
 }

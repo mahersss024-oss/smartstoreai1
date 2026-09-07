@@ -103,6 +103,7 @@ model Listing {
   city             String?
   condition        ListingCondition?
   attributes       Json                @default("{}")
+  searchText       String?             @db.Text
   status           ListingStatus       @default(draft)
   compliance       Json                @default("{}")
   views            Int                 @default(0)
@@ -121,6 +122,31 @@ model Listing {
   @@index([sellerId, status])
   @@index([status, updatedAt])
   @@index([category, city])
+}
+
+model MarketplaceSearchState {
+  id        String   @id @default(cuid())
+  ownerKey  String   @unique
+  state     Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model ApiIdempotencyKey {
+  id         String   @id @default(cuid())
+  namespace  String
+  actorKey   String
+  key        String
+  status     String   @default("pending")
+  statusCode Int?
+  response   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([namespace, actorKey, key])
+  @@index([createdAt])
 }
 
 model ListingImage {

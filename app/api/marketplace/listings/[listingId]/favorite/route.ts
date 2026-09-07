@@ -1,4 +1,6 @@
 import { toggleFavoriteListing } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 type RouteContext = {
@@ -20,16 +22,44 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'favorite',
+    actorId: session.user.id,
+    maxRequests: 40,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const { listingId } = await context.params;
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'favorite_toggle',
+    actorKey: `${session.user.id}:${listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const result = await toggleFavoriteListing(listingId, session.user);
 
   if (result.status === 'not_found') {
-    return Response.json({ error: 'listing_not_found' }, { status: 404 });
+    const responseBody = { error: 'listing_not_found' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 404)
+      : Response.json(responseBody, { status: 404 });
   }
 
   if (result.status === 'self_favorite_blocked') {
-    return Response.json({ error: 'self_favorite_blocked' }, { status: 409 });
+    const responseBody = { error: 'self_favorite_blocked' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
   }
 
-  return Response.json(result);
+  return idempotency ? idempotency.complete(result) : Response.json(result);
 }

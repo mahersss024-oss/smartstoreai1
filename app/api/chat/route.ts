@@ -1,4 +1,8 @@
 import {
+  createHash,
+} from 'node:crypto';
+
+import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -105,6 +109,20 @@ function getClientId(request: Request) {
     request.headers.get('cf-connecting-ip') ||
     'anonymous'
   );
+}
+
+function getSearchOwnerKey(
+  session: ReturnType<typeof getAuthSession>,
+  request: Request,
+) {
+  if (session) {
+    return `user:${session.user.id}`;
+  }
+
+  return `anon:${createHash('sha256')
+    .update(getClientId(request))
+    .digest('hex')
+    .slice(0, 32)}`;
 }
 
 function isPolicyFacilitationIntent(intent: string) {
@@ -658,6 +676,7 @@ async function generateCheckedAssistantResponse(
   options: {
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
+    searchOwnerKey?: string;
   } = {},
 ) {
   try {
@@ -964,6 +983,7 @@ export async function POST(request: Request) {
   }
 
   const session = getAuthSession(request);
+  const searchOwnerKey = getSearchOwnerKey(session, request);
   const directPublishResponse = await publishLatestReadyDraftFromConfirmation({
     userRequest: preliminaryUserRequest,
     language,
@@ -1141,6 +1161,6 @@ export async function POST(request: Request) {
     userRequest,
     language,
     session,
-    { hasVisionInput: false, latestUploadedImages },
+    { hasVisionInput: false, latestUploadedImages, searchOwnerKey },
   );
 }

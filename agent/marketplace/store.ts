@@ -61,37 +61,19 @@ type PersistedMarketplaceStore = {
 
 export type MarketplaceListingFilters = {
   query?: string;
+  category?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  condition?: ListingDraft['condition'];
+  yearMin?: number;
+  yearMax?: number;
+  terms?: string[];
+  termGroups?: string[][];
+  excludedTerms?: string[];
   page?: number;
   limit?: number;
 };
-
-const searchStopWords = new Set([
-  'ابحث',
-  'أبحث',
-  'بحث',
-  'اريد',
-  'أريد',
-  'ابي',
-  'أبي',
-  'احتاج',
-  'منتج',
-  'منتجات',
-  'مساعد',
-  'مساعدة',
-  'الذكاء',
-  'الاصطناعي',
-  'بمساعدة',
-  'في',
-  'عن',
-  'من',
-  'الى',
-  'إلى',
-  'على',
-  'لي',
-  'للبيع',
-  'اعلان',
-  'إعلان',
-]);
 
 function shouldPersistStore() {
   return (
@@ -216,9 +198,16 @@ function normalizeSearchText(value: string) {
   return normalizeMarketplaceSearchText(value);
 }
 
-function getSearchTokens(query: string) {
-  return parseMarketplaceSearchQuery(query).terms.filter(
-    (token) => !searchStopWords.has(token),
+function getFilterTermGroups(filters: MarketplaceListingFilters) {
+  if (filters.termGroups) {
+    return filters.termGroups;
+  }
+
+  const parsedQuery = parseMarketplaceSearchQuery(filters.query);
+  const terms = filters.terms?.length ? filters.terms : parsedQuery.terms;
+
+  return terms.map(
+    (term) => parseMarketplaceSearchQuery(term).termGroups[0] ?? [term],
   );
 }
 
@@ -473,60 +462,110 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
     .filter((listing) => listing.status === 'published')
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
-  if (!filters.query?.trim()) {
+  if (
+    !filters.query?.trim() &&
+    !filters.category &&
+    !filters.city &&
+    filters.minPrice === undefined &&
+    filters.maxPrice === undefined &&
+    !filters.condition &&
+    filters.yearMin === undefined &&
+    filters.yearMax === undefined &&
+    !filters.terms?.length &&
+    !filters.termGroups?.length &&
+    !filters.excludedTerms?.length
+  ) {
     return paginateListings(publishedListings, filters);
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
+  const category = filters.category ?? parsedQuery.category;
+  const city = filters.city ?? parsedQuery.city;
+  const minPrice = filters.minPrice ?? parsedQuery.minPrice;
+  const maxPrice = filters.maxPrice ?? parsedQuery.maxPrice;
+  const yearMin = filters.yearMin ?? parsedQuery.yearMin;
+  const yearMax = filters.yearMax ?? parsedQuery.yearMax;
   const filteredListings = publishedListings.filter((listing) => {
-    if (parsedQuery.category && listing.category !== parsedQuery.category) {
+    if (category && listing.category !== category) {
       return false;
     }
 
     if (
-      parsedQuery.city &&
+      city &&
       !normalizeSearchText(listing.city ?? '').includes(
-        normalizeSearchText(parsedQuery.city),
+        normalizeSearchText(city),
       )
     ) {
       return false;
     }
 
-    if (
-      parsedQuery.minPrice !== undefined ||
-      parsedQuery.maxPrice !== undefined
-    ) {
+    if (filters.condition && listing.condition !== filters.condition) {
+      return false;
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
       if (typeof listing.price !== 'number') {
         return false;
       }
 
       if (
-        parsedQuery.minPrice !== undefined &&
-        listing.price < parsedQuery.minPrice
+        minPrice !== undefined &&
+        listing.price < minPrice
       ) {
         return false;
       }
 
       if (
-        parsedQuery.maxPrice !== undefined &&
-        listing.price > parsedQuery.maxPrice
+        maxPrice !== undefined &&
+        listing.price > maxPrice
       ) {
+        return false;
+      }
+    }
+
+    if (yearMin !== undefined || yearMax !== undefined) {
+      const text = toListingSearchText(listing);
+      const years = Array.from(text.matchAll(/(?:19|20)\d{2}/g)).map((match) =>
+        Number.parseInt(match[0], 10),
+      );
+
+      if (
+        years.length > 0 &&
+        !years.some(
+          (year) =>
+            (yearMin === undefined || year >= yearMin) &&
+            (yearMax === undefined || year <= yearMax),
+        )
+      ) {
+        return false;
+      }
+    }
+
+    for (const excludedTerm of filters.excludedTerms ?? []) {
+      if (toListingSearchText(listing).includes(normalizeSearchText(excludedTerm))) {
         return false;
       }
     }
 
     return true;
   });
-  const tokens = getSearchTokens(filters.query);
+  const termGroups = getFilterTermGroups(filters);
 
-  if (tokens.length === 0) {
+  if (termGroups.length === 0) {
     return paginateListings(filteredListings, filters);
   }
 
   const scoredListings = filteredListings
     .map((listing) => ({
       listing,
-      score: scoreListingForQuery(listing, tokens),
+      score: termGroups.reduce(
+        (score, termGroup) =>
+          score +
+          Math.max(
+            ...termGroup.map((term) => scoreListingForQuery(listing, [term])),
+          ),
+        0,
+      ),
     }))
     .filter((result) => result.score > 0)
     .sort((left, right) => {

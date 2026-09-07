@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Heart,
   Home,
+  ImageIcon,
   LogOut,
   Megaphone,
   MessageCircle,
@@ -59,7 +60,7 @@ type ListingCard = {
   title: string;
   price: string;
   city: string;
-  image: string;
+  image: string | null;
   category: string;
   status: string;
   stats: string;
@@ -72,44 +73,6 @@ type PaginationMeta = {
   hasMore: boolean;
   nextPage: number | null;
 };
-
-function getFallbackImage(category: string, index = 0) {
-  const images = {
-    mobile_phones:
-      'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?auto=format&fit=crop&w=900&q=80',
-    cars:
-      'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=900&q=80',
-    computers:
-      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80',
-    furniture:
-      'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80',
-    real_estate:
-      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80',
-    auto_parts:
-      'https://images.unsplash.com/photo-1632823469850-1b7b1e8b7e1e?auto=format&fit=crop&w=900&q=80',
-    fashion:
-      'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=900&q=80',
-    home_garden:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=900&q=80',
-    sports:
-      'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=900&q=80',
-    gaming_hobbies:
-      'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=900&q=80',
-    books_education:
-      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=900&q=80',
-    kids:
-      'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80',
-    tools_equipment:
-      'https://images.unsplash.com/photo-1581147036324-c1c88bb0b379?auto=format&fit=crop&w=900&q=80',
-    watches_accessories:
-      'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=900&q=80',
-    beauty:
-      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80',
-  } satisfies Record<string, string>;
-  const values = Object.values(images);
-
-  return images[category as keyof typeof images] ?? values[index % values.length];
-}
 
 function formatListingPrice(price: ApiListingRecord['price']) {
   if (typeof price === 'number') {
@@ -174,7 +137,7 @@ function getDurableImageUrl(...urls: Array<string | undefined>) {
   });
 }
 
-function listingRecordToCard(listing: ApiListingRecord, index: number): ListingCard {
+function listingRecordToCard(listing: ApiListingRecord): ListingCard {
   const primaryImage =
     listing.images?.find((image) => image.status === 'approved') ??
     listing.images?.[0];
@@ -191,8 +154,7 @@ function listingRecordToCard(listing: ApiListingRecord, index: number): ListingC
         primaryImage?.thumbnailUrl,
         primaryImage?.displayUrl,
         primaryImage?.originalUrl,
-      ) ??
-      getFallbackImage(listing.category, index),
+      ) ?? null,
     status: formatListingStatus(listing.status),
     stats: `${listing.views ?? 0} مشاهدة · ${listing.messageCount ?? 0} رسائل · ${
       listing.favoriteCount ?? 0
@@ -455,7 +417,16 @@ export default function AccountPage() {
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {listings.map((listing) => (
                       <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background">
-                      <img alt={listing.title} className="aspect-[4/3] w-full object-cover" src={listing.image} />
+                      {listing.image ? (
+                        <img alt={listing.title} className="aspect-[4/3] w-full object-cover" src={listing.image} />
+                      ) : (
+                        <div className="grid aspect-[4/3] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                          <div className="grid gap-1">
+                            <ImageIcon className="mx-auto size-5" />
+                            <span>لا توجد صورة حقيقية</span>
+                          </div>
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <div className="grid gap-2 p-3">
                           <div className="flex min-w-0 items-center justify-between gap-2">

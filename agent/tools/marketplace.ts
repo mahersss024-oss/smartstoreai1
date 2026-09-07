@@ -18,6 +18,10 @@ import {
   updateListingForSeller,
   type CreateListingInput,
 } from '@/agent/marketplace/repository';
+import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
+import { compareMarketplaceListings as compareListingsWithEngine } from '@/agent/marketplace/comparison-engine';
+import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
+import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine';
 import type { AuthSession } from '@/lib/auth/session';
 
 type MarketplaceListingResult = Awaited<
@@ -54,16 +58,33 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
   };
 }
 
-function buildComparableListingQuery(listing: MarketplaceListingResult) {
-  return [
-    listing.category,
-    listing.title,
-    listing.city,
-    listing.condition,
-    typeof listing.price === 'number' ? String(listing.price) : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+function getRankedListingSearchSummary(
+  result: Awaited<ReturnType<typeof searchMarketplaceWithState>>['listings'][number],
+) {
+  return {
+    ...getListingSearchSummary(result.listing),
+    matchScore: result.scores.finalScore,
+    scores: result.scores,
+    reasons: result.reasons,
+  };
+}
+
+function getComparisonListingSummary(
+  item: ReturnType<typeof compareListingsWithEngine>['target'],
+) {
+  return {
+    ...getListingSearchSummary(item.listing),
+    overallScore: item.overallScore,
+    priceScore: item.priceScore,
+    conditionScore: item.conditionScore,
+    mileageScore: item.mileageScore,
+    specsScore: item.specsScore,
+    locationScore: item.locationScore,
+    listingQualityScore: item.listingQualityScore,
+    marketValueScore: item.marketValueScore,
+    labels: item.labels,
+    reasons: item.reasons,
+  };
 }
 
 function buildListingText(input: {
@@ -178,7 +199,10 @@ function buildImageReviewMessages(
 
 export function createMarketplaceTools(
   session: AuthSession | null,
-  options: { latestUploadedImages?: UploadedListingImage[] } = {},
+  options: {
+    latestUploadedImages?: UploadedListingImage[];
+    searchOwnerKey?: string;
+  } = {},
 ) {
   return {
     searchMarketplaceListings: tool({
@@ -188,14 +212,25 @@ export function createMarketplaceTools(
         query: z.string().trim().min(1).max(300).optional(),
       }),
       execute: async ({ query }) => {
-        const listings = await listMarketplaceListings({ query });
+        const searchResult = await searchMarketplaceWithState({
+          ownerKey:
+            options.searchOwnerKey ??
+            (session ? `user:${session.user.id}` : 'anonymous'),
+          query,
+        });
 
         return {
-          status: 'searched',
-          count: listings.length,
-          listings: listings.slice(0, 8).map(getListingSearchSummary),
+          status: searchResult.status,
+          count: searchResult.listings.length,
+          candidateCount: searchResult.candidateCount,
+          rankedCount: searchResult.rankedCount,
+          searchState: searchResult.searchState,
+          listings: searchResult.listings.map(getRankedListingSearchSummary),
+          recommendations: searchResult.recommendations,
+          market: searchResult.market,
+          relaxedSuggestion: searchResult.relaxedSuggestion,
           note:
-            'Search words such as أبحث or أريد are treated as intent only, not stored as listing data.',
+            'Search state is accumulated on the server. Return only the visible ranked matches and explain scores using the provided reasons. Do not invent unavailable listings or market averages.',
         };
       },
     }),
@@ -220,22 +255,95 @@ export function createMarketplaceTools(
           };
         }
 
-        const comparisonQuery = query?.trim() || buildComparableListingQuery(targetListing);
-        const listings = await listMarketplaceListings({
-          query: comparisonQuery,
-          limit: Math.max(limit + 1, 4),
-        });
-        const alternatives = listings
-          .filter((listing) => listing.id !== targetListing.id)
-          .slice(0, limit);
+        const comparisonQuery = query?.trim();
+        const listings = await listMarketplaceListings(
+          comparisonQuery
+            ? {
+                query: comparisonQuery,
+                limit: Math.max(limit + 24, 30),
+              }
+            : {
+                category: targetListing.category,
+                city: targetListing.city,
+                terms: [targetListing.title ?? ''].filter(Boolean),
+                limit: Math.max(limit + 24, 30),
+              },
+        );
+        const comparison = compareListingsWithEngine(
+          targetListing,
+          listings,
+          limit,
+        );
 
         return {
           status: 'compared',
-          target: getListingSearchSummary(targetListing),
-          count: alternatives.length,
-          listings: alternatives.map(getListingSearchSummary),
+          target: getComparisonListingSummary(comparison.target),
+          count: comparison.alternatives.length,
+          listings: comparison.alternatives.map(getComparisonListingSummary),
+          marketSummary: comparison.marketSummary,
           comparisonBasis:
-            'Compare price, condition, city, description/specs, image availability, views, message count, and favorite count. Do not invent market data.',
+            'Comparison scores and labels are computed from real SmartStore AI listing data. Explain these values; do not invent market averages or unavailable alternatives.',
+        };
+      },
+    }),
+
+    estimateListingPrice: tool({
+      description:
+        'Estimate an honest seller price range using real comparable SmartStore AI listings. Return a range, comparable count, confidence, and adjustments. Never present this as a guaranteed market price.',
+      inputSchema: listingDetailsInputSchema,
+      execute: async (input) => {
+        const listingInput = normalizeListingDetailsInput(
+          input,
+        ) as CreateListingInput;
+        const comparableListings = await listMarketplaceListings({
+          category: listingInput.category,
+          city: listingInput.city,
+          terms: [
+            listingInput.title ?? '',
+            String(listingInput.attributes?.brand ?? ''),
+            String(listingInput.attributes?.model ?? ''),
+          ].filter(Boolean),
+          limit: 80,
+        });
+
+        return recommendListingPrice(listingInput, comparableListings);
+      },
+    }),
+
+    evaluateNegotiationOffer: tool({
+      description:
+        'Evaluate a buyer offer for a specific published listing using asking price and comparable SmartStore AI listings. This gives negotiation guidance only and never accepts, rejects, or commits to a deal.',
+      inputSchema: z.object({
+        listingId: z.string().min(1),
+        buyerOffer: z.number().nonnegative(),
+      }),
+      execute: async ({ listingId, buyerOffer }) => {
+        const listing = await getListing(listingId);
+
+        if (!listing || listing.status !== 'published') {
+          return {
+            status: 'not_found',
+            message:
+              'The listing was not found, deleted, or is not currently published.',
+          };
+        }
+
+        const comparableListings = await listMarketplaceListings({
+          category: listing.category,
+          city: listing.city,
+          terms: [listing.title ?? ''].filter(Boolean),
+          limit: 80,
+        });
+
+        return {
+          status: 'evaluated',
+          advice: evaluateNegotiationOffer(
+            listing,
+            buyerOffer,
+            comparableListings,
+          ),
+          note:
+            'This is guidance only. Do not accept, reject, or commit to a deal without explicit user confirmation.',
         };
       },
     }),

@@ -4,6 +4,8 @@ import {
   createListingDraft,
   listMarketplaceListings,
 } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const createListingSchema = z.object({
@@ -29,6 +31,16 @@ function parsePositiveInteger(value: string | null, fallback: number) {
 }
 
 export async function GET(request: Request) {
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'search',
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const url = new URL(request.url);
   const query = url.searchParams.get('q') ?? undefined;
   const page = parsePositiveInteger(url.searchParams.get('page'), 1);
@@ -67,6 +79,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'listing_create',
+    actorId: session.user.id,
+    maxRequests: 12,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   let payload: unknown;
 
   try {
@@ -84,17 +107,31 @@ export async function POST(request: Request) {
     );
   }
 
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'listing_create',
+    actorKey: session.user.id,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const listing = await createListingDraft(session.user, parsed.data);
 
   if (listing.compliance.decision === 'block') {
-    return Response.json(
-      {
-        error: 'listing_blocked',
-        listing,
-      },
-      { status: 422 },
-    );
+    const responseBody = {
+      error: 'listing_blocked',
+      listing,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 422)
+      : Response.json(responseBody, { status: 422 });
   }
 
-  return Response.json({ listing }, { status: 201 });
+  const responseBody = { listing };
+
+  return idempotency
+    ? idempotency.complete(responseBody, 201)
+    : Response.json(responseBody, { status: 201 });
 }

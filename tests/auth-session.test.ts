@@ -5,6 +5,7 @@ import {
   createCommissionAgreementCookie,
   hasCommissionAgreement,
   isAdminSession,
+  isModeratorSession,
   parseCommissionAgreement,
 } from '@/lib/auth/session';
 
@@ -40,5 +41,46 @@ test('detects admin sessions from configured admin emails', () => {
       expiresAt: 2,
     }),
     false,
+  );
+});
+
+test('detects admin and moderator roles from the signed session user', () => {
+  process.env.SMARTSTORE_ADMIN_EMAILS = '';
+
+  assert.equal(
+    isAdminSession({
+      user: {
+        id: 'google:admin-role',
+        email: 'role-admin@example.com',
+        role: 'admin',
+      },
+      issuedAt: 1,
+      expiresAt: 2,
+    }),
+    true,
+  );
+  assert.equal(
+    isAdminSession({
+      user: {
+        id: 'google:moderator-role',
+        email: 'moderator@example.com',
+        role: 'moderator',
+      },
+      issuedAt: 1,
+      expiresAt: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    isModeratorSession({
+      user: {
+        id: 'google:moderator-role',
+        email: 'moderator@example.com',
+        role: 'moderator',
+      },
+      issuedAt: 1,
+      expiresAt: 2,
+    }),
+    true,
   );
 });

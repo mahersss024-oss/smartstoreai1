@@ -5,6 +5,8 @@ import {
   setListingStatusForSeller,
   updateListingForSeller,
 } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const updateListingSchema = z.object({
@@ -69,6 +71,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'listing_update',
+    actorId: session.user.id,
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const { listingId } = await context.params;
   let payload: unknown;
 
@@ -81,6 +94,15 @@ export async function PATCH(request: Request, context: RouteContext) {
   const action = actionSchema.safeParse(payload);
 
   if (action.success) {
+    const idempotency = await reserveIdempotencyKey(request, {
+      namespace: `listing_action:${action.data.action}`,
+      actorKey: `${session.user.id}:${listingId}`,
+    });
+
+    if (idempotency?.response) {
+      return idempotency.response;
+    }
+
     const listing = await setListingStatusForSeller(
       listingId,
       session.user.id,
@@ -88,10 +110,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
 
     if (!listing) {
-      return Response.json({ error: 'listing_not_found' }, { status: 404 });
+      const responseBody = { error: 'listing_not_found' };
+
+      return idempotency
+        ? idempotency.complete(responseBody, 404)
+        : Response.json(responseBody, { status: 404 });
     }
 
-    return Response.json({ listing });
+    const responseBody = { listing };
+
+    return idempotency
+      ? idempotency.complete(responseBody)
+      : Response.json(responseBody);
   }
 
   const updates = updateListingSchema.safeParse(payload);
@@ -103,6 +133,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'listing_update',
+    actorKey: `${session.user.id}:${listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const listing = await updateListingForSeller(
     listingId,
     session.user.id,
@@ -110,18 +149,27 @@ export async function PATCH(request: Request, context: RouteContext) {
   );
 
   if (!listing) {
-    return Response.json({ error: 'listing_not_found' }, { status: 404 });
+    const responseBody = { error: 'listing_not_found' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 404)
+      : Response.json(responseBody, { status: 404 });
   }
 
   if (listing.compliance.decision === 'block') {
-    return Response.json(
-      {
-        error: 'listing_blocked',
-        listing,
-      },
-      { status: 422 },
-    );
+    const responseBody = {
+      error: 'listing_blocked',
+      listing,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 422)
+      : Response.json(responseBody, { status: 422 });
   }
 
-  return Response.json({ listing });
+  const responseBody = { listing };
+
+  return idempotency
+    ? idempotency.complete(responseBody)
+    : Response.json(responseBody);
 }
