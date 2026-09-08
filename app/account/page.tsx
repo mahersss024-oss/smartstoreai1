@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
@@ -51,6 +52,10 @@ type ApiListingRecord = {
   city?: string;
   condition?: 'new' | 'used' | 'like_new' | 'damaged';
   status?: string;
+  compliance?: {
+    decision?: 'allow' | 'block' | 'needs_review';
+    reasons?: string[];
+  };
   views?: number;
   messageCount?: number;
   favoriteCount?: number;
@@ -83,6 +88,10 @@ type ListingCard = {
   condition?: 'new' | 'used' | 'like_new' | 'damaged';
   status: string;
   rawStatus?: string;
+  compliance?: {
+    decision?: 'allow' | 'block' | 'needs_review';
+    reasons?: string[];
+  };
   stats: string;
   description?: string;
   images: ListingImageCard[];
@@ -103,6 +112,13 @@ type PaginationMeta = {
   limit: number;
   hasMore: boolean;
   nextPage: number | null;
+};
+
+type ListingEditNotice = {
+  listingId: string;
+  tone: 'info' | 'warning' | 'danger';
+  message: string;
+  reasons?: string[];
 };
 
 const listingCategoryOptions = [
@@ -184,6 +200,30 @@ function formatCategory(category: string) {
   return labels[category] ?? category;
 }
 
+function formatComplianceReason(reason: string) {
+  if (reason === 'prohibited_in_saudi_marketplace_policy') {
+    return 'يبدو أن الإعلان يتضمن منتجًا أو وصفًا غير مسموح في سياسة السوق.';
+  }
+
+  if (reason === 'high_risk_or_regulated_product') {
+    return 'الإعلان يتضمن منتجًا عالي المخاطر أو يحتاج موافقة ومراجعة قبل النشر.';
+  }
+
+  return 'راجع العنوان والوصف والتصنيف واحذف أي تفاصيل قد تخالف سياسة المنصة.';
+}
+
+function getEditNoticeClasses(tone: ListingEditNotice['tone']) {
+  if (tone === 'danger') {
+    return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-200';
+  }
+
+  if (tone === 'warning') {
+    return 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-100';
+  }
+
+  return 'border-blue-500/40 bg-blue-500/10 text-blue-800 dark:text-blue-100';
+}
+
 function getDurableImageUrl(...urls: Array<string | undefined>) {
   return urls.find((url) => {
     return (
@@ -240,6 +280,7 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
       ) ?? null,
     status: formatListingStatus(listing.status),
     rawStatus: listing.status,
+    compliance: listing.compliance,
     images,
     stats: `${listing.views ?? 0} مشاهدة · ${listing.messageCount ?? 0} رسائل · ${
       listing.favoriteCount ?? 0
@@ -271,6 +312,7 @@ export default function AccountPage() {
     category: 'other',
     condition: '',
   });
+  const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
 
   const stats = useMemo(() => {
@@ -362,6 +404,12 @@ export default function AccountPage() {
 
   const startEditingListing = useCallback((listing: ListingCard) => {
     setEditingListingId(listing.id);
+    setEditNotice({
+      listingId: listing.id,
+      tone: 'info',
+      message:
+        'أي تعديل على الإعلان يتم فحصه تلقائيًا بالذكاء الاصطناعي قبل اعتماده. إذا أصبح الإعلان مخالفًا سيتم رفضه أو تحويله للمراجعة.',
+    });
     setEditForm({
       title: listing.title,
       description: listing.description ?? '',
@@ -379,6 +427,7 @@ export default function AccountPage() {
   const cancelEditingListing = useCallback(() => {
     setEditingListingId(null);
     setSavingListingId(null);
+    setEditNotice(null);
   }, []);
 
   const saveListingEdits = useCallback(
@@ -429,16 +478,69 @@ export default function AccountPage() {
           const responsePayload = (await response.json().catch(() => null)) as {
             error?: string;
             message?: string;
+            listing?: ApiListingRecord;
           } | null;
 
-          window.alert(
-            responsePayload?.message ??
+          if (responsePayload?.listing) {
+            const blockedListing = listingRecordToCard(responsePayload.listing);
+
+            setListings((currentListings) =>
+              currentListings.map((currentListing) =>
+                currentListing.id === blockedListing.id
+                  ? blockedListing
+                  : currentListing,
+              ),
+            );
+          }
+
+          if (responsePayload?.error === 'listing_blocked') {
+            setEditNotice({
+              listingId: listing.id,
+              tone: 'danger',
+              message:
+                'لم يتم قبول التعديل لأن فحص الذكاء الاصطناعي صنّف الإعلان كمخالف. عدّل البيانات ثم حاول الحفظ مرة أخرى.',
+              reasons: responsePayload.listing?.compliance?.reasons,
+            });
+            return;
+          }
+
+          setEditNotice({
+            listingId: listing.id,
+            tone: 'danger',
+            message:
+              responsePayload?.message ??
               responsePayload?.error ??
-              'تعذر تحديث الإعلان الآن.',
-          );
+              'تعذر تحديث الإعلان الآن. حاول مرة أخرى بعد قليل.',
+          });
           return;
         }
 
+        const responsePayload = (await response.json().catch(() => null)) as {
+          listing?: ApiListingRecord;
+        } | null;
+
+        if (responsePayload?.listing?.compliance?.decision === 'needs_review') {
+          const reviewedListing = listingRecordToCard(responsePayload.listing);
+
+          setListings((currentListings) =>
+            currentListings.map((currentListing) =>
+              currentListing.id === reviewedListing.id
+                ? reviewedListing
+                : currentListing,
+            ),
+          );
+          setEditNotice({
+            listingId: listing.id,
+            tone: 'warning',
+            message:
+              'تم حفظ التعديل، لكن الإعلان انتقل للمراجعة قبل النشر لأن فحص الذكاء الاصطناعي وجد عناصر تحتاج تحققًا إضافيًا.',
+            reasons: responsePayload.listing.compliance.reasons,
+          });
+          await refreshListings(1);
+          return;
+        }
+
+        setEditNotice(null);
         setEditingListingId(null);
         await refreshListings(1);
       } finally {
@@ -745,6 +847,27 @@ export default function AccountPage() {
                       </div>
                       {editingListingId === listing.id && (
                         <div className="grid gap-2 border-t p-3 md:col-span-2 xl:col-span-3">
+                          {editNotice?.listingId === listing.id && (
+                            <div
+                              className={`grid gap-1.5 rounded-md border px-3 py-2 text-xs leading-6 ${getEditNoticeClasses(
+                                editNotice.tone,
+                              )}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                                <p>{editNotice.message}</p>
+                              </div>
+                              {editNotice.reasons?.length ? (
+                                <ul className="grid gap-1 pr-6">
+                                  {editNotice.reasons.map((reason) => (
+                                    <li key={reason} className="list-disc">
+                                      {formatComplianceReason(reason)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                          )}
                           <input
                             className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
                             onChange={(event) =>
