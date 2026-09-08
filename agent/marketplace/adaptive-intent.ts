@@ -532,7 +532,7 @@ For buyer searches, set execution="search_listings" and provide searchQuery usin
 If the latest user message contains images, set execution="analyze_images" unless the text clearly asks for a different account-bound action.
 For seller listing creation, set execution="create_listing_draft" only when there is enough useful product detail; otherwise set execution="ask_clarifying_question" and list missingFields.
 For account-bound actions, requiresAuth must be true. The user is currently ${session ? 'signed in' : 'not signed in'}.
-Dangerous or final actions such as publish, delete, mark sold, price change, accept offer, and open seller chat require confirmation.
+Dangerous or final actions such as publish, delete, mark sold, price change, and open seller chat require confirmation. Negotiation is advisory only; do not classify private price guidance as permission to accept, reject, send, or commit to a deal.
 If the latest user message confirms a complete listing preview with words like approve, yes, publish, proceed, اعتمد, نعم, انشر, اوك, or موافق, use the prior conversation to infer create_listing with execution="create_listing_draft" if no listing id exists yet, or update_listing with execution="set_listing_status" if a listing id exists. Do not classify this as general_info.
 Keep decisions within allowed Saudi marketplace work. Language=${language}.`,
         prompt: JSON.stringify({

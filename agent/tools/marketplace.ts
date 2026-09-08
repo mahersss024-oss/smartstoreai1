@@ -314,7 +314,7 @@ export function createMarketplaceTools(
 
     evaluateNegotiationOffer: tool({
       description:
-        'Evaluate a buyer offer for a specific published listing using asking price and comparable SmartStore AI listings. This gives negotiation guidance only and never accepts, rejects, or commits to a deal.',
+        'Evaluate a buyer offer for a specific published listing using asking price and comparable SmartStore AI listings. This gives private advisory guidance only and never sends messages, accepts, rejects, changes prices, or commits to a deal.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         buyerOffer: z.number().nonnegative(),
@@ -345,7 +345,7 @@ export function createMarketplaceTools(
             comparableListings,
           ),
           note:
-            'This is guidance only. Do not accept, reject, or commit to a deal without explicit user confirmation.',
+            'This is private guidance only. Do not send a message, accept, reject, change price, or commit to a deal.',
         };
       },
     }),
