@@ -27,6 +27,10 @@ import type {
 } from './types';
 import { evaluateConversationMessageSafety } from './message-safety';
 import {
+  ListingLimitReachedError,
+  hasReachedSellerListingLimit,
+} from './listing-limits';
+import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from './listing-image-limits';
@@ -632,6 +636,17 @@ export async function createListingDraft(
   }
 
   await ensureUser(user);
+
+  const sellerListingCount = await prisma.listing.count({
+    where: {
+      sellerId: user.id,
+      status: { not: 'deleted' },
+    },
+  });
+
+  if (hasReachedSellerListingLimit(sellerListingCount)) {
+    throw new ListingLimitReachedError();
+  }
 
   const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
   const listing = await prisma.listing.create({

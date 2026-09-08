@@ -4,6 +4,10 @@ import {
   createListingDraft,
   listMarketplaceListings,
 } from '@/agent/marketplace/repository';
+import {
+  getMaxListingsPerSeller,
+  isListingLimitReachedError,
+} from '@/agent/marketplace/listing-limits';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { createMemoryJsonCache } from '@/lib/api/memory-json-cache';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -170,7 +174,27 @@ export async function POST(request: Request) {
     return idempotency.response;
   }
 
-  const listing = await createListingDraft(session.user, parsed.data);
+  let listing: Awaited<ReturnType<typeof createListingDraft>>;
+
+  try {
+    listing = await createListingDraft(session.user, parsed.data);
+  } catch (error) {
+    if (isListingLimitReachedError(error)) {
+      const maxListings = getMaxListingsPerSeller();
+      const responseBody = {
+        error: 'seller_listing_limit_reached',
+        message: `وصل حسابك إلى الحد الأقصى (${maxListings}) من الإعلانات المحفوظة. احذف إعلانًا قديمًا قبل إضافة إعلان جديد.`,
+        maxListings,
+      };
+
+      return idempotency
+        ? idempotency.complete(responseBody, 409)
+        : Response.json(responseBody, { status: 409 });
+    }
+
+    await idempotency?.abandon();
+    throw error;
+  }
 
   if (listing.compliance.decision === 'block') {
     const responseBody = {

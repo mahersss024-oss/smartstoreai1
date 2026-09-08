@@ -6,6 +6,10 @@ import {
   saveUploadedListingImagesForSeller,
   type UploadedListingImage,
 } from '@/agent/marketplace/listing-image-storage';
+import {
+  getMaxListingsPerSeller,
+  isListingLimitReachedError,
+} from '@/agent/marketplace/listing-limits';
 import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
   createConversationForListing,
@@ -362,7 +366,23 @@ export function createMarketplaceTools(
         const listingInput = normalizeListingDetailsInput(
           input,
         ) as CreateListingInput;
-        let listing = await createListingDraft(session.user, listingInput);
+        let listing: Awaited<ReturnType<typeof createListingDraft>>;
+
+        try {
+          listing = await createListingDraft(session.user, listingInput);
+        } catch (error) {
+          if (isListingLimitReachedError(error)) {
+            const maxListings = getMaxListingsPerSeller();
+
+            return {
+              status: 'limit_reached',
+              message: `This account has reached the maximum of ${maxListings} saved listings. Ask the seller to delete an old listing before creating a new one.`,
+              maxListings,
+            };
+          }
+
+          throw error;
+        }
 
         if (listing.compliance.decision === 'block') {
           return {

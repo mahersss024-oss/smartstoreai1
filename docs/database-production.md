@@ -11,9 +11,13 @@ SmartStore AI is standardized on PostgreSQL with Prisma.
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public
+SMARTSTORE_MAX_LISTINGS_PER_SELLER=100
 ```
 
 Keep this value server-side only.
+`SMARTSTORE_MAX_LISTINGS_PER_SELLER` controls saved non-deleted listings per
+seller account. It defaults to `100` and is capped at `1000`; it does not limit
+the total platform listings across all sellers.
 
 ## Local And Production Commands
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { ListingLimitReachedError } from '@/agent/marketplace/listing-limits';
 import { defaultMaxListingImages } from '@/agent/marketplace/listing-image-limits';
 import {
   addConversationMessage,
@@ -121,6 +122,53 @@ test('lets only the owner change listing status', () => {
 
   assert.equal(unauthorized, null);
   assert.equal(paused?.status, 'paused');
+});
+
+test('limits saved seller listings and frees a slot after deletion', () => {
+  const originalLimit = process.env.SMARTSTORE_MAX_LISTINGS_PER_SELLER;
+  process.env.SMARTSTORE_MAX_LISTINGS_PER_SELLER = '2';
+
+  try {
+    const firstListing = createListingDraft({
+      sellerId: 'seller:listing-limit',
+      category: 'cars',
+      title: 'First listing',
+    });
+    createListingDraft({
+      sellerId: 'seller:listing-limit',
+      category: 'cars',
+      title: 'Second listing',
+    });
+
+    assert.throws(
+      () =>
+        createListingDraft({
+          sellerId: 'seller:listing-limit',
+          category: 'cars',
+          title: 'Third listing',
+        }),
+      ListingLimitReachedError,
+    );
+
+    setListingStatusForSeller(
+      firstListing.id,
+      'seller:listing-limit',
+      'deleted',
+    );
+    const replacementListing = createListingDraft({
+      sellerId: 'seller:listing-limit',
+      category: 'cars',
+      title: 'Replacement listing',
+    });
+
+    assert.equal(replacementListing.title, 'Replacement listing');
+  } finally {
+    if (originalLimit === undefined) {
+      delete process.env.SMARTSTORE_MAX_LISTINGS_PER_SELLER;
+    } else {
+      process.env.SMARTSTORE_MAX_LISTINGS_PER_SELLER = originalLimit;
+    }
+  }
 });
 
 test('prevents opening a conversation with your own listing', () => {

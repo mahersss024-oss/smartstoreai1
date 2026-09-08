@@ -26,6 +26,8 @@ services:
         sync: false
       - key: SMARTSTORE_MARKETPLACE_STORE
         value: database
+      - key: SMARTSTORE_MAX_LISTINGS_PER_SELLER
+        value: "100"
       - key: SMARTSTORE_ADMIN_EMAILS
         sync: false
       - key: SMARTSTORE_IMAGE_STORAGE

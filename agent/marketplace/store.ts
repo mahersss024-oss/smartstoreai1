@@ -4,6 +4,10 @@ import { dirname, join } from 'node:path';
 
 import { evaluateConversationMessageSafety } from './message-safety';
 import {
+  ListingLimitReachedError,
+  hasReachedSellerListingLimit,
+} from './listing-limits';
+import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from './listing-image-limits';
@@ -303,6 +307,15 @@ function seedListings() {
 
 export function createListingDraft(input: CreateListingDraftInput): ListingRecord {
   loadStore();
+
+  const sellerListingCount = [...listings.values()].filter(
+    (listing) =>
+      listing.sellerId === input.sellerId && listing.status !== 'deleted',
+  ).length;
+
+  if (hasReachedSellerListingLimit(sellerListingCount)) {
+    throw new ListingLimitReachedError();
+  }
 
   const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
   const timestamp = nowIso();
