@@ -713,13 +713,13 @@ export default function AccountPage() {
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background">
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_13rem]">
                       {listing.image ? (
-                        <img alt={listing.title} className="aspect-[4/3] w-full object-cover" src={listing.image} />
+                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:h-full md:min-h-40" src={listing.image} />
                       ) : (
-                        <div className="grid aspect-[4/3] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:h-full md:min-h-40">
                           <div className="grid gap-1">
                             <ImageIcon className="mx-auto size-5" />
                             <span>لا توجد صورة حقيقية</span>
@@ -734,7 +734,7 @@ export default function AccountPage() {
                             {listing.status}
                           </span>
                           </div>
-                          <p className="line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{listing.description}</p>
+                          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{listing.description}</p>
                           <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                             <span className="truncate font-semibold text-slate-950 dark:text-card-foreground">{listing.price}</span>
                             <span className="truncate">{listing.city}</span>
@@ -865,15 +865,15 @@ export default function AccountPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid gap-2 border-t p-3">
+                        <div className="grid gap-2 border-t p-3 xl:border-r xl:border-t-0">
                           <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-2 xl:overflow-visible xl:pb-0">
                             {listing.images.map((image) => (
                               <div
                                 key={image.id}
-                                className="grid gap-1 rounded-md border p-1"
+                                className="grid w-20 shrink-0 gap-1 rounded-md border p-1 xl:w-auto"
                               >
                                 <div className="relative aspect-square overflow-hidden rounded bg-slate-100 dark:bg-slate-900">
                                   {image.url ? (
@@ -924,7 +924,7 @@ export default function AccountPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 xl:col-span-3 xl:grid-cols-6">
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => startEditingListing(listing)}>
                           <Pencil className="size-3.5" />
                           تعديل

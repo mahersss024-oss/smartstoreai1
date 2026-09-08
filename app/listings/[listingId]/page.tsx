@@ -210,7 +210,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,42rem)_19rem]">
+        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,38rem)_18rem]">
           <div className="grid min-w-0 gap-4">
             <ListingImageGallery
               images={images}
