@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import {
+  getMaxListingImagesPerListing,
+  hasReachedListingImageLimit,
+} from '@/agent/marketplace/listing-image-limits';
 import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
 import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
@@ -50,6 +54,19 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!existingListing || existingListing.sellerId !== session.user.id) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
+  }
+
+  const maxImages = getMaxListingImagesPerListing();
+
+  if (hasReachedListingImageLimit(existingListing.images)) {
+    return Response.json(
+      {
+        error: 'listing_image_limit_reached',
+        message: `وصل الإعلان إلى الحد الأقصى (${maxImages}) من الصور. احذف صورة قديمة قبل رفع صورة جديدة.`,
+        maxImages,
+      },
+      { status: 409 },
+    );
   }
 
   const formData = await request.formData();

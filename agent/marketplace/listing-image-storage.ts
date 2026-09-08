@@ -3,8 +3,12 @@ import { randomUUID } from 'node:crypto';
 import type { ModelMessage } from 'ai';
 
 import { analyzeImageQuality } from './image-quality';
+import {
+  defaultMaxListingImages,
+  getMaxListingImagesPerListing,
+} from './listing-image-limits';
 import { storeListingObject } from './object-storage';
-import { addListingImageForSeller } from './repository';
+import { addListingImageForSeller, getListing } from './repository';
 import type { ListingImage } from './types';
 
 const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -82,7 +86,7 @@ export async function createPersistentListingImageUrl({
 
 export function extractLatestUploadedListingImages(
   messages: ModelMessage[],
-  maxImages = 8,
+  maxImages = defaultMaxListingImages,
 ) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -129,9 +133,25 @@ export async function saveUploadedListingImagesForSeller({
   sellerId: string;
   images: UploadedListingImage[];
 }) {
-  let latestListing = null;
+  const maxImages = getMaxListingImagesPerListing();
+  const existingListing = await getListing(listingId);
 
-  for (const uploadedImage of images.slice(0, 8)) {
+  if (!existingListing || existingListing.sellerId !== sellerId) {
+    return null;
+  }
+
+  const remainingSlots = Math.max(
+    maxImages - existingListing.images.length,
+    0,
+  );
+
+  if (remainingSlots === 0) {
+    return existingListing;
+  }
+
+  let latestListing = existingListing;
+
+  for (const uploadedImage of images.slice(0, remainingSlots)) {
     const imageId = randomUUID();
     const imageUrl = await createPersistentListingImageUrl({
       data: uploadedImage.data,
@@ -161,7 +181,15 @@ export async function saveUploadedListingImagesForSeller({
       enhancements: quality.enhancements,
     };
 
-    latestListing = await addListingImageForSeller(listingId, sellerId, image);
+    const updatedListing = await addListingImageForSeller(
+      listingId,
+      sellerId,
+      image,
+    );
+
+    if (updatedListing) {
+      latestListing = updatedListing;
+    }
   }
 
   return latestListing;

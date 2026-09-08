@@ -6,7 +6,14 @@ import type { ModelMessage } from 'ai';
 import {
   createPersistentImageDataUrl,
   extractLatestUploadedListingImages,
+  saveUploadedListingImagesForSeller,
 } from '@/agent/marketplace/listing-image-storage';
+import { defaultMaxListingImages } from '@/agent/marketplace/listing-image-limits';
+import {
+  addListingImageForSeller,
+  createListingDraft,
+  listSellerListings,
+} from '@/agent/marketplace/store';
 
 test('extracts the latest uploaded product images from prior chat context', () => {
   const messages: ModelMessage[] = [
@@ -66,4 +73,64 @@ test('creates a persistent image data URL for database-backed listings', () => {
   );
 
   assert.equal(url, 'data:image/png;base64,AQID');
+});
+
+test('saves only the remaining available image slots for chat uploads', async () => {
+  const originalLimit = process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING;
+  process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING = String(defaultMaxListingImages);
+
+  try {
+    const listing = createListingDraft({
+      sellerId: 'seller:chat-image-limit',
+      category: 'cars',
+      title: 'Toyota Camry chat image limit',
+    });
+
+    for (let index = 0; index < defaultMaxListingImages - 1; index += 1) {
+      addListingImageForSeller(listing.id, 'seller:chat-image-limit', {
+        id: `chat-image-existing-${index}`,
+        listingId: listing.id,
+        originalUrl: `https://example.com/existing-${index}.jpg`,
+        displayUrl: `https://example.com/existing-${index}.jpg`,
+        thumbnailUrl: `https://example.com/existing-${index}.jpg`,
+        isPrimary: index === 0,
+        qualityScore: 90,
+        status: 'approved',
+        enhancements: [],
+      });
+    }
+
+    await saveUploadedListingImagesForSeller({
+      listingId: listing.id,
+      sellerId: 'seller:chat-image-limit',
+      images: [
+        { data: new Uint8Array([4]), mediaType: 'image/png' },
+        { data: new Uint8Array([5]), mediaType: 'image/png' },
+      ],
+    });
+
+    const updated = listSellerListings('seller:chat-image-limit').find(
+      (sellerListing) => sellerListing.id === listing.id,
+    );
+
+    assert.equal(updated?.images.length, defaultMaxListingImages);
+    assert.equal(
+      updated?.images.some(
+        (image) => image.originalUrl === 'data:image/png;base64,BA==',
+      ),
+      true,
+    );
+    assert.equal(
+      updated?.images.some(
+        (image) => image.originalUrl === 'data:image/png;base64,BQ==',
+      ),
+      false,
+    );
+  } finally {
+    if (originalLimit === undefined) {
+      delete process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING;
+    } else {
+      process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING = originalLimit;
+    }
+  }
 });

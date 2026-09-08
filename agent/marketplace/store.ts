@@ -3,6 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { evaluateConversationMessageSafety } from './message-safety';
+import {
+  getMaxListingImagesPerListing,
+  hasReachedListingImageLimit,
+} from './listing-image-limits';
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
   normalizeMarketplaceSearchText,
@@ -446,6 +450,10 @@ export function addListingImageForSeller(
     return null;
   }
 
+  if (hasReachedListingImageLimit(listing.images)) {
+    return listing;
+  }
+
   const isFirstApprovedImage = !listing.images.some(
     (existingImage) => existingImage.status === 'approved',
   );
@@ -455,7 +463,10 @@ export function addListingImageForSeller(
     isPrimary: image.isPrimary || isFirstApprovedImage,
   };
 
-  listing.images = [...listing.images, nextImage].slice(0, 10);
+  listing.images = [...listing.images, nextImage].slice(
+    0,
+    getMaxListingImagesPerListing(),
+  );
   listing.updatedAt = nowIso();
   listings.set(listing.id, listing);
   persistStore();

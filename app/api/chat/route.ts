@@ -37,6 +37,10 @@ import {
   type UploadedListingImage,
 } from '@/agent/marketplace/listing-image-storage';
 import {
+  defaultMaxListingImages,
+  getMaxListingImagesPerListing,
+} from '@/agent/marketplace/listing-image-limits';
+import {
   getListing,
   listSellerListings,
   setListingStatusForSeller,
@@ -62,7 +66,7 @@ import { checkChatRateLimit } from '@/lib/rate-limit';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
-const maxImagesPerChatMessage = 8;
+const maxImagesPerChatMessage = defaultMaxListingImages;
 const maxChatImageBytes = 12 * 1024 * 1024;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const policyFacilitationIntents = new Set([
@@ -522,13 +526,15 @@ function summarizeListingForAgent(
     city: listing.city ?? null,
     price: formatListingPriceForChat(listing.price, language),
     condition: listing.condition ?? null,
-    images: listing.images.slice(0, 10).map((image, index) => ({
-      id: image.id,
-      order: index + 1,
-      isPrimary: image.isPrimary,
-      status: image.status,
-      thumbnailUrl: image.thumbnailUrl,
-    })),
+    images: listing.images
+      .slice(0, getMaxListingImagesPerListing())
+      .map((image, index) => ({
+        id: image.id,
+        order: index + 1,
+        isPrimary: image.isPrimary,
+        status: image.status,
+        thumbnailUrl: image.thumbnailUrl,
+      })),
     approvedImageCount: listing.images.filter(
       (image) => image.status === 'approved',
     ).length,

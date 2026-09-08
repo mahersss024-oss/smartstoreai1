@@ -68,9 +68,12 @@ CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 CLOUDINARY_FOLDER=smartstore/listings
+SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
 Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
+`SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` and is capped at `12`
+to control storage cost, upload abuse, and listing page performance.
 
 Alternatively, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
 
@@ -82,6 +85,7 @@ SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID=...
 SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY=...
 SMARTSTORE_OBJECT_STORAGE_REGION=auto
 SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL=https://PUBLIC_BUCKET_OR_CDN_DOMAIN
+SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
 `SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL` must be a public bucket URL or CDN URL that can serve uploaded listing images in the browser. If `SMARTSTORE_IMAGE_STORAGE` is empty, the app keeps the local development fallback.

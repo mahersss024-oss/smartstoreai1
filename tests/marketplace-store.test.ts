@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { defaultMaxListingImages } from '@/agent/marketplace/listing-image-limits';
 import {
   addConversationMessage,
   addListingImageForSeller,
@@ -426,6 +427,51 @@ test('recommends blurring sensitive information without rejecting a useful image
   assert.equal(result.recommendedAction, 'blur_sensitive_info');
   assert.equal(result.listingImageStatus, 'approved');
   assert.equal(result.enhancements.includes('blur_sensitive_info'), true);
+});
+
+test('limits stored listing images to the configured maximum', () => {
+  const originalLimit = process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING;
+  process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING = String(defaultMaxListingImages);
+
+  try {
+    const listing = createListingDraft({
+      sellerId: 'seller:image-limit',
+      category: 'cars',
+      title: 'Toyota Camry image limit',
+    });
+
+    for (let index = 0; index < defaultMaxListingImages + 1; index += 1) {
+      addListingImageForSeller(listing.id, 'seller:image-limit', {
+        id: `image-limit-${index}`,
+        listingId: listing.id,
+        originalUrl: `https://example.com/${index}.jpg`,
+        displayUrl: `https://example.com/${index}.jpg`,
+        thumbnailUrl: `https://example.com/${index}.jpg`,
+        isPrimary: index === 0,
+        qualityScore: 90,
+        status: 'approved',
+        enhancements: [],
+      });
+    }
+
+    const updated = listSellerListings('seller:image-limit').find(
+      (sellerListing) => sellerListing.id === listing.id,
+    );
+
+    assert.equal(updated?.images.length, defaultMaxListingImages);
+    assert.equal(
+      updated?.images.some(
+        (image) => image.id === `image-limit-${defaultMaxListingImages}`,
+      ),
+      false,
+    );
+  } finally {
+    if (originalLimit === undefined) {
+      delete process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING;
+    } else {
+      process.env.SMARTSTORE_MAX_IMAGES_PER_LISTING = originalLimit;
+    }
+  }
 });
 
 test('lets sellers set a primary listing image', () => {

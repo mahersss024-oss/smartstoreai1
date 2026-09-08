@@ -629,7 +629,22 @@ export default function AccountPage() {
           const payload = (await response.json().catch(() => null)) as {
             error?: string;
             message?: string;
+            maxImages?: number;
           } | null;
+
+          if (payload?.error === 'listing_image_limit_reached') {
+            setEditingListingId(listing.id);
+            setEditForm(createEditFormFromListing(listing));
+            setEditNotice({
+              listingId: listing.id,
+              tone: 'warning',
+              message:
+                payload.message ??
+                `وصل الإعلان إلى الحد الأقصى (${payload.maxImages ?? 8}) من الصور. احذف صورة قديمة قبل رفع صورة جديدة.`,
+            });
+            return;
+          }
+
           window.alert(
             payload?.message ??
               payload?.error ??

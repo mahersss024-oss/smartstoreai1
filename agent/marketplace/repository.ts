@@ -26,6 +26,10 @@ import type {
   ReportRecord,
 } from './types';
 import { evaluateConversationMessageSafety } from './message-safety';
+import {
+  getMaxListingImagesPerListing,
+  hasReachedListingImageLimit,
+} from './listing-image-limits';
 import { deleteListingObject } from './object-storage';
 
 type DatabaseListingRecord = {
@@ -791,6 +795,10 @@ export async function addListingImageForSeller(
     return null;
   }
 
+  if (hasReachedListingImageLimit(existing.images)) {
+    return toListingRecord(existing);
+  }
+
   const isFirstApprovedImage = !existing.images.some(
     (currentImage) => currentImage.status === 'approved',
   );
@@ -814,7 +822,7 @@ export async function addListingImageForSeller(
     include: {
       images: {
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        take: 10,
+        take: getMaxListingImagesPerListing(),
       },
     },
   });
@@ -874,7 +882,7 @@ export async function deleteListingImageForSeller(
       include: {
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 10,
+          take: getMaxListingImagesPerListing(),
         },
       },
     });
@@ -932,7 +940,7 @@ export async function setPrimaryListingImageForSeller(
       include: {
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 10,
+          take: getMaxListingImagesPerListing(),
         },
       },
     });
