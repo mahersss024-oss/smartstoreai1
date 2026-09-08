@@ -60,7 +60,19 @@ When the database store is enabled, listings, images, conversations, messages, f
 
 ## Listing Image Storage
 
-For production, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
+For production, use hosted image storage. Cloudinary is the simplest no-card option for early launch:
+
+```env
+SMARTSTORE_IMAGE_STORAGE=cloudinary
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+CLOUDINARY_FOLDER=smartstore/listings
+```
+
+Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
+
+Alternatively, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
 
 ```env
 SMARTSTORE_IMAGE_STORAGE=object
