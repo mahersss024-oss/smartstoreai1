@@ -699,7 +699,7 @@ export default function AccountPage() {
 
               {isListingsLoading && listings.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-                  ط¬ط§ط± طھط­ظ…ظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ...
+                  جار تحميل الإعلانات...
                 </div>
               ) : listings.length === 0 ? (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed p-6 text-center">
@@ -717,16 +717,16 @@ export default function AccountPage() {
                     {listings.map((listing) => (
                       <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_13rem]">
                       {listing.image ? (
-                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:h-full md:min-h-40" src={listing.image} />
+                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:row-start-1 md:h-full md:min-h-40" src={listing.image} />
                       ) : (
-                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:h-full md:min-h-40">
+                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:h-full md:min-h-40">
                           <div className="grid gap-1">
                             <ImageIcon className="mx-auto size-5" />
                             <span>لا توجد صورة حقيقية</span>
                           </div>
                         </div>
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 md:row-start-1">
                         <div className="grid gap-2 p-3">
                           <div className="flex min-w-0 items-center justify-between gap-2">
                             <h3 className="truncate text-sm font-bold">{listing.title}</h3>
@@ -744,7 +744,7 @@ export default function AccountPage() {
                         </div>
                       </div>
                       {editingListingId === listing.id && (
-                        <div className="grid gap-2 border-t p-3">
+                        <div className="grid gap-2 border-t p-3 md:col-span-2 xl:col-span-3">
                           <input
                             className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
                             onChange={(event) =>
@@ -865,7 +865,7 @@ export default function AccountPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid gap-2 border-t p-3 xl:border-r xl:border-t-0">
+                        <div className="grid gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:border-r xl:border-t-0">
                           <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
@@ -924,7 +924,7 @@ export default function AccountPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 xl:col-span-3 xl:grid-cols-6">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-6">
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => startEditingListing(listing)}>
                           <Pencil className="size-3.5" />
                           تعديل
@@ -975,7 +975,7 @@ export default function AccountPage() {
                         void refreshListings(listingsPagination.nextPage ?? 1)
                       }
                     >
-                      {isListingsLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                      {isListingsLoading ? 'جار التحميل...' : 'تحميل المزيد'}
                     </Button>
                   )}
                 </div>
