@@ -525,7 +525,9 @@ export async function listMarketplaceListings(
     },
     include: {
       images: {
+        where: { status: 'approved' },
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        take: 1,
       },
     },
     orderBy: { updatedAt: 'desc' },

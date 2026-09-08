@@ -5,8 +5,52 @@ import {
   listMarketplaceListings,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { createMemoryJsonCache } from '@/lib/api/memory-json-cache';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
+
+type ListingsResponsePayload = {
+  listings: Awaited<ReturnType<typeof listMarketplaceListings>>;
+  pagination: {
+    page: number;
+    limit: number;
+    hasMore: boolean;
+    nextPage: number | null;
+  };
+};
+
+const publicListingsCache = createMemoryJsonCache<ListingsResponsePayload>({
+  ttlMs: 15_000,
+  maxEntries: 200,
+});
+
+function createPublicListingsCacheKey({
+  query,
+  page,
+  limit,
+}: {
+  query?: string;
+  page: number;
+  limit: number;
+}) {
+  return JSON.stringify({
+    limit,
+    page,
+    query: query?.trim().toLowerCase() ?? '',
+  });
+}
+
+function jsonPublicListingsResponse(
+  payload: ListingsResponsePayload,
+  cacheStatus: 'HIT' | 'MISS',
+) {
+  return Response.json(payload, {
+    headers: {
+      'Cache-Control': 'public, max-age=15, stale-while-revalidate=60',
+      'X-SmartStore-Cache': cacheStatus,
+    },
+  });
+}
 
 const createListingSchema = z.object({
   category: z.string().min(2),
@@ -31,6 +75,20 @@ function parsePositiveInteger(value: string | null, fallback: number) {
 }
 
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const query = url.searchParams.get('q') ?? undefined;
+  const page = parsePositiveInteger(url.searchParams.get('page'), 1);
+  const limit = Math.min(
+    Math.max(parsePositiveInteger(url.searchParams.get('limit'), 24), 1),
+    48,
+  );
+  const cacheKey = createPublicListingsCacheKey({ query, page, limit });
+  const cachedPayload = publicListingsCache.get(cacheKey);
+
+  if (cachedPayload) {
+    return jsonPublicListingsResponse(cachedPayload, 'HIT');
+  }
+
   const rateLimitResponse = await enforceApiRateLimit(request, {
     namespace: 'search',
     maxRequests: 60,
@@ -41,21 +99,13 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const url = new URL(request.url);
-  const query = url.searchParams.get('q') ?? undefined;
-  const page = parsePositiveInteger(url.searchParams.get('page'), 1);
-  const limit = Math.min(
-    Math.max(parsePositiveInteger(url.searchParams.get('limit'), 24), 1),
-    48,
-  );
   const listings = await listMarketplaceListings({
     query,
     page,
     limit: limit + 1,
   });
   const hasMore = listings.length > limit;
-
-  return Response.json({
+  const payload = {
     listings: listings.slice(0, limit),
     pagination: {
       page,
@@ -63,7 +113,11 @@ export async function GET(request: Request) {
       hasMore,
       nextPage: hasMore ? page + 1 : null,
     },
-  });
+  };
+
+  publicListingsCache.set(cacheKey, payload);
+
+  return jsonPublicListingsResponse(payload, 'MISS');
 }
 
 export async function POST(request: Request) {

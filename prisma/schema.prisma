@@ -121,6 +121,7 @@ model Listing {
 
   @@index([sellerId, status])
   @@index([status, updatedAt])
+  @@index([status, category, city, updatedAt])
   @@index([category, city])
 }
 
@@ -164,6 +165,7 @@ model ListingImage {
   listing        Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId, isPrimary])
+  @@index([listingId, status, isPrimary])
 }
 
 model Conversation {
