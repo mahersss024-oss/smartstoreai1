@@ -318,7 +318,7 @@ export default function CommissionsPage() {
 
               {paymentMethods.length === 0 ? (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  لم يتم إعداد بيانات دفع العمولة بعد. أضف أرقام الحسابات في Render لتظهر هنا تلقائياً.
+                  لم يتم إعداد بيانات دفع العمولة بعد.
                 </div>
               ) : (
                 <div className="grid gap-3 lg:grid-cols-3">
