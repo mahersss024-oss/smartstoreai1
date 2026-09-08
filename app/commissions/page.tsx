@@ -2,7 +2,16 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, Percent, Receipt, User } from 'lucide-react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Copy,
+  CreditCard,
+  Percent,
+  Receipt,
+  User,
+} from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
@@ -43,6 +52,42 @@ type PaginationMeta = {
   nextPage: number | null;
 };
 
+type CommissionPaymentMethod = {
+  id: 'alrajhi' | 'snb' | 'stc-pay';
+  name: string;
+  subtitle: string;
+  logoLabel: string;
+  fields: Array<{
+    label: string;
+    value: string;
+    copyValue: string;
+  }>;
+};
+
+function getPaymentMethodTheme(methodId: CommissionPaymentMethod['id']) {
+  if (methodId === 'alrajhi') {
+    return {
+      card: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-400/20 dark:bg-emerald-400/5',
+      logo: 'bg-emerald-600 text-white',
+      chip: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200',
+    };
+  }
+
+  if (methodId === 'snb') {
+    return {
+      card: 'border-teal-200 bg-teal-50/80 dark:border-teal-400/20 dark:bg-teal-400/5',
+      logo: 'bg-teal-700 text-white',
+      chip: 'bg-teal-100 text-teal-800 dark:bg-teal-400/10 dark:text-teal-200',
+    };
+  }
+
+  return {
+    card: 'border-violet-200 bg-violet-50/80 dark:border-violet-400/20 dark:bg-violet-400/5',
+    logo: 'bg-violet-700 text-white',
+    chip: 'bg-violet-100 text-violet-800 dark:bg-violet-400/10 dark:text-violet-200',
+  };
+}
+
 function formatMoney(value: number | null) {
   if (typeof value !== 'number') {
     return 'غير محدد';
@@ -69,9 +114,13 @@ export default function CommissionsPage() {
     user: null,
   });
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<
+    CommissionPaymentMethod[]
+  >([]);
   const [commissionsPagination, setCommissionsPagination] =
     useState<PaginationMeta | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [copiedPaymentValue, setCopiedPaymentValue] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,13 +137,24 @@ export default function CommissionsPage() {
     setNotice('');
 
     try {
-      const [sessionResponse, commissionsResponse] = await Promise.all([
-        fetch('/api/auth/session'),
-        fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`),
-      ]);
+      const [sessionResponse, commissionsResponse, paymentMethodsResponse] =
+        await Promise.all([
+          fetch('/api/auth/session'),
+          fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`),
+          fetch('/api/marketplace/commission-payment-methods'),
+        ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
       setSession(nextSession);
+
+      if (paymentMethodsResponse.ok) {
+        const paymentMethodsPayload = (await paymentMethodsResponse.json()) as {
+          paymentMethods?: CommissionPaymentMethod[];
+        };
+        setPaymentMethods(paymentMethodsPayload.paymentMethods ?? []);
+      } else {
+        setPaymentMethods([]);
+      }
 
       if (!commissionsResponse.ok) {
         setCommissions([]);
@@ -148,6 +208,22 @@ export default function CommissionsPage() {
     },
     [amounts, refreshCommissions],
   );
+
+  const copyPaymentValue = useCallback(async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedPaymentValue(value);
+      setNotice('تم نسخ بيانات الدفع.');
+
+      window.setTimeout(() => {
+        setCopiedPaymentValue((currentValue) =>
+          currentValue === value ? '' : currentValue,
+        );
+      }, 1800);
+    } catch {
+      setNotice('تعذر نسخ بيانات الدفع. يمكنك تحديد الرقم ونسخه يدوياً.');
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -207,6 +283,93 @@ export default function CommissionsPage() {
                 {notice}
               </div>
             )}
+
+            <section className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <CreditCard className="size-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold">طرق دفع العمولة</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      اختر الجهة المناسبة وحوّل عمولة البيع، ثم احتفظ بصورة الإيصال للمراجعة.
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  عمولة 1%
+                </span>
+              </div>
+
+              {paymentMethods.length === 0 ? (
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                  لم يتم إعداد بيانات دفع العمولة بعد. أضف أرقام الحسابات في Render لتظهر هنا تلقائياً.
+                </div>
+              ) : (
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {paymentMethods.map((method) => {
+                    const theme = getPaymentMethodTheme(method.id);
+
+                    return (
+                      <article
+                        key={method.id}
+                        className={`grid gap-3 rounded-md border p-3 ${theme.card}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-bold">{method.name}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {method.subtitle}
+                            </div>
+                          </div>
+                          <div
+                            className={`grid min-h-10 min-w-16 place-items-center rounded-md px-3 text-xs font-black ${theme.logo}`}
+                          >
+                            {method.logoLabel}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                          {method.fields.map((field) => (
+                            <div
+                              key={`${method.id}-${field.label}`}
+                              className="rounded-md bg-white/75 p-2 dark:bg-background/40"
+                            >
+                              <div className="text-[11px] font-semibold text-muted-foreground">
+                                {field.label}
+                              </div>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <span
+                                  className="min-w-0 break-all text-sm font-bold"
+                                  dir="ltr"
+                                >
+                                  {field.value}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className={`h-8 w-8 shrink-0 rounded-md ${theme.chip}`}
+                                  onClick={() => void copyPaymentValue(field.copyValue)}
+                                  title="نسخ"
+                                >
+                                  {copiedPaymentValue === field.copyValue ? (
+                                    <Check className="size-4" />
+                                  ) : (
+                                    <Copy className="size-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
             <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold">

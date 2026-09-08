@@ -34,6 +34,22 @@ services:
         sync: false
       - key: SMARTSTORE_MAX_IMAGES_PER_LISTING
         sync: false
+      - key: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME
+        sync: false
+      - key: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER
+        sync: false
+      - key: SMARTSTORE_COMMISSION_ALRAJHI_IBAN
+        sync: false
+      - key: SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME
+        sync: false
+      - key: SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER
+        sync: false
+      - key: SMARTSTORE_COMMISSION_SNB_IBAN
+        sync: false
+      - key: SMARTSTORE_COMMISSION_STC_PAY_NAME
+        sync: false
+      - key: SMARTSTORE_COMMISSION_STC_PAY_NUMBER
+        sync: false
       - key: SMARTSTORE_OBJECT_STORAGE_ENDPOINT
         sync: false
       - key: SMARTSTORE_OBJECT_STORAGE_BUCKET

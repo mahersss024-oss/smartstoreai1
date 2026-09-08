@@ -84,6 +84,28 @@ storage, bandwidth, and listing page work. Keep this variable managed in the
 Render dashboard so production can raise or lower the limit without a code
 change.
 
+## Manual Commission Payment Methods
+
+The seller commissions page can show manual payment instructions for Al Rajhi,
+SNB, and STC Pay. Add only the methods you want to display; any empty method is
+hidden automatically.
+
+```env
+SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER=...
+SMARTSTORE_COMMISSION_ALRAJHI_IBAN=SA...
+
+SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER=...
+SMARTSTORE_COMMISSION_SNB_IBAN=SA...
+
+SMARTSTORE_COMMISSION_STC_PAY_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_STC_PAY_NUMBER=05...
+```
+
+Keep these values managed in the Render dashboard so payment recipients can be
+changed without a code deployment.
+
 Alternatively, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
 
 ```env
