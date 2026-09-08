@@ -8,6 +8,7 @@ import {
   Check,
   Copy,
   CreditCard,
+  FileText,
   Percent,
   Receipt,
   User,
@@ -297,9 +298,22 @@ export default function CommissionsPage() {
                     </p>
                   </div>
                 </div>
-                <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  عمولة 1%
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    عمولة 1%
+                  </span>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-md text-xs"
+                  >
+                    <Link href="/commission-policy">
+                      <FileText className="size-3.5" />
+                      سياسة العمولة
+                    </Link>
+                  </Button>
+                </div>
               </div>
 
               {paymentMethods.length === 0 ? (
