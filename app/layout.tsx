@@ -1,10 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import "./globals.css";
 import { appConfig } from "./app-config";
-
-type Theme = "light" | "dark";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
@@ -61,26 +58,18 @@ const themeInitScript = `
 })();
 `;
 
-function getTheme(value: string | undefined): Theme | undefined {
-  return value === "dark" || value === "light" ? value : undefined;
-}
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode | React.ReactElement;
 }>) {
-  const cookieStore = await cookies();
-  const initialTheme = getTheme(cookieStore.get(themeCookieName)?.value);
-
   return (
     <html
-      className={initialTheme === "dark" ? "dark" : undefined}
       dir="rtl"
       lang="ar"
       style={{
         ...themeStyle,
-        colorScheme: initialTheme ?? "light",
+        colorScheme: "light",
       }}
       suppressHydrationWarning
     >
