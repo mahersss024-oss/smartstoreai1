@@ -1,7 +1,8 @@
-import type { CSSProperties } from "react";
+import { Suspense, type CSSProperties } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
+import { SiteVisitTracker } from "@/components/site-visit-tracker";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
@@ -80,6 +81,9 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
+        <Suspense fallback={null}>
+          <SiteVisitTracker />
+        </Suspense>
         {children}
       </body>
     </html>

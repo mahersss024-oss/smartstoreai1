@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { prisma } from '@/lib/db/prisma';
 
 const commissionStatusSchema = z.object({
   status: z.enum(['due', 'paid', 'waived', 'disputed']),
@@ -53,4 +54,40 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   return Response.json(result);
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return Response.json({ error: 'auth_required' }, { status: 401 });
+  }
+
+  if (!isAdminSession(session)) {
+    return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const { commissionId } = await context.params;
+  const existing = await prisma.commission.findUnique({
+    where: { id: commissionId },
+  });
+
+  if (!existing) {
+    return Response.json({ error: 'commission_not_found' }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.commission.delete({ where: { id: commissionId } }),
+    prisma.adminAuditLog.create({
+      data: {
+        adminId: session.user.id,
+        action: 'update_commission',
+        targetType: 'commission',
+        targetId: commissionId,
+        metadata: { operation: 'delete_commission' },
+      },
+    }),
+  ]);
+
+  return Response.json({ status: 'deleted' });
 }

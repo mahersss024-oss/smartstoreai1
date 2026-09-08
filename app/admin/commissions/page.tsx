@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, Percent, Receipt, ShieldCheck } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Percent,
+  Receipt,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -139,13 +146,34 @@ export default function AdminCommissionsPage() {
     [refreshCommissions],
   );
 
+  const deleteCommission = useCallback(
+    async (commissionId: string) => {
+      if (!window.confirm('هل تريد حذف سجل العمولة؟')) {
+        return;
+      }
+
+      const response = await fetch(`/api/admin/commissions/${commissionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        setNotice('تعذر حذف سجل العمولة.');
+        return;
+      }
+
+      setNotice('تم حذف سجل العمولة.');
+      await refreshCommissions(1);
+    },
+    [refreshCommissions],
+  );
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin/moderation">
+              <Link href="/admin">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -220,7 +248,7 @@ export default function AdminCommissionsPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <Button
                       variant="outline"
                       className="rounded-md"
@@ -249,6 +277,14 @@ export default function AdminCommissionsPage() {
                       onClick={() => setCommissionStatus(commission.id, 'waived')}
                     >
                       إعفاء
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-md"
+                      onClick={() => void deleteCommission(commission.id)}
+                    >
+                      <Trash2 className="size-4" />
+                      حذف
                     </Button>
                   </div>
                   </article>

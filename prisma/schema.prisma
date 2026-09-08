@@ -150,6 +150,24 @@ model ApiIdempotencyKey {
   @@index([createdAt])
 }
 
+model SiteVisitDaily {
+  day            String   @id
+  visits         Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SiteVisitUnique {
+  id        String   @id @default(cuid())
+  day       String
+  visitorId String
+  createdAt DateTime @default(now())
+
+  @@unique([day, visitorId])
+  @@index([day, createdAt])
+}
+
 model ListingImage {
   id             String             @id @default(cuid())
   listingId      String
