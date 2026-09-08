@@ -16,8 +16,9 @@ SMARTSTORE_MAX_LISTINGS_PER_SELLER=100
 
 Keep this value server-side only.
 `SMARTSTORE_MAX_LISTINGS_PER_SELLER` controls saved non-deleted listings per
-seller account. It defaults to `100` and is capped at `1000`; it does not limit
-the total platform listings across all sellers.
+seller account. It defaults to `100` when unset. Any positive integer configured
+in Render is used as the active limit; this does not limit the total platform
+listings across all sellers.
 
 ## Local And Production Commands
 
@@ -76,8 +77,9 @@ SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
 Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
-`SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` and is capped at `12`
-to control storage cost, upload abuse, and listing page performance.
+`SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Any positive
+integer configured in Render is used as the active limit. Larger values increase
+storage, bandwidth, and listing page work.
 
 Alternatively, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
 

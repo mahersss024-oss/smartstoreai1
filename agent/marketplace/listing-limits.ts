@@ -1,5 +1,4 @@
 export const defaultMaxListingsPerSeller = 100;
-export const maxConfigurableListingsPerSeller = 1000;
 
 export class ListingLimitReachedError extends Error {
   readonly code = 'seller_listing_limit_reached';
@@ -22,7 +21,7 @@ export function getMaxListingsPerSeller() {
     return defaultMaxListingsPerSeller;
   }
 
-  return Math.min(configuredValue, maxConfigurableListingsPerSeller);
+  return configuredValue;
 }
 
 export function hasReachedSellerListingLimit(listingCount: number) {

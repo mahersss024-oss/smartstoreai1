@@ -4,7 +4,6 @@ import test from 'node:test';
 import {
   defaultMaxListingImages,
   getMaxListingImagesPerListing,
-  maxConfigurableListingImages,
 } from '@/agent/marketplace/listing-image-limits';
 
 function withImageLimitEnv(value: string | undefined, assertion: () => void) {
@@ -41,12 +40,12 @@ test('uses the default listing image limit when the env value is missing or inva
   });
 });
 
-test('allows a configured listing image limit up to the hard cap', () => {
+test('uses the configured listing image limit from the environment', () => {
   withImageLimitEnv('5', () => {
     assert.equal(getMaxListingImagesPerListing(), 5);
   });
 
   withImageLimitEnv('100', () => {
-    assert.equal(getMaxListingImagesPerListing(), maxConfigurableListingImages);
+    assert.equal(getMaxListingImagesPerListing(), 100);
   });
 });

@@ -4,7 +4,6 @@ import test from 'node:test';
 import {
   defaultMaxListingsPerSeller,
   getMaxListingsPerSeller,
-  maxConfigurableListingsPerSeller,
 } from '@/agent/marketplace/listing-limits';
 
 function withListingLimitEnv(value: string | undefined, assertion: () => void) {
@@ -41,15 +40,12 @@ test('uses the default seller listing limit when the env value is missing or inv
   });
 });
 
-test('allows a configured seller listing limit up to the hard cap', () => {
+test('uses the configured seller listing limit from the environment', () => {
   withListingLimitEnv('25', () => {
     assert.equal(getMaxListingsPerSeller(), 25);
   });
 
   withListingLimitEnv('5000', () => {
-    assert.equal(
-      getMaxListingsPerSeller(),
-      maxConfigurableListingsPerSeller,
-    );
+    assert.equal(getMaxListingsPerSeller(), 5000);
   });
 });
