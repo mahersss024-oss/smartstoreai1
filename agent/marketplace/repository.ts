@@ -26,6 +26,7 @@ import type {
   ReportRecord,
 } from './types';
 import { evaluateConversationMessageSafety } from './message-safety';
+import { deleteListingObject } from './object-storage';
 
 type DatabaseListingRecord = {
   id: string;
@@ -811,6 +812,125 @@ export async function addListingImageForSeller(
   });
 
   return listing ? toListingRecord(listing) : null;
+}
+
+export async function deleteListingImageForSeller(
+  listingId: string,
+  sellerId: string,
+  imageId: string,
+) {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.deleteListingImageForSeller(listingId, sellerId, imageId);
+  }
+
+  const existing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
+  });
+
+  if (!existing || existing.sellerId !== sellerId) {
+    return null;
+  }
+
+  const imageToDelete = existing.images.find((image) => image.id === imageId);
+
+  if (!imageToDelete) {
+    return null;
+  }
+
+  const listing = await prisma.$transaction(async (tx) => {
+    await tx.listingImage.delete({
+      where: { id: imageId },
+    });
+
+    if (imageToDelete.isPrimary) {
+      const nextPrimaryImage = await tx.listingImage.findFirst({
+        where: {
+          listingId,
+          status: 'approved',
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (nextPrimaryImage) {
+        await tx.listingImage.update({
+          where: { id: nextPrimaryImage.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return tx.listing.update({
+      where: { id: listingId },
+      data: { updatedAt: new Date() },
+      include: {
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 10,
+        },
+      },
+    });
+  });
+
+  try {
+    await deleteListingObject({ imageId });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[listing_image_storage_delete] failure=${errorName}`);
+  }
+
+  return toListingRecord(listing);
+}
+
+export async function setPrimaryListingImageForSeller(
+  listingId: string,
+  sellerId: string,
+  imageId: string,
+) {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.setPrimaryListingImageForSeller(
+      listingId,
+      sellerId,
+      imageId,
+    );
+  }
+
+  const existing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    include: { images: true },
+  });
+
+  if (
+    !existing ||
+    existing.sellerId !== sellerId ||
+    !existing.images.some((image) => image.id === imageId)
+  ) {
+    return null;
+  }
+
+  const listing = await prisma.$transaction(async (tx) => {
+    await tx.listingImage.updateMany({
+      where: { listingId },
+      data: { isPrimary: false },
+    });
+    await tx.listingImage.update({
+      where: { id: imageId },
+      data: { isPrimary: true },
+    });
+
+    return tx.listing.update({
+      where: { id: listingId },
+      data: { updatedAt: new Date() },
+      include: {
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 10,
+        },
+      },
+    });
+  });
+
+  return toListingRecord(listing);
 }
 
 export async function listUserConversations(userId: string) {

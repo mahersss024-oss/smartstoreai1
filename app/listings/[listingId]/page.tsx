@@ -186,7 +186,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
+      <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
@@ -210,8 +210,8 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="grid gap-4">
+        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,42rem)_19rem]">
+          <div className="grid min-w-0 gap-4">
             <ListingImageGallery
               images={images}
               title={listing.title ?? 'صورة الإعلان'}
@@ -243,7 +243,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                       مطابق لسياسة السوق
                     </span>
                   </div>
-                  <h2 className="text-2xl font-bold leading-tight">{listing.title ?? 'إعلان بدون عنوان'}</h2>
+                  <h2 className="text-xl font-bold leading-tight sm:text-2xl">{listing.title ?? 'إعلان بدون عنوان'}</h2>
                   <p className="mt-2 text-sm leading-7 text-muted-foreground">{listing.description ?? 'لا يوجد وصف مضاف لهذا الإعلان.'}</p>
                 </div>
               </div>
@@ -303,7 +303,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
               <div className="mb-4">
                 <div className="text-xs text-muted-foreground">السعر المطلوب</div>
-                <div className="mt-1 text-2xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
+                <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
               </div>
               <ListingContactActions listingId={listing.id} />
               <ListingSafetyActions listingId={listing.id} />

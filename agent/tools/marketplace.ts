@@ -10,10 +10,12 @@ import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-comp
 import {
   createConversationForListing,
   createListingDraft,
+  deleteListingImageForSeller,
   getListing,
   listMarketplaceListings,
   reportListing,
   setListingStatusForSeller,
+  setPrimaryListingImageForSeller,
   toggleFavoriteListing,
   updateListingForSeller,
   type CreateListingInput,
@@ -474,6 +476,109 @@ export function createMarketplaceTools(
 
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'updated',
+          listing,
+        };
+      },
+    }),
+
+    addUploadedImagesToListing: tool({
+      description:
+        'Attach the latest uploaded chat images to a seller-owned listing after the user clearly asks to add/update listing photos. Requires Google sign-in and a clear listingId. Use only truth-preserving product images already uploaded in this chat turn or retained listing image context.',
+      inputSchema: z.object({
+        listingId: z.string().min(1),
+      }),
+      execute: async ({ listingId }) => {
+        if (!session) {
+          return authRequired();
+        }
+
+        if (!options.latestUploadedImages?.length) {
+          return {
+            status: 'missing_images',
+            message:
+              'No uploaded listing images are available. Ask the user to attach JPG, PNG, or WEBP product images.',
+          };
+        }
+
+        const listing = await saveUploadedListingImagesForSeller({
+          listingId,
+          sellerId: session.user.id,
+          images: options.latestUploadedImages,
+        });
+
+        if (!listing) {
+          return {
+            status: 'not_found',
+            message: 'Listing was not found or is not owned by this user.',
+          };
+        }
+
+        return {
+          status: 'images_added',
+          listing,
+        };
+      },
+    }),
+
+    deleteListingImage: tool({
+      description:
+        'Delete one image from a seller-owned listing. Requires Google sign-in, clear listingId and imageId, and explicit user confirmation.',
+      inputSchema: z.object({
+        listingId: z.string().min(1),
+        imageId: z.string().min(1),
+      }),
+      execute: async ({ listingId, imageId }) => {
+        if (!session) {
+          return authRequired();
+        }
+
+        const listing = await deleteListingImageForSeller(
+          listingId,
+          session.user.id,
+          imageId,
+        );
+
+        if (!listing) {
+          return {
+            status: 'not_found',
+            message: 'Listing image was not found or is not owned by this user.',
+          };
+        }
+
+        return {
+          status: 'image_deleted',
+          listing,
+        };
+      },
+    }),
+
+    setPrimaryListingImage: tool({
+      description:
+        'Set one image as the primary image for a seller-owned listing. Requires Google sign-in and clear listingId and imageId.',
+      inputSchema: z.object({
+        listingId: z.string().min(1),
+        imageId: z.string().min(1),
+      }),
+      execute: async ({ listingId, imageId }) => {
+        if (!session) {
+          return authRequired();
+        }
+
+        const listing = await setPrimaryListingImageForSeller(
+          listingId,
+          session.user.id,
+          imageId,
+        );
+
+        if (!listing) {
+          return {
+            status: 'not_found',
+            message: 'Listing image was not found or is not owned by this user.',
+          };
+        }
+
+        return {
+          status: 'primary_image_updated',
           listing,
         };
       },

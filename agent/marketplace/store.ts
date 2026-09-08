@@ -456,6 +456,76 @@ export function addListingImageForSeller(
   return listing;
 }
 
+export function deleteListingImageForSeller(
+  listingId: string,
+  sellerId: string,
+  imageId: string,
+) {
+  loadStore();
+
+  const listing = listings.get(listingId);
+
+  if (!listing || listing.sellerId !== sellerId) {
+    return null;
+  }
+
+  const imageToDelete = listing.images.find((image) => image.id === imageId);
+
+  if (!imageToDelete) {
+    return null;
+  }
+
+  const remainingImages = listing.images.filter((image) => image.id !== imageId);
+
+  if (
+    imageToDelete.isPrimary &&
+    !remainingImages.some((image) => image.isPrimary)
+  ) {
+    const nextPrimaryImage = remainingImages.find(
+      (image) => image.status === 'approved',
+    );
+
+    if (nextPrimaryImage) {
+      nextPrimaryImage.isPrimary = true;
+    }
+  }
+
+  listing.images = remainingImages;
+  listing.updatedAt = nowIso();
+  listings.set(listing.id, listing);
+  persistStore();
+  return listing;
+}
+
+export function setPrimaryListingImageForSeller(
+  listingId: string,
+  sellerId: string,
+  imageId: string,
+) {
+  loadStore();
+
+  const listing = listings.get(listingId);
+
+  if (!listing || listing.sellerId !== sellerId) {
+    return null;
+  }
+
+  const selectedImage = listing.images.find((image) => image.id === imageId);
+
+  if (!selectedImage) {
+    return null;
+  }
+
+  listing.images = listing.images.map((image) => ({
+    ...image,
+    isPrimary: image.id === imageId,
+  }));
+  listing.updatedAt = nowIso();
+  listings.set(listing.id, listing);
+  persistStore();
+  return listing;
+}
+
 export function listMarketplaceListings(filters: MarketplaceListingFilters = {}) {
   seedListings();
   const publishedListings = [...listings.values()]

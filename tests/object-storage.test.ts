@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  deleteListingObject,
   getMissingObjectStorageConfig,
   storeListingObject,
 } from '@/agent/marketplace/object-storage';
@@ -109,6 +110,50 @@ test('uploads listing images to Cloudinary with a signed server request', async 
       result?.url,
       'https://res.cloudinary.com/demo-cloud/image/upload/v1/smartstore-test/listings/image-1.png',
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+test('deletes Cloudinary listing images with a signed server request', async () => {
+  const restoreEnv = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 'cloudinary',
+    CLOUDINARY_CLOUD_NAME: 'demo-cloud',
+    CLOUDINARY_API_KEY: 'test-api-key',
+    CLOUDINARY_API_SECRET: 'test-api-secret',
+    CLOUDINARY_FOLDER: 'smartstore-test/listings',
+  });
+  const originalFetch = globalThis.fetch;
+  const deleted: {
+    url: string;
+    formData: FormData | null;
+  } = {
+    url: '',
+    formData: null,
+  };
+
+  globalThis.fetch = async (input, init) => {
+    deleted.url = String(input);
+    deleted.formData = init?.body instanceof FormData ? init.body : null;
+
+    return Response.json({ result: 'ok' });
+  };
+
+  try {
+    const result = await deleteListingObject({ imageId: 'image-1' });
+
+    assert.equal(
+      deleted.url,
+      'https://api.cloudinary.com/v1_1/demo-cloud/image/destroy',
+    );
+    const formData = deleted.formData;
+
+    assert.ok(formData);
+    assert.equal(formData.get('api_key'), 'test-api-key');
+    assert.equal(formData.get('public_id'), 'smartstore-test/listings/image-1');
+    assert.equal(typeof formData.get('signature'), 'string');
+    assert.equal(result, true);
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv();

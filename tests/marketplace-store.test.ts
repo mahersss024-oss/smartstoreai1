@@ -4,8 +4,10 @@ import test from 'node:test';
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
 import {
   addConversationMessage,
+  addListingImageForSeller,
   createConversationForListing,
   createListingDraft,
+  deleteListingImageForSeller,
   getConversationForUser,
   listModerationQueue,
   listMarketplaceListings,
@@ -17,6 +19,7 @@ import {
   publishListing,
   reportListing,
   setListingModerationStatus,
+  setPrimaryListingImageForSeller,
   setReportModerationStatus,
   setCommissionStatusForAdmin,
   setListingStatusForSeller,
@@ -387,4 +390,101 @@ test('recommends blurring sensitive information without rejecting a useful image
   assert.equal(result.recommendedAction, 'blur_sensitive_info');
   assert.equal(result.listingImageStatus, 'approved');
   assert.equal(result.enhancements.includes('blur_sensitive_info'), true);
+});
+
+test('lets sellers set a primary listing image', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:image-primary',
+    category: 'cars',
+    title: 'Toyota Camry',
+  });
+
+  addListingImageForSeller(listing.id, 'seller:image-primary', {
+    id: 'image-primary-1',
+    listingId: listing.id,
+    originalUrl: 'https://example.com/1.jpg',
+    displayUrl: 'https://example.com/1.jpg',
+    thumbnailUrl: 'https://example.com/1.jpg',
+    isPrimary: true,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+  const updated = addListingImageForSeller(listing.id, 'seller:image-primary', {
+    id: 'image-primary-2',
+    listingId: listing.id,
+    originalUrl: 'https://example.com/2.jpg',
+    displayUrl: 'https://example.com/2.jpg',
+    thumbnailUrl: 'https://example.com/2.jpg',
+    isPrimary: false,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+
+  assert.equal(
+    updated?.images.find((image) => image.id === 'image-primary-1')?.isPrimary,
+    true,
+  );
+
+  const result = setPrimaryListingImageForSeller(
+    listing.id,
+    'seller:image-primary',
+    'image-primary-2',
+  );
+
+  assert.equal(
+    result?.images.find((image) => image.id === 'image-primary-1')?.isPrimary,
+    false,
+  );
+  assert.equal(
+    result?.images.find((image) => image.id === 'image-primary-2')?.isPrimary,
+    true,
+  );
+});
+
+test('deleting the primary listing image promotes another approved image', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:image-delete',
+    category: 'cars',
+    title: 'Toyota Corolla',
+  });
+
+  addListingImageForSeller(listing.id, 'seller:image-delete', {
+    id: 'image-delete-1',
+    listingId: listing.id,
+    originalUrl: 'https://example.com/1.jpg',
+    displayUrl: 'https://example.com/1.jpg',
+    thumbnailUrl: 'https://example.com/1.jpg',
+    isPrimary: true,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+  addListingImageForSeller(listing.id, 'seller:image-delete', {
+    id: 'image-delete-2',
+    listingId: listing.id,
+    originalUrl: 'https://example.com/2.jpg',
+    displayUrl: 'https://example.com/2.jpg',
+    thumbnailUrl: 'https://example.com/2.jpg',
+    isPrimary: false,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+
+  const result = deleteListingImageForSeller(
+    listing.id,
+    'seller:image-delete',
+    'image-delete-1',
+  );
+
+  assert.equal(
+    result?.images.some((image) => image.id === 'image-delete-1'),
+    false,
+  );
+  assert.equal(
+    result?.images.find((image) => image.id === 'image-delete-2')?.isPrimary,
+    true,
+  );
 });

@@ -98,6 +98,11 @@ type ListingCard = {
   description?: string;
 };
 
+type SelectedListingContext = Pick<
+  ListingCard,
+  'id' | 'title' | 'price' | 'city' | 'category' | 'status' | 'description'
+>;
+
 type ApiListingRecord = {
   id: string;
   category: string;
@@ -161,6 +166,7 @@ const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
 
 type StoredChatState = {
   activeListingQuery: string;
+  selectedListingContext?: SelectedListingContext | null;
   messages: UIMessage[];
   updatedAt: number;
 };
@@ -473,6 +479,11 @@ function readStoredChatState(): StoredChatState | null {
         typeof parsed.activeListingQuery === 'string'
           ? parsed.activeListingQuery
           : '',
+      selectedListingContext:
+        parsed.selectedListingContext &&
+        typeof parsed.selectedListingContext === 'object'
+          ? parsed.selectedListingContext
+          : null,
       messages: sanitizeMessagesForStorage(parsed.messages),
       updatedAt: parsed.updatedAt,
     };
@@ -482,7 +493,11 @@ function readStoredChatState(): StoredChatState | null {
   }
 }
 
-function writeStoredChatState(messages: UIMessage[], activeListingQuery: string) {
+function writeStoredChatState(
+  messages: UIMessage[],
+  activeListingQuery: string,
+  selectedListingContext: SelectedListingContext | null,
+) {
   if (typeof window === 'undefined') {
     return;
   }
@@ -494,6 +509,7 @@ function writeStoredChatState(messages: UIMessage[], activeListingQuery: string)
 
   const state: StoredChatState = {
     activeListingQuery,
+    selectedListingContext,
     messages: sanitizeMessagesForStorage(messages),
     updatedAt: Date.now(),
   };
@@ -611,6 +627,24 @@ async function clearRetainedListingImages() {
     };
     transaction.onerror = () => reject(transaction.error);
   });
+}
+
+function toSelectedListingContext(
+  listing: ListingCard,
+): SelectedListingContext | null {
+  if (!listing.id) {
+    return null;
+  }
+
+  return {
+    id: listing.id,
+    title: listing.title,
+    price: listing.price,
+    city: listing.city,
+    category: listing.category,
+    status: listing.status,
+    description: listing.description,
+  };
 }
 
 function isSearchToolOutput(value: unknown): value is SearchToolOutput {
@@ -738,13 +772,13 @@ function ListingCardView({
   onOpen,
 }: {
   listing: ListingCard;
-  onAsk: (prompt: string) => void;
+  onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
 }) {
   return (
     <article
-      className="min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card"
+      className="w-full min-w-0 max-w-[10.75rem] cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]"
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -755,7 +789,7 @@ function ListingCardView({
       role="button"
       tabIndex={0}
     >
-      <div className="relative aspect-[4/3] bg-slate-100">
+      <div className="relative aspect-[16/10] bg-slate-100">
         {listing.image ? (
           <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
         ) : (
@@ -779,15 +813,15 @@ function ListingCardView({
           <Heart className="size-3.5 sm:size-4" />
         </Button>
       </div>
-      <div className="grid gap-1.5 p-2 text-right sm:p-2.5">
-        <h3 className="line-clamp-1 text-[11px] font-bold sm:text-xs">{listing.title}</h3>
-        <div className="text-xs font-bold text-slate-950 dark:text-card-foreground sm:text-sm">{listing.price}</div>
+      <div className="grid gap-1 p-2 text-right">
+        <h3 className="line-clamp-1 text-[11px] font-bold">{listing.title}</h3>
+        <div className="text-xs font-bold text-slate-950 dark:text-card-foreground">{listing.price}</div>
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-[11px]">
           <MapPin className="size-3" />
           {listing.city}
         </div>
         {listing.description && (
-          <p className="line-clamp-1 text-[10px] leading-5 text-muted-foreground sm:text-[11px]">
+          <p className="line-clamp-1 text-[10px] leading-4 text-muted-foreground">
             {listing.description}
           </p>
         )}
@@ -798,13 +832,18 @@ function ListingCardView({
           </span>
           <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">{listing.stats}</span>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-1.5 sm:pt-2">
+        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-1.5">
           <Button
             size="sm"
-            className="h-7 rounded-md bg-blue-600 text-[11px] hover:bg-blue-700 sm:h-8 sm:text-xs"
+            className="h-7 rounded-md bg-blue-600 text-[11px] hover:bg-blue-700"
             onClick={(event) => {
               event.stopPropagation();
-              onAsk(`أريد التواصل بخصوص ${listing.title}`);
+              onAsk(
+                listing.id
+                  ? `أريد التواصل مع البائع بخصوص الإعلان رقم ${listing.id}: ${listing.title}`
+                  : `أريد التواصل بخصوص ${listing.title}`,
+                listing,
+              );
             }}
           >
             <MessageCircle className="size-3 sm:size-3.5" />
@@ -813,7 +852,7 @@ function ListingCardView({
           <Button
             size="icon-sm"
             variant="outline"
-            className="size-7 rounded-md sm:size-8"
+            className="size-7 rounded-md"
             aria-label="مقارنة الإعلان"
             onClick={(event) => {
               event.stopPropagation();
@@ -821,6 +860,7 @@ function ListingCardView({
                 listing.id
                   ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
                   : `قارن لي إعلان ${listing.title} بالسوق`,
+                listing,
               );
             }}
           >
@@ -900,6 +940,8 @@ export default function Page() {
   });
   const [isLoadingListings, setIsLoadingListings] = useState(false);
   const [activeListingQuery, setActiveListingQuery] = useState('');
+  const [selectedListingContext, setSelectedListingContext] =
+    useState<SelectedListingContext | null>(null);
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const [isMobileChatVisible, setIsMobileChatVisible] = useState(true);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
@@ -1007,6 +1049,7 @@ export default function Page() {
       if (storedState) {
         setMessages(storedState.messages);
         setActiveListingQuery(storedState.activeListingQuery);
+        setSelectedListingContext(storedState.selectedListingContext ?? null);
       }
 
       setHasRestoredChat(true);
@@ -1022,8 +1065,17 @@ export default function Page() {
       return;
     }
 
-    writeStoredChatState(filteredMessages, activeListingQuery);
-  }, [activeListingQuery, filteredMessages, hasRestoredChat]);
+    writeStoredChatState(
+      filteredMessages,
+      activeListingQuery,
+      selectedListingContext,
+    );
+  }, [
+    activeListingQuery,
+    filteredMessages,
+    hasRestoredChat,
+    selectedListingContext,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1162,17 +1214,35 @@ export default function Page() {
       void sendMessage(
         { text, files },
         {
-          body: { locationSettings, retainedListingImages },
+          body: {
+            locationSettings,
+            retainedListingImages,
+            selectedListing: selectedListingContext,
+          },
         },
       );
     },
-    [activeListingQuery, hasRestoredChat, refreshMarketplaceListings, sendMessage],
+    [
+      activeListingQuery,
+      hasRestoredChat,
+      refreshMarketplaceListings,
+      selectedListingContext,
+      sendMessage,
+    ],
   );
 
   const sendStarter = useCallback(
-    (prompt: string) => {
+    (prompt: string, listing?: ListingCard) => {
       if (isLoading || !hasRestoredChat) {
         return;
+      }
+
+      const nextSelectedListingContext = listing
+        ? toSelectedListingContext(listing)
+        : selectedListingContext;
+
+      if (listing) {
+        setSelectedListingContext(nextSelectedListingContext);
       }
 
       const intent = inferClientIntent(prompt);
@@ -1199,15 +1269,31 @@ export default function Page() {
       void sendMessage(
         { text: prompt },
         {
-          body: { locationSettings },
+          body: {
+            locationSettings,
+            selectedListing: nextSelectedListingContext,
+          },
         },
       );
     },
-    [activeListingQuery, hasRestoredChat, isLoading, refreshMarketplaceListings, sendMessage],
+    [
+      activeListingQuery,
+      hasRestoredChat,
+      isLoading,
+      refreshMarketplaceListings,
+      selectedListingContext,
+      sendMessage,
+    ],
   );
 
   const openListing = useCallback(
     (listing: ListingCard) => {
+      const nextSelectedListingContext = toSelectedListingContext(listing);
+
+      if (nextSelectedListingContext) {
+        setSelectedListingContext(nextSelectedListingContext);
+      }
+
       if (!listing.id) {
         return;
       }
@@ -1219,6 +1305,12 @@ export default function Page() {
 
   const favoriteListing = useCallback(
     (listing: ListingCard) => {
+      const nextSelectedListingContext = toSelectedListingContext(listing);
+
+      if (nextSelectedListingContext) {
+        setSelectedListingContext(nextSelectedListingContext);
+      }
+
       if (!listing.id) {
         return;
       }
@@ -1266,6 +1358,7 @@ export default function Page() {
   const startNewChat = useCallback(() => {
     setMessages([]);
     setActiveListingQuery('');
+    setSelectedListingContext(null);
     retainedListingImagesRef.current = [];
     clearStoredChatState();
     void clearRetainedListingImages().catch(() => {});
@@ -1349,7 +1442,7 @@ export default function Page() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,10.75rem))] justify-start gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))]">
                 {displayedMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}

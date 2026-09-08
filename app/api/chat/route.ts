@@ -37,6 +37,7 @@ import {
   type UploadedListingImage,
 } from '@/agent/marketplace/listing-image-storage';
 import {
+  getListing,
   listSellerListings,
   setListingStatusForSeller,
 } from '@/agent/marketplace/repository';
@@ -134,6 +135,7 @@ type ChatRequestBody = {
   model?: string;
   locationSettings?: LocationSettings;
   retainedListingImages?: unknown;
+  selectedListing?: unknown;
   data?: {
     model?: string;
     [key: string]: unknown;
@@ -159,6 +161,18 @@ type LocationSettings = {
   currency?: unknown;
   language?: unknown;
 };
+
+type SelectedListingRequestContext = {
+  id: string;
+  title?: string;
+  price?: string;
+  city?: string;
+  category?: string;
+  status?: string;
+  description?: string;
+};
+
+type ListingRecord = NonNullable<Awaited<ReturnType<typeof getListing>>>;
 
 function isChatMessage(message: unknown): message is ChatMessage {
   return typeof message === 'object' && message !== null;
@@ -372,6 +386,31 @@ function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function parseSelectedListingContext(
+  value: unknown,
+): SelectedListingRequestContext | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const id = cleanString(record.id);
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    title: cleanString(record.title),
+    price: cleanString(record.price),
+    city: cleanString(record.city),
+    category: cleanString(record.category),
+    status: cleanString(record.status),
+    description: cleanString(record.description),
+  };
+}
+
 function buildLocationSystemMessage(settings: LocationSettings | undefined) {
   const country = cleanString(settings?.country);
   const currency = cleanString(settings?.currency);
@@ -467,6 +506,134 @@ function formatListingPriceForChat(price: unknown, language: AppLanguage) {
   }
 
   return language === 'en' ? 'Not specified' : 'غير محدد';
+}
+
+function summarizeListingForAgent(
+  listing: ListingRecord,
+  language: AppLanguage,
+  ownership: 'current_user' | 'other_seller',
+) {
+  return {
+    id: listing.id,
+    ownership,
+    status: listing.status,
+    title: listing.title ?? null,
+    category: listing.category,
+    city: listing.city ?? null,
+    price: formatListingPriceForChat(listing.price, language),
+    condition: listing.condition ?? null,
+    images: listing.images.slice(0, 10).map((image, index) => ({
+      id: image.id,
+      order: index + 1,
+      isPrimary: image.isPrimary,
+      status: image.status,
+      thumbnailUrl: image.thumbnailUrl,
+    })),
+    approvedImageCount: listing.images.filter(
+      (image) => image.status === 'approved',
+    ).length,
+    views: listing.views,
+    messageCount: listing.messageCount,
+    favoriteCount: listing.favoriteCount,
+    description: listing.description?.slice(0, 260) ?? null,
+    attributes: Object.fromEntries(
+      Object.entries(listing.attributes ?? {}).slice(0, 10),
+    ),
+  };
+}
+
+async function getVerifiedSelectedListingContext({
+  selectedListing,
+  session,
+  language,
+}: {
+  selectedListing: unknown;
+  session: ReturnType<typeof getAuthSession>;
+  language: AppLanguage;
+}) {
+  const parsed = parseSelectedListingContext(selectedListing);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const listing = await getListing(parsed.id);
+
+  if (
+    !listing ||
+    (listing.status !== 'published' && listing.sellerId !== session?.user.id)
+  ) {
+    return null;
+  }
+
+  return summarizeListingForAgent(
+    listing,
+    language,
+    listing.sellerId === session?.user.id ? 'current_user' : 'other_seller',
+  );
+}
+
+async function buildMarketplaceInterfaceContext({
+  selectedListing,
+  session,
+  language,
+}: {
+  selectedListing: unknown;
+  session: ReturnType<typeof getAuthSession>;
+  language: AppLanguage;
+}) {
+  const [verifiedSelectedListing, sellerListings] = await Promise.all([
+    getVerifiedSelectedListingContext({ selectedListing, session, language }),
+    session
+      ? listSellerListings(session.user.id).catch((error) => {
+          const errorName = error instanceof Error ? error.name : 'UnknownError';
+          console.warn(`[seller_listing_context] failure=${errorName}`);
+          return [];
+        })
+      : Promise.resolve([]),
+  ]);
+  const sellerListingSummaries = sellerListings
+    .slice(0, 12)
+    .map((listing) =>
+      summarizeListingForAgent(listing, language, 'current_user'),
+    );
+
+  if (!verifiedSelectedListing && sellerListingSummaries.length === 0) {
+    return null;
+  }
+
+  return `SmartStore interface context:
+- selectedListing is the listing most recently clicked or targeted in the UI. If the user says "this listing", "this ad", "the selected ad", "تواصل معه", "هذا الإعلان", or similar, use selectedListing.id as the target listing.
+- sellerListings are listings owned by the signed-in user. Use them when the user asks about "my listings", "my ad", editing, pausing, deleting, marking sold, or adding listing details.
+- For buyer-seller contact, use openMarketplaceConversation only for a published selected listing owned by another seller. If selectedListing.ownership is current_user, explain that the user cannot contact themselves.
+- For seller listing edits, use updateListing only when the target is owned by the signed-in user and the requested change is clear. Ask for confirmation before destructive or price-changing actions.
+${JSON.stringify(
+  {
+    selectedListing: verifiedSelectedListing,
+    sellerListings: sellerListingSummaries,
+  },
+  null,
+  2,
+)}`;
+}
+
+function buildMarketplaceInterfaceSystemMessage(content: string) {
+  return {
+    role: 'system',
+    content,
+  } satisfies ModelMessage;
+}
+
+function buildMarketplaceInterfaceScopeMessage(content: string) {
+  return {
+    role: 'assistant',
+    parts: [
+      {
+        type: 'text',
+        text: content,
+      },
+    ],
+  };
 }
 
 async function publishLatestReadyDraftFromConfirmation({
@@ -984,6 +1151,17 @@ export async function POST(request: Request) {
 
   const session = getAuthSession(request);
   const searchOwnerKey = getSearchOwnerKey(session, request);
+  const marketplaceInterfaceContext = await buildMarketplaceInterfaceContext({
+    selectedListing: body.selectedListing,
+    session,
+    language,
+  });
+  const marketplaceInterfaceScopeMessage = marketplaceInterfaceContext
+    ? buildMarketplaceInterfaceScopeMessage(marketplaceInterfaceContext)
+    : null;
+  const marketplaceInterfaceSystemMessage = marketplaceInterfaceContext
+    ? buildMarketplaceInterfaceSystemMessage(marketplaceInterfaceContext)
+    : null;
   const directPublishResponse = await publishLatestReadyDraftFromConfirmation({
     userRequest: preliminaryUserRequest,
     language,
@@ -994,7 +1172,12 @@ export async function POST(request: Request) {
     return directPublishResponse;
   }
 
-  const inputScopeDecision = await checkInputScope({ messages: filteredMessages });
+  const scopeCheckMessages = marketplaceInterfaceScopeMessage
+    ? [...filteredMessages, marketplaceInterfaceScopeMessage]
+    : filteredMessages;
+  const inputScopeDecision = await checkInputScope({
+    messages: scopeCheckMessages,
+  });
 
   if (
     inputScopeDecision.decision === 'BLOCK' ||
@@ -1034,9 +1217,12 @@ export async function POST(request: Request) {
     scopedMessagesBase,
     language,
   );
+  const scopedMessagesWithInterfaceContext = marketplaceInterfaceScopeMessage
+    ? [...scopedMessages, marketplaceInterfaceScopeMessage]
+    : scopedMessages;
   const userRequest = getLatestUserRequest(scopedMessages);
   const adaptiveIntent = await resolveAdaptiveMarketplaceIntent({
-    messages: scopedMessages,
+    messages: scopedMessagesWithInterfaceContext,
     language,
     session,
   });
@@ -1148,6 +1334,9 @@ export async function POST(request: Request) {
   const internalContextMessages = [
     authSystemMessage,
     ...(locationSystemMessage ? [locationSystemMessage] : []),
+    ...(marketplaceInterfaceSystemMessage
+      ? [marketplaceInterfaceSystemMessage]
+      : []),
     adaptiveIntentSystemMessage,
     ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),
   ];

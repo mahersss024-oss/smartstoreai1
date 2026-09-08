@@ -8,6 +8,10 @@ type StoreListingObjectInput = {
   fileName?: string;
 };
 
+type DeleteListingObjectInput = {
+  imageId: string;
+};
+
 type S3ObjectStorageConfig = {
   endpoint: string;
   bucket: string;
@@ -329,6 +333,43 @@ async function storeListingObjectInCloudinary(input: StoreListingObjectInput) {
   };
 }
 
+async function deleteListingObjectFromCloudinary(input: DeleteListingObjectInput) {
+  const config = getCloudinaryStorageConfig();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = `${config.folder.replace(/\/$/, '')}/${input.imageId}`;
+  const destroyParams = {
+    public_id: publicId,
+    timestamp,
+  };
+  const formData = new FormData();
+
+  formData.append('api_key', config.apiKey);
+  formData.append('public_id', destroyParams.public_id);
+  formData.append('timestamp', String(destroyParams.timestamp));
+  formData.append(
+    'signature',
+    createCloudinarySignature(destroyParams, config.apiSecret),
+  );
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+      config.cloudName,
+    )}/image/destroy`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Cloudinary delete failed with status ${response.status}.`);
+  }
+
+  const result = (await response.json()) as { result?: unknown };
+
+  return result.result === 'ok' || result.result === 'not found';
+}
+
 export async function storeListingObject(input: StoreListingObjectInput) {
   if (!isObjectStorageEnabled()) {
     return null;
@@ -347,4 +388,24 @@ export async function storeListingObject(input: StoreListingObjectInput) {
   }
 
   return storeListingObjectInS3(input);
+}
+
+export async function deleteListingObject(input: DeleteListingObjectInput) {
+  if (!isObjectStorageEnabled()) {
+    return false;
+  }
+
+  const missingConfig = getMissingObjectStorageConfig();
+
+  if (missingConfig.length) {
+    throw new Error(
+      `Missing object storage configuration: ${missingConfig.join(', ')}`,
+    );
+  }
+
+  if (getObjectStorageMode() === 'cloudinary') {
+    return deleteListingObjectFromCloudinary(input);
+  }
+
+  return false;
 }
