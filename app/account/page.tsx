@@ -288,6 +288,25 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
   };
 }
 
+function listingHasApprovedImage(listing: ListingCard) {
+  return listing.images.some((image) => image.status === 'approved');
+}
+
+function createEditFormFromListing(listing: ListingCard): ListingEditForm {
+  return {
+    title: listing.title,
+    description: listing.description ?? '',
+    priceMode:
+      listing.rawPrice === 'bid' || listing.rawPrice === 'negotiable'
+        ? listing.rawPrice
+        : 'number',
+    price: typeof listing.rawPrice === 'number' ? String(listing.rawPrice) : '',
+    city: listing.city,
+    category: listing.rawCategory,
+    condition: listing.condition ?? '',
+  };
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [session, setSession] = useState<AuthSessionPayload>({
@@ -380,6 +399,18 @@ export default function AccountPage() {
 
   const controlListing = useCallback(
     (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {
+      if (action === 'publish' && !listingHasApprovedImage(listing)) {
+        setEditingListingId(listing.id);
+        setEditForm(createEditFormFromListing(listing));
+        setEditNotice({
+          listingId: listing.id,
+          tone: 'warning',
+          message:
+            'لا يمكن نشر الإعلان قبل إضافة صورة حقيقية مطابقة للمنتج. ارفع صورة واضحة للمنتج نفسه ثم حاول النشر مرة أخرى.',
+        });
+        return;
+      }
+
       const labels = {
         publish: 'نشر الإعلان',
         pause: 'إيقاف الإعلان',
@@ -395,7 +426,37 @@ export default function AccountPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
-      }).then(() => {
+      }).then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+          listing?: ApiListingRecord;
+        } | null;
+
+        if (payload?.listing) {
+          const updatedListing = listingRecordToCard(payload.listing);
+
+          setListings((currentListings) =>
+            currentListings.map((currentListing) =>
+              currentListing.id === updatedListing.id
+                ? updatedListing
+                : currentListing,
+            ),
+          );
+        }
+
+        if (!response.ok && action === 'publish') {
+          setEditingListingId(listing.id);
+          setEditForm(createEditFormFromListing(listing));
+          setEditNotice({
+            listingId: listing.id,
+            tone: 'warning',
+            message:
+              payload?.message ??
+              'لا يمكن نشر الإعلان الآن. تأكد من وجود صورة حقيقية مطابقة وأن بيانات الإعلان لا تخالف سياسة السوق.',
+          });
+        }
+
         void refreshListings(1);
       });
     },
@@ -410,18 +471,7 @@ export default function AccountPage() {
       message:
         'أي تعديل على الإعلان يتم فحصه تلقائيًا بالذكاء الاصطناعي قبل اعتماده. إذا أصبح الإعلان مخالفًا سيتم رفضه أو تحويله للمراجعة.',
     });
-    setEditForm({
-      title: listing.title,
-      description: listing.description ?? '',
-      priceMode:
-        listing.rawPrice === 'bid' || listing.rawPrice === 'negotiable'
-          ? listing.rawPrice
-          : 'number',
-      price: typeof listing.rawPrice === 'number' ? String(listing.rawPrice) : '',
-      city: listing.city,
-      category: listing.rawCategory,
-      condition: listing.condition ?? '',
-    });
+    setEditForm(createEditFormFromListing(listing));
   }, []);
 
   const cancelEditingListing = useCallback(() => {

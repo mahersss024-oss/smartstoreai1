@@ -64,6 +64,42 @@ test('publishes only compliant listings', () => {
   assert.equal(published?.status, 'published');
 });
 
+test('requires an approved image before seller publishes listing', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:image-required',
+    category: 'cars',
+    title: 'سيارة عائلية للبيع',
+  });
+
+  const pending = setListingStatusForSeller(
+    listing.id,
+    'seller:image-required',
+    'published',
+  );
+
+  assert.equal(pending?.status, 'pending');
+
+  addListingImageForSeller(listing.id, 'seller:image-required', {
+    id: 'publish-image-required',
+    listingId: listing.id,
+    originalUrl: 'https://images.example.com/car-original.jpg',
+    displayUrl: 'https://images.example.com/car-display.jpg',
+    thumbnailUrl: 'https://images.example.com/car-thumb.jpg',
+    isPrimary: true,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+
+  const published = setListingStatusForSeller(
+    listing.id,
+    'seller:image-required',
+    'published',
+  );
+
+  assert.equal(published?.status, 'published');
+});
+
 test('lets only the owner change listing status', () => {
   const listing = createListingDraft({
     sellerId: 'seller:status-owner',

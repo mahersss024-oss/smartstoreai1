@@ -254,6 +254,10 @@ function chooseInitialStatus(compliance: ComplianceDecision): ListingStatus {
   return 'draft';
 }
 
+function hasApprovedImage(listing: Pick<ListingRecord, 'images'>) {
+  return listing.images.some((image) => image.status === 'approved');
+}
+
 function calculateCommissionAmount(productValue: number) {
   return Math.round(productValue * 0.01 * 100) / 100;
 }
@@ -414,6 +418,8 @@ export function setListingStatusForSeller(
   if (status === 'published' && listing.compliance.decision !== 'allow') {
     listing.status =
       listing.compliance.decision === 'block' ? 'rejected' : 'pending';
+  } else if (status === 'published' && !hasApprovedImage(listing)) {
+    listing.status = 'pending';
   } else {
     listing.status = status;
   }

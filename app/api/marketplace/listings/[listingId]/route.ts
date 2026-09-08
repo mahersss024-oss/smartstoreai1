@@ -117,6 +117,21 @@ export async function PATCH(request: Request, context: RouteContext) {
         : Response.json(responseBody, { status: 404 });
     }
 
+    if (action.data.action === 'publish' && listing.status !== 'published') {
+      const responseBody = {
+        error: 'listing_publish_blocked',
+        message:
+          listing.status === 'pending'
+            ? 'لا يمكن نشر الإعلان الآن. يحتاج الإعلان إلى صورة حقيقية مطابقة أو مراجعة قبل النشر.'
+            : 'لا يمكن نشر الإعلان لأنه لا يطابق سياسة السوق.',
+        listing,
+      };
+
+      return idempotency
+        ? idempotency.complete(responseBody, 422)
+        : Response.json(responseBody, { status: 422 });
+    }
+
     const responseBody = { listing };
 
     return idempotency

@@ -174,6 +174,10 @@ function chooseInitialStatus(compliance: ComplianceDecision): ListingStatus {
   return 'draft';
 }
 
+function hasApprovedImage(listing: { images: ListingImage[] }) {
+  return listing.images.some((image) => image.status === 'approved');
+}
+
 function toPriceMode(price: CreateListingInput['price']) {
   return typeof price === 'number' ? null : price ?? null;
 }
@@ -726,6 +730,8 @@ export async function setListingStatusForSeller(
       ? existing.compliance.decision === 'block'
         ? 'rejected'
         : 'pending'
+      : status === 'published' && !hasApprovedImage(existing)
+        ? 'pending'
       : status;
   const listing = await prisma.$transaction(async (tx) => {
     const updatedListing = await tx.listing.update({
