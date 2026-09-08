@@ -1,85 +1,69 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+
+import { LegalPolicyPage } from '@/components/legal-policy-page';
 
 export const metadata: Metadata = {
   title: 'سياسة الخصوصية | SmartStore AI',
   description:
-    'توضيح كيف يتعامل SmartStore AI مع البيانات المحلية والمحادثات والإعدادات.',
+    'توضيح طريقة تعامل SmartStore AI مع بيانات الحساب والإعلانات والمحادثات والصور.',
 };
+
+const updatedAt = '9 سبتمبر 2026';
 
 const sections = [
   {
-    title: 'البيانات التي نحفظها',
+    title: 'البيانات التي نستخدمها',
     items: [
-      'سجل المحادثات الذي يظهر في جهازك فقط بحسب ما يسمح به المتصفح.',
-      'إعدادات البلد والعملة واللغة على هذا المتصفح.',
-      'البيانات التي ترسلها داخل الشات بهدف توليد الرد.',
+      'بيانات الحساب الأساسية عند تسجيل الدخول عبر Google مثل الاسم والبريد والصورة إذا كانت متاحة.',
+      'بيانات الإعلانات التي تضيفها مثل العنوان والوصف والسعر والمدينة والتصنيف والصور.',
+      'المحادثات والطلبات التي ترسلها لمساعد SmartStore AI لتقديم البحث أو إنشاء الإعلان أو إدارة السوق.',
+      'بيانات تشغيلية مثل وقت الطلب، حالة الإعلان، البلاغات، المفضلة، وسجلات العمولة.',
     ],
   },
   {
     title: 'كيف نستخدم البيانات',
     items: [
-      'تحسين جودة الردود وتخصيصها حسب البلد والعملة.',
-      'الحفاظ على المحادثات السابقة حتى تعود إليها لاحقًا.',
-      'تشغيل البحث أو المعالجة الخلفية عند الحاجة فقط.',
+      'تشغيل ميزات السوق مثل البحث، عرض الإعلانات، إدارة الحساب، المحادثات الداخلية، والمفضلة.',
+      'مساعدة الذكاء الاصطناعي على فهم طلبك، إنشاء مسودة إعلان، مقارنة المنتجات، وفحص الصور.',
+      'حماية المنصة من المنتجات المخالفة، الصور المضللة، محاولات الاحتيال، أو إساءة الاستخدام.',
+      'إدارة سجلات العمولة عند وضع الإعلان كمباع أو عند إدخال قيمة البيع النهائية.',
     ],
   },
   {
-    title: 'ملاحظات مهمة',
+    title: 'الذكاء الاصطناعي ومزودو الخدمة',
     items: [
-      'لا نعرض سجل المحادثات إلا داخل المتصفح أو الجهاز الذي استخدمته.',
-      'قد تمر بعض الرسائل عبر مزودات الذكاء الاصطناعي أو البحث التي تم تفعيلها في الخلفية.',
-      'يمكنك حذف المحادثة أو مسح السجل من داخل الواجهة في أي وقت.',
+      'قد تمر بعض الرسائل أو الصور عبر مزودي الذكاء الاصطناعي لفهم الطلب أو فحص المحتوى.',
+      'قد تُخزن الصور لدى مزود تخزين خارجي مثل Cloudinary حتى تظهر بشكل دائم داخل الإعلانات.',
+      'لا نطلب منك إرسال معلومات حساسة غير لازمة للبيع أو الشراء داخل المنصة.',
+    ],
+  },
+  {
+    title: 'المشاركة والحماية',
+    items: [
+      'لا يتم بيع بياناتك الشخصية كمصدر مستقل.',
+      'قد تظهر بيانات الإعلان العامة للمستخدمين لأنها جزء من نشر المنتج في السوق.',
+      'قد يطلع المشرفون على الإعلانات والبلاغات والمحادثات عند الحاجة للمراجعة أو حماية المنصة.',
+      'نستخدم حدود طلبات وفحوصات سياسة للحد من الإساءة والحفاظ على جودة الخدمة.',
+    ],
+  },
+  {
+    title: 'حقوقك',
+    items: [
+      'يمكنك تعديل أو حذف إعلاناتك من صفحة الحساب عندما تكون الميزة متاحة.',
+      'يمكنك إيقاف الإعلان أو تعيينه كمباع حسب حالة المنتج.',
+      'يمكنك التواصل مع إدارة المنصة بخصوص حذف أو مراجعة بيانات مرتبطة بحسابك.',
     ],
   },
 ];
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-5 py-8 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            SmartStore AI
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            سياسة الخصوصية
-          </h1>
-        </div>
-        <Link
-          href="/"
-          className="rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-        >
-          العودة للرئيسية
-        </Link>
-      </div>
-
-      <section className="grid gap-4 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
-        <p className="text-sm leading-7 text-muted-foreground">
-          نعامل الخصوصية ببساطة: ما يلزم لعمل الشات فقط، وما يبقى مفيدًا لك
-          فقط داخل جهازك، وما تحتاجه الخدمة لرد أفضل يمر عبر المسار التقني
-          المعتاد للتشغيل.
-        </p>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {sections.map((section) => (
-          <section
-            key={section.title}
-            className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm"
-          >
-            <h2 className="text-lg font-semibold">{section.title}</h2>
-            <ul className="mt-4 grid gap-3 text-sm leading-7 text-muted-foreground">
-              {section.items.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </main>
+    <LegalPolicyPage
+      title="سياسة الخصوصية"
+      eyebrow="بيانات المستخدم"
+      description="هذه السياسة توضّح كيف تتعامل SmartStore AI مع بيانات الحساب والإعلانات والمحادثات والصور أثناء تشغيل السوق الذكي."
+      updatedAt={updatedAt}
+      sections={sections}
+    />
   );
 }

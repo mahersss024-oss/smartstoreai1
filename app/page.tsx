@@ -1386,6 +1386,18 @@ export default function Page() {
               </button>
             </div>
 
+            <nav className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground xl:flex">
+              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/terms">
+                الشروط
+              </Link>
+              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/listing-policy">
+                سياسة الإعلانات
+              </Link>
+              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/commission-policy">
+                العمولة
+              </Link>
+            </nav>
+
             <div className="flex items-center gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
