@@ -112,6 +112,20 @@ export function LegalPolicyPage({
           هذه الصفحات توضح قواعد تشغيل SmartStore AI للمستخدمين. يمكن تحديثها
           عند تطوير الخدمة، ويفضل مراجعتها قانونيًا قبل الإطلاق التجاري الواسع.
         </section>
+
+        <section className="rounded-md border bg-white p-4 text-sm leading-7 shadow-sm dark:bg-card">
+          <h2 className="mb-1 text-base font-bold">التواصل مع الإدارة</h2>
+          <p className="text-muted-foreground">
+            للاستفسارات الرسمية أو مراجعة السياسات:
+            {' '}
+            <a
+              className="font-bold text-blue-700 underline dark:text-blue-300"
+              href="mailto:mahersss024@gmail.com"
+            >
+              mahersss024@gmail.com
+            </a>
+          </p>
+        </section>
       </div>
     </main>
   );
