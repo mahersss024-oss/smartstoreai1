@@ -1262,7 +1262,7 @@ export default function Page() {
       bottom: hasKeyboardOffset
         ? `calc(${keyboardOffset}px + env(safe-area-inset-bottom))`
         : 'calc(4.5rem + env(safe-area-inset-bottom))',
-      height: isAssistantExpanded ? expandedHeight : '14rem',
+      height: isAssistantExpanded ? expandedHeight : '12.75rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
       minHeight: isAssistantExpanded && !hasKeyboardOffset ? '26rem' : '0',
     };
@@ -1950,7 +1950,7 @@ export default function Page() {
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
                 isAssistantExpanded
                   ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
-                  : 'pb-[calc(15rem+env(safe-area-inset-bottom))] sm:pb-[calc(15rem+env(safe-area-inset-bottom))]'
+                  : 'pb-[calc(14rem+env(safe-area-inset-bottom))] sm:pb-[calc(14rem+env(safe-area-inset-bottom))]'
               }`}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
