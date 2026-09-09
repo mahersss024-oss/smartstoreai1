@@ -1533,7 +1533,7 @@ export default function Page() {
               <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <>
-                  <Button asChild variant="outline" size="sm" className="rounded-md">
+                  <Button asChild variant="outline" size="sm" className="hidden rounded-md sm:inline-flex">
                     <Link href="/account">
                       <User className="size-4" />
                       حسابي
