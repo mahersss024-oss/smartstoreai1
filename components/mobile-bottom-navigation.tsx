@@ -6,21 +6,21 @@ import {
   ChevronDown,
   FileText,
   Grid2X2,
-  Heart,
   Home,
   Percent,
   ShieldCheck,
   Store,
+  type LucideIcon,
   User,
 } from 'lucide-react';
 
 type NavItem = {
   href: string;
   label: string;
-  icon: typeof User;
+  icon: LucideIcon;
   primary?: boolean;
   active?: boolean;
-  action?: 'listings' | 'more';
+  action?: 'more';
 };
 
 function isActive(pathname: string, href: string) {
@@ -37,10 +37,9 @@ export function MobileBottomNavigation() {
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const [homeSection, setHomeSection] = useState<'home' | 'listings'>('home');
 
   useEffect(() => {
-    ['/account', '/favorites', '/', '/terms'].forEach((href) => {
+    ['/', '/account', '/terms'].forEach((href) => {
       router.prefetch(href);
     });
   }, [router]);
@@ -59,20 +58,12 @@ export function MobileBottomNavigation() {
   const moreActive = moreLinks.some((item) => isActive(pathname, item.href));
   const items: NavItem[] = [
     { href: '/account', label: 'حسابي', icon: User },
-    { href: '/favorites', label: 'المفضلة', icon: Heart },
     {
       href: '/',
       label: 'الرئيسية',
       icon: Home,
       primary: true,
-      active: pathname === '/' && homeSection === 'home',
-    },
-    {
-      href: '/#suggested-listings',
-      label: 'الإعلانات',
-      icon: Store,
-      action: 'listings',
-      active: pathname === '/' && homeSection === 'listings',
+      active: pathname === '/',
     },
     {
       href: '/terms',
@@ -86,31 +77,14 @@ export function MobileBottomNavigation() {
   const activeIndex = items.findIndex(
     (item) => item.active ?? isActive(pathname, item.href),
   );
-  const indicatorIndex = activeIndex >= 0 ? activeIndex : 2;
+  const indicatorIndex = activeIndex >= 0 ? activeIndex : 1;
 
   function navigate(href: string) {
     setPendingHref(href);
     setIsMoreOpen(false);
-    if (href === '/') {
-      setHomeSection('home');
-    }
     startTransition(() => {
       router.push(href);
     });
-  }
-
-  function handleListingsClick() {
-    setHomeSection('listings');
-    window.dispatchEvent(new Event('smartstore:collapse-assistant'));
-
-    if (pathname === '/') {
-      document
-        .getElementById('suggested-listings')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-
-    navigate('/#suggested-listings');
   }
 
   return (
@@ -161,12 +135,12 @@ export function MobileBottomNavigation() {
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-3 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 lg:hidden">
         <div
-          className="pointer-events-none absolute top-0 h-0.5 w-1/5 rounded-full bg-emerald-500 transition-transform duration-300 ease-out"
+          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-emerald-500 transition-transform duration-300 ease-out"
           style={{ transform: `translateX(${-indicatorIndex * 100}%)` }}
         />
-        <div className="grid h-16 grid-cols-5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        <div className="grid h-16 grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           {items.map((item) => {
             const Icon = item.icon;
             const active = item.active ?? isActive(pathname, item.href);
@@ -184,11 +158,6 @@ export function MobileBottomNavigation() {
                 onClick={() => {
                   if (item.action === 'more') {
                     setIsMoreOpen((open) => !open);
-                    return;
-                  }
-
-                  if (item.action === 'listings') {
-                    handleListingsClick();
                     return;
                   }
 
