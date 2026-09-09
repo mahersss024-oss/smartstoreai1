@@ -4,6 +4,7 @@
 import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -18,9 +19,7 @@ import {
   BadgeCheck,
   Bell,
   Bot,
-  Grid2X2,
   Heart,
-  Home,
   ImageIcon,
   LogOut,
   MapPin,
@@ -1003,8 +1002,8 @@ export default function Page() {
     [],
   );
 
-  const handleAssistantDragEnd = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
+  const settleAssistantDrag = useCallback(
+    (endY: number) => {
       const startY = assistantDragStartYRef.current;
       assistantDragStartYRef.current = null;
 
@@ -1012,7 +1011,7 @@ export default function Page() {
         return;
       }
 
-      const deltaY = event.clientY - startY;
+      const deltaY = endY - startY;
 
       if (deltaY > assistantDragThreshold) {
         collapseAssistant();
@@ -1024,6 +1023,51 @@ export default function Page() {
       }
     },
     [collapseAssistant, expandAssistant],
+  );
+
+  const handleAssistantDragEnd = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      settleAssistantDrag(event.clientY);
+    },
+    [settleAssistantDrag],
+  );
+
+  const handleAssistantTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLElement>) => {
+      assistantDragStartYRef.current = event.touches[0]?.clientY ?? null;
+    },
+    [],
+  );
+
+  const handleAssistantTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLElement>) => {
+      const endY = event.changedTouches[0]?.clientY;
+
+      if (typeof endY === 'number') {
+        settleAssistantDrag(endY);
+      }
+    },
+    [settleAssistantDrag],
+  );
+
+  const collapseAssistantFromPage = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (!isAssistantExpanded || window.innerWidth >= 1024) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (
+        target instanceof Element &&
+        target.closest('a, button, input, textarea, [role="button"]')
+      ) {
+        return;
+      }
+
+      collapseAssistant();
+    },
+    [collapseAssistant, isAssistantExpanded],
   );
 
   const refreshMarketplaceListings = useCallback((query?: string, page = 1) => {
@@ -1082,6 +1126,37 @@ export default function Page() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
   }, []);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleWindowScroll = () => {
+      const nextScrollY = window.scrollY;
+
+      if (window.innerWidth < 1024 && nextScrollY > lastScrollY + 12) {
+        collapseAssistant();
+      }
+
+      lastScrollY = nextScrollY;
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [collapseAssistant]);
+
+  useEffect(() => {
+    window.addEventListener('smartstore:collapse-assistant', collapseAssistant);
+
+    return () => {
+      window.removeEventListener(
+        'smartstore:collapse-assistant',
+        collapseAssistant,
+      );
+    };
+  }, [collapseAssistant]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1414,7 +1489,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 pb-[calc(14rem+env(safe-area-inset-bottom))] sm:px-6 lg:h-full lg:min-h-0 lg:pb-3">
+      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0">
         <section className="flex min-h-0 flex-col rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card lg:overflow-hidden">
           <header className="flex h-14 items-center justify-between border-b bg-[#f7f9fc] px-4 dark:bg-background">
             <div className="flex min-w-0 items-center gap-3">
@@ -1485,8 +1560,10 @@ export default function Page() {
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
                 isAssistantExpanded
                   ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
-                  : 'pb-[calc(9rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]'
+                  : 'pb-[calc(15rem+env(safe-area-inset-bottom))] sm:pb-[calc(15rem+env(safe-area-inset-bottom))]'
               }`}
+              id="suggested-listings"
+              onPointerDown={collapseAssistantFromPage}
             >
               <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-between md:text-right">
                 <div>
@@ -1559,13 +1636,15 @@ export default function Page() {
             </section>
 
             <section
-              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-200 ease-out dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
+              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-300 ease-out dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
                 isAssistantExpanded
                   ? 'h-[68dvh] min-h-[26rem] max-h-[42rem]'
-                  : 'h-[8.75rem]'
+                  : 'h-[10.25rem]'
               }`}
               onPointerDown={handleAssistantDragStart}
               onPointerUp={handleAssistantDragEnd}
+              onTouchEnd={handleAssistantTouchEnd}
+              onTouchStart={handleAssistantTouchStart}
             >
               <header className={`shrink-0 px-4 ${isAssistantExpanded ? 'border-b py-3' : 'py-2 lg:border-b lg:py-3'}`}>
                 <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
@@ -1706,35 +1785,6 @@ export default function Page() {
             </section>
           </div>
         </section>
-
-        <nav className="fixed inset-x-0 bottom-0 z-30 grid h-[4.5rem] grid-cols-5 border-t bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 text-[11px] font-semibold text-slate-500 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 dark:text-slate-400 lg:hidden">
-          <Link className="grid place-items-center gap-1 rounded-md" href="/account">
-            <User className="size-5" />
-            حسابي
-          </Link>
-          <Link className="grid place-items-center gap-1 rounded-md" href="/favorites">
-            <Heart className="size-5" />
-            المفضلة
-          </Link>
-          <Link className="grid place-items-center gap-1 rounded-md text-emerald-600" href="/">
-            <span className="grid size-10 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/25">
-              <Home className="size-5" />
-            </span>
-            الرئيسية
-          </Link>
-          <button
-            type="button"
-            className="grid place-items-center gap-1 rounded-md text-emerald-600"
-            onClick={collapseAssistant}
-          >
-            <Store className="size-5" />
-            الإعلانات
-          </button>
-          <Link className="grid place-items-center gap-1 rounded-md" href="/terms">
-            <Grid2X2 className="size-5" />
-            المزيد
-          </Link>
-        </nav>
 
       </div>
     </main>

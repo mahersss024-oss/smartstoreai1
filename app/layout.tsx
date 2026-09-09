@@ -2,6 +2,7 @@ import { Suspense, type CSSProperties } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
+import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
 
 const themeStorageKey = "theme";
@@ -80,11 +81,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
       </head>
-      <body className="antialiased">
+      <body className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>
         {children}
+        <MobileBottomNavigation />
       </body>
     </html>
   );
