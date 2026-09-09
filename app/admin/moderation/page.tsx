@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 
 type ListingRecord = {
@@ -151,6 +152,14 @@ export default function AdminModerationPage() {
     void refreshQueue();
   }, [refreshQueue]);
 
+  const queueLoadMoreRef = useInfiniteScroll({
+    enabled: hasMoreQueue,
+    isLoading,
+    onLoadMore: () => {
+      void refreshQueue(nextPage);
+    },
+  });
+
   const moderateListing = useCallback(
     async (listingId: string, action: 'approve' | 'reject' | 'delete') => {
       const response = await fetch(
@@ -252,7 +261,7 @@ export default function AdminModerationPage() {
               الإعلانات الحساسة
             </div>
 
-            {isLoading ? (
+            {isLoading && queue.listings.length === 0 ? (
               <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
                 جار تحميل المراجعة...
               </div>
@@ -320,7 +329,7 @@ export default function AdminModerationPage() {
               البلاغات
             </div>
 
-            {isLoading ? (
+            {isLoading && queue.reports.length === 0 ? (
               <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
                 جار تحميل البلاغات...
               </div>
@@ -374,6 +383,7 @@ export default function AdminModerationPage() {
             )}
           </section>
         </section>
+        <div ref={queueLoadMoreRef} className="h-px" />
         {hasMoreQueue && (
           <Button
             variant="outline"

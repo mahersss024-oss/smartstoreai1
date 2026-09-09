@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 
 type CommissionRecord = {
@@ -125,6 +126,14 @@ export default function AdminCommissionsPage() {
     void refreshCommissions();
   }, [refreshCommissions]);
 
+  const commissionsLoadMoreRef = useInfiniteScroll({
+    enabled: Boolean(commissionsPagination?.hasMore),
+    isLoading,
+    onLoadMore: () => {
+      void refreshCommissions(commissionsPagination?.nextPage ?? 1);
+    },
+  });
+
   const setCommissionStatus = useCallback(
     async (
       commissionId: string,
@@ -217,7 +226,7 @@ export default function AdminCommissionsPage() {
             سجل العمولات
           </div>
 
-          {isLoading ? (
+          {isLoading && commissions.length === 0 ? (
             <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
               جار تحميل العمولات...
             </div>
@@ -290,6 +299,7 @@ export default function AdminCommissionsPage() {
                   </article>
                 ))}
               </div>
+              <div ref={commissionsLoadMoreRef} className="h-px" />
               {commissionsPagination?.hasMore && (
                 <Button
                   variant="outline"

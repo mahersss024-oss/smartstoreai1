@@ -68,6 +68,7 @@ import {
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 
@@ -1606,6 +1607,12 @@ export default function Page() {
     refreshMarketplaceListings,
   ]);
 
+  const listingsLoadMoreRef = useInfiniteScroll({
+    enabled: canLoadMoreListings,
+    isLoading: isLoadingListings,
+    onLoadMore: loadMoreListings,
+  });
+
   const startNewChat = useCallback(() => {
     setMessages([]);
     setActiveListingQuery('');
@@ -1707,17 +1714,7 @@ export default function Page() {
                 </Button>
               </div>
 
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-10 items-center gap-1 rounded-md px-1 text-sm font-semibold text-blue-700 dark:text-blue-300"
-                  onClick={() => {
-                    collapseAssistant();
-                    loadMoreListings();
-                  }}
-                >
-                  عرض الكل
-                </button>
+              <div className="mb-3 flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2 text-base font-bold">
                   <Sparkles className="size-4 text-blue-600" />
                   الإعلانات المقترحة
@@ -1735,6 +1732,8 @@ export default function Page() {
                   />
                 ))}
               </div>
+
+              <div ref={listingsLoadMoreRef} className="h-px" />
 
               {canLoadMoreListings && (
                 <div className="mt-4 grid place-items-center">

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 
@@ -182,6 +183,14 @@ export default function CommissionsPage() {
     document.documentElement.dir = 'rtl';
     void refreshCommissions();
   }, [refreshCommissions]);
+
+  const commissionsLoadMoreRef = useInfiniteScroll({
+    enabled: Boolean(commissionsPagination?.hasMore),
+    isLoading,
+    onLoadMore: () => {
+      void refreshCommissions(commissionsPagination?.nextPage ?? 1);
+    },
+  });
 
   const updateSaleAmount = useCallback(
     async (event: FormEvent<HTMLFormElement>, commissionId: string) => {
@@ -391,7 +400,7 @@ export default function CommissionsPage() {
                 السجلات
               </div>
 
-              {isLoading ? (
+              {isLoading && commissions.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
                   جار تحميل العمولات...
                 </div>
@@ -447,6 +456,7 @@ export default function CommissionsPage() {
                       </article>
                     ))}
                   </div>
+                  <div ref={commissionsLoadMoreRef} className="h-px" />
                   {commissionsPagination?.hasMore && (
                     <Button
                       variant="outline"

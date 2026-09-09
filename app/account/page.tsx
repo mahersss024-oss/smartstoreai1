@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -378,6 +379,14 @@ export default function AccountPage() {
       setIsListingsLoading(false);
     }
   }, []);
+
+  const listingsLoadMoreRef = useInfiniteScroll({
+    enabled: Boolean(listingsPagination?.hasMore),
+    isLoading: isListingsLoading,
+    onLoadMore: () => {
+      void refreshListings(listingsPagination?.nextPage ?? 1);
+    },
+  });
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -1170,6 +1179,7 @@ export default function AccountPage() {
                       </article>
                     ))}
                   </div>
+                  <div ref={listingsLoadMoreRef} className="h-px" />
                   {listingsPagination?.hasMore && (
                     <Button
                       variant="outline"

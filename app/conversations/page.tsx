@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -155,6 +156,14 @@ export default function ConversationsPage() {
     void refreshConversations();
   }, [refreshConversations]);
 
+  const conversationsLoadMoreRef = useInfiniteScroll({
+    enabled: Boolean(conversationsPagination?.hasMore),
+    isLoading,
+    onLoadMore: () => {
+      void refreshConversations(conversationsPagination?.nextPage ?? 1);
+    },
+  });
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
@@ -223,7 +232,7 @@ export default function ConversationsPage() {
                 قائمة المحادثات
               </div>
 
-              {isLoading ? (
+              {isLoading && conversations.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
                   جار تحميل المحادثات...
                 </div>
@@ -283,6 +292,7 @@ export default function ConversationsPage() {
                     );
                     })}
                   </div>
+                  <div ref={conversationsLoadMoreRef} className="h-px" />
                   {conversationsPagination?.hasMore && (
                     <Button
                       variant="outline"

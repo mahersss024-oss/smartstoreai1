@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 
@@ -179,6 +180,14 @@ export default function AdminListingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  const listingsLoadMoreRef = useInfiniteScroll({
+    enabled: Boolean(pagination?.hasMore),
+    isLoading,
+    onLoadMore: () => {
+      void loadListings(pagination?.nextPage ?? 1);
+    },
+  });
+
   const updateDraft = useCallback(
     (listingId: string, updates: Partial<ListingDraft>) => {
       setDrafts((current) => ({
@@ -313,7 +322,7 @@ export default function AdminListingsPage() {
             </Button>
           </div>
 
-          {isLoading ? (
+          {isLoading && listings.length === 0 ? (
             <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
               جار تحميل الإعلانات...
             </div>
@@ -441,6 +450,10 @@ export default function AdminListingsPage() {
                   </article>
                 );
               })}
+
+              {pagination?.hasMore && (
+                <div ref={listingsLoadMoreRef} className="h-px" />
+              )}
 
               {pagination?.hasMore && (
                 <Button
