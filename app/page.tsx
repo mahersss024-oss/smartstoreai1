@@ -1262,7 +1262,7 @@ export default function Page() {
       bottom: hasKeyboardOffset
         ? `calc(${keyboardOffset}px + env(safe-area-inset-bottom))`
         : 'calc(4.5rem + env(safe-area-inset-bottom))',
-      height: isAssistantExpanded ? expandedHeight : '14.75rem',
+      height: isAssistantExpanded ? expandedHeight : '14rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
       minHeight: isAssistantExpanded && !hasKeyboardOffset ? '26rem' : '0',
     };
@@ -1950,7 +1950,7 @@ export default function Page() {
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
                 isAssistantExpanded
                   ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
-                  : 'pb-[calc(16rem+env(safe-area-inset-bottom))] sm:pb-[calc(16rem+env(safe-area-inset-bottom))]'
+                  : 'pb-[calc(15rem+env(safe-area-inset-bottom))] sm:pb-[calc(15rem+env(safe-area-inset-bottom))]'
               }`}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
@@ -2049,10 +2049,10 @@ export default function Page() {
                 </div>
               </header>
 
-              <div className={`min-h-0 overflow-hidden transition-[flex-basis,height,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex lg:flex-1 lg:opacity-100 ${
+              <div className={`flex min-h-0 flex-1 overflow-hidden transition-opacity duration-150 lg:pointer-events-auto lg:opacity-100 ${
                 isAssistantExpanded
-                  ? 'pointer-events-auto flex flex-1 opacity-100'
-                  : 'pointer-events-none h-0 flex-none opacity-0'
+                  ? 'pointer-events-auto opacity-100'
+                  : 'pointer-events-none opacity-0'
               }`}>
                 <Conversation className="min-h-0 flex-1">
                   <ConversationContent className="gap-4 px-4 py-5">
