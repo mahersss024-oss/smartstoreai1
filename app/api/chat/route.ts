@@ -435,7 +435,7 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
     return {
       role: 'system',
       content:
-        'Authenticated user context: signed_in=false. Account-bound marketplace actions require Google sign-in before tools can create, publish, edit, favorite, report, message, or mark listings sold.',
+        'Authenticated user context: signed_in=false. SmartStore AI chat requires Google sign-in before any assistant interaction or account-bound marketplace action.',
     } satisfies ModelMessage;
   }
 
@@ -999,7 +999,7 @@ For mixed images, explain that one listing must represent one product and ask fo
 For upload validation, explain the practical upload requirement and next step.
 For text policy issues, say the item/action cannot proceed because it may conflict with Saudi marketplace rules or Islamic values, then offer help with an allowed product.
 For scope issues, redirect naturally to SmartStore AI marketplace actions without sounding like an error template.
-For auth_required, explain that questions and browsing remain open, but account actions need Google sign-in.
+For auth_required, explain that SmartStore AI chat requires Google sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
 Use the user's language. Language=${input.language}.`,
         },
@@ -1052,26 +1052,6 @@ Use the user's language. Language=${input.language}.`,
 }
 
 export async function POST(request: Request) {
-  const retryAfterSeconds = await checkChatRateLimit(getClientId(request));
-
-  if (retryAfterSeconds !== null) {
-    return new Response('Too many requests. Please try again shortly.', {
-      status: 429,
-      headers: {
-        'Retry-After': retryAfterSeconds.toString(),
-      },
-    });
-  }
-
-  const missingApiKeys = getMissingApiKeys();
-
-  if (missingApiKeys.length) {
-    return new Response(
-      `Missing production environment variables: ${missingApiKeys.join(', ')}. Add them to your Render environment variables and redeploy.`,
-      { status: 500 },
-    );
-  }
-
   let body: ChatRequestBody;
 
   try {
@@ -1115,6 +1095,32 @@ export async function POST(request: Request) {
   const locationSystemMessage = buildLocationSystemMessage(body.locationSettings);
   const language = getRequestLanguage(body.locationSettings);
   const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return createTextUIResponse(getAuthRequiredResponse(language));
+  }
+
+  const retryAfterSeconds = await checkChatRateLimit(getClientId(request));
+
+  if (retryAfterSeconds !== null) {
+    return new Response('Too many requests. Please try again shortly.', {
+      status: 429,
+      headers: {
+        'Retry-After': retryAfterSeconds.toString(),
+      },
+    });
+  }
+
+  const missingApiKeys = getMissingApiKeys();
+
+  if (missingApiKeys.length) {
+    return new Response(
+      `Missing production environment variables: ${missingApiKeys.join(', ')}. Add them to your Render environment variables and redeploy.`,
+      { status: 500 },
+    );
+  }
+
   const imageValidationFailure = validateChatImageAttachments(filteredMessages);
   const retainedImageValidationFailure = validateRetainedListingImages(
     body.retainedListingImages,
@@ -1155,7 +1161,6 @@ export async function POST(request: Request) {
     });
   }
 
-  const session = getAuthSession(request);
   const searchOwnerKey = getSearchOwnerKey(session, request);
   const marketplaceInterfaceContext = await buildMarketplaceInterfaceContext({
     selectedListing: body.selectedListing,

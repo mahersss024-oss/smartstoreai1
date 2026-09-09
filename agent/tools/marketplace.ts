@@ -38,7 +38,7 @@ function authRequired() {
   return {
     status: 'auth_required' as const,
     message:
-      'Google sign-in is required before account-bound marketplace actions. The user can still ask questions without signing in.',
+      'Google sign-in is required before using SmartStore AI chat or account-bound marketplace actions.',
   };
 }
 

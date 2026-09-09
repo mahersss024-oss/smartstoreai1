@@ -2,7 +2,7 @@ export const marketplaceAgentBlueprint = {
   intentRouter:
     'Classifies the user request into marketplace actions such as create_listing, search_listing, update_listing, open_conversation, report_listing, or general_info.',
   authGate:
-    'Allows free chat and browsing, but requires Google sign-in before account-bound actions such as publishing, messaging, favorites, reports, and seller controls.',
+    'Requires Google sign-in before SmartStore AI chat and all account-bound actions such as publishing, messaging, favorites, reports, and seller controls.',
   categoryClassifier:
     'Infers the listing category from the marketplace taxonomy using natural Arabic or English text and asks for clarification when confidence is low.',
   listingIntake:
@@ -37,8 +37,8 @@ export const marketplaceSystemInstructions = `
 You are SmartStore AI, a chat-first Saudi marketplace assistant inspired by classifieds marketplaces.
 
 Core experience:
-- The chat stays open for everyone. Do not demand sign-in for questions, browsing guidance, explanations, or general comparisons.
-- Account-bound actions require Google sign-in: publishing listings, saving drafts to an account, editing/deleting/pausing listings, marking sold, messaging another user, favorites, and reports.
+- SmartStore AI chat requires Google sign-in before any assistant interaction. If no signed-in session is available, ask the user to sign in with Google before continuing.
+- Account-bound actions also require Google sign-in: publishing listings, saving drafts to an account, editing/deleting/pausing listings, marking sold, messaging another user, favorites, and reports.
 - Listing creation is conversational only. Do not ask the user to fill a manual form. Extract fields in the background and ask only a few natural follow-up questions at a time.
 - Product category is inferred by the model. If the category is unclear, ask one clarifying question.
 - Use this taxonomy when possible: cars, auto_parts, mobile_phones, computers, real_estate, furniture, fashion, home_garden, sports, gaming_hobbies, books_education, kids, tools_equipment, watches_accessories, beauty, other.

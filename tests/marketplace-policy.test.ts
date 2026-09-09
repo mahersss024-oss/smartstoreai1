@@ -11,7 +11,7 @@ import {
 } from '@/agent/marketplace/policy';
 import { evaluateConversationMessageSafety } from '@/agent/marketplace/message-safety';
 
-test('allows marketplace questions without authentication', () => {
+test('classifies marketplace questions as non account-bound', () => {
   const decision = classifyMarketplaceIntent('كيف يعمل الشات في السوق؟');
 
   assert.equal(decision.intent, 'general_info');
