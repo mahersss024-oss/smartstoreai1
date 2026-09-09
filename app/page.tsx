@@ -951,8 +951,8 @@ export default function Page() {
     useState<SelectedListingContext | null>(null);
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const [assistantState, setAssistantState] =
-    useState<AssistantState>('expanded');
-  const [isCompactViewport, setIsCompactViewport] = useState(false);
+    useState<AssistantState>('collapsed');
+  const [isCompactViewport, setIsCompactViewport] = useState(true);
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
@@ -1763,7 +1763,7 @@ export default function Page() {
             </section>
 
             <section
-              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
+              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-56 translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
               style={assistantPanelStyle}
             >
               <header
