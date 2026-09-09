@@ -29,7 +29,6 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
-  Mic,
   MoreHorizontal,
   Plus,
   SendHorizontal,
@@ -173,7 +172,7 @@ const assistantDragThreshold = 60;
 const chatMaxAttachments = 8;
 const chatInputGroupStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '3.35rem minmax(0, 1fr) 6.4rem',
+  gridTemplateColumns: '3.35rem minmax(0, 1fr) 3.35rem',
   height: 'auto',
   minHeight: '4.75rem',
 };
@@ -399,18 +398,6 @@ function ChatAttachmentControls() {
         variant="ghost"
       >
         <Plus className="size-5" />
-      </Button>
-      <span aria-hidden="true" className="h-7 w-px bg-slate-700/80" />
-      <Button
-        aria-label="الإملاء الصوتي"
-        className="size-10 rounded-2xl border border-white/10 bg-slate-900/50 text-slate-500"
-        disabled
-        size="icon-sm"
-        title="الإملاء الصوتي قريباً"
-        type="button"
-        variant="ghost"
-      >
-        <Mic className="size-5" />
       </Button>
     </div>
   );

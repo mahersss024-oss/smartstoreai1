@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -114,6 +114,16 @@ export default function AdminListingsPage() {
   const [status, setStatus] = useState<AdminListing['status'] | 'all'>('all');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const queryRef = useRef(query);
+  const statusRef = useRef(status);
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const loadListings = useCallback(
     async (page = 1) => {
@@ -124,11 +134,11 @@ export default function AdminListingsPage() {
         const params = new URLSearchParams({
           page: String(page),
           limit: '24',
-          status,
+          status: statusRef.current,
         });
 
-        if (query.trim()) {
-          params.set('query', query.trim());
+        if (queryRef.current.trim()) {
+          params.set('query', queryRef.current.trim());
         }
 
         const response = await fetch(`/api/admin/listings?${params}`);
@@ -152,10 +162,10 @@ export default function AdminListingsPage() {
           listings: AdminListing[];
           pagination: PaginationMeta;
         };
-        const nextListings =
-          page === 1 ? payload.listings : [...listings, ...payload.listings];
 
-        setListings(nextListings);
+        setListings((current) =>
+          page === 1 ? payload.listings : [...current, ...payload.listings],
+        );
         setPagination(payload.pagination);
         setDrafts((current) => ({
           ...current,
@@ -170,15 +180,14 @@ export default function AdminListingsPage() {
         setIsLoading(false);
       }
     },
-    [listings, query, router, status],
+    [router],
   );
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
     void loadListings(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [loadListings, status]);
 
   const listingsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(pagination?.hasMore),
