@@ -1636,17 +1636,17 @@ export default function Page() {
             </section>
 
             <section
-              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-300 ease-out dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
+              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-[68dvh] min-h-[26rem] max-h-[42rem] transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:translate-y-0 lg:rounded-none lg:border-0 lg:shadow-none ${
                 isAssistantExpanded
-                  ? 'h-[68dvh] min-h-[26rem] max-h-[42rem]'
-                  : 'h-[10.25rem]'
+                  ? 'translate-y-0'
+                  : 'translate-y-[calc(100%-10.25rem)]'
               }`}
               onPointerDown={handleAssistantDragStart}
               onPointerUp={handleAssistantDragEnd}
               onTouchEnd={handleAssistantTouchEnd}
               onTouchStart={handleAssistantTouchStart}
             >
-              <header className={`shrink-0 px-4 ${isAssistantExpanded ? 'border-b py-3' : 'py-2 lg:border-b lg:py-3'}`}>
+              <header className="shrink-0 border-b px-4 py-3">
                 <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1668,7 +1668,11 @@ export default function Page() {
                 </div>
               </header>
 
-              <div className={`${isAssistantExpanded ? 'flex' : 'hidden lg:flex'} min-h-0 flex-1 overflow-hidden`}>
+              <div className={`flex min-h-0 flex-1 overflow-hidden transition-opacity duration-150 lg:pointer-events-auto lg:opacity-100 ${
+                isAssistantExpanded
+                  ? 'pointer-events-auto opacity-100'
+                  : 'pointer-events-none opacity-0'
+              }`}>
                 <Conversation className="min-h-0 flex-1">
                   <ConversationContent className="gap-4 px-4 py-5">
                     <ConversationAutoScroll watchKey={scrollWatchKey} enabled />
@@ -1752,7 +1756,16 @@ export default function Page() {
                 </Conversation>
               </div>
 
-              <div className="shrink-0 border-t p-3" onFocus={expandAssistant}>
+              <div
+                className="shrink-0 border-t p-3"
+                onFocus={expandAssistant}
+                onPointerDown={(event) => {
+                  if (!isAssistantExpanded) {
+                    event.stopPropagation();
+                    expandAssistant();
+                  }
+                }}
+              >
                 <PromptInput
                   accept="image/jpeg,image/png,image/webp"
                   allowAttachments
