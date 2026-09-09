@@ -3,6 +3,7 @@
 
 import {
   type ReactNode,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -17,7 +18,9 @@ import {
   BadgeCheck,
   Bell,
   Bot,
+  Grid2X2,
   Heart,
+  Home,
   ImageIcon,
   LogOut,
   MapPin,
@@ -28,7 +31,6 @@ import {
   Sparkles,
   Store,
   User,
-  X,
 } from 'lucide-react';
 
 import {
@@ -146,6 +148,8 @@ type ClientIntentState = {
   label: string;
 };
 
+type AssistantState = 'expanded' | 'collapsed';
+
 type RetainedListingImage = Pick<
   FileUIPart,
   'type' | 'url' | 'mediaType' | 'filename'
@@ -163,6 +167,7 @@ const retainedListingImagesStoreName = 'listing-images';
 const retainedListingImagesRecordKey = 'latest';
 const maxStoredChatMessages = 60;
 const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
+const assistantDragThreshold = 60;
 
 type StoredChatState = {
   activeListingQuery: string;
@@ -778,7 +783,7 @@ function ListingCardView({
 }) {
   return (
     <article
-      className="w-full min-w-0 max-w-[10.75rem] cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]"
+      className="w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]"
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -814,8 +819,8 @@ function ListingCardView({
         </Button>
       </div>
       <div className="grid gap-1 p-2 text-right">
-        <h3 className="line-clamp-1 text-[11px] font-bold">{listing.title}</h3>
-        <div className="text-xs font-bold text-slate-950 dark:text-card-foreground">{listing.price}</div>
+        <h3 className="line-clamp-1 text-xs font-bold leading-5">{listing.title}</h3>
+        <div className="text-sm font-bold text-emerald-600 dark:text-emerald-300">{listing.price}</div>
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-[11px]">
           <MapPin className="size-3" />
           {listing.city}
@@ -943,9 +948,11 @@ export default function Page() {
   const [selectedListingContext, setSelectedListingContext] =
     useState<SelectedListingContext | null>(null);
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
-  const [isMobileChatVisible, setIsMobileChatVisible] = useState(true);
+  const [assistantState, setAssistantState] =
+    useState<AssistantState>('expanded');
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
+  const assistantDragStartYRef = useRef<number | null>(null);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -979,6 +986,45 @@ export default function Page() {
     !latestSearchToolOutput &&
     listingPagination.hasMore &&
     displayedMarketplaceListings.length > 0;
+  const isAssistantExpanded = assistantState === 'expanded';
+
+  const collapseAssistant = useCallback(() => {
+    setAssistantState('collapsed');
+  }, []);
+
+  const expandAssistant = useCallback(() => {
+    setAssistantState('expanded');
+  }, []);
+
+  const handleAssistantDragStart = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      assistantDragStartYRef.current = event.clientY;
+    },
+    [],
+  );
+
+  const handleAssistantDragEnd = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const startY = assistantDragStartYRef.current;
+      assistantDragStartYRef.current = null;
+
+      if (startY === null) {
+        return;
+      }
+
+      const deltaY = event.clientY - startY;
+
+      if (deltaY > assistantDragThreshold) {
+        collapseAssistant();
+        return;
+      }
+
+      if (deltaY < -assistantDragThreshold) {
+        expandAssistant();
+      }
+    },
+    [collapseAssistant, expandAssistant],
+  );
 
   const refreshMarketplaceListings = useCallback((query?: string, page = 1) => {
     const params = new URLSearchParams();
@@ -1170,7 +1216,7 @@ export default function Page() {
         return;
       }
 
-      setIsMobileChatVisible(true);
+      expandAssistant();
 
       const text = hasText && 'text' in message ? message.text : '';
       const files = hasFiles && 'files' in message ? message.files : undefined;
@@ -1228,6 +1274,7 @@ export default function Page() {
       refreshMarketplaceListings,
       selectedListingContext,
       sendMessage,
+      expandAssistant,
     ],
   );
 
@@ -1247,7 +1294,7 @@ export default function Page() {
 
       const intent = inferClientIntent(prompt);
       setClientIntent(intent);
-      setIsMobileChatVisible(true);
+      expandAssistant();
 
       const nextListingQuery = getNextListingQuery(
         prompt,
@@ -1283,6 +1330,7 @@ export default function Page() {
       refreshMarketplaceListings,
       selectedListingContext,
       sendMessage,
+      expandAssistant,
     ],
   );
 
@@ -1366,7 +1414,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-4 py-3 sm:px-6 lg:h-full lg:min-h-0">
+      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 pb-[calc(14rem+env(safe-area-inset-bottom))] sm:px-6 lg:h-full lg:min-h-0 lg:pb-3">
         <section className="flex min-h-0 flex-col rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card lg:overflow-hidden">
           <header className="flex h-14 items-center justify-between border-b bg-[#f7f9fc] px-4 dark:bg-background">
             <div className="flex min-w-0 items-center gap-3">
@@ -1435,14 +1483,14 @@ export default function Page() {
           <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden">
             <section
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
-                isMobileChatVisible
-                  ? 'pb-[calc(46dvh+2rem)] sm:pb-[calc(46dvh+2rem)]'
-                  : 'pb-20 sm:pb-20'
+                isAssistantExpanded
+                  ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
+                  : 'pb-[calc(9rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]'
               }`}
             >
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-between md:text-right">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 md:justify-start">
                     <Store className="size-4" />
                     واجهة الإعلانات
                   </div>
@@ -1454,7 +1502,24 @@ export default function Page() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,10.75rem))] justify-start gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  className="inline-flex h-10 items-center gap-1 rounded-md px-1 text-sm font-semibold text-blue-700 dark:text-blue-300"
+                  onClick={() => {
+                    collapseAssistant();
+                    loadMoreListings();
+                  }}
+                >
+                  عرض الكل
+                </button>
+                <div className="flex items-center gap-2 text-base font-bold">
+                  <Sparkles className="size-4 text-blue-600" />
+                  الإعلانات المقترحة
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
                 {displayedMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
@@ -1494,11 +1559,16 @@ export default function Page() {
             </section>
 
             <section
-              className={`inset-x-3 bottom-3 z-40 h-[46dvh] min-h-64 max-h-[30rem] flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/20 dark:bg-card lg:static lg:flex lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
-                isMobileChatVisible ? 'fixed flex' : 'hidden'
+              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-200 ease-out dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none ${
+                isAssistantExpanded
+                  ? 'h-[68dvh] min-h-[26rem] max-h-[42rem]'
+                  : 'h-[8.75rem]'
               }`}
+              onPointerDown={handleAssistantDragStart}
+              onPointerUp={handleAssistantDragEnd}
             >
-              <header className="shrink-0 border-b px-4 py-3">
+              <header className={`shrink-0 px-4 ${isAssistantExpanded ? 'border-b py-3' : 'py-2 lg:border-b lg:py-3'}`}>
+                <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="grid size-8 place-items-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
@@ -1515,20 +1585,11 @@ export default function Page() {
                     <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
                       <MoreHorizontal className="size-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-md lg:hidden"
-                      onClick={() => setIsMobileChatVisible(false)}
-                      aria-label="إخفاء الشات"
-                    >
-                      <X className="size-4" />
-                    </Button>
                   </div>
                 </div>
               </header>
 
-              <div className="flex min-h-0 flex-1 overflow-hidden">
+              <div className={`${isAssistantExpanded ? 'flex' : 'hidden lg:flex'} min-h-0 flex-1 overflow-hidden`}>
                 <Conversation className="min-h-0 flex-1">
                   <ConversationContent className="gap-4 px-4 py-5">
                     <ConversationAutoScroll watchKey={scrollWatchKey} enabled />
@@ -1612,7 +1673,7 @@ export default function Page() {
                 </Conversation>
               </div>
 
-              <div className="shrink-0 border-t p-3">
+              <div className="shrink-0 border-t p-3" onFocus={expandAssistant}>
                 <PromptInput
                   accept="image/jpeg,image/png,image/webp"
                   allowAttachments
@@ -1646,15 +1707,35 @@ export default function Page() {
           </div>
         </section>
 
-        {!isMobileChatVisible && (
-          <Button
-            className="fixed bottom-4 right-4 z-40 h-11 rounded-md bg-blue-600 px-4 shadow-2xl shadow-slate-950/25 hover:bg-blue-700 lg:hidden"
-            onClick={() => setIsMobileChatVisible(true)}
+        <nav className="fixed inset-x-0 bottom-0 z-30 grid h-[4.5rem] grid-cols-5 border-t bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 text-[11px] font-semibold text-slate-500 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 dark:text-slate-400 lg:hidden">
+          <Link className="grid place-items-center gap-1 rounded-md" href="/account">
+            <User className="size-5" />
+            حسابي
+          </Link>
+          <Link className="grid place-items-center gap-1 rounded-md" href="/favorites">
+            <Heart className="size-5" />
+            المفضلة
+          </Link>
+          <Link className="grid place-items-center gap-1 rounded-md text-emerald-600" href="/">
+            <span className="grid size-10 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/25">
+              <Home className="size-5" />
+            </span>
+            الرئيسية
+          </Link>
+          <button
+            type="button"
+            className="grid place-items-center gap-1 rounded-md text-emerald-600"
+            onClick={collapseAssistant}
           >
-            <MessageCircle className="size-4" />
-            إظهار الشات
-          </Button>
-        )}
+            <Store className="size-5" />
+            الإعلانات
+          </button>
+          <Link className="grid place-items-center gap-1 rounded-md" href="/terms">
+            <Grid2X2 className="size-5" />
+            المزيد
+          </Link>
+        </nav>
+
       </div>
     </main>
   );

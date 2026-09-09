@@ -1,6 +1,7 @@
 import {
   getAuthSession,
   getCommissionAgreement,
+  isAdminSession,
 } from '@/lib/auth/session';
 
 export async function GET(request: Request) {
@@ -9,7 +10,12 @@ export async function GET(request: Request) {
 
   return Response.json({
     authenticated: Boolean(session),
-    user: session?.user ?? null,
+    user: session
+      ? {
+          ...session.user,
+          role: isAdminSession(session) ? 'admin' : session.user.role ?? 'user',
+        }
+      : null,
     commissionAgreementAccepted: Boolean(commissionAgreement),
     commissionAgreement,
   });

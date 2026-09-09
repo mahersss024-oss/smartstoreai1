@@ -36,6 +36,7 @@ type AuthUser = {
   email: string;
   name?: string;
   picture?: string;
+  role?: string;
 };
 
 type AuthSessionPayload = {
@@ -342,6 +343,7 @@ export default function AccountPage() {
       sold: listings.filter((listing) => listing.status === 'مباع').length,
     };
   }, [listings]);
+  const isAdmin = session.user?.role === 'admin';
 
   const refreshSession = useCallback(() => {
     return fetch('/api/auth/session')
@@ -787,6 +789,12 @@ export default function AccountPage() {
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-xl font-bold">{session.user?.name ?? 'عميل SmartStore'}</h2>
                     <BadgeCheck className="size-5 shrink-0 text-blue-600" />
+                    {isAdmin && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                        <ShieldCheck className="size-3.5" />
+                        مالك المنصة
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 truncate text-sm text-muted-foreground">{session.user?.email}</p>
                   <p className="mt-2 text-xs leading-6 text-muted-foreground">
@@ -825,6 +833,14 @@ export default function AccountPage() {
                     العمولات
                   </Link>
                 </Button>
+                {isAdmin && (
+                  <Button asChild variant="outline" className="rounded-md border-emerald-500/40 text-emerald-700 dark:text-emerald-200">
+                    <Link href="/admin">
+                      <ShieldCheck className="size-4" />
+                      لوحة الإدارة
+                    </Link>
+                  </Button>
+                )}
               </div>
             </section>
 
