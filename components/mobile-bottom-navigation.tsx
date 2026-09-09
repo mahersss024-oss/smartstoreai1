@@ -37,12 +37,59 @@ export function MobileBottomNavigation() {
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
     ['/', '/account', '/terms'].forEach((href) => {
       router.prefetch(href);
     });
   }, [router]);
+
+  useEffect(() => {
+    const isTextEntryTarget = (target: EventTarget | null) =>
+      target instanceof Element &&
+      Boolean(
+        target.closest(
+          'input:not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]',
+        ),
+      );
+
+    const syncKeyboardState = () => {
+      setIsKeyboardOpen(isTextEntryTarget(document.activeElement));
+    };
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (!isTextEntryTarget(event.target)) {
+        return;
+      }
+
+      setIsMoreOpen(false);
+      setIsKeyboardOpen(true);
+    };
+
+    const handleFocusOut = () => {
+      window.setTimeout(syncKeyboardState, 80);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setIsKeyboardOpen(false);
+      setIsMoreOpen(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [pathname]);
 
   if (pathname.startsWith('/admin') || pathname.startsWith('/api')) {
     return null;
@@ -89,7 +136,7 @@ export function MobileBottomNavigation() {
 
   return (
     <>
-      {isMoreOpen && (
+      {isMoreOpen && !isKeyboardOpen && (
         <button
           aria-label="إغلاق المزيد"
           className="fixed inset-0 z-40 bg-slate-950/15 backdrop-blur-[1px] lg:hidden"
@@ -100,7 +147,7 @@ export function MobileBottomNavigation() {
 
       <div
         className={`fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 overflow-hidden rounded-2xl border bg-white/98 p-2 shadow-2xl shadow-slate-950/15 transition-all duration-200 dark:bg-card/98 lg:hidden ${
-          isMoreOpen
+          isMoreOpen && !isKeyboardOpen
             ? 'translate-y-0 opacity-100'
             : 'pointer-events-none translate-y-3 opacity-0'
         }`}
@@ -135,7 +182,13 @@ export function MobileBottomNavigation() {
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 lg:hidden">
+      <nav
+        className={`fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all duration-200 dark:bg-card/95 lg:hidden ${
+          isKeyboardOpen
+            ? 'pointer-events-none translate-y-full opacity-0'
+            : 'translate-y-0 opacity-100'
+        }`}
+      >
         <div
           className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-emerald-500 transition-[right] duration-300 ease-out"
           style={{ right: `${indicatorIndex * (100 / 3)}%` }}

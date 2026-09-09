@@ -3,6 +3,7 @@
 
 import {
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
@@ -951,6 +952,8 @@ export default function Page() {
   const [assistantState, setAssistantState] =
     useState<AssistantState>('expanded');
   const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const [isChatInputFocused, setIsChatInputFocused] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
@@ -994,12 +997,25 @@ export default function Page() {
       return undefined;
     }
 
+    const hasKeyboardOffset = isChatInputFocused && keyboardOffset > 0;
+    const expandedHeight = hasKeyboardOffset
+      ? `min(68dvh, calc(100dvh - ${keyboardOffset}px - 0.75rem))`
+      : '68dvh';
+
     return {
-      height: isAssistantExpanded ? '68dvh' : '14rem',
+      bottom: isChatInputFocused
+        ? `calc(${keyboardOffset}px + env(safe-area-inset-bottom))`
+        : 'calc(4.5rem + env(safe-area-inset-bottom))',
+      height: isAssistantExpanded ? expandedHeight : '14rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
-      minHeight: isAssistantExpanded ? '26rem' : '0',
+      minHeight: isAssistantExpanded && !hasKeyboardOffset ? '26rem' : '0',
     };
-  }, [isAssistantExpanded, isCompactViewport]);
+  }, [
+    isAssistantExpanded,
+    isChatInputFocused,
+    isCompactViewport,
+    keyboardOffset,
+  ]);
 
   const collapseAssistant = useCallback(() => {
     setAssistantState('collapsed');
@@ -1008,6 +1024,77 @@ export default function Page() {
   const expandAssistant = useCallback(() => {
     setAssistantState('expanded');
   }, []);
+
+  const handleChatInputFocus = useCallback(() => {
+    setIsChatInputFocused(true);
+    expandAssistant();
+  }, [expandAssistant]);
+
+  const handleChatInputBlur = useCallback(
+    (event: ReactFocusEvent<HTMLDivElement>) => {
+      const promptInputContainer = event.currentTarget;
+      const nextTarget = event.relatedTarget;
+
+      if (
+        nextTarget instanceof Element &&
+        promptInputContainer.contains(nextTarget)
+      ) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        const activeElement = document.activeElement;
+
+        if (
+          activeElement instanceof Element &&
+          promptInputContainer.contains(activeElement)
+        ) {
+          return;
+        }
+
+        setIsChatInputFocused(false);
+        setKeyboardOffset(0);
+      }, 80);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isCompactViewport || !isChatInputFocused) {
+      return;
+    }
+
+    const syncKeyboardOffset = () => {
+      const visualViewport = window.visualViewport;
+
+      if (!visualViewport) {
+        setKeyboardOffset(0);
+        return;
+      }
+
+      setKeyboardOffset(
+        Math.max(
+          0,
+          Math.round(
+            window.innerHeight -
+              visualViewport.height -
+              visualViewport.offsetTop,
+          ),
+        ),
+      );
+    };
+
+    syncKeyboardOffset();
+    window.visualViewport?.addEventListener('resize', syncKeyboardOffset);
+    window.visualViewport?.addEventListener('scroll', syncKeyboardOffset);
+    window.addEventListener('resize', syncKeyboardOffset);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncKeyboardOffset);
+      window.visualViewport?.removeEventListener('scroll', syncKeyboardOffset);
+      window.removeEventListener('resize', syncKeyboardOffset);
+    };
+  }, [isChatInputFocused, isCompactViewport]);
 
   useEffect(() => {
     const syncViewportMode = () => {
@@ -1798,11 +1885,12 @@ export default function Page() {
 
               <div
                 className="shrink-0 border-t p-3"
-                onFocus={expandAssistant}
+                onBlur={handleChatInputBlur}
+                onFocus={handleChatInputFocus}
                 onPointerDown={(event) => {
                   if (!isAssistantExpanded) {
                     event.stopPropagation();
-                    expandAssistant();
+                    handleChatInputFocus();
                   }
                 }}
               >
