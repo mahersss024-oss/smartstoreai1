@@ -1137,8 +1137,8 @@ function ListingCardView({
 function AssistantMessageFrame({ children }: { children: ReactNode }) {
   return (
     <div className="flex w-full items-start gap-2">
-      <div className="mt-1 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
-        <Bot className="size-4" />
+      <div className="mt-1 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
+        <Bot className="size-3.5" />
       </div>
       <div className="min-w-0 flex-1 text-right">{children}</div>
     </div>
@@ -2031,7 +2031,7 @@ export default function Page() {
                 <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="grid size-8 place-items-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
+                    <div className="grid size-8 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
                       <Bot className="size-4" />
                     </div>
                     <div>
