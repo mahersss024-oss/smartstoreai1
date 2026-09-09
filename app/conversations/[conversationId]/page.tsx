@@ -226,7 +226,7 @@ export default function ConversationPage() {
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/">
+              <Link href="/conversations">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

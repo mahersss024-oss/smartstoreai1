@@ -161,7 +161,7 @@ export default function ConversationsPage() {
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/">
+              <Link href="/account">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -177,7 +177,7 @@ export default function ConversationsPage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle language="ar" />
-            <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
+            <Button asChild className="hidden rounded-md bg-blue-600 hover:bg-blue-700 sm:inline-flex">
               <Link href="/account">
                 <User className="size-4" />
                 حسابي
