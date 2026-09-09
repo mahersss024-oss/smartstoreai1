@@ -13,25 +13,33 @@ import {
   useRef,
   useState,
 } from 'react';
-import { DefaultChatTransport, type FileUIPart, type UIMessage } from 'ai';
+import { DefaultChatTransport, type ChatStatus, type FileUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  ChevronLeft,
+  ChevronRight,
   BadgeCheck,
   Bell,
   Bot,
   Heart,
   ImageIcon,
+  Loader2,
   LogOut,
   MapPin,
   MessageCircle,
+  Mic,
   MoreHorizontal,
   Plus,
+  SendHorizontal,
   ShieldCheck,
   Sparkles,
+  Square,
   Store,
+  Trash2,
   User,
+  X,
 } from 'lucide-react';
 
 import {
@@ -48,19 +56,10 @@ import {
 } from '@chat-elements/message';
 import {
   PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
-  PromptInputAttachment,
-  PromptInputAttachments,
   PromptInputBody,
-  PromptInputFooter,
-  PromptInputHeader,
   type PromptInputMessage,
-  PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputTools,
+  usePromptInputAttachments,
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import {
@@ -71,6 +70,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
+import { cn } from '@/lib/utils';
 
 type LocationSettings = {
   country: 'SA';
@@ -170,6 +170,28 @@ const retainedListingImagesRecordKey = 'latest';
 const maxStoredChatMessages = 60;
 const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
 const assistantDragThreshold = 60;
+const chatMaxAttachments = 8;
+const chatInputGroupStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '3.35rem minmax(0, 1fr) 6.4rem',
+  height: 'auto',
+  minHeight: '4.75rem',
+};
+const chatInputTextAreaStyle: CSSProperties = {
+  gridColumn: '2',
+  gridRow: '2',
+  minHeight: '3.5rem',
+};
+const chatSubmitButtonStyle: CSSProperties = {
+  gridColumn: '1',
+  gridRow: '2',
+  height: '2.75rem',
+  width: '2.75rem',
+};
+const chatAttachmentControlsStyle: CSSProperties = {
+  gridColumn: '3',
+  gridRow: '2',
+};
 
 type StoredChatState = {
   activeListingQuery: string;
@@ -183,6 +205,239 @@ type StoredListingImagesState = {
   images: RetainedListingImage[];
   updatedAt: number;
 };
+
+type PendingChatAttachment = FileUIPart & { id: string };
+
+function getAttachmentLabel(file: PendingChatAttachment) {
+  return file.filename || (file.mediaType?.startsWith('image/') ? 'صورة مرفقة' : 'ملف مرفق');
+}
+
+function ChatAttachmentPreviewStrip({ maxFiles }: { maxFiles: number }) {
+  const attachments = usePromptInputAttachments();
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const files = attachments.files;
+  const safePreviewIndex =
+    previewIndex === null || files.length === 0 ? null : Math.min(previewIndex, files.length - 1);
+  const previewFile = safePreviewIndex === null ? null : files[safePreviewIndex] ?? null;
+
+  if (files.length === 0) {
+    return null;
+  }
+
+  const closePreview = () => setPreviewIndex(null);
+  const showPrevious = () => {
+    setPreviewIndex((current) => {
+      const activeIndex = current ?? 0;
+      return (activeIndex - 1 + files.length) % files.length;
+    });
+  };
+  const showNext = () => {
+    setPreviewIndex((current) => {
+      const activeIndex = current ?? 0;
+      return (activeIndex + 1) % files.length;
+    });
+  };
+  const removePreviewFile = () => {
+    if (!previewFile) {
+      return;
+    }
+
+    attachments.remove(previewFile.id);
+    if (files.length <= 1) {
+      setPreviewIndex(null);
+    } else {
+      setPreviewIndex((current) => Math.min(current ?? 0, files.length - 2));
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="col-span-full border-b border-slate-700/70 bg-slate-950/20 px-3 py-2"
+        dir="rtl"
+      >
+        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] text-slate-300">
+          <span>معاينة قبل الإرسال</span>
+          <span className="rounded-full bg-blue-500/10 px-2 py-0.5 font-semibold text-blue-200">
+            {files.length} / {maxFiles}
+          </span>
+        </div>
+        <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+          {files.map((file, index) => {
+            const isImage = file.mediaType?.startsWith('image/') && file.url;
+
+            return (
+              <button
+                aria-label={`معاينة ${getAttachmentLabel(file)}`}
+                className={cn(
+                  'group relative h-20 w-20 shrink-0 snap-start overflow-hidden rounded-xl border bg-slate-900 text-slate-300 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-300/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
+                  safePreviewIndex === index ? 'border-blue-400 ring-2 ring-blue-400/40' : 'border-slate-700/80',
+                )}
+                key={file.id}
+                onClick={() => setPreviewIndex(index)}
+                type="button"
+              >
+                {isImage ? (
+                  <img
+                    alt={getAttachmentLabel(file)}
+                    className="size-full object-cover"
+                    src={file.url}
+                  />
+                ) : (
+                  <div className="grid size-full place-items-center px-2 text-center text-[10px] leading-4">
+                    {getAttachmentLabel(file)}
+                  </div>
+                )}
+                <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+                  تكبير
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {previewFile && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md"
+          onClick={closePreview}
+          role="dialog"
+        >
+          <div
+            className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 shadow-2xl"
+            dir="rtl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{getAttachmentLabel(previewFile)}</p>
+                <p className="text-xs text-slate-400">قبل الإرسال</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  aria-label="حذف الصورة"
+                  className="rounded-xl text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                  onClick={removePreviewFile}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+                <Button
+                  aria-label="إغلاق المعاينة"
+                  className="rounded-xl"
+                  onClick={closePreview}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="relative grid min-h-[18rem] place-items-center bg-slate-900/80 p-3">
+              {previewFile.mediaType?.startsWith('image/') && previewFile.url ? (
+                <img
+                  alt={getAttachmentLabel(previewFile)}
+                  className="max-h-[68dvh] max-w-full rounded-xl object-contain"
+                  src={previewFile.url}
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 px-6 py-8 text-center text-slate-200">
+                  {getAttachmentLabel(previewFile)}
+                </div>
+              )}
+              {files.length > 1 && (
+                <>
+                  <Button
+                    aria-label="الصورة السابقة"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/70 text-white hover:bg-slate-900"
+                    onClick={showPrevious}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <ChevronRight className="size-5" />
+                  </Button>
+                  <Button
+                    aria-label="الصورة التالية"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/70 text-white hover:bg-slate-900"
+                    onClick={showNext}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ChatAttachmentControls() {
+  const attachments = usePromptInputAttachments();
+
+  return (
+    <div
+      className="m-2 flex h-11 items-center justify-end gap-1 self-end"
+      dir="ltr"
+      style={chatAttachmentControlsStyle}
+    >
+      <Button
+        aria-label="إرفاق صور المنتج"
+        className="size-10 rounded-2xl border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white"
+        onClick={attachments.openFileDialog}
+        size="icon-sm"
+        type="button"
+        variant="ghost"
+      >
+        <Plus className="size-5" />
+      </Button>
+      <span aria-hidden="true" className="h-7 w-px bg-slate-700/80" />
+      <Button
+        aria-label="الإملاء الصوتي"
+        className="size-10 rounded-2xl border border-white/10 bg-slate-900/50 text-slate-500"
+        disabled
+        size="icon-sm"
+        title="الإملاء الصوتي قريباً"
+        type="button"
+        variant="ghost"
+      >
+        <Mic className="size-5" />
+      </Button>
+    </div>
+  );
+}
+
+function ChatSubmitButton({ status }: { status: ChatStatus }) {
+  const isBusy = status === 'submitted' || status === 'streaming';
+
+  return (
+    <Button
+      aria-label={isBusy ? 'جار الإرسال' : 'إرسال'}
+      className="col-start-1 row-start-2 m-2 size-11 self-end rounded-2xl bg-sky-400 text-slate-950 shadow-lg shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
+      disabled={isBusy}
+      size="icon-sm"
+      style={chatSubmitButtonStyle}
+      type="submit"
+    >
+      {status === 'submitted' ? (
+        <Loader2 className="size-5 animate-spin" />
+      ) : status === 'streaming' ? (
+        <Square className="size-4" />
+      ) : (
+        <SendHorizontal className="size-5" />
+      )}
+    </Button>
+  );
+}
 
 const featuredListings: ListingCard[] = [];
 
@@ -1894,32 +2149,28 @@ export default function Page() {
                 }}
               >
                 <PromptInput
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
                   allowAttachments
+                  className="mx-auto max-w-[52rem]"
+                  dir="ltr"
+                  inputGroupClassName="items-end rounded-[1.65rem] border-slate-700/80 bg-slate-950/50 shadow-lg shadow-slate-950/10 transition-[border-color,box-shadow] duration-200 focus-within:border-blue-400/70 focus-within:shadow-blue-950/20"
+                  inputGroupStyle={chatInputGroupStyle}
                   maxFileSize={12 * 1024 * 1024}
-                  maxFiles={8}
+                  maxFiles={chatMaxAttachments}
                   multiple
                   onSubmit={handleSubmit}
                 >
-                  <PromptInputHeader>
-                    <PromptInputAttachments>
-                      {(attachment) => <PromptInputAttachment data={attachment} />}
-                    </PromptInputAttachments>
-                  </PromptInputHeader>
+                  <ChatAttachmentPreviewStrip maxFiles={chatMaxAttachments} />
+                  <ChatSubmitButton status={status} />
                   <PromptInputBody>
-                    <PromptInputTextarea className="max-h-28 min-h-12" placeholder="اكتب طلبك أو أرفق صور المنتج..." />
+                    <PromptInputTextarea
+                      className="col-start-2 row-start-2 max-h-36 min-h-14 resize-none px-1 py-4 text-right text-base leading-7 text-slate-100 placeholder:text-slate-400 sm:min-h-16"
+                      dir="rtl"
+                      placeholder="اكتب طلبك أو أرفق صور المنتج..."
+                      style={chatInputTextAreaStyle}
+                    />
                   </PromptInputBody>
-                  <PromptInputFooter>
-                    <PromptInputTools>
-                      <PromptInputActionMenu>
-                        <PromptInputActionMenuTrigger aria-label="إرفاق صورة" />
-                        <PromptInputActionMenuContent>
-                          <PromptInputActionAddAttachments label="إرفاق صور المنتج" />
-                        </PromptInputActionMenuContent>
-                      </PromptInputActionMenu>
-                    </PromptInputTools>
-                    <PromptInputSubmit status={status} />
-                  </PromptInputFooter>
+                  <ChatAttachmentControls />
                 </PromptInput>
               </div>
             </section>

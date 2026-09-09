@@ -55,6 +55,7 @@ import {
   Children,
   type ClipboardEventHandler,
   type ComponentProps,
+  type CSSProperties,
   createContext,
   type FormEvent,
   type FormEventHandler,
@@ -425,6 +426,8 @@ export type PromptInputProps = Omit<
   HTMLAttributes<HTMLFormElement>,
   "onSubmit" | "onError"
 > & {
+  inputGroupClassName?: string;
+  inputGroupStyle?: CSSProperties;
   accept?: string; // e.g., "image/*" or leave undefined for any
   multiple?: boolean;
   allowAttachments?: boolean;
@@ -447,6 +450,8 @@ export type PromptInputProps = Omit<
 
 export const PromptInput = ({
   className,
+  inputGroupClassName,
+  inputGroupStyle,
   accept,
   multiple,
   allowAttachments = false,
@@ -842,7 +847,12 @@ export const PromptInput = ({
         onSubmit={handleSubmit}
         {...props}
       >
-        <InputGroup className="overflow-hidden">{children}</InputGroup>
+        <InputGroup
+          className={cn("overflow-hidden", inputGroupClassName)}
+          style={inputGroupStyle}
+        >
+          {children}
+        </InputGroup>
       </form>
     </>
   );
