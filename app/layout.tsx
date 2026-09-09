@@ -81,7 +81,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
       </head>
-      <body className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
+      <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>

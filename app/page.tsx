@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import {
+  type CSSProperties,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
@@ -949,9 +950,11 @@ export default function Page() {
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const [assistantState, setAssistantState] =
     useState<AssistantState>('expanded');
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
+  const compactViewportRef = useRef<boolean | null>(null);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -986,6 +989,17 @@ export default function Page() {
     listingPagination.hasMore &&
     displayedMarketplaceListings.length > 0;
   const isAssistantExpanded = assistantState === 'expanded';
+  const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!isCompactViewport) {
+      return undefined;
+    }
+
+    return {
+      height: isAssistantExpanded ? '68dvh' : '14rem',
+      maxHeight: isAssistantExpanded ? '42rem' : 'none',
+      minHeight: isAssistantExpanded ? '26rem' : '0',
+    };
+  }, [isAssistantExpanded, isCompactViewport]);
 
   const collapseAssistant = useCallback(() => {
     setAssistantState('collapsed');
@@ -994,6 +1008,33 @@ export default function Page() {
   const expandAssistant = useCallback(() => {
     setAssistantState('expanded');
   }, []);
+
+  useEffect(() => {
+    const syncViewportMode = () => {
+      const isCompact = window.innerWidth < 1024;
+
+      setIsCompactViewport(isCompact);
+
+      if (compactViewportRef.current === isCompact) {
+        return;
+      }
+
+      compactViewportRef.current = isCompact;
+
+      if (isCompact) {
+        collapseAssistant();
+      } else {
+        expandAssistant();
+      }
+    };
+
+    syncViewportMode();
+    window.addEventListener('resize', syncViewportMode);
+
+    return () => {
+      window.removeEventListener('resize', syncViewportMode);
+    };
+  }, [collapseAssistant, expandAssistant]);
 
   const handleAssistantDragStart = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -1491,14 +1532,14 @@ export default function Page() {
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0">
         <section className="flex min-h-0 flex-col rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card lg:overflow-hidden">
-          <header className="flex h-14 items-center justify-between border-b bg-[#f7f9fc] px-4 dark:bg-background">
-            <div className="flex min-w-0 items-center gap-3">
+          <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
                 <img alt="SmartStore AI" className="size-8 object-cover" src="/smartstore-mark.png" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-sm font-bold">SmartStore AI</h1>
-                <p className="truncate text-[11px] text-muted-foreground">سوق ذكي للتسويق للمنتجات</p>
+                <h1 className="truncate text-xs font-bold sm:text-sm">SmartStore AI</h1>
+                <p className="max-w-[8rem] truncate text-[10px] text-muted-foreground sm:max-w-none sm:text-[11px]">سوق ذكي للتسويق للمنتجات</p>
               </div>
             </div>
 
@@ -1521,10 +1562,10 @@ export default function Page() {
               </Link>
             </nav>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" variant="ghost" aria-label="الإشعارات">
+                  <Button size="icon-sm" variant="ghost" aria-label="الإشعارات" className="hidden sm:inline-flex">
                     <Bell className="size-4" />
                   </Button>
                 </TooltipTrigger>
@@ -1636,11 +1677,8 @@ export default function Page() {
             </section>
 
             <section
-              className={`fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-[68dvh] min-h-[26rem] max-h-[42rem] transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:translate-y-0 lg:rounded-none lg:border-0 lg:shadow-none ${
-                isAssistantExpanded
-                  ? 'translate-y-0'
-                  : 'translate-y-[calc(100%-10.25rem)]'
-              }`}
+              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
+              style={assistantPanelStyle}
               onPointerDown={handleAssistantDragStart}
               onPointerUp={handleAssistantDragEnd}
               onTouchEnd={handleAssistantTouchEnd}

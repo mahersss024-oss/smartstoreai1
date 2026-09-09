@@ -729,24 +729,24 @@ export default function AccountPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex items-center gap-3">
+      <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
+        <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:gap-3 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md border bg-white dark:bg-background" href="/">
               <ArrowRight className="size-4" />
             </Link>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+            <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm sm:size-10">
+              <img alt="SmartStore AI" className="size-9 object-cover sm:size-10" src="/smartstore-mark.png" />
             </div>
-            <div>
-              <h1 className="text-base font-bold">حسابي في SmartStore AI</h1>
-              <p className="text-xs text-muted-foreground">بيانات العميل وإعلاناته الخاصة</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold sm:text-base">حسابي في SmartStore AI</h1>
+              <p className="truncate text-[11px] text-muted-foreground sm:text-xs">بيانات العميل وإعلاناته الخاصة</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <ThemeToggle language="ar" />
             {session.authenticated && (
-              <Button variant="outline" size="sm" className="rounded-md" onClick={handleLogout}>
+              <Button variant="outline" size="sm" className="rounded-md px-2 sm:px-3" onClick={handleLogout}>
                 <LogOut className="size-4" />
                 خروج
               </Button>
@@ -766,7 +766,7 @@ export default function AccountPage() {
                   هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل Google.
                 </p>
               </div>
-              <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
+              <Button asChild className="w-full max-w-sm justify-center rounded-md bg-blue-600 hover:bg-blue-700">
                 <a href="/api/auth/google/start">
                   <User className="size-4" />
                   دخول Google

@@ -137,8 +137,8 @@ export function MobileBottomNavigation() {
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-card/95 lg:hidden">
         <div
-          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-emerald-500 transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(${-indicatorIndex * 100}%)` }}
+          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-emerald-500 transition-[right] duration-300 ease-out"
+          style={{ right: `${indicatorIndex * (100 / 3)}%` }}
         />
         <div className="grid h-16 grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           {items.map((item) => {
