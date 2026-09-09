@@ -391,7 +391,7 @@ function ChatAttachmentControls() {
     >
       <Button
         aria-label="إرفاق صور المنتج"
-        className="size-10 rounded-2xl border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white"
+        className="size-10 rounded-2xl border border-border/80 bg-card text-primary shadow-sm hover:bg-accent hover:text-primary dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
         onClick={attachments.openFileDialog}
         size="icon-sm"
         type="button"
@@ -2140,7 +2140,7 @@ export default function Page() {
                   allowAttachments
                   className="mx-auto max-w-[52rem]"
                   dir="ltr"
-                  inputGroupClassName="items-end rounded-[1.65rem] border-slate-700/80 bg-slate-950/50 shadow-lg shadow-slate-950/10 transition-[border-color,box-shadow] duration-200 focus-within:border-blue-400/70 focus-within:shadow-blue-950/20"
+                  inputGroupClassName="items-end rounded-[1.65rem] border border-border/80 bg-card shadow-lg shadow-slate-200/70 transition-[border-color,box-shadow] duration-200 focus-within:border-primary/70 focus-within:shadow-primary/15 dark:border-slate-700/80 dark:bg-slate-950/50 dark:shadow-slate-950/10 dark:focus-within:border-blue-400/70 dark:focus-within:shadow-blue-950/20"
                   inputGroupStyle={chatInputGroupStyle}
                   maxFileSize={12 * 1024 * 1024}
                   maxFiles={chatMaxAttachments}
@@ -2151,7 +2151,7 @@ export default function Page() {
                   <ChatSubmitButton status={status} />
                   <PromptInputBody>
                     <PromptInputTextarea
-                      className="col-start-2 row-start-2 max-h-36 min-h-14 resize-none px-1 py-4 text-right text-base leading-7 text-slate-100 placeholder:text-slate-400 sm:min-h-16"
+                      className="col-start-2 row-start-2 max-h-36 min-h-14 resize-none px-1 py-4 text-right text-base leading-7 text-foreground placeholder:text-muted-foreground sm:min-h-16 dark:text-slate-100 dark:placeholder:text-slate-400"
                       dir="rtl"
                       placeholder="اكتب طلبك أو أرفق صور المنتج..."
                       style={chatInputTextAreaStyle}
