@@ -441,7 +441,7 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
 
   return {
     role: 'system',
-    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
+    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. If this request reaches an AI model, the user has already passed Google sign-in. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
   } satisfies ModelMessage;
 }
 
