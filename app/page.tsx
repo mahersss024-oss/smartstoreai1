@@ -1679,12 +1679,14 @@ export default function Page() {
             <section
               className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
               style={assistantPanelStyle}
-              onPointerDown={handleAssistantDragStart}
-              onPointerUp={handleAssistantDragEnd}
-              onTouchEnd={handleAssistantTouchEnd}
-              onTouchStart={handleAssistantTouchStart}
             >
-              <header className="shrink-0 border-b px-4 py-3">
+              <header
+                className="shrink-0 touch-none border-b px-4 py-3"
+                onPointerDown={handleAssistantDragStart}
+                onPointerUp={handleAssistantDragEnd}
+                onTouchEnd={handleAssistantTouchEnd}
+                onTouchStart={handleAssistantTouchStart}
+              >
                 <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
