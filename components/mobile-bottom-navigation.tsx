@@ -190,7 +190,7 @@ export function MobileBottomNavigation() {
         }`}
       >
         <div
-          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-emerald-500 transition-[right] duration-300 ease-out"
+          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
           style={{ right: `${indicatorIndex * (100 / 3)}%` }}
         />
         <div className="grid h-16 grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
@@ -205,7 +205,7 @@ export function MobileBottomNavigation() {
                 aria-current={active ? 'page' : undefined}
                 className={`relative grid min-w-0 place-items-center gap-1 rounded-2xl transition duration-200 active:scale-95 ${
                   active
-                    ? 'text-emerald-600 dark:text-emerald-300'
+                    ? 'text-blue-600 dark:text-blue-300'
                     : 'hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
                 onClick={() => {
@@ -219,14 +219,14 @@ export function MobileBottomNavigation() {
                 type="button"
               >
                 {item.primary ? (
-                  <span className="grid size-10 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 transition-transform duration-200">
+                  <span className="grid size-10 place-items-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/25 transition-transform duration-200">
                     <Icon className="size-5" />
                   </span>
                 ) : (
                   <span
                     className={`grid size-8 place-items-center rounded-full transition-colors ${
                       active
-                        ? 'bg-emerald-50 dark:bg-emerald-400/10'
+                        ? 'bg-blue-50 dark:bg-blue-400/10'
                         : 'bg-transparent'
                     }`}
                   >
