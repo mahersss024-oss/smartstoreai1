@@ -724,8 +724,8 @@ function getDefaultImageAnalysisRequest(language: AppLanguage) {
 
 function getModelProviderFailureResponse(language: AppLanguage) {
   return language === 'en'
-    ? 'The AI model is not available right now. Please review the model provider settings and try again.'
-    : 'تعذر تشغيل نموذج الذكاء الاصطناعي حاليًا. راجع إعدادات مزود النموذج ثم أعد المحاولة.';
+    ? 'SmartStore AI could not complete the request right now. Please try again in a few moments; no listing will be published or changed until the review succeeds.'
+    : 'تعذر إكمال الطلب الآن. أعد المحاولة بعد لحظات، ولن يتم نشر أو تعديل أي إعلان حتى تكتمل المراجعة بنجاح.';
 }
 
 function getImageComplianceBlockResponse(language: AppLanguage) {
@@ -742,8 +742,8 @@ function getImageComplianceReviewResponse(language: AppLanguage) {
 
 function getImageComplianceUnavailableResponse(language: AppLanguage) {
   return language === 'en'
-    ? 'I could not inspect the image right now. Send a clear JPG, PNG, or WEBP image again; listing or sale actions will wait until the image check succeeds.'
-    : 'تعذر فحص الصورة حاليًا. أعد إرسال صورة واضحة بصيغة JPG أو PNG أو WEBP، ولن أتابع أي إجراء نشر أو بيع حتى ينجح فحص الصورة.';
+    ? 'I received the image, but image review is temporarily unavailable. I will not publish, sell, or attach it to a listing until the review succeeds. Try again in a few moments.'
+    : 'وصلت الصورة، لكن فحص الصور متعذر مؤقتًا. لن أنشر الإعلان أو أضيف الصورة للإعلان حتى ينجح الفحص. أعد المحاولة بعد لحظات.';
 }
 
 function getImageUploadValidationResponse(
@@ -981,6 +981,10 @@ async function generateProfessionalChatIssueResponse(
   input: ChatIssueResponseInput,
 ) {
   const fallback = getChatIssueFallbackResponse(input);
+
+  if (input.kind === 'image_inspection_unavailable') {
+    return createTextUIResponse(fallback);
+  }
 
   try {
     const result = await generateText({
