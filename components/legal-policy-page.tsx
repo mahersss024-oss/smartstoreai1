@@ -119,7 +119,7 @@ export function LegalPolicyPage({
             للاستفسارات الرسمية أو مراجعة السياسات:
             {' '}
             <a
-              className="font-bold text-blue-700 underline dark:text-blue-300"
+              className="inline-flex h-9 items-center font-bold text-blue-700 underline dark:text-blue-300"
               href="mailto:mahersss024@gmail.com"
             >
               mahersss024@gmail.com

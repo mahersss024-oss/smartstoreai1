@@ -1894,19 +1894,19 @@ export default function Page() {
 
             <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
               <Sparkles className="size-4 text-blue-600" />
-              <button className="min-w-0 truncate text-start text-xs" type="button" onClick={() => sendStarter('أبحث عن منتج بمساعدة الذكاء الاصطناعي')}>
+              <button className="flex h-full min-w-0 flex-1 items-center truncate text-start text-xs" type="button" onClick={() => sendStarter('أبحث عن منتج بمساعدة الذكاء الاصطناعي')}>
                 اسأل مساعد SmartStore AI عن المنتج الذي تبحث عنه
               </button>
             </div>
 
             <nav className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground xl:flex">
-              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/terms">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/terms">
                 الشروط
               </Link>
-              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/listing-policy">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/listing-policy">
                 سياسة الإعلانات
               </Link>
-              <Link className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground" href="/commission-policy">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/commission-policy">
                 العمولة
               </Link>
             </nav>

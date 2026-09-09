@@ -93,13 +93,13 @@ export default function CommissionAgreementPage() {
                 أقر بأنني إذا أتممت عملية بيع منتج عن طريق SmartStore AI، فإنني أوافق على دفع عمولة مقدارها 1% من قيمة المنتج. لا تمنع هذه الخطوة التصفح أو السؤال، لكنها مطلوبة قبل إنشاء حساب وتنفيذ العمليات المرتبطة بالحساب.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                <Link className="rounded-md border px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms">
                   شروط الاستخدام
                 </Link>
-                <Link className="rounded-md border px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/commission-policy">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/commission-policy">
                   سياسة العمولة
                 </Link>
-                <Link className="rounded-md border px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/listing-policy">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/listing-policy">
                   سياسة الإعلانات
                 </Link>
               </div>
