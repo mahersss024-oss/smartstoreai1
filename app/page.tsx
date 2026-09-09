@@ -1259,10 +1259,10 @@ export default function Page() {
       : '68dvh';
 
     return {
-      bottom: isChatInputFocused
+      bottom: hasKeyboardOffset
         ? `calc(${keyboardOffset}px + env(safe-area-inset-bottom))`
         : 'calc(4.5rem + env(safe-area-inset-bottom))',
-      height: isAssistantExpanded ? expandedHeight : '14rem',
+      height: isAssistantExpanded ? expandedHeight : '17rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
       minHeight: isAssistantExpanded && !hasKeyboardOffset ? '26rem' : '0',
     };
@@ -1950,7 +1950,7 @@ export default function Page() {
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
                 isAssistantExpanded
                   ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
-                  : 'pb-[calc(15rem+env(safe-area-inset-bottom))] sm:pb-[calc(15rem+env(safe-area-inset-bottom))]'
+                  : 'pb-[calc(18rem+env(safe-area-inset-bottom))] sm:pb-[calc(18rem+env(safe-area-inset-bottom))]'
               }`}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
@@ -2018,7 +2018,7 @@ export default function Page() {
             </section>
 
             <section
-              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-56 translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
+              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-72 translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
               style={assistantPanelStyle}
             >
               <header
