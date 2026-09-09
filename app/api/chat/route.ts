@@ -1258,7 +1258,7 @@ export async function POST(request: Request) {
   }
 
   const modelMessages = normalizeModelMessageFileData(
-    convertToModelMessages(scopedMessages as UIMessage[]),
+    await convertToModelMessages(scopedMessages as UIMessage[]),
   );
   const uploadedImagesFromMessages =
     extractLatestUploadedListingImages(modelMessages);
