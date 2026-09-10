@@ -668,22 +668,13 @@ async function publishLatestReadyDraftFromConfirmation({
     const listings = await listSellerListings(session.user.id);
     const draft = listings.find(
       (listing) =>
-        listing.status === 'draft' &&
+        ['draft', 'paused', 'pending'].includes(listing.status) &&
         listing.compliance.decision === 'allow' &&
-        listing.title &&
-        listing.description &&
-        listing.price !== undefined &&
-        listing.city &&
-        listing.condition &&
         listing.images.some((image) => image.status === 'approved'),
     );
 
     if (!draft) {
-      return createTextUIResponse(
-        language === 'en'
-          ? 'I could not find a ready draft to publish. Please complete the listing details and approved product image first.'
-          : 'لم أجد مسودة جاهزة للنشر. أكمل بيانات الإعلان وصورة المنتج المعتمدة أولًا، ثم أرسل أمر النشر.',
-      );
+      return null;
     }
 
     const published = await setListingStatusForSeller(

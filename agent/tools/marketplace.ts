@@ -17,6 +17,7 @@ import {
   deleteListingImageForSeller,
   getListing,
   listMarketplaceListings,
+  listSellerListings,
   reportListing,
   setListingStatusForSeller,
   setPrimaryListingImageForSeller,
@@ -152,6 +153,7 @@ const updateListingDetailsInputSchema = listingDetailsInputSchema
   });
 
 type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
+type ListingStatusAction = 'published' | 'paused' | 'sold' | 'deleted';
 
 function normalizeListingDetailsInput(
   input: Partial<ListingDetailsInput>,
@@ -179,6 +181,44 @@ function normalizeListingDetailsInput(
       ...(brand ? { brand } : {}),
     },
   };
+}
+
+function getFallbackStatusesForAction(status: ListingStatusAction) {
+  if (status === 'published') {
+    return new Set(['draft', 'paused', 'pending']);
+  }
+
+  if (status === 'paused' || status === 'sold') {
+    return new Set(['published']);
+  }
+
+  return new Set(['draft', 'pending', 'paused', 'published', 'rejected']);
+}
+
+async function getCurrentSellerListingForStatusAction({
+  sellerId,
+  listingId,
+  status,
+}: {
+  sellerId: string;
+  listingId?: string;
+  status: ListingStatusAction;
+}) {
+  if (listingId) {
+    const listing = await getListing(listingId);
+    return listing && listing.sellerId === sellerId ? listing : null;
+  }
+
+  const allowedStatuses = getFallbackStatusesForAction(status);
+  const listings = await listSellerListings(sellerId);
+
+  return (
+    listings.find(
+      (listing) =>
+        allowedStatuses.has(listing.status) &&
+        listing.compliance.decision !== 'block',
+    ) ?? null
+  );
 }
 
 function buildImageReviewMessages(
@@ -607,9 +647,9 @@ export function createMarketplaceTools(
 
     setListingStatus: tool({
       description:
-        'Publish, pause, mark sold, or delete a seller-owned listing. Use only after explicit user confirmation for the selected listing.',
+        'Publish, pause, mark sold, or delete a seller-owned listing. Use only after explicit user confirmation for the selected listing. If the user clearly refers to the current draft or latest owned listing and no listingId is available, omit listingId so the tool can use the most recent matching seller listing.',
       inputSchema: z.object({
-        listingId: z.string().min(1),
+        listingId: z.string().min(1).optional(),
         status: z.enum(['published', 'paused', 'sold', 'deleted']),
       }),
       execute: async ({ listingId, status }) => {
@@ -617,8 +657,22 @@ export function createMarketplaceTools(
           return authRequired();
         }
 
-        const listing = await setListingStatusForSeller(
+        const targetListing = await getCurrentSellerListingForStatusAction({
+          sellerId: session.user.id,
           listingId,
+          status,
+        });
+
+        if (!targetListing) {
+          return {
+            status: 'not_found',
+            message:
+              'No matching seller listing was found for this confirmed action. If the seller has provided product details in this conversation but no saved draft exists, create the draft first, then retry the status action.',
+          };
+        }
+
+        const listing = await setListingStatusForSeller(
+          targetListing.id,
           session.user.id,
           status,
         );
