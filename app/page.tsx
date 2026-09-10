@@ -65,6 +65,10 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
+import {
+  getCanLoadMoreListings,
+  getDisplayedListings,
+} from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -1255,22 +1259,27 @@ export default function Page() {
     () => getLatestSearchToolOutput(filteredMessages),
     [filteredMessages],
   );
+  const searchToolListings = useMemo(() => {
+    if (!latestSearchToolOutput) {
+      return [];
+    }
+
+    return (latestSearchToolOutput.listings as ApiListingRecord[]).map(
+      listingRecordToCard,
+    );
+  }, [latestSearchToolOutput]);
+  const shouldPreferSearchToolListings = searchToolListings.length > 0;
   const displayedMarketplaceListings = useMemo(() => {
-    if (marketplaceListings.length > 0) {
-      return marketplaceListings;
-    }
-
-    if (latestSearchToolOutput) {
-      return (latestSearchToolOutput.listings as ApiListingRecord[]).map(
-        listingRecordToCard,
-      );
-    }
-
-    return marketplaceListings;
-  }, [latestSearchToolOutput, marketplaceListings]);
-  const canLoadMoreListings =
-    listingPagination.hasMore &&
-    displayedMarketplaceListings.length > 0;
+    return getDisplayedListings({
+      marketplaceListings,
+      searchToolListings,
+    });
+  }, [marketplaceListings, searchToolListings, shouldPreferSearchToolListings]);
+  const canLoadMoreListings = getCanLoadMoreListings({
+    hasMore: listingPagination.hasMore,
+    displayedCount: displayedMarketplaceListings.length,
+    hasSearchToolListings: shouldPreferSearchToolListings,
+  });
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isCompactViewport) {
