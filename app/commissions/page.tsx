@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -110,6 +110,10 @@ function formatStatus(status: CommissionRecord['status']) {
   return labels[status];
 }
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 export default function CommissionsPage() {
   const [session, setSession] = useState<AuthSessionPayload>({
     authenticated: false,
@@ -125,6 +129,7 @@ export default function CommissionsPage() {
   const [copiedPaymentValue, setCopiedPaymentValue] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const updateRequestKeysRef = useRef<Record<string, string>>({});
 
   const totalDue = useMemo(
     () =>
@@ -202,9 +207,18 @@ export default function CommissionsPage() {
         return;
       }
 
+      const requestKey =
+        updateRequestKeysRef.current[commissionId] ??
+        createClientIdempotencyKey('commission-update');
+      updateRequestKeysRef.current[commissionId] = requestKey;
+
+      try {
       const response = await fetch(`/api/marketplace/commissions/${commissionId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': requestKey,
+        },
         body: JSON.stringify({ productValue }),
       });
 
@@ -215,6 +229,9 @@ export default function CommissionsPage() {
 
       setAmounts((current) => ({ ...current, [commissionId]: '' }));
       await refreshCommissions();
+      } finally {
+      delete updateRequestKeysRef.current[commissionId];
+      }
     },
     [amounts, refreshCommissions],
   );

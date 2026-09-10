@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { createConversationForListing } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const createConversationSchema = z.object({
@@ -20,6 +22,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'conversation_create',
+    actorId: session.user.id,
+    maxRequests: 20,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   let payload: unknown;
 
   try {
@@ -37,26 +50,39 @@ export async function POST(request: Request) {
     );
   }
 
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'conversation_create',
+    actorKey: `${session.user.id}:${parsed.data.listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const result = await createConversationForListing(
     parsed.data.listingId,
     session.user,
   );
 
   if (result.status === 'not_found') {
-    return Response.json(
-      { error: 'listing_not_found_or_unavailable' },
-      { status: 404 },
-    );
+    const responseBody = { error: 'listing_not_found_or_unavailable' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 404)
+      : Response.json(responseBody, { status: 404 });
   }
 
   if (result.status === 'self_contact_blocked') {
-    return Response.json(
-      { error: 'self_contact_blocked' },
-      { status: 409 },
-    );
+    const responseBody = { error: 'self_contact_blocked' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
   }
 
-  return Response.json(result, {
-    status: result.status === 'created' ? 201 : 200,
-  });
+  const responseStatus = result.status === 'created' ? 201 : 200;
+
+  return idempotency
+    ? idempotency.complete(result, responseStatus)
+    : Response.json(result, { status: responseStatus });
 }

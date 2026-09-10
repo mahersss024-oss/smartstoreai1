@@ -295,6 +295,10 @@ function listingHasApprovedImage(listing: ListingCard) {
   return listing.images.some((image) => image.status === 'approved');
 }
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 function createEditFormFromListing(listing: ListingCard): ListingEditForm {
   return {
     title: listing.title,
@@ -436,7 +440,10 @@ export default function AccountPage() {
 
       void fetch(`/api/marketplace/listings/${listing.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': createClientIdempotencyKey(`listing-${action}`),
+        },
         body: JSON.stringify({ action }),
       }).then(async (response) => {
         const payload = (await response.json().catch(() => null)) as {
@@ -527,7 +534,10 @@ export default function AccountPage() {
 
         const response = await fetch(`/api/marketplace/listings/${listing.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('listing-update'),
+          },
           body: JSON.stringify(payload),
         });
 
@@ -629,6 +639,9 @@ export default function AccountPage() {
           `/api/marketplace/listings/${listing.id}/images`,
           {
             method: 'POST',
+            headers: {
+              'Idempotency-Key': createClientIdempotencyKey('listing-image-upload'),
+            },
             body: formData,
           },
         );
@@ -687,7 +700,10 @@ export default function AccountPage() {
           `/api/marketplace/listings/${listing.id}/images/${image.id}`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': createClientIdempotencyKey('listing-image-primary'),
+            },
             body: JSON.stringify({ action: 'set_primary' }),
           },
         );
@@ -721,7 +737,12 @@ export default function AccountPage() {
       try {
         const response = await fetch(
           `/api/marketplace/listings/${listing.id}/images/${image.id}`,
-          { method: 'DELETE' },
+          {
+            method: 'DELETE',
+            headers: {
+              'Idempotency-Key': createClientIdempotencyKey('listing-image-delete'),
+            },
+          },
         );
 
         if (response.status === 401) {

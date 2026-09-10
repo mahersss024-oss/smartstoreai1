@@ -18,6 +18,10 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Textarea } from '@ui/textarea';
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 type AuthUser = {
   id: string;
   email: string;
@@ -182,7 +186,10 @@ export default function ConversationPage() {
           `/api/marketplace/conversations/${conversationId}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': createClientIdempotencyKey('message-send'),
+            },
             body: JSON.stringify({ body: draft }),
           },
         );

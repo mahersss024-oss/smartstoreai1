@@ -6,6 +6,10 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 export function ListingSafetyActions({ listingId }: { listingId: string }) {
   const router = useRouter();
   const [notice, setNotice] = useState('');
@@ -19,7 +23,12 @@ export function ListingSafetyActions({ listingId }: { listingId: string }) {
     try {
       const response = await fetch(
         `/api/marketplace/listings/${listingId}/favorite`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: {
+            'Idempotency-Key': createClientIdempotencyKey('favorite-toggle'),
+          },
+        },
       );
 
       if (response.status === 401) {
@@ -57,7 +66,10 @@ export function ListingSafetyActions({ listingId }: { listingId: string }) {
         `/api/marketplace/listings/${listingId}/reports`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('listing-report'),
+          },
           body: JSON.stringify({
             reason: 'prohibited_item',
             details: 'بلاغ من صفحة تفاصيل الإعلان.',

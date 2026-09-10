@@ -1,24 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MessageCircle, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 export function ListingContactActions({ listingId }: { listingId: string }) {
   const router = useRouter();
+  const requestKeyRef = useRef<string | null>(null);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const openConversation = async () => {
+    if (isLoading || requestKeyRef.current) {
+      return;
+    }
+
+    requestKeyRef.current = createClientIdempotencyKey('conversation');
     setIsLoading(true);
     setMessage('');
 
     try {
       const response = await fetch('/api/marketplace/conversations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': requestKeyRef.current,
+        },
         body: JSON.stringify({ listingId }),
       });
 
@@ -48,6 +61,7 @@ export function ListingContactActions({ listingId }: { listingId: string }) {
 
       setMessage('تم فتح محادثة داخلية بخصوص الإعلان.');
     } finally {
+      requestKeyRef.current = null;
       setIsLoading(false);
     }
   };

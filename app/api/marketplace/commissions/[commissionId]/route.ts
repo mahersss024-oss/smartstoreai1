@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { updateCommissionSaleAmountForSeller } from '@/agent/marketplace/repository';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 
 const updateCommissionSchema = z.object({
@@ -26,6 +28,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'commission_update',
+    actorId: session.user.id,
+    maxRequests: 20,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   let payload: unknown;
 
   try {
@@ -44,6 +57,15 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { commissionId } = await context.params;
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'commission_update',
+    actorKey: `${session.user.id}:${commissionId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const result = await updateCommissionSaleAmountForSeller(
     commissionId,
     session.user.id,
@@ -51,15 +73,23 @@ export async function PATCH(request: Request, context: RouteContext) {
   );
 
   if (result.status === 'not_found') {
-    return Response.json({ error: 'commission_not_found' }, { status: 404 });
+    const responseBody = { error: 'commission_not_found' };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 404)
+      : Response.json(responseBody, { status: 404 });
   }
 
   if (result.status === 'locked') {
-    return Response.json(
-      { error: 'commission_locked', commission: result.commission },
-      { status: 409 },
-    );
+    const responseBody = {
+      error: 'commission_locked',
+      commission: result.commission,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
   }
 
-  return Response.json(result);
+  return idempotency ? idempotency.complete(result) : Response.json(result);
 }

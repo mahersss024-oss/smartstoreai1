@@ -1148,6 +1148,10 @@ function getChatErrorMessage(error: Error | undefined) {
   return chatServiceUnavailableMessage;
 }
 
+function createClientIdempotencyKey(scope: string) {
+  return `${scope}:${crypto.randomUUID()}`;
+}
+
 const guardedChatFetch: typeof fetch = async (input, init) => {
   const response = await fetch(input, init);
   const contentType = response.headers.get('content-type') ?? '';
@@ -1828,6 +1832,9 @@ export default function Page() {
 
       void fetch(`/api/marketplace/listings/${listing.id}/favorite`, {
         method: 'POST',
+        headers: {
+          'Idempotency-Key': createClientIdempotencyKey('favorite-toggle'),
+        },
       }).then((response) => {
         if (response.status === 401) {
           router.push('/api/auth/google/start');
