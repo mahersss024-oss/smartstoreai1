@@ -14,12 +14,18 @@ export function createChatAgent(
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
     searchOwnerKey?: string;
+    additionalInstructions?: string;
   } = {},
 ) {
   return new ToolLoopAgent({
     model: getDeepseekChatModel(options.hasVisionInput ? 'vision' : 'chat'),
     instructions:
-      appConfig.agent.instructions + marketplaceSystemInstructions + systemPrompt,
+      appConfig.agent.instructions +
+      marketplaceSystemInstructions +
+      systemPrompt +
+      (options.additionalInstructions
+        ? `\n\n${options.additionalInstructions}`
+        : ''),
     tools: {
       ...createMarketplaceTools(session, {
         latestUploadedImages: options.latestUploadedImages,

@@ -567,15 +567,10 @@ async function generateImageComplianceText(imageMessage: ModelMessage) {
       const result = await withTimeout(imageComplianceTimeoutMs, (signal) =>
         generateText({
           model: getDeepseekChatModel('vision'),
+          instructions: imageComplianceSystemPrompt,
           maxOutputTokens: 520,
           abortSignal: signal,
-          messages: [
-            {
-              role: 'system',
-              content: imageComplianceSystemPrompt,
-            },
-            imageMessage,
-          ],
+          messages: [imageMessage],
         }),
       );
 

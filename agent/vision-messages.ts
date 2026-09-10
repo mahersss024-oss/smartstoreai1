@@ -24,7 +24,7 @@ function tryCreateUrl(value: string) {
   try {
     const url = new URL(value);
 
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
+    return ['data:', 'http:', 'https:'].includes(url.protocol) ? url : null;
   } catch {
     return null;
   }
@@ -45,6 +45,46 @@ export function dataUrlToBytes(value: string) {
 
 function normalizeFilePartData(part: ModelFilePart) {
   if (typeof part.data !== 'string') {
+    if (part.data instanceof URL) {
+      const value = part.data.toString();
+      const dataUrl = dataUrlToBytes(value);
+
+      return dataUrl
+        ? { ...part, mediaType: dataUrl.mediaType || part.mediaType, data: dataUrl.data }
+        : part;
+    }
+
+    if (
+      typeof part.data === 'object' &&
+      part.data !== null &&
+      'url' in part.data
+    ) {
+      const urlValue = (part.data as { url?: unknown }).url;
+      const value =
+        urlValue instanceof URL
+          ? urlValue.toString()
+          : typeof urlValue === 'string'
+            ? urlValue
+            : null;
+
+      if (value) {
+        const dataUrl = dataUrlToBytes(value);
+        const url = tryCreateUrl(value);
+
+        if (dataUrl) {
+          return {
+            ...part,
+            mediaType: dataUrl.mediaType || part.mediaType,
+            data: dataUrl.data,
+          };
+        }
+
+        if (url && (url.protocol === 'http:' || url.protocol === 'https:')) {
+          return { ...part, data: url };
+        }
+      }
+    }
+
     return part;
   }
 

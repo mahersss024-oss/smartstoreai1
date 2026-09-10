@@ -45,6 +45,32 @@ test('normalizes model file parts from data URLs and hosted URLs', () => {
   assert.ok(hostedUrlPart.data instanceof URL);
 });
 
+test('normalizes AI SDK URL file objects from chat attachments', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: {
+            type: 'url',
+            url: new URL('data:image/png;base64,AAE='),
+          },
+        },
+      ],
+    },
+  ];
+
+  const [message] = normalizeModelMessageFileData(messages);
+  const content = Array.isArray(message.content) ? message.content : [];
+  const dataUrlPart = content[0] as { data: unknown; mediaType: string };
+
+  assert.equal(dataUrlPart.mediaType, 'image/png');
+  assert.ok(dataUrlPart.data instanceof Uint8Array);
+  assert.deepEqual([...(dataUrlPart.data as Uint8Array)], [0, 1]);
+});
+
 test('strips image file parts before text-only chat model calls', () => {
   const messages: ModelMessage[] = [
     {
