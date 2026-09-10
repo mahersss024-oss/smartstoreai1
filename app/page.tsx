@@ -1221,6 +1221,7 @@ export default function Page() {
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
+  const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const listingsRequestIdRef = useRef(0);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
@@ -1294,6 +1295,18 @@ export default function Page() {
   }, []);
 
   const handleChatInputFocus = useCallback(() => {
+    const visualViewport = window.visualViewport;
+    const viewportHeight = Math.max(
+      window.innerHeight,
+      visualViewport
+        ? visualViewport.height + visualViewport.offsetTop
+        : window.innerHeight,
+    );
+
+    keyboardBaselineViewportHeightRef.current = Math.max(
+      keyboardBaselineViewportHeightRef.current ?? 0,
+      viewportHeight,
+    );
     setIsChatInputFocused(true);
     expandAssistant();
   }, [expandAssistant]);
@@ -1322,6 +1335,7 @@ export default function Page() {
 
         setIsChatInputFocused(false);
         setKeyboardOffset(0);
+        keyboardBaselineViewportHeightRef.current = null;
       }, 80);
     },
     [],
@@ -1340,16 +1354,19 @@ export default function Page() {
         return;
       }
 
-      setKeyboardOffset(
-        Math.max(
-          0,
-          Math.round(
-            window.innerHeight -
-              visualViewport.height -
-              visualViewport.offsetTop,
-          ),
-        ),
+      const viewportBottom = visualViewport.height + visualViewport.offsetTop;
+      const baselineViewportHeight = Math.max(
+        keyboardBaselineViewportHeightRef.current ?? 0,
+        window.innerHeight,
+        viewportBottom,
       );
+      keyboardBaselineViewportHeightRef.current = baselineViewportHeight;
+      const nextKeyboardOffset = Math.max(
+        0,
+        Math.round(baselineViewportHeight - viewportBottom),
+      );
+
+      setKeyboardOffset(nextKeyboardOffset > 80 ? nextKeyboardOffset : 0);
     };
 
     syncKeyboardOffset();
