@@ -6,6 +6,11 @@ import { appConfig } from '@/app/app-config';
 
 export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
 
+const defaultDeepseekMaxConcurrentRequests = 64;
+const defaultDeepseekQueueTimeoutMs = 15_000;
+const deepseekSlotQueue: Array<() => void> = [];
+let activeDeepseekRequests = 0;
+
 const profileEnvironmentKeys = {
   chat: 'DEEPSEEK_CHAT_MODEL',
   scope: 'DEEPSEEK_SCOPE_MODEL',
@@ -120,6 +125,105 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function getDeepseekMaxConcurrentRequests() {
+  const configuredValue = Number.parseInt(
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS ?? '',
+    10,
+  );
+
+  if (!Number.isFinite(configuredValue) || configuredValue <= 0) {
+    return defaultDeepseekMaxConcurrentRequests;
+  }
+
+  return Math.min(512, Math.max(1, configuredValue));
+}
+
+export function getDeepseekQueueTimeoutMs() {
+  const configuredValue = Number.parseInt(
+    process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS ?? '',
+    10,
+  );
+
+  if (!Number.isFinite(configuredValue) || configuredValue <= 0) {
+    return defaultDeepseekQueueTimeoutMs;
+  }
+
+  return Math.min(60_000, Math.max(1_000, configuredValue));
+}
+
+function removeQueuedSlot(waiter: () => void) {
+  const index = deepseekSlotQueue.indexOf(waiter);
+
+  if (index >= 0) {
+    deepseekSlotQueue.splice(index, 1);
+  }
+}
+
+function releaseDeepseekSlot() {
+  activeDeepseekRequests = Math.max(0, activeDeepseekRequests - 1);
+
+  queueMicrotask(() => {
+    const maxConcurrentRequests = getDeepseekMaxConcurrentRequests();
+
+    while (
+      activeDeepseekRequests < maxConcurrentRequests &&
+      deepseekSlotQueue.length > 0
+    ) {
+      const next = deepseekSlotQueue.shift();
+
+      if (next) {
+        next();
+      }
+    }
+  });
+}
+
+function acquireDeepseekSlot(signal?: AbortSignal | null) {
+  if (signal?.aborted) {
+    throw new DOMException('DeepSeek request aborted.', 'AbortError');
+  }
+
+  if (activeDeepseekRequests < getDeepseekMaxConcurrentRequests()) {
+    activeDeepseekRequests += 1;
+    return Promise.resolve(releaseDeepseekSlot);
+  }
+
+  return new Promise<() => void>((resolve, reject) => {
+    const onAbort = () => {
+      removeQueuedSlot(waiter);
+      clearTimeout(timeout);
+      reject(new DOMException('DeepSeek request aborted.', 'AbortError'));
+    };
+    const waiter = () => {
+      signal?.removeEventListener('abort', onAbort);
+      clearTimeout(timeout);
+      activeDeepseekRequests += 1;
+      resolve(releaseDeepseekSlot);
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      removeQueuedSlot(waiter);
+      reject(new DOMException('DeepSeek request queue timed out.', 'AbortError'));
+    }, getDeepseekQueueTimeoutMs());
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    deepseekSlotQueue.push(waiter);
+  });
+}
+
+async function fetchDeepseekWithConcurrencyLimit(
+  input: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+) {
+  const release = await acquireDeepseekSlot(init?.signal);
+
+  try {
+    return await fetch(input, init);
+  } finally {
+    release();
+  }
+}
+
 export async function fetchDeepseekWithRetry(
   input: Parameters<typeof fetch>[0],
   init: Parameters<typeof fetch>[1],
@@ -129,7 +233,7 @@ export async function fetchDeepseekWithRetry(
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const response = await fetch(input, init);
+      const response = await fetchDeepseekWithConcurrencyLimit(input, init);
 
       if (
         !isTransientDeepseekResponse(response.status) ||

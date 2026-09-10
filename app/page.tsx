@@ -157,6 +157,8 @@ type RetainedListingImage = Pick<
 >;
 
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
+const chatRateLimitMessage =
+  'الضغط مرتفع الآن على مساعد SmartStore AI. انتظر لحظات ثم أعد إرسال الطلب.';
 const locationSettings: LocationSettings = {
   country: 'SA',
   currency: 'SAR',
@@ -1145,6 +1147,10 @@ function getChatErrorMessage(error: Error | undefined) {
     return 'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
   }
 
+  if (error.message === chatRateLimitMessage) {
+    return chatRateLimitMessage;
+  }
+
   return chatServiceUnavailableMessage;
 }
 
@@ -1167,6 +1173,10 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
 
     if (contentType.includes('text/html') || isRawServiceErrorResponse(text)) {
       throw new Error(chatServiceUnavailableMessage);
+    }
+
+    if (response.status === 429) {
+      throw new Error(chatRateLimitMessage);
     }
 
     throw new Error(chatServiceUnavailableMessage);

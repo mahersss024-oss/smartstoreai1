@@ -7,7 +7,9 @@ import test from 'node:test';
 import {
   fetchDeepseekWithRetry,
   getDeepseekApiKey,
+  getDeepseekMaxConcurrentRequests,
   getDeepseekModelName,
+  getDeepseekQueueTimeoutMs,
   isTransientDeepseekResponse,
   normalizeDeepseekChatBody,
 } from '@/agent/deepseek-provider';
@@ -20,6 +22,8 @@ const modelEnvKeys = [
   'DEEPSEEK_SCOPE_MODEL',
   'DEEPSEEK_MODERATION_MODEL',
   'DEEPSEEK_VISION_MODEL',
+  'SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS',
+  'SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS',
 ] as const;
 
 function withModelEnvironment(
@@ -164,5 +168,88 @@ test('retries transient DeepSeek fetch responses', async () => {
     assert.equal(calls, 2);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('limits concurrent DeepSeek fetch attempts', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  let inFlight = 0;
+  let maxInFlight = 0;
+
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '2';
+    globalThis.fetch = (async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      inFlight -= 1;
+
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    await Promise.all(
+      Array.from({ length: 8 }, () =>
+        fetchDeepseekWithRetry('https://api.deepseek.test', {
+          method: 'POST',
+        }),
+      ),
+    );
+
+    assert.equal(getDeepseekMaxConcurrentRequests(), 2);
+    assert.equal(maxInFlight <= 2, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+
+    if (previousLimit === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+    }
+  }
+});
+
+test('times out queued DeepSeek requests before they hang', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  const previousTimeout = process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS;
+
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS = '1000';
+    globalThis.fetch = (async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    const firstRequest = fetchDeepseekWithRetry('https://api.deepseek.test', {
+      method: 'POST',
+    });
+    const secondRequest = fetchDeepseekWithRetry(
+      'https://api.deepseek.test',
+      { method: 'POST' },
+      1,
+    );
+
+    await assert.rejects(secondRequest, { name: 'AbortError' });
+    await firstRequest;
+
+    assert.equal(getDeepseekQueueTimeoutMs(), 1000);
+  } finally {
+    globalThis.fetch = originalFetch;
+
+    if (previousLimit === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+    }
+
+    if (previousTimeout === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS = previousTimeout;
+    }
   }
 });
