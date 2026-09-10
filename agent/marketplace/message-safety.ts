@@ -5,16 +5,23 @@ export type ConversationMessageSafetyDecision = {
   reasons: string[];
 };
 
-const externalContactPatterns = [
-  /(?:05|5)\d{8}/,
-  /\+\s*966\s*5\d{8}/,
+const offPlatformContactPatterns = [
   /(?:واتساب|واتس|whatsapp|telegram|تليجرام|سناب|snapchat)/i,
   /(?:اتصل|كلم|راسلني).{0,24}(?:رقمي|جوالي|خاص|خارج التطبيق)/i,
-  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+  /(?:خارج المنصة|خارج التطبيق|برا التطبيق|بعيد عن التطبيق)/i,
+];
+
+const directContactDetailsPatterns = [
+  /(?:05|5)\d{8}/,
+  /\+\s*966\s*5\d{8}/,
+  /\b[^@\s]+@[^@\s]+\.[A-Za-z]{2,}\b/,
+];
+
+const inspectionCoordinationPatterns = [
+  /(?:معاينة|فحص|تجربة|موعد|نتقابل|مكان عام|inspection|meeting|viewing)/i,
 ];
 
 const externalDealPatterns = [
-  /(?:خارج المنصة|خارج التطبيق|برا التطبيق|بعيد عن التطبيق)/i,
   /(?:تحويل|حوالة|دفعة|عربون).{0,40}(?:قبل المعاينة|خارج|واتساب|رقم|حساب)/i,
   /(?:iban|حساب بنكي|بطاقة ائتمان|credit card)/i,
 ];
@@ -22,23 +29,35 @@ const externalDealPatterns = [
 export function evaluateConversationMessageSafety(
   body: string,
 ): ConversationMessageSafetyDecision {
-  const reasons: string[] = [];
+  const reasons = new Set<string>();
   const forbiddenTermsDecision = evaluateForbiddenMarketplaceTerms(body);
+  const hasInspectionIntent = inspectionCoordinationPatterns.some((pattern) =>
+    pattern.test(body),
+  );
 
-  if (externalContactPatterns.some((pattern) => pattern.test(body))) {
-    reasons.push('external_contact_attempt');
+  if (offPlatformContactPatterns.some((pattern) => pattern.test(body))) {
+    reasons.add('external_contact_attempt');
+  }
+
+  if (
+    directContactDetailsPatterns.some((pattern) => pattern.test(body)) &&
+    !hasInspectionIntent
+  ) {
+    reasons.add('external_contact_attempt');
   }
 
   if (externalDealPatterns.some((pattern) => pattern.test(body))) {
-    reasons.push('external_deal_or_payment_attempt');
+    reasons.add('external_deal_or_payment_attempt');
   }
 
   if (forbiddenTermsDecision.decision !== 'allow') {
-    reasons.push('forbidden_or_regulated_marketplace_terms');
+    reasons.add('forbidden_or_regulated_marketplace_terms');
   }
 
+  const resolvedReasons = [...reasons];
+
   return {
-    decision: reasons.length ? 'block' : 'allow',
-    reasons,
+    decision: resolvedReasons.length ? 'block' : 'allow',
+    reasons: resolvedReasons,
   };
 }

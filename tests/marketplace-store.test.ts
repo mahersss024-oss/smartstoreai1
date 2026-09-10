@@ -247,6 +247,25 @@ test('blocks conversation messages that move contact outside the platform', () =
   assert.equal(blocked.message?.reasons.includes('external_contact_attempt'), true);
 });
 
+test('allows sharing direct contact for inspection coordination', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:messages-3',
+    category: 'cars',
+    title: 'سيارة نظيفة للبيع',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:messages-3');
+  const sent = addConversationMessage(
+    opened.conversation?.id ?? '',
+    'buyer:messages-3',
+    'ممكن موعد معاينة اليوم مساءً وهذا رقمي 0501234567',
+  );
+
+  assert.equal(sent.status, 'sent');
+  assert.equal(sent.message?.status, 'sent');
+});
+
 test('toggles favorite listings and updates the listing favorite count', () => {
   const listing = createListingDraft({
     sellerId: 'seller:favorites-1',

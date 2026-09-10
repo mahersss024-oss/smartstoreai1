@@ -71,6 +71,30 @@ type ConversationRecord = {
 const missingListingImageDataUrl =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22900%22 height=%22675%22 viewBox=%220 0 900 675%22%3E%3Crect width=%22900%22 height=%22675%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M382 291h136a28 28 0 0 1 28 28v95a28 28 0 0 1-28 28H382a28 28 0 0 1-28-28v-95a28 28 0 0 1 28-28z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22/%3E%3Ccircle cx=%22417%22 cy=%22342%22 r=%2220%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m382 414 53-55 43 43 25-27 43 39%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22450%22 y=%22492%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
 
+const conversationRefreshIntervalMs = 3000;
+
+function pickLatestConversation(
+  current: ConversationRecord | null,
+  incoming: ConversationRecord,
+) {
+  if (current?.id !== incoming.id) {
+    return incoming;
+  }
+
+  const currentTimestamp = Date.parse(current.updatedAt);
+  const incomingTimestamp = Date.parse(incoming.updatedAt);
+
+  if (
+    Number.isFinite(currentTimestamp) &&
+    Number.isFinite(incomingTimestamp) &&
+    incomingTimestamp < currentTimestamp
+  ) {
+    return current;
+  }
+
+  return incoming;
+}
+
 function formatPrice(price: ConversationListing['price']) {
   if (typeof price === 'number') {
     return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
@@ -130,14 +154,26 @@ export default function ConversationPage() {
     [conversation?.messages],
   );
 
-  const refreshConversation = useCallback(async () => {
-    setIsLoading(true);
-    setNotice('');
+  const refreshConversation = useCallback(async (
+    options?: { showLoading?: boolean; clearNotice?: boolean },
+  ) => {
+    const showLoading = options?.showLoading ?? true;
+    const clearNotice = options?.clearNotice ?? true;
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
+    if (clearNotice) {
+      setNotice('');
+    }
 
     try {
       const [sessionResponse, conversationResponse] = await Promise.all([
-        fetch('/api/auth/session'),
-        fetch(`/api/marketplace/conversations/${conversationId}`),
+        fetch('/api/auth/session', { cache: 'no-store' }),
+        fetch(`/api/marketplace/conversations/${conversationId}`, {
+          cache: 'no-store',
+        }),
       ]);
 
       const nextSession =
@@ -158,9 +194,13 @@ export default function ConversationPage() {
       const payload = (await conversationResponse.json()) as {
         conversation: ConversationRecord;
       };
-      setConversation(payload.conversation);
+      setConversation((currentConversation) =>
+        pickLatestConversation(currentConversation, payload.conversation),
+      );
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, [conversationId, router]);
 
@@ -168,6 +208,14 @@ export default function ConversationPage() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
     void refreshConversation();
+
+    const intervalId = window.setInterval(() => {
+      void refreshConversation({ showLoading: false, clearNotice: false });
+    }, conversationRefreshIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, [refreshConversation]);
 
   const sendConversationMessage = useCallback(
@@ -205,10 +253,15 @@ export default function ConversationPage() {
 
         if (response.status === 422) {
           setNotice(
-            'لم يتم إرسال الرسالة. أبقِ التواصل والدفع داخل SmartStore AI.',
+            'تم حظر الرسالة. استخدم الشات لترتيب المعاينة وتجنب مشاركة طرق دفع أو تحويل خارج المنصة.',
           );
           if (payload.conversation) {
-            setConversation(payload.conversation);
+            setConversation((currentConversation) =>
+              pickLatestConversation(
+                currentConversation,
+                payload.conversation as ConversationRecord,
+              ),
+            );
           }
           return;
         }
@@ -219,12 +272,18 @@ export default function ConversationPage() {
         }
 
         setDraft('');
-        setConversation(payload.conversation);
+        setConversation((currentConversation) =>
+          pickLatestConversation(
+            currentConversation,
+            payload.conversation as ConversationRecord,
+          ),
+        );
+        void refreshConversation({ showLoading: false, clearNotice: false });
       } finally {
         setIsSending(false);
       }
     },
-    [conversationId, draft, isSending, router],
+    [conversationId, draft, isSending, refreshConversation, router],
   );
 
   return (
@@ -334,7 +393,7 @@ export default function ConversationPage() {
             <form className="grid gap-2 border-t p-3" onSubmit={sendConversationMessage}>
               <Textarea
                 className="min-h-20 resize-none"
-                disabled={!conversation || conversation.status !== 'open'}
+                disabled={conversation?.status !== 'open'}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}
