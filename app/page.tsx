@@ -1132,6 +1132,22 @@ function AssistantMessageFrame({ children }: { children: ReactNode }) {
   );
 }
 
+function getChatErrorMessage(error: Error | undefined) {
+  if (!error) {
+    return null;
+  }
+
+  if (
+    error.message === 'Load failed' ||
+    error.message === 'Failed to fetch' ||
+    error.message === 'NetworkError when attempting to fetch resource.'
+  ) {
+    return 'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
+  }
+
+  return chatServiceUnavailableMessage;
+}
+
 const guardedChatFetch: typeof fetch = async (input, init) => {
   const response = await fetch(input, init);
   const contentType = response.headers.get('content-type') ?? '';
@@ -1208,6 +1224,7 @@ export default function Page() {
     [messages],
   );
   const isLoading = status === 'streaming' || status === 'submitted';
+  const chatErrorMessage = getChatErrorMessage(error);
   const scrollWatchKey = useMemo(() => {
     const lastMessage = filteredMessages.at(-1);
     const lastTextLength =
@@ -2112,9 +2129,9 @@ export default function Page() {
                             </AssistantMessageFrame>
                           </Message>
                         )}
-                        {error && (
+                        {chatErrorMessage && (
                           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                            {error.message}
+                            {chatErrorMessage}
                           </div>
                         )}
                       </>
