@@ -11,6 +11,28 @@ const defaultDeepseekQueueTimeoutMs = 15_000;
 const deepseekSlotQueue: Array<() => void> = [];
 let activeDeepseekRequests = 0;
 
+export type DeepseekProviderMetrics = {
+  attempts: number;
+  completed: number;
+  fetchErrors: number;
+  transientResponses: number;
+  maxActiveRequests: number;
+  statusCounts: Record<string, number>;
+  queueWaitMs: number[];
+  providerFetchMs: number[];
+};
+
+const deepseekProviderMetrics: DeepseekProviderMetrics = {
+  attempts: 0,
+  completed: 0,
+  fetchErrors: 0,
+  transientResponses: 0,
+  maxActiveRequests: 0,
+  statusCounts: {},
+  queueWaitMs: [],
+  providerFetchMs: [],
+};
+
 const profileEnvironmentKeys = {
   chat: 'DEEPSEEK_CHAT_MODEL',
   scope: 'DEEPSEEK_SCOPE_MODEL',
@@ -125,6 +147,50 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function shouldCollectDeepseekProviderMetrics() {
+  return process.env.SMARTSTORE_DEEPSEEK_METRICS === '1';
+}
+
+function recordMetricSample(target: number[], value: number) {
+  if (shouldCollectDeepseekProviderMetrics()) {
+    target.push(Math.round(value));
+  }
+}
+
+function recordStatusMetric(status: number) {
+  if (!shouldCollectDeepseekProviderMetrics()) {
+    return;
+  }
+
+  const key = String(status);
+  deepseekProviderMetrics.statusCounts[key] =
+    (deepseekProviderMetrics.statusCounts[key] ?? 0) + 1;
+
+  if (isTransientDeepseekResponse(status)) {
+    deepseekProviderMetrics.transientResponses += 1;
+  }
+}
+
+export function resetDeepseekProviderMetrics() {
+  deepseekProviderMetrics.attempts = 0;
+  deepseekProviderMetrics.completed = 0;
+  deepseekProviderMetrics.fetchErrors = 0;
+  deepseekProviderMetrics.transientResponses = 0;
+  deepseekProviderMetrics.maxActiveRequests = 0;
+  deepseekProviderMetrics.statusCounts = {};
+  deepseekProviderMetrics.queueWaitMs = [];
+  deepseekProviderMetrics.providerFetchMs = [];
+}
+
+export function getDeepseekProviderMetrics() {
+  return {
+    ...deepseekProviderMetrics,
+    statusCounts: { ...deepseekProviderMetrics.statusCounts },
+    queueWaitMs: [...deepseekProviderMetrics.queueWaitMs],
+    providerFetchMs: [...deepseekProviderMetrics.providerFetchMs],
+  } satisfies DeepseekProviderMetrics;
+}
+
 export function getDeepseekMaxConcurrentRequests() {
   const configuredValue = Number.parseInt(
     process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS ?? '',
@@ -185,6 +251,10 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
 
   if (activeDeepseekRequests < getDeepseekMaxConcurrentRequests()) {
     activeDeepseekRequests += 1;
+    deepseekProviderMetrics.maxActiveRequests = Math.max(
+      deepseekProviderMetrics.maxActiveRequests,
+      activeDeepseekRequests,
+    );
     return Promise.resolve(releaseDeepseekSlot);
   }
 
@@ -198,6 +268,10 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
       signal?.removeEventListener('abort', onAbort);
       clearTimeout(timeout);
       activeDeepseekRequests += 1;
+      deepseekProviderMetrics.maxActiveRequests = Math.max(
+        deepseekProviderMetrics.maxActiveRequests,
+        activeDeepseekRequests,
+      );
       resolve(releaseDeepseekSlot);
     };
     const timeout = setTimeout(() => {
@@ -215,10 +289,35 @@ async function fetchDeepseekWithConcurrencyLimit(
   input: Parameters<typeof fetch>[0],
   init: Parameters<typeof fetch>[1],
 ) {
+  const queueStartedAt = Date.now();
   const release = await acquireDeepseekSlot(init?.signal);
+  recordMetricSample(
+    deepseekProviderMetrics.queueWaitMs,
+    Date.now() - queueStartedAt,
+  );
 
   try {
-    return await fetch(input, init);
+    const fetchStartedAt = Date.now();
+
+    try {
+      deepseekProviderMetrics.attempts += 1;
+      const response = await fetch(input, init);
+      deepseekProviderMetrics.completed += 1;
+      recordStatusMetric(response.status);
+      recordMetricSample(
+        deepseekProviderMetrics.providerFetchMs,
+        Date.now() - fetchStartedAt,
+      );
+
+      return response;
+    } catch (error) {
+      deepseekProviderMetrics.fetchErrors += 1;
+      recordMetricSample(
+        deepseekProviderMetrics.providerFetchMs,
+        Date.now() - fetchStartedAt,
+      );
+      throw error;
+    }
   } finally {
     release();
   }

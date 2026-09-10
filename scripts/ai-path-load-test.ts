@@ -2,6 +2,8 @@ import { performance } from 'node:perf_hooks';
 
 import { createSessionCookie } from '../lib/auth/session';
 
+type DeepseekProviderModule = typeof import('../agent/deepseek-provider');
+
 type LoadResult = {
   level: number;
   total: number;
@@ -14,6 +16,13 @@ type LoadResult = {
   providerCalls: number;
   providerRejectedCalls: number;
   maxProviderInFlight: number;
+  providerStatusCounts: Record<string, number>;
+  queueWaitP50Ms: number;
+  queueWaitP95Ms: number;
+  queueWaitMaxMs: number;
+  providerFetchP50Ms: number;
+  providerFetchP95Ms: number;
+  providerFetchMaxMs: number;
   minMs: number;
   p50Ms: number;
   p95Ms: number;
@@ -53,9 +62,14 @@ let providerCalls = 0;
 let providerInFlight = 0;
 let providerRejectedCalls = 0;
 let maxProviderInFlight = 0;
+let deepseekProviderModule: DeepseekProviderModule | null = null;
 
-process.env.DEEPSEEK_API_KEY ||= 'load-test-key';
 process.env.SMARTSTORE_MARKETPLACE_STORE ||= 'memory';
+process.env.SMARTSTORE_DEEPSEEK_METRICS = '1';
+
+if (mode === 'mock') {
+  process.env.DEEPSEEK_API_KEY ||= 'load-test-key';
+}
 
 if (process.env.AI_LOAD_VERBOSE !== '1') {
   console.log = (...args: unknown[]) => {
@@ -71,6 +85,12 @@ if (process.env.AI_LOAD_VERBOSE !== '1') {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getDeepseekProviderModule() {
+  deepseekProviderModule ??= await import('../agent/deepseek-provider');
+
+  return deepseekProviderModule;
 }
 
 function getMockContent(body: string) {
@@ -255,19 +275,26 @@ function percentile(values: number[], ratio: number) {
   return values[index];
 }
 
-function summarize(level: number, results: RequestResult[]): LoadResult {
+function summarize(
+  level: number,
+  results: RequestResult[],
+  providerMetrics: ReturnType<DeepseekProviderModule['getDeepseekProviderMetrics']>,
+): LoadResult {
   const durations = results
     .map((result) => result.durationMs)
     .sort((left, right) => left - right);
+  const queueWaitDurations = providerMetrics.queueWaitMs.sort(
+    (left, right) => left - right,
+  );
+  const providerFetchDurations = providerMetrics.providerFetchMs.sort(
+    (left, right) => left - right,
+  );
   const isIncompleteSuccessfulResponse = (result: RequestResult) => {
     if (!result.ok || !result.body.trim()) {
       return false;
     }
 
-    return (
-      !result.body.includes('finish') ||
-      !result.body.includes('SmartStore') && !result.body.includes('نتائج')
-    );
+    return !result.body.includes('finish');
   };
   const bodyFailures = results.filter(isIncompleteSuccessfulResponse).length;
   const emptyBodies = results.filter(
@@ -296,9 +323,18 @@ function summarize(level: number, results: RequestResult[]): LoadResult {
     emptyBodies,
     incompleteStreams: bodyFailures,
     providerFallbackResponses,
-    providerCalls,
-    providerRejectedCalls,
-    maxProviderInFlight,
+    providerCalls: providerMetrics.attempts || providerCalls,
+    providerRejectedCalls:
+      Number(providerMetrics.statusCounts['429'] ?? providerRejectedCalls),
+    maxProviderInFlight:
+      providerMetrics.maxActiveRequests || maxProviderInFlight,
+    providerStatusCounts: providerMetrics.statusCounts,
+    queueWaitP50Ms: Math.round(percentile(queueWaitDurations, 0.5)),
+    queueWaitP95Ms: Math.round(percentile(queueWaitDurations, 0.95)),
+    queueWaitMaxMs: Math.round(queueWaitDurations.at(-1) ?? 0),
+    providerFetchP50Ms: Math.round(percentile(providerFetchDurations, 0.5)),
+    providerFetchP95Ms: Math.round(percentile(providerFetchDurations, 0.95)),
+    providerFetchMaxMs: Math.round(providerFetchDurations.at(-1) ?? 0),
     minMs: Math.round(durations[0] ?? 0),
     p50Ms: Math.round(percentile(durations, 0.5)),
     p95Ms: Math.round(percentile(durations, 0.95)),
@@ -309,6 +345,9 @@ function summarize(level: number, results: RequestResult[]): LoadResult {
 }
 
 async function runLevel(level: number) {
+  const providerModule = await getDeepseekProviderModule();
+
+  providerModule.resetDeepseekProviderMetrics();
   providerCalls = 0;
   providerInFlight = 0;
   providerRejectedCalls = 0;
@@ -316,15 +355,19 @@ async function runLevel(level: number) {
   const results = await Promise.all(
     Array.from({ length: level }, (_, index) => runOne(index + level * 10_000)),
   );
-  return summarize(level, results);
+  return summarize(level, results, providerModule.getDeepseekProviderMetrics());
 }
 
 async function main() {
-  if (mode !== 'mock') {
-    throw new Error('Only AI_LOAD_MODE=mock is enabled for safe local load tests.');
+  if (mode !== 'mock' && mode !== 'real') {
+    throw new Error('Use AI_LOAD_MODE=mock or AI_LOAD_MODE=real.');
   }
 
-  installMockProvider();
+  if (mode === 'mock') {
+    installMockProvider();
+  } else if (!(await getDeepseekProviderModule()).getDeepseekApiKey()) {
+    throw new Error('DEEPSEEK_API_KEY is required for AI_LOAD_MODE=real.');
+  }
 
   const summaries: LoadResult[] = [];
 
