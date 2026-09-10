@@ -30,6 +30,10 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import {
+  convertAttachmentBlobToDataUrl,
+  isProbablyImageFile,
+} from "@/lib/client-image-normalization";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -505,6 +509,10 @@ export const PromptInput = ({
         .filter(Boolean)
         .some((acceptedType) => {
           if (acceptedType.endsWith("/*")) {
+            if (acceptedType === "image/*") {
+              return isProbablyImageFile(f, f.type, f.name);
+            }
+
             return f.type
               .toLowerCase()
               .startsWith(acceptedType.slice(0, -1));
@@ -716,7 +724,11 @@ export const PromptInput = ({
     }
   };
 
-  const convertBlobUrlToDataUrl = async (url: string): Promise<string> => {
+  const convertBlobUrlToDataUrl = async (
+    url: string,
+    mediaType?: string,
+    fileName?: string
+  ): Promise<{ mediaType: string; url: string }> => {
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -724,16 +736,7 @@ export const PromptInput = ({
     }
 
     const blob = await response.blob();
-    return convertFileToDataUrl(blob);
-  };
-
-  const convertFileToDataUrl = async (file: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    return convertAttachmentBlobToDataUrl(blob, mediaType, fileName);
   };
 
   const ctx = useMemo<AttachmentsContext>(
@@ -778,16 +781,28 @@ export const PromptInput = ({
         };
 
         if (item.file) {
+          const convertedFile = await convertAttachmentBlobToDataUrl(
+            item.file,
+            item.mediaType,
+            item.filename
+          );
+
           return {
             ...filePart,
-            url: await convertFileToDataUrl(item.file),
+            ...convertedFile,
           };
         }
 
         if (filePart.url && filePart.url.startsWith("blob:")) {
+          const convertedFile = await convertBlobUrlToDataUrl(
+            filePart.url,
+            filePart.mediaType,
+            filePart.filename
+          );
+
           return {
             ...filePart,
-            url: await convertBlobUrlToDataUrl(filePart.url),
+            ...convertedFile,
           };
         }
         return filePart;

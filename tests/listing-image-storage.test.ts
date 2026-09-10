@@ -49,7 +49,7 @@ test('extracts the latest uploaded product images from prior chat context', () =
   assert.deepEqual([...image.data], [1, 2, 3]);
 });
 
-test('ignores unsupported image payloads', () => {
+test('accepts gif image payloads from chat context', () => {
   const messages: ModelMessage[] = [
     {
       role: 'user',
@@ -57,6 +57,26 @@ test('ignores unsupported image payloads', () => {
         {
           type: 'file',
           mediaType: 'image/gif',
+          data: new Uint8Array([1]),
+        },
+      ],
+    },
+  ];
+
+  const images = extractLatestUploadedListingImages(messages);
+
+  assert.equal(images.length, 1);
+  assert.equal(images[0]?.mediaType, 'image/gif');
+});
+
+test('ignores unsupported non-image payloads', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'file',
+          mediaType: 'application/pdf',
           data: new Uint8Array([1]),
         },
       ],

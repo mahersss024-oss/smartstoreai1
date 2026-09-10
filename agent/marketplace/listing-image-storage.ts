@@ -11,7 +11,12 @@ import { storeListingObject } from './object-storage';
 import { addListingImageForSeller, getListing } from './repository';
 import type { ListingImage } from './types';
 
-const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const supportedMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 
 export type UploadedListingImage = {
   data: Uint8Array;

@@ -34,7 +34,12 @@ export type ImageQualityResult = {
   notes: string[];
 };
 
-const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const supportedMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 const maxImageBytes = 12 * 1024 * 1024;
 const minimumUsefulPixels = 720 * 720;
 

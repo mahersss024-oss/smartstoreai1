@@ -30,6 +30,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { createNormalizedImageFile } from '@/lib/client-image-normalization';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -620,8 +621,9 @@ export default function AccountPage() {
       setUploadingListingId(listing.id);
 
       try {
+        const uploadFile = await createNormalizedImageFile(file);
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('image', uploadFile);
 
         const response = await fetch(
           `/api/marketplace/listings/${listing.id}/images`,
@@ -665,6 +667,10 @@ export default function AccountPage() {
         }
 
         void refreshListings(1);
+      } catch {
+        window.alert(
+          'تعذر تجهيز الصورة. جرّب صورة JPG أو PNG أو WEBP أو GIF واضحة، أو أعد التقاطها من الكاميرا.',
+        );
       } finally {
         setUploadingListingId(null);
       }
@@ -1147,7 +1153,7 @@ export default function AccountPage() {
                             <Upload className="size-3.5" />
                             {uploadingListingId === listing.id ? 'رفع...' : 'صورة'}
                             <input
-                              accept="image/jpeg,image/png,image/webp"
+                              accept="image/*"
                               className="sr-only"
                               disabled={uploadingListingId === listing.id}
                               onChange={(event) => {
