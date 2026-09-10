@@ -1221,6 +1221,7 @@ export default function Page() {
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
+  const listingsRequestIdRef = useRef(0);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -1243,6 +1244,10 @@ export default function Page() {
     [filteredMessages],
   );
   const displayedMarketplaceListings = useMemo(() => {
+    if (marketplaceListings.length > 0) {
+      return marketplaceListings;
+    }
+
     if (latestSearchToolOutput) {
       return (latestSearchToolOutput.listings as ApiListingRecord[]).map(
         listingRecordToCard,
@@ -1252,7 +1257,6 @@ export default function Page() {
     return marketplaceListings;
   }, [latestSearchToolOutput, marketplaceListings]);
   const canLoadMoreListings =
-    !latestSearchToolOutput &&
     listingPagination.hasMore &&
     displayedMarketplaceListings.length > 0;
   const isAssistantExpanded = assistantState === 'expanded';
@@ -1463,7 +1467,10 @@ export default function Page() {
   );
 
   const refreshMarketplaceListings = useCallback((query?: string, page = 1) => {
+    const requestId = ++listingsRequestIdRef.current;
     const params = new URLSearchParams();
+
+    setIsLoadingListings(true);
 
     if (query?.trim()) {
       params.set('q', query.trim());
@@ -1479,6 +1486,10 @@ export default function Page() {
         response.json() as Promise<ListingsResponsePayload>,
       )
       .then((payload) => {
+        if (requestId !== listingsRequestIdRef.current) {
+          return;
+        }
+
         if (payload.listings) {
           const nextListings = payload.listings.map(listingRecordToCard);
 
@@ -1504,13 +1515,19 @@ export default function Page() {
         });
       })
       .catch(() => {
+        if (requestId !== listingsRequestIdRef.current) {
+          return;
+        }
+
         if (page <= 1) {
           setMarketplaceListings(featuredListings);
         }
         setListingPagination({ page: 1, hasMore: false });
       })
       .finally(() => {
-        setIsLoadingListings(false);
+        if (requestId === listingsRequestIdRef.current) {
+          setIsLoadingListings(false);
+        }
       });
   }, []);
 
@@ -1628,7 +1645,13 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    void refreshMarketplaceListings();
+    const timeoutId = window.setTimeout(() => {
+      void refreshMarketplaceListings();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [refreshMarketplaceListings]);
 
   useEffect(() => {
@@ -1652,7 +1675,13 @@ export default function Page() {
     }
 
     lastSyncedAssistantMessageIdRef.current = lastAssistantMessage.id;
-    void refreshMarketplaceListings(activeListingQuery);
+    const timeoutId = window.setTimeout(() => {
+      void refreshMarketplaceListings(activeListingQuery);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [
     activeListingQuery,
     filteredMessages,

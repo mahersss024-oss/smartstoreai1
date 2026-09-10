@@ -204,3 +204,29 @@ test('retrieval treats feature synonyms as alternatives, not mandatory words', a
     true,
   );
 });
+
+test('retrieval matches Arabic city searches against English stored cities', async () => {
+  const ownerKey = 'test:search-state-arabic-english-city';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-camry-english-city',
+    title: 'Toyota Camry 2020',
+    price: 85000,
+    year: 2020,
+    mileage: 90000,
+    city: 'Riyadh',
+  });
+
+  const result = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'أريد كامري في الرياض',
+  });
+
+  assert.equal(
+    result.listings.some(
+      (ranked) => ranked.listing.id === 'listing:p0-camry-english-city',
+    ),
+    true,
+  );
+});

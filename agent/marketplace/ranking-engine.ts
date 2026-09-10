@@ -1,4 +1,5 @@
 import {
+  getMarketplaceCitySearchVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
 } from './search';
@@ -267,9 +268,15 @@ function scoreLocation(listing: ListingRecord, state: MarketplaceSearchState) {
     return 70;
   }
 
-  return normalizeMarketplaceSearchText(listing.city ?? '').includes(
-    normalizeMarketplaceSearchText(state.city),
-  )
+  const normalizedListingCity = normalizeMarketplaceSearchText(listing.city ?? '');
+  const matchesCity = getMarketplaceCitySearchVariants(state.city).some(
+    (cityVariant) =>
+      normalizedListingCity.includes(
+        normalizeMarketplaceSearchText(cityVariant),
+      ),
+  );
+
+  return matchesCity
     ? 100
     : 15;
 }

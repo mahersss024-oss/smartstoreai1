@@ -13,6 +13,7 @@ import {
 } from './listing-image-limits';
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
+  getMarketplaceCitySearchVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
 } from './search';
@@ -204,6 +205,14 @@ function toSearchText(input: CreateListingDraftInput) {
 
 function normalizeSearchText(value: string) {
   return normalizeMarketplaceSearchText(value);
+}
+
+function matchesCityFilter(listingCity: string | undefined, requestedCity: string) {
+  const normalizedListingCity = normalizeSearchText(listingCity ?? '');
+
+  return getMarketplaceCitySearchVariants(requestedCity).some((cityVariant) =>
+    normalizedListingCity.includes(normalizeSearchText(cityVariant)),
+  );
 }
 
 function getFilterTermGroups(filters: MarketplaceListingFilters) {
@@ -590,12 +599,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
       return false;
     }
 
-    if (
-      city &&
-      !normalizeSearchText(listing.city ?? '').includes(
-        normalizeSearchText(city),
-      )
-    ) {
+    if (city && !matchesCityFilter(listing.city, city)) {
       return false;
     }
 

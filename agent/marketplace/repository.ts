@@ -9,6 +9,7 @@ import type { AdminAuditAction, Prisma } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
+  getMarketplaceCitySearchVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
 } from './search';
@@ -465,8 +466,12 @@ export async function listMarketplaceListings(
   }
 
   if (city) {
+    const cityVariants = getMarketplaceCitySearchVariants(city);
+
     searchConditions.push({
-      city: { contains: city, mode: 'insensitive' },
+      OR: cityVariants.map((cityVariant) => ({
+        city: { contains: cityVariant, mode: 'insensitive' },
+      })),
     });
   }
 

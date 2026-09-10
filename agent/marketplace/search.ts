@@ -255,6 +255,28 @@ export function normalizeMarketplaceSearchText(value: string) {
     .trim();
 }
 
+export function getMarketplaceCitySearchVariants(city?: string) {
+  const normalizedCity = normalizeMarketplaceSearchText(city ?? '');
+
+  if (!normalizedCity) {
+    return [];
+  }
+
+  const matchedCity = cityMatchers.find((matcher) => {
+    if (normalizeMarketplaceSearchText(matcher.city) === normalizedCity) {
+      return true;
+    }
+
+    return matcher.stopWords.some(
+      (stopWord) => normalizeMarketplaceSearchText(stopWord) === normalizedCity,
+    );
+  });
+
+  return uniqueValues(
+    matchedCity ? [matchedCity.city, ...matchedCity.stopWords] : [city ?? ''],
+  );
+}
+
 function tokenizeSearchQuery(query: string) {
   return normalizeMarketplaceSearchText(query)
     .split(/[^\p{L}\p{N}]+/u)
