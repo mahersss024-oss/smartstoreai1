@@ -53,3 +53,79 @@ test('publishes the latest matching seller draft when listingId is omitted', asy
   assert.equal(result?.status, 'published');
   assert.equal(result?.listing.id, listing.id);
 });
+
+test('adds many follow-up details to the current draft when listingId is omitted', async () => {
+  const sellerId = 'seller:tool-update-current-draft';
+  const listing = createListingDraft({
+    sellerId,
+    category: 'cars',
+    title: 'Camry for sale',
+    attributes: {
+      brand: 'Toyota',
+    },
+  });
+
+  const tools = createMarketplaceTools(createTestSession(sellerId));
+  const executeUpdateListing = tools.updateListing.execute as unknown as (
+    input: {
+      price: number;
+      city: string;
+      condition: 'used';
+      attributes: Record<string, unknown>;
+    },
+    options: Record<string, never>,
+  ) => Promise<{
+    status: string;
+    listing: {
+      id: string;
+      price?: number | 'bid' | 'negotiable';
+      city?: string;
+      condition?: string;
+      attributes: Record<string, unknown>;
+    };
+  }>;
+
+  const result = await executeUpdateListing(
+    {
+      price: 85000,
+      city: 'Riyadh',
+      condition: 'used',
+      attributes: {
+        model: 'Camry',
+        year: 2020,
+        mileageKm: 90000,
+        transmission: 'automatic',
+        fuelType: 'gasoline',
+        exteriorColor: 'white',
+        interiorColor: 'beige',
+        bodyCondition: 'clean',
+        accidentHistory: 'none_reported',
+        ownership: 'first_owner',
+        warranty: 'expired',
+        serviceHistory: 'available',
+        tireCondition: 'good',
+        batteryCondition: 'good',
+        inspectionStatus: 'valid',
+        registrationStatus: 'valid',
+        saleTerms: 'fixed',
+        accessories: ['spare_key', 'floor_mats'],
+        defects: 'no known defects',
+        sellerNotes: 'ready for inspection',
+      },
+    },
+    {},
+  );
+
+  assert.equal(result.status, 'updated');
+  assert.equal(result.listing.id, listing.id);
+  assert.equal(result.listing.price, 85000);
+  assert.equal(result.listing.city, 'Riyadh');
+  assert.equal(result.listing.condition, 'used');
+  assert.equal(result.listing.attributes.brand, 'Toyota');
+  assert.equal(result.listing.attributes.model, 'Camry');
+  assert.equal(result.listing.attributes.year, 2020);
+  assert.deepEqual(result.listing.attributes.accessories, [
+    'spare_key',
+    'floor_mats',
+  ]);
+});

@@ -149,7 +149,7 @@ const listingDetailsInputSchema = z.object(listingDetailsSchema);
 const updateListingDetailsInputSchema = listingDetailsInputSchema
   .partial()
   .extend({
-    listingId: z.string().min(1),
+    listingId: z.string().min(1).optional(),
   });
 
 type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
@@ -217,6 +217,27 @@ async function getCurrentSellerListingForStatusAction({
       (listing) =>
         allowedStatuses.has(listing.status) &&
         listing.compliance.decision !== 'block',
+    ) ?? null
+  );
+}
+
+async function getCurrentEditableSellerListing({
+  sellerId,
+  listingId,
+}: {
+  sellerId: string;
+  listingId?: string;
+}) {
+  if (listingId) {
+    const listing = await getListing(listingId);
+    return listing && listing.sellerId === sellerId ? listing : null;
+  }
+
+  const listings = await listSellerListings(sellerId);
+
+  return (
+    listings.find((listing) =>
+      ['draft', 'pending', 'paused'].includes(listing.status),
     ) ?? null
   );
 }
@@ -396,7 +417,7 @@ export function createMarketplaceTools(
 
     createListingDraft: tool({
       description:
-        'Create a structured marketplace listing draft from a natural seller conversation. Use only after the user wants to sell or publish an allowed marketplace item. Include confirmed sale terms, usage notes, defects/no-defects, color, material, and brand when the seller provides them. Do not use for prohibited Saudi or Islamic-policy items.',
+        'Create a structured marketplace listing draft from a natural seller conversation. Use after the user wants to sell or publish an allowed marketplace item and gives a minimum product signal. Put every confirmed extra detail that does not fit title, description, price, city, condition, or category into attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. Do not use for prohibited Saudi or Islamic-policy items.',
       inputSchema: listingDetailsInputSchema,
       execute: async (input) => {
         if (!session) {
@@ -506,15 +527,28 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change. Requires Google sign-in. Preserve confirmed sale terms, usage notes, defects/no-defects, color, material, and brand as structured attributes. Price changes and destructive actions must be confirmed by the user before using this tool.',
+        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires Google sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Price changes and destructive actions must be confirmed by the user before using this tool.',
       inputSchema: updateListingDetailsInputSchema,
       execute: async ({ listingId, ...updates }) => {
         if (!session) {
           return authRequired();
         }
 
-        const listing = await updateListingForSeller(
+        const targetListing = await getCurrentEditableSellerListing({
+          sellerId: session.user.id,
           listingId,
+        });
+
+        if (!targetListing) {
+          return {
+            status: 'not_found',
+            message:
+              'No editable seller draft was found. If the seller has provided product details in this conversation but no saved draft exists, create the draft first, then apply these details.',
+          };
+        }
+
+        const listing = await updateListingForSeller(
+          targetListing.id,
           session.user.id,
           normalizeListingDetailsInput(updates),
         );
