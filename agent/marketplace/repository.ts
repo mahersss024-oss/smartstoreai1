@@ -5,6 +5,11 @@ import {
   normalizePagination,
   toPaginatedResponse,
 } from '@/lib/pagination';
+import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
+import type {
+  PublishRealtimeEventInput,
+  RealtimeEventVisibility,
+} from '@/lib/realtime/events';
 import type { AdminAuditAction, Prisma } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
@@ -217,6 +222,31 @@ function toNumber(value: unknown) {
 
 function calculateCommissionAmount(productValue: number) {
   return Math.round(productValue * 0.01 * 100) / 100;
+}
+
+function safelyPublishRealtimeEvent(input: PublishRealtimeEventInput) {
+  try {
+    publishRealtimeEvent(input);
+  } catch {
+    // Realtime notifications must not break marketplace writes.
+  }
+}
+
+function getListingRealtimeVisibility(
+  sellerId: string,
+  status: string,
+): RealtimeEventVisibility {
+  const isPublicListingState =
+    status === 'published' ||
+    status === 'paused' ||
+    status === 'sold' ||
+    status === 'deleted';
+
+  return {
+    includePublic: isPublicListingState,
+    includeAdmins: true,
+    userIds: [sellerId],
+  };
 }
 
 function asRecord(value: unknown) {
@@ -634,10 +664,22 @@ export async function createListingDraft(
   input: CreateListingInput,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.createListingDraft({
+    const listing = memoryStore.createListingDraft({
       sellerId: user.id,
       ...input,
     });
+
+    safelyPublishRealtimeEvent({
+      type: 'ad_created',
+      payload: {
+        listingId: listing.id,
+        sellerId: listing.sellerId,
+        status: listing.status,
+      },
+      visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+    });
+
+    return listing;
   }
 
   await ensureUser(user);
@@ -674,7 +716,22 @@ export async function createListingDraft(
     include: { images: true },
   });
 
-  return toListingRecord(listing);
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_created',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      status: mappedListing.status,
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  return mappedListing;
 }
 
 export async function updateListingForSeller(
@@ -683,7 +740,26 @@ export async function updateListingForSeller(
   updates: Partial<CreateListingInput>,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.updateListingForSeller(listingId, sellerId, updates);
+    const listing = memoryStore.updateListingForSeller(
+      listingId,
+      sellerId,
+      updates,
+    );
+
+    if (listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          status: listing.status,
+          reason: 'content',
+        },
+        visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+      });
+    }
+
+    return listing;
   }
 
   const existing = await getListing(listingId);
@@ -731,7 +807,23 @@ export async function updateListingForSeller(
     include: { images: true },
   });
 
-  return toListingRecord(listing);
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      status: mappedListing.status,
+      reason: 'content',
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  return mappedListing;
 }
 
 export async function setListingStatusForSeller(
@@ -740,7 +832,42 @@ export async function setListingStatusForSeller(
   status: Extract<ListingStatus, 'published' | 'paused' | 'sold' | 'deleted'>,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setListingStatusForSeller(listingId, sellerId, status);
+    const existingListing = memoryStore.getListing(listingId);
+    const listing = memoryStore.setListingStatusForSeller(
+      listingId,
+      sellerId,
+      status,
+    );
+
+    if (listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_status_changed',
+        payload: {
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          previousStatus: existingListing?.status ?? listing.status,
+          status: listing.status,
+        },
+        visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+      });
+
+      if (listing.status === 'deleted') {
+        safelyPublishRealtimeEvent({
+          type: 'ad_deleted',
+          payload: {
+            listingId: listing.id,
+            sellerId: listing.sellerId,
+          },
+          visibility: {
+            includePublic: true,
+            includeAdmins: true,
+            userIds: [listing.sellerId],
+          },
+        });
+      }
+    }
+
+    return listing;
   }
 
   const existing = await getListing(listingId);
@@ -794,7 +921,66 @@ export async function setListingStatusForSeller(
     return updatedListing;
   });
 
-  return toListingRecord(listing);
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_status_changed',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      previousStatus: existing.status,
+      status: mappedListing.status,
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  if (mappedListing.status === 'deleted') {
+    safelyPublishRealtimeEvent({
+      type: 'ad_deleted',
+      payload: {
+        listingId: mappedListing.id,
+        sellerId: mappedListing.sellerId,
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+        userIds: [mappedListing.sellerId],
+      },
+    });
+  }
+
+  if (mappedListing.status === 'sold') {
+    const commission = await prisma.commission.findUnique({
+      where: { listingId: mappedListing.id },
+      select: {
+        id: true,
+        status: true,
+        sellerId: true,
+      },
+    });
+
+    if (commission) {
+      safelyPublishRealtimeEvent({
+        type: 'commission_updated',
+        payload: {
+          commissionId: commission.id,
+          listingId: mappedListing.id,
+          sellerId: commission.sellerId,
+          status: commission.status,
+          reason: 'created',
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [commission.sellerId],
+        },
+      });
+    }
+  }
+
+  return mappedListing;
 }
 
 export async function addListingImageForSeller(
@@ -803,7 +989,26 @@ export async function addListingImageForSeller(
   image: ListingImage,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.addListingImageForSeller(listingId, sellerId, image);
+    const listing = memoryStore.addListingImageForSeller(
+      listingId,
+      sellerId,
+      image,
+    );
+
+    if (listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          status: listing.status,
+          reason: 'image_added',
+        },
+        visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+      });
+    }
+
+    return listing;
   }
 
   const existing = await prisma.listing.findUnique({
@@ -847,7 +1052,25 @@ export async function addListingImageForSeller(
     },
   });
 
-  return listing ? toListingRecord(listing) : null;
+  const mappedListing = listing ? toListingRecord(listing) : null;
+
+  if (mappedListing) {
+    safelyPublishRealtimeEvent({
+      type: 'ad_updated',
+      payload: {
+        listingId: mappedListing.id,
+        sellerId: mappedListing.sellerId,
+        status: mappedListing.status,
+        reason: 'image_added',
+      },
+      visibility: getListingRealtimeVisibility(
+        mappedListing.sellerId,
+        mappedListing.status,
+      ),
+    });
+  }
+
+  return mappedListing;
 }
 
 export async function deleteListingImageForSeller(
@@ -856,7 +1079,26 @@ export async function deleteListingImageForSeller(
   imageId: string,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.deleteListingImageForSeller(listingId, sellerId, imageId);
+    const listing = memoryStore.deleteListingImageForSeller(
+      listingId,
+      sellerId,
+      imageId,
+    );
+
+    if (listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          status: listing.status,
+          reason: 'image_deleted',
+        },
+        visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+      });
+    }
+
+    return listing;
   }
 
   const existing = await prisma.listing.findUnique({
@@ -915,7 +1157,23 @@ export async function deleteListingImageForSeller(
     console.warn(`[listing_image_storage_delete] failure=${errorName}`);
   }
 
-  return toListingRecord(listing);
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      status: mappedListing.status,
+      reason: 'image_deleted',
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  return mappedListing;
 }
 
 export async function setPrimaryListingImageForSeller(
@@ -924,11 +1182,26 @@ export async function setPrimaryListingImageForSeller(
   imageId: string,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setPrimaryListingImageForSeller(
+    const listing = memoryStore.setPrimaryListingImageForSeller(
       listingId,
       sellerId,
       imageId,
     );
+
+    if (listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          status: listing.status,
+          reason: 'primary_image',
+        },
+        visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+      });
+    }
+
+    return listing;
   }
 
   const existing = await prisma.listing.findUnique({
@@ -966,7 +1239,23 @@ export async function setPrimaryListingImageForSeller(
     });
   });
 
-  return toListingRecord(listing);
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      status: mappedListing.status,
+      reason: 'primary_image',
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  return mappedListing;
 }
 
 export async function listUserConversations(userId: string) {
@@ -1070,7 +1359,41 @@ export async function createConversationForListing(
   const buyerId = getActorId(buyer);
 
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.createConversationForListing(listingId, buyerId);
+    const result = memoryStore.createConversationForListing(listingId, buyerId);
+
+    if (result.status === 'created' && result.conversation) {
+      safelyPublishRealtimeEvent({
+        type: 'conversation_updated',
+        payload: {
+          conversationId: result.conversation.id,
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          buyerId: result.conversation.buyerId,
+          status: result.conversation.status,
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          status: 'published',
+          reason: 'message_count',
+        },
+        visibility: {
+          includePublic: true,
+          includeAdmins: true,
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const listing = await prisma.listing.findUnique({
@@ -1152,9 +1475,41 @@ export async function createConversationForListing(
     return created;
   });
 
+  const mappedConversation = toConversationRecord(conversation);
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: mappedConversation.id,
+      listingId: mappedConversation.listingId,
+      sellerId: mappedConversation.sellerId,
+      buyerId: mappedConversation.buyerId,
+      status: mappedConversation.status,
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [mappedConversation.sellerId, mappedConversation.buyerId],
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: mappedConversation.listingId,
+      sellerId: mappedConversation.sellerId,
+      status: mappedConversation.listing?.status ?? 'published',
+      reason: 'message_count',
+    },
+    visibility: {
+      includePublic: true,
+      includeAdmins: true,
+      userIds: [mappedConversation.sellerId, mappedConversation.buyerId],
+    },
+  });
+
   return {
     status: 'created' as const,
-    conversation: toConversationRecord(conversation),
+    conversation: mappedConversation,
   };
 }
 
@@ -1166,7 +1521,47 @@ export async function addConversationMessage(
   const senderId = getActorId(sender);
 
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.addConversationMessage(conversationId, senderId, body);
+    const result = memoryStore.addConversationMessage(
+      conversationId,
+      senderId,
+      body,
+    );
+
+    if (result.conversation && result.message) {
+      safelyPublishRealtimeEvent({
+        type: 'message_created',
+        payload: {
+          conversationId: result.conversation.id,
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          buyerId: result.conversation.buyerId,
+          messageId: result.message.id,
+          senderId: result.message.senderId,
+          status: result.message.status,
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+
+      safelyPublishRealtimeEvent({
+        type: 'conversation_updated',
+        payload: {
+          conversationId: result.conversation.id,
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          buyerId: result.conversation.buyerId,
+          status: result.conversation.status,
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const conversation = await getConversationForUser(conversationId, senderId);
@@ -1219,6 +1614,40 @@ export async function addConversationMessage(
     reasons: message.reasons,
     createdAt: message.createdAt.toISOString(),
   };
+
+  if (updatedConversation) {
+    safelyPublishRealtimeEvent({
+      type: 'message_created',
+      payload: {
+        conversationId: updatedConversation.id,
+        listingId: updatedConversation.listingId,
+        sellerId: updatedConversation.sellerId,
+        buyerId: updatedConversation.buyerId,
+        messageId: mappedMessage.id,
+        senderId: mappedMessage.senderId,
+        status: mappedMessage.status,
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [updatedConversation.sellerId, updatedConversation.buyerId],
+      },
+    });
+
+    safelyPublishRealtimeEvent({
+      type: 'conversation_updated',
+      payload: {
+        conversationId: updatedConversation.id,
+        listingId: updatedConversation.listingId,
+        sellerId: updatedConversation.sellerId,
+        buyerId: updatedConversation.buyerId,
+        status: updatedConversation.status,
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [updatedConversation.sellerId, updatedConversation.buyerId],
+      },
+    });
+  }
 
   if (mappedMessage.status === 'blocked') {
     return {
@@ -1299,7 +1728,26 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
   const userId = getActorId(actor);
 
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.toggleFavoriteListing(listingId, userId);
+    const result = memoryStore.toggleFavoriteListing(listingId, userId);
+
+    if (result.listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: result.listing.id,
+          sellerId: result.listing.sellerId,
+          status: result.listing.status,
+          reason: 'favorite_count',
+        },
+        visibility: {
+          includePublic: true,
+          includeAdmins: true,
+          userIds: [userId, result.listing.sellerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const listing = await getListing(listingId);
@@ -1346,11 +1794,28 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
       });
     });
 
-    return {
+    const result = {
       status: 'removed' as const,
       favorite: null,
       listing: toListingRecord(updatedListing),
     };
+
+    safelyPublishRealtimeEvent({
+      type: 'ad_updated',
+      payload: {
+        listingId: result.listing.id,
+        sellerId: result.listing.sellerId,
+        status: result.listing.status,
+        reason: 'favorite_count',
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+        userIds: [userId, result.listing.sellerId],
+      },
+    });
+
+    return result;
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -1373,7 +1838,7 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
     return { favorite, listing: updatedListing };
   });
 
-  return {
+  const response = {
     status: 'saved' as const,
     favorite: {
       id: result.favorite.id,
@@ -1383,6 +1848,23 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
     } satisfies FavoriteRecord,
     listing: toListingRecord(result.listing),
   };
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: response.listing.id,
+      sellerId: response.listing.sellerId,
+      status: response.listing.status,
+      reason: 'favorite_count',
+    },
+    visibility: {
+      includePublic: true,
+      includeAdmins: true,
+      userIds: [userId, response.listing.sellerId],
+    },
+  });
+
+  return response;
 }
 
 export async function reportListing(
@@ -1394,7 +1876,25 @@ export async function reportListing(
   const reporterId = getActorId(actor);
 
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.reportListing(listingId, reporterId, reason, details);
+    const result = memoryStore.reportListing(listingId, reporterId, reason, details);
+
+    if (result.listing) {
+      safelyPublishRealtimeEvent({
+        type: 'ad_updated',
+        payload: {
+          listingId: result.listing.id,
+          sellerId: result.listing.sellerId,
+          status: result.listing.status,
+          reason: 'report',
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.listing.sellerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const listing = await getListing(listingId);
@@ -1415,6 +1915,32 @@ export async function reportListing(
       reporterId,
       reason,
       details,
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_updated',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      status: listing.status,
+      reason: 'report',
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [listing.sellerId],
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'moderation_updated',
+    payload: {
+      entity: 'report',
+      entityId: report.id,
+      status: report.status,
+    },
+    visibility: {
+      includeAdmins: true,
     },
   });
 
@@ -1550,7 +2076,54 @@ export async function setListingModerationStatus(
   admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setListingModerationStatus(listingId, status);
+    const existingListing = memoryStore.getListing(listingId);
+    const result = memoryStore.setListingModerationStatus(listingId, status);
+
+    if (result.listing) {
+      safelyPublishRealtimeEvent({
+        type: 'moderation_updated',
+        payload: {
+          entity: 'listing',
+          entityId: result.listing.id,
+          status: result.listing.status,
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.listing.sellerId],
+        },
+      });
+
+      safelyPublishRealtimeEvent({
+        type: 'ad_status_changed',
+        payload: {
+          listingId: result.listing.id,
+          sellerId: result.listing.sellerId,
+          previousStatus: existingListing?.status ?? result.listing.status,
+          status: result.listing.status,
+        },
+        visibility: getListingRealtimeVisibility(
+          result.listing.sellerId,
+          result.listing.status,
+        ),
+      });
+
+      if (result.listing.status === 'deleted') {
+        safelyPublishRealtimeEvent({
+          type: 'ad_deleted',
+          payload: {
+            listingId: result.listing.id,
+            sellerId: result.listing.sellerId,
+          },
+          visibility: {
+            includePublic: true,
+            includeAdmins: true,
+            userIds: [result.listing.sellerId],
+          },
+        });
+      }
+    }
+
+    return result;
   }
 
   const existing = await getListing(listingId);
@@ -1601,9 +2174,53 @@ export async function setListingModerationStatus(
     return updatedListing;
   });
 
+  const mappedListing = toListingRecord(listing);
+
+  safelyPublishRealtimeEvent({
+    type: 'moderation_updated',
+    payload: {
+      entity: 'listing',
+      entityId: mappedListing.id,
+      status: mappedListing.status,
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [mappedListing.sellerId],
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_status_changed',
+    payload: {
+      listingId: mappedListing.id,
+      sellerId: mappedListing.sellerId,
+      previousStatus: existing.status,
+      status: mappedListing.status,
+    },
+    visibility: getListingRealtimeVisibility(
+      mappedListing.sellerId,
+      mappedListing.status,
+    ),
+  });
+
+  if (mappedListing.status === 'deleted') {
+    safelyPublishRealtimeEvent({
+      type: 'ad_deleted',
+      payload: {
+        listingId: mappedListing.id,
+        sellerId: mappedListing.sellerId,
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+        userIds: [mappedListing.sellerId],
+      },
+    });
+  }
+
   return {
-    status: listing.status as ListingStatus,
-    listing: toListingRecord(listing),
+    status: mappedListing.status,
+    listing: mappedListing,
   };
 }
 
@@ -1613,7 +2230,23 @@ export async function setReportModerationStatus(
   admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setReportModerationStatus(reportId, status);
+    const result = memoryStore.setReportModerationStatus(reportId, status);
+
+    if (result.report) {
+      safelyPublishRealtimeEvent({
+        type: 'moderation_updated',
+        payload: {
+          entity: 'report',
+          entityId: result.report.id,
+          status: result.report.status,
+        },
+        visibility: {
+          includeAdmins: true,
+        },
+      });
+    }
+
+    return result;
   }
 
   const adminId = await getAdminAuditActorId(admin);
@@ -1650,9 +2283,23 @@ export async function setReportModerationStatus(
     };
   }
 
+  const mappedReport = toReportRecord(report);
+
+  safelyPublishRealtimeEvent({
+    type: 'moderation_updated',
+    payload: {
+      entity: 'report',
+      entityId: mappedReport.id,
+      status: mappedReport.status,
+    },
+    visibility: {
+      includeAdmins: true,
+    },
+  });
+
   return {
-    status: report.status as ReportRecord['status'],
-    report: toReportRecord(report),
+    status: mappedReport.status,
+    report: mappedReport,
   };
 }
 
@@ -1777,11 +2424,30 @@ export async function updateCommissionSaleAmountForSeller(
   productValue: number,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.updateCommissionSaleAmountForSeller(
+    const result = memoryStore.updateCommissionSaleAmountForSeller(
       commissionId,
       sellerId,
       productValue,
     );
+
+    if (result.commission && result.status === 'updated') {
+      safelyPublishRealtimeEvent({
+        type: 'commission_updated',
+        payload: {
+          commissionId: result.commission.id,
+          listingId: result.commission.listingId,
+          sellerId: result.commission.sellerId,
+          status: result.commission.status,
+          reason: 'sale_amount_updated',
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.commission.sellerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const commission = await prisma.commission.findFirst({
@@ -1804,12 +2470,15 @@ export async function updateCommissionSaleAmountForSeller(
     };
   }
 
-  const mappedCommission = toCommissionRecord(commission);
+  const existingCommission = toCommissionRecord(commission);
 
-  if (mappedCommission.status === 'paid' || mappedCommission.status === 'waived') {
+  if (
+    existingCommission.status === 'paid' ||
+    existingCommission.status === 'waived'
+  ) {
     return {
       status: 'locked' as const,
-      commission: mappedCommission,
+      commission: existingCommission,
     };
   }
 
@@ -1831,9 +2500,26 @@ export async function updateCommissionSaleAmountForSeller(
     },
   });
 
+  const mappedCommission = toCommissionRecord(updated);
+
+  safelyPublishRealtimeEvent({
+    type: 'commission_updated',
+    payload: {
+      commissionId: mappedCommission.id,
+      listingId: mappedCommission.listingId,
+      sellerId: mappedCommission.sellerId,
+      status: mappedCommission.status,
+      reason: 'sale_amount_updated',
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [mappedCommission.sellerId],
+    },
+  });
+
   return {
     status: 'updated' as const,
-    commission: toCommissionRecord(updated),
+    commission: mappedCommission,
   };
 }
 
@@ -1843,7 +2529,26 @@ export async function setCommissionStatusForAdmin(
   admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setCommissionStatusForAdmin(commissionId, status);
+    const result = memoryStore.setCommissionStatusForAdmin(commissionId, status);
+
+    if (result.commission) {
+      safelyPublishRealtimeEvent({
+        type: 'commission_updated',
+        payload: {
+          commissionId: result.commission.id,
+          listingId: result.commission.listingId,
+          sellerId: result.commission.sellerId,
+          status: result.commission.status,
+          reason: 'status_updated',
+        },
+        visibility: {
+          includeAdmins: true,
+          userIds: [result.commission.sellerId],
+        },
+      });
+    }
+
+    return result;
   }
 
   const adminId = await getAdminAuditActorId(admin);
@@ -1883,8 +2588,25 @@ export async function setCommissionStatusForAdmin(
     };
   }
 
+  const mappedCommission = toCommissionRecord(updated);
+
+  safelyPublishRealtimeEvent({
+    type: 'commission_updated',
+    payload: {
+      commissionId: mappedCommission.id,
+      listingId: mappedCommission.listingId,
+      sellerId: mappedCommission.sellerId,
+      status: mappedCommission.status,
+      reason: 'status_updated',
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [mappedCommission.sellerId],
+    },
+  });
+
   return {
-    status: updated.status as CommissionStatus,
-    commission: toCommissionRecord(updated),
+    status: mappedCommission.status,
+    commission: mappedCommission,
   };
 }

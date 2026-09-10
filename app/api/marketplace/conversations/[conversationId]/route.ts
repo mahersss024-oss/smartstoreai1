@@ -5,8 +5,11 @@ import {
   getConversationForUser,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
+
+export const dynamic = 'force-dynamic';
 
 const sendMessageSchema = z.object({
   body: z.string().trim().min(1).max(1000),
@@ -38,7 +41,7 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json({ error: 'conversation_not_found' }, { status: 404 });
   }
 
-  return Response.json({ conversation });
+  return Response.json({ conversation }, { headers: noStoreHeaders });
 }
 
 export async function POST(request: Request, context: RouteContext) {

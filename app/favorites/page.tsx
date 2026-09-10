@@ -1,12 +1,13 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Heart, MapPin, Store, User } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -88,14 +89,20 @@ export default function FavoritesPage() {
   const [favoritesPagination, setFavoritesPagination] =
     useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const trackedListingIds = useMemo(
+    () => new Set(favorites.map((favorite) => favorite.listingId)),
+    [favorites],
+  );
 
   const refreshFavorites = useCallback(async (page = 1) => {
     setIsLoading(true);
 
     try {
       const [sessionResponse, favoritesResponse] = await Promise.all([
-        fetch('/api/auth/session'),
-        fetch(`/api/marketplace/me/favorites?page=${page}&limit=24`),
+        fetch('/api/auth/session', { cache: 'no-store' }),
+        fetch(`/api/marketplace/me/favorites?page=${page}&limit=24`, {
+          cache: 'no-store',
+        }),
       ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
@@ -126,6 +133,34 @@ export default function FavoritesPage() {
     document.documentElement.dir = 'rtl';
     void refreshFavorites();
   }, [refreshFavorites]);
+
+  useSmartstoreRealtime({
+    enabled: session.authenticated,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'ad_updated',
+      'ad_status_changed',
+      'ad_deleted',
+      'maintenance_cleanup',
+    ],
+    onEvent: (event) => {
+      if (event.type === 'maintenance_cleanup') {
+        void refreshFavorites(1);
+        return;
+      }
+
+      if ('listingId' in event.payload && trackedListingIds.has(event.payload.listingId)) {
+        void refreshFavorites(1);
+      }
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event' || !session.authenticated) {
+        return;
+      }
+
+      return refreshFavorites(1);
+    },
+  });
 
   const favoritesLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(favoritesPagination?.hasMore),
@@ -248,7 +283,7 @@ export default function FavoritesPage() {
                       void refreshFavorites(favoritesPagination.nextPage ?? 1)
                     }
                   >
-                    {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                    {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
                   </Button>
                 )}
               </div>

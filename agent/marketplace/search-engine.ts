@@ -12,6 +12,7 @@ import {
   type MarketplaceSearchState,
 } from './search-state';
 import { parseStructuredSearchIntent } from './structured-search-intent';
+import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 export type StatefulMarketplaceSearchResult = Awaited<
   ReturnType<typeof searchMarketplaceWithState>
@@ -70,6 +71,27 @@ export async function searchMarketplaceWithState(input: {
   );
   const recommendations = buildMarketplaceRecommendations(results.shown, market);
   const visibleListingIds = results.shown.map((result) => result.listing.id);
+
+  if (input.ownerKey.startsWith('user:')) {
+    const userId = input.ownerKey.slice('user:'.length);
+
+    if (userId) {
+      try {
+        publishRealtimeEvent({
+          type: 'ai_results_updated',
+          payload: {
+            ownerKey: input.ownerKey,
+            query: input.query,
+          },
+          visibility: {
+            userIds: [userId],
+          },
+        });
+      } catch {
+        // Search should remain successful even if realtime publish fails.
+      }
+    }
+  }
 
   return {
     status: 'searched' as const,

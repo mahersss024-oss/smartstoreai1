@@ -9,9 +9,11 @@ import {
   isListingLimitReachedError,
 } from '@/agent/marketplace/listing-limits';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
-import { createMemoryJsonCache } from '@/lib/api/memory-json-cache';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
+
+export const dynamic = 'force-dynamic';
 
 type ListingsResponsePayload = {
   listings: Awaited<ReturnType<typeof listMarketplaceListings>>;
@@ -22,39 +24,6 @@ type ListingsResponsePayload = {
     nextPage: number | null;
   };
 };
-
-const publicListingsCache = createMemoryJsonCache<ListingsResponsePayload>({
-  ttlMs: 15_000,
-  maxEntries: 200,
-});
-
-function createPublicListingsCacheKey({
-  query,
-  page,
-  limit,
-}: {
-  query?: string;
-  page: number;
-  limit: number;
-}) {
-  return JSON.stringify({
-    limit,
-    page,
-    query: query?.trim().toLowerCase() ?? '',
-  });
-}
-
-function jsonPublicListingsResponse(
-  payload: ListingsResponsePayload,
-  cacheStatus: 'HIT' | 'MISS',
-) {
-  return Response.json(payload, {
-    headers: {
-      'Cache-Control': 'public, max-age=15, stale-while-revalidate=60',
-      'X-SmartStore-Cache': cacheStatus,
-    },
-  });
-}
 
 const createListingSchema = z.object({
   category: z.string().min(2),
@@ -86,12 +55,6 @@ export async function GET(request: Request) {
     Math.max(parsePositiveInteger(url.searchParams.get('limit'), 24), 1),
     48,
   );
-  const cacheKey = createPublicListingsCacheKey({ query, page, limit });
-  const cachedPayload = publicListingsCache.get(cacheKey);
-
-  if (cachedPayload) {
-    return jsonPublicListingsResponse(cachedPayload, 'HIT');
-  }
 
   const rateLimitResponse = await enforceApiRateLimit(request, {
     namespace: 'search',
@@ -119,9 +82,9 @@ export async function GET(request: Request) {
     },
   };
 
-  publicListingsCache.set(cacheKey, payload);
-
-  return jsonPublicListingsResponse(payload, 'MISS');
+  return Response.json(payload, {
+    headers: noStoreHeaders,
+  });
 }
 
 export async function POST(request: Request) {

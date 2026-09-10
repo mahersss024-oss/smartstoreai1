@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 const cleanupSchema = z.object({
   scope: z.enum([
@@ -179,6 +180,21 @@ export async function POST(request: Request) {
       },
     },
   });
+
+  try {
+    publishRealtimeEvent({
+      type: 'maintenance_cleanup',
+      payload: {
+        scope: parsed.data.scope,
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+      },
+    });
+  } catch {
+    // Cleanup completion should not fail due to realtime publish.
+  }
 
   return Response.json({
     status: 'completed',

@@ -1,6 +1,9 @@
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { parsePaginationFromRequest } from '@/lib/pagination';
+
+export const dynamic = 'force-dynamic';
 
 function decimalToListingPrice(price: unknown, priceMode?: string | null) {
   if (priceMode === 'bid' || priceMode === 'negotiable') {
@@ -115,5 +118,7 @@ export async function GET(request: Request) {
         pagination.skip + listings.length < total ? pagination.page + 1 : null,
       total,
     },
+  }, {
+    headers: noStoreHeaders,
   });
 }

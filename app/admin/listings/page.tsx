@@ -17,6 +17,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 
@@ -141,7 +142,9 @@ export default function AdminListingsPage() {
           params.set('query', queryRef.current.trim());
         }
 
-        const response = await fetch(`/api/admin/listings?${params}`);
+        const response = await fetch(`/api/admin/listings?${params}`, {
+          cache: 'no-store',
+        });
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -188,6 +191,28 @@ export default function AdminListingsPage() {
     document.documentElement.dir = 'rtl';
     void loadListings(1);
   }, [loadListings, status]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'ad_created',
+      'ad_updated',
+      'ad_deleted',
+      'ad_status_changed',
+      'maintenance_cleanup',
+    ],
+    onEvent: () => {
+      void loadListings(1);
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return loadListings(1);
+    },
+  });
 
   const listingsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(pagination?.hasMore),

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 const commissionStatusSchema = z.object({
   status: z.enum(['due', 'paid', 'waived', 'disputed']),
@@ -88,6 +89,25 @@ export async function DELETE(request: Request, context: RouteContext) {
       },
     }),
   ]);
+
+  try {
+    publishRealtimeEvent({
+      type: 'commission_updated',
+      payload: {
+        commissionId: existing.id,
+        listingId: existing.listingId,
+        sellerId: existing.sellerId,
+        status: 'deleted',
+        reason: 'deleted',
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [existing.sellerId],
+      },
+    });
+  } catch {
+    // Commission deletion should not fail due to realtime publish.
+  }
 
   return Response.json({ status: 'deleted' });
 }

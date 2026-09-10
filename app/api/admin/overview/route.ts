@@ -1,6 +1,9 @@
 import { getSiteVisitStats } from '@/lib/analytics/site-visits';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+
+export const dynamic = 'force-dynamic';
 
 function decimalToNumber(value: unknown) {
   if (value && typeof value === 'object' && 'toNumber' in value) {
@@ -106,5 +109,7 @@ export async function GET(request: Request) {
       paidCommissions: decimalToNumber(paidCommissionTotal._sum.commissionAmount),
     },
     visits,
+  }, {
+    headers: noStoreHeaders,
   });
 }

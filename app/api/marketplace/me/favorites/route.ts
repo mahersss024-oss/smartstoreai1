@@ -1,6 +1,9 @@
 import { listUserFavoritesPage } from '@/agent/marketplace/repository';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
@@ -23,5 +26,7 @@ export async function GET(request: Request) {
   return Response.json({
     favorites: favoritesPage.items,
     pagination: favoritesPage.pagination,
+  }, {
+    headers: noStoreHeaders,
   });
 }

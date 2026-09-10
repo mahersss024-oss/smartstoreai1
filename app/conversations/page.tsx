@@ -13,6 +13,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -62,8 +63,6 @@ type PaginationMeta = {
   hasMore: boolean;
   nextPage: number | null;
 };
-
-const conversationsRefreshIntervalMs = 8000;
 
 const missingListingImageDataUrl =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22900%22 height=%22675%22 viewBox=%220 0 900 675%22%3E%3Crect width=%22900%22 height=%22675%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M382 291h136a28 28 0 0 1 28 28v95a28 28 0 0 1-28 28H382a28 28 0 0 1-28-28v-95a28 28 0 0 1 28-28z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22/%3E%3Ccircle cx=%22417%22 cy=%22342%22 r=%2220%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m382 414 53-55 43 43 25-27 43 39%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22450%22 y=%22492%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
@@ -119,6 +118,10 @@ export default function ConversationsPage() {
         .length,
     [conversations],
   );
+  const trackedListingIds = useMemo(
+    () => new Set(conversations.map((conversation) => conversation.listingId)),
+    [conversations],
+  );
 
   const refreshConversations = useCallback(async (
     page = 1,
@@ -167,15 +170,47 @@ export default function ConversationsPage() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
     void refreshConversations(1);
-
-    const intervalId = window.setInterval(() => {
-      void refreshConversations(1, { showLoading: false });
-    }, conversationsRefreshIntervalMs);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
   }, [refreshConversations]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'message_created',
+      'conversation_updated',
+      'ad_status_changed',
+      'ad_deleted',
+      'maintenance_cleanup',
+    ],
+    onEvent: (event) => {
+      if (
+        event.type === 'message_created' ||
+        event.type === 'conversation_updated'
+      ) {
+        void refreshConversations(1, { showLoading: false });
+        return;
+      }
+
+      if (
+        (event.type === 'ad_status_changed' || event.type === 'ad_deleted') &&
+        trackedListingIds.has(event.payload.listingId)
+      ) {
+        void refreshConversations(1, { showLoading: false });
+        return;
+      }
+
+      if (event.type === 'maintenance_cleanup') {
+        void refreshConversations(1, { showLoading: false });
+      }
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return refreshConversations(1, { showLoading: false });
+    },
+  });
 
   const conversationsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(conversationsPagination?.hasMore),

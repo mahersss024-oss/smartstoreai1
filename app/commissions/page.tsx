@@ -16,6 +16,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 
@@ -146,9 +147,13 @@ export default function CommissionsPage() {
     try {
       const [sessionResponse, commissionsResponse, paymentMethodsResponse] =
         await Promise.all([
-          fetch('/api/auth/session'),
-          fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`),
-          fetch('/api/marketplace/commission-payment-methods'),
+          fetch('/api/auth/session', { cache: 'no-store' }),
+          fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`, {
+            cache: 'no-store',
+          }),
+          fetch('/api/marketplace/commission-payment-methods', {
+            cache: 'no-store',
+          }),
         ]);
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
@@ -188,6 +193,22 @@ export default function CommissionsPage() {
     document.documentElement.dir = 'rtl';
     void refreshCommissions();
   }, [refreshCommissions]);
+
+  useSmartstoreRealtime({
+    enabled: session.authenticated,
+    fallbackIntervalMs: 4000,
+    eventTypes: ['commission_updated', 'maintenance_cleanup'],
+    onEvent: () => {
+      void refreshCommissions(1);
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event' || !session.authenticated) {
+        return;
+      }
+
+      return refreshCommissions(1);
+    },
+  });
 
   const commissionsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(commissionsPagination?.hasMore),
@@ -485,7 +506,7 @@ export default function CommissionsPage() {
                         )
                       }
                     >
-                      {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                      {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
                     </Button>
                   )}
                 </div>

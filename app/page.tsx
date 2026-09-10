@@ -65,6 +65,7 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
@@ -1493,11 +1494,18 @@ export default function Page() {
     [collapseAssistant, isAssistantExpanded],
   );
 
-  const refreshMarketplaceListings = useCallback((query?: string, page = 1) => {
+  const refreshMarketplaceListings = useCallback((
+    query?: string,
+    page = 1,
+    options?: { showLoading?: boolean },
+  ) => {
     const requestId = ++listingsRequestIdRef.current;
     const params = new URLSearchParams();
+    const showLoading = options?.showLoading ?? true;
 
-    setIsLoadingListings(true);
+    if (showLoading) {
+      setIsLoadingListings(true);
+    }
 
     if (query?.trim()) {
       params.set('q', query.trim());
@@ -1508,7 +1516,7 @@ export default function Page() {
 
     const endpoint = `/api/marketplace/listings?${params.toString()}`;
 
-    return fetch(endpoint)
+    return fetch(endpoint, { cache: 'no-store' })
       .then((response) =>
         response.json() as Promise<ListingsResponsePayload>,
       )
@@ -1653,7 +1661,7 @@ export default function Page() {
   useEffect(() => {
     let mounted = true;
 
-    void fetch('/api/auth/session')
+    void fetch('/api/auth/session', { cache: 'no-store' })
       .then((response) => response.json() as Promise<AuthSessionPayload>)
       .then((payload) => {
         if (mounted) {
@@ -1716,6 +1724,50 @@ export default function Page() {
     refreshMarketplaceListings,
     status,
   ]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'ad_created',
+      'ad_updated',
+      'ad_deleted',
+      'ad_status_changed',
+      'ai_results_updated',
+      'maintenance_cleanup',
+    ],
+    onEvent: (event) => {
+      if (event.type === 'ai_results_updated') {
+        if (!('ownerKey' in event.payload)) {
+          return;
+        }
+
+        const userId = session.user?.id;
+
+        if (!userId || event.payload.ownerKey !== `user:${userId}`) {
+          return;
+        }
+
+        void refreshMarketplaceListings(activeListingQuery, 1, {
+          showLoading: false,
+        });
+        return;
+      }
+
+      void refreshMarketplaceListings(activeListingQuery, 1, {
+        showLoading: false,
+      });
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return refreshMarketplaceListings(activeListingQuery, 1, {
+        showLoading: false,
+      });
+    },
+  });
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {

@@ -31,6 +31,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { createNormalizedImageFile } from '@/lib/client-image-normalization';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type AuthUser = {
@@ -352,7 +353,7 @@ export default function AccountPage() {
   const isAdmin = session.user?.role === 'admin';
 
   const refreshSession = useCallback(() => {
-    return fetch('/api/auth/session')
+    return fetch('/api/auth/session', { cache: 'no-store' })
       .then((response) => response.json() as Promise<AuthSessionPayload>)
       .then(setSession)
       .catch(() => setSession({ authenticated: false, user: null }));
@@ -365,6 +366,7 @@ export default function AccountPage() {
     try {
       const response = await fetch(
         `/api/marketplace/me/listings?page=${page}&limit=24`,
+        { cache: 'no-store' },
       );
       const payload: {
         listings?: ApiListingRecord[];
@@ -404,6 +406,59 @@ export default function AccountPage() {
       void refreshListings();
     }
   }, [refreshListings, session.authenticated]);
+
+  useSmartstoreRealtime({
+    enabled: session.authenticated,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'ad_created',
+      'ad_updated',
+      'ad_deleted',
+      'ad_status_changed',
+      'message_created',
+      'commission_updated',
+      'maintenance_cleanup',
+    ],
+    onEvent: (event) => {
+      const currentUserId = session.user?.id;
+
+      if (!currentUserId) {
+        return;
+      }
+
+      if (event.type === 'maintenance_cleanup') {
+        void refreshListings(1);
+        return;
+      }
+
+      if (event.type === 'message_created') {
+        if (event.payload.sellerId === currentUserId) {
+          void refreshListings(1);
+        }
+
+        return;
+      }
+
+      if (event.type === 'commission_updated') {
+        if (event.payload.sellerId === currentUserId) {
+          void refreshListings(1);
+        }
+
+        return;
+      }
+
+      if ('sellerId' in event.payload && event.payload.sellerId === currentUserId) {
+        void refreshListings(1);
+      }
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event' || !session.authenticated) {
+        return;
+      }
+
+      return refreshListings(1);
+    },
+  });
 
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {

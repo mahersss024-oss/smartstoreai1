@@ -4,6 +4,7 @@ import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import { getAuthSession, isAdminSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 const adminListingUpdateSchema = z.object({
   category: z.string().min(2).optional(),
@@ -155,6 +156,56 @@ export async function PATCH(request: Request, context: RouteContext) {
     return listing;
   });
 
+  const nextStatus = updated.status;
+  const visibility = {
+    includePublic:
+      nextStatus === 'published' ||
+      nextStatus === 'paused' ||
+      nextStatus === 'sold' ||
+      nextStatus === 'deleted',
+    includeAdmins: true,
+    userIds: [updated.sellerId],
+  };
+
+  try {
+    publishRealtimeEvent({
+      type: 'ad_updated',
+      payload: {
+        listingId: updated.id,
+        sellerId: updated.sellerId,
+        status: nextStatus,
+        reason: 'admin_update',
+      },
+      visibility,
+    });
+
+    if (updated.status !== existing.status) {
+      publishRealtimeEvent({
+        type: 'ad_status_changed',
+        payload: {
+          listingId: updated.id,
+          sellerId: updated.sellerId,
+          previousStatus: existing.status,
+          status: updated.status,
+        },
+        visibility,
+      });
+    }
+
+    if (updated.status === 'deleted') {
+      publishRealtimeEvent({
+        type: 'ad_deleted',
+        payload: {
+          listingId: updated.id,
+          sellerId: updated.sellerId,
+        },
+        visibility,
+      });
+    }
+  } catch {
+    // Admin update must not fail due to realtime delivery.
+  }
+
   return Response.json({
     listing: {
       ...updated,
@@ -201,6 +252,38 @@ export async function DELETE(request: Request, context: RouteContext) {
       },
     }),
   ]);
+
+  try {
+    publishRealtimeEvent({
+      type: 'ad_status_changed',
+      payload: {
+        listingId,
+        sellerId: existing.sellerId,
+        previousStatus: existing.status,
+        status: 'deleted',
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+        userIds: [existing.sellerId],
+      },
+    });
+
+    publishRealtimeEvent({
+      type: 'ad_deleted',
+      payload: {
+        listingId,
+        sellerId: existing.sellerId,
+      },
+      visibility: {
+        includePublic: true,
+        includeAdmins: true,
+        userIds: [existing.sellerId],
+      },
+    });
+  } catch {
+    // Admin delete must not fail due to realtime delivery.
+  }
 
   return Response.json({ status: 'deleted' });
 }

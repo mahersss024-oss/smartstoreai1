@@ -1,6 +1,9 @@
 import { listModerationQueuePage } from '@/agent/marketplace/repository';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { getAuthSession, isModeratorSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
@@ -17,5 +20,8 @@ export async function GET(request: Request) {
     await listModerationQueuePage(
       parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 }),
     ),
+    {
+      headers: noStoreHeaders,
+    },
   );
 }

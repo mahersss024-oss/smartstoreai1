@@ -17,6 +17,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type ListingRecord = {
@@ -111,7 +112,9 @@ export default function AdminModerationPage() {
     setNotice('');
 
     try {
-      const response = await fetch(`/api/admin/moderation?page=${page}&limit=20`);
+      const response = await fetch(`/api/admin/moderation?page=${page}&limit=20`, {
+        cache: 'no-store',
+      });
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -151,6 +154,28 @@ export default function AdminModerationPage() {
     document.documentElement.dir = 'rtl';
     void refreshQueue();
   }, [refreshQueue]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'moderation_updated',
+      'ad_status_changed',
+      'ad_deleted',
+      'ad_updated',
+      'maintenance_cleanup',
+    ],
+    onEvent: () => {
+      void refreshQueue(1);
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return refreshQueue(1);
+    },
+  });
 
   const queueLoadMoreRef = useInfiniteScroll({
     enabled: hasMoreQueue,
@@ -391,7 +416,7 @@ export default function AdminModerationPage() {
             disabled={isLoading}
             onClick={() => void refreshQueue(nextPage)}
           >
-            {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+            {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
           </Button>
         )}
       </div>

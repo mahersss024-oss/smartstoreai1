@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type OverviewPayload = {
@@ -148,7 +149,9 @@ export default function AdminHomePage() {
     setNotice('');
 
     try {
-      const response = await fetch('/api/admin/overview');
+      const response = await fetch('/api/admin/overview', {
+        cache: 'no-store',
+      });
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -176,6 +179,32 @@ export default function AdminHomePage() {
     document.documentElement.dir = 'rtl';
     void loadOverview();
   }, [loadOverview]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'ad_created',
+      'ad_updated',
+      'ad_deleted',
+      'ad_status_changed',
+      'message_created',
+      'conversation_updated',
+      'commission_updated',
+      'moderation_updated',
+      'maintenance_cleanup',
+    ],
+    onEvent: () => {
+      void loadOverview();
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return loadOverview();
+    },
+  });
 
   const quickLinks = useMemo(
     () => [

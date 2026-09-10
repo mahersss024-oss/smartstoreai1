@@ -6,8 +6,11 @@ import {
   updateListingForSeller,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
+
+export const dynamic = 'force-dynamic';
 
 const updateListingSchema = z.object({
   title: z.string().min(2).optional(),
@@ -55,7 +58,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
-  return Response.json({ listing });
+  return Response.json({ listing }, { headers: noStoreHeaders });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {

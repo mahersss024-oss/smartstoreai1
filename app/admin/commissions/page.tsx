@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type CommissionRecord = {
@@ -87,7 +88,9 @@ export default function AdminCommissionsPage() {
     setNotice('');
 
     try {
-      const response = await fetch(`/api/admin/commissions?page=${page}&limit=20`);
+      const response = await fetch(`/api/admin/commissions?page=${page}&limit=20`, {
+        cache: 'no-store',
+      });
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -125,6 +128,22 @@ export default function AdminCommissionsPage() {
     document.documentElement.dir = 'rtl';
     void refreshCommissions();
   }, [refreshCommissions]);
+
+  useSmartstoreRealtime({
+    enabled: true,
+    fallbackIntervalMs: 4000,
+    eventTypes: ['commission_updated', 'maintenance_cleanup'],
+    onEvent: () => {
+      void refreshCommissions(1);
+    },
+    onResync: ({ reason }) => {
+      if (reason === 'event') {
+        return;
+      }
+
+      return refreshCommissions(1);
+    },
+  });
 
   const commissionsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(commissionsPagination?.hasMore),
@@ -311,7 +330,7 @@ export default function AdminCommissionsPage() {
                     )
                   }
                 >
-                  {isLoading ? 'ط¬ط§ط± ط§ظ„طھط­ظ…ظٹظ„...' : 'طھط­ظ…ظٹظ„ ط§ظ„ظ…ط²ظٹط¯'}
+                  {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
                 </Button>
               )}
             </div>
