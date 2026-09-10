@@ -527,7 +527,7 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires Google sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Price changes and destructive actions must be confirmed by the user before using this tool.',
+        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires Google sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. Price changes and destructive actions must be confirmed by the user before using this tool.',
       inputSchema: updateListingDetailsInputSchema,
       execute: async ({ listingId, ...updates }) => {
         if (!session) {

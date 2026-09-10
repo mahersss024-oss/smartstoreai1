@@ -97,6 +97,26 @@ test('routes listing approval follow-ups to draft creation', () => {
   assert.equal(intent.requiresAuth, true);
 });
 
+test('routes a new standalone seller product to a new draft after a prior listing', () => {
+  const intent = getFallbackAdaptiveMarketplaceIntent([
+    { role: 'user', parts: [{ type: 'text', text: 'عندي آيفون 14 برو للبيع' }] },
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'text',
+          text: 'تم إنشاء مسودة إعلان الآيفون. هل تريد نشرها؟',
+        },
+      ],
+    },
+    { role: 'user', parts: [{ type: 'text', text: 'سيارة كامري 2020 للبيع السعر 85000 في الرياض ممشى 90 ألف' }] },
+  ]);
+
+  assert.equal(intent.intent, 'create_listing');
+  assert.equal(intent.execution, 'create_listing_draft');
+  assert.equal(intent.requiresAuth, true);
+});
+
 test('routes image-only messages to listing image analysis', () => {
   const intent = getFallbackAdaptiveMarketplaceIntent([
     {
