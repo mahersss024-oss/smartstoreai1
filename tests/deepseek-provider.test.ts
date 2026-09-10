@@ -119,6 +119,13 @@ test('prefers local DeepSeek key over stale machine environment key', () => {
   }
 });
 
+test('uses load-tested DeepSeek concurrency defaults', () => {
+  withModelEnvironment({}, () => {
+    assert.equal(getDeepseekMaxConcurrentRequests(), 100);
+    assert.equal(getDeepseekQueueTimeoutMs(), 60_000);
+  });
+});
+
 test('normalizes DeepSeek requests for non-thinking marketplace responses', () => {
   const normalized = JSON.parse(
     normalizeDeepseekChatBody(

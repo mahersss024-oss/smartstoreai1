@@ -6,8 +6,8 @@ import { appConfig } from '@/app/app-config';
 
 export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
 
-const defaultDeepseekMaxConcurrentRequests = 64;
-const defaultDeepseekQueueTimeoutMs = 15_000;
+const defaultDeepseekMaxConcurrentRequests = 100;
+const defaultDeepseekQueueTimeoutMs = 60_000;
 const deepseekSlotQueue: Array<() => void> = [];
 let activeDeepseekRequests = 0;
 
