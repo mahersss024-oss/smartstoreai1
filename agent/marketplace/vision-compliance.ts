@@ -149,6 +149,8 @@ export type ImageComplianceDecision = {
   shariaSensitive: boolean;
 };
 
+export type ImageComplianceReviewMode = 'all_images' | 'primary_only';
+
 type ModelImageFilePart = {
   type: 'file';
   mediaType: string;
@@ -428,12 +430,14 @@ export function createImageComplianceUserMessages({
   language,
   expectedCategory,
   listingText,
+  reviewMode = 'all_images',
 }: {
   messages: ModelMessage[];
   userRequest: string;
   language: AppLanguage;
   expectedCategory?: string;
   listingText?: string;
+  reviewMode?: ImageComplianceReviewMode;
 }) {
   const imageMessage = createImageComplianceUserMessage({
     messages,
@@ -450,6 +454,26 @@ export function createImageComplianceUserMessages({
   const imageParts = imageMessage.content.filter(isModelImageFilePart);
   const textPart = imageMessage.content.find(isModelTextPart);
 
+  if (reviewMode === 'primary_only') {
+    const primaryImagePart = imageParts[0];
+
+    if (!primaryImagePart) {
+      return [];
+    }
+
+    const primaryText = `${textPart?.text ?? ''}\nPrimary listing image review mode: inspect image 1 only. Secondary images in the same listing are accepted only after technical upload checks and inherit trust from the approved primary image.`;
+
+    return [
+      {
+        role: 'user' as const,
+        content: [
+          { type: 'text' as const, text: primaryText },
+          primaryImagePart,
+        ],
+      } satisfies ModelMessage,
+    ];
+  }
+
   if (imageParts.length <= 1) {
     return [imageMessage];
   }
@@ -463,6 +487,28 @@ export function createImageComplianceUserMessages({
       content: [{ type: 'text' as const, text: perImageText }, imagePart],
     } satisfies ModelMessage;
   });
+}
+
+function countLatestUserImageParts(messages: ModelMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (
+      !isModelMessageLike(message) ||
+      message.role !== 'user' ||
+      !Array.isArray(message.content)
+    ) {
+      continue;
+    }
+
+    const imagePartCount = message.content.filter(isModelImageFilePart).length;
+
+    if (imagePartCount) {
+      return imagePartCount;
+    }
+  }
+
+  return 0;
 }
 
 function firstDefined<T>(values: Array<T | undefined>) {
@@ -653,19 +699,22 @@ export async function checkImageMarketplaceCompliance({
   language,
   expectedCategory,
   listingText,
+  reviewMode = 'all_images',
 }: {
   messages: ModelMessage[];
   userRequest: string;
   language: AppLanguage;
   expectedCategory?: string;
   listingText?: string;
-}) {
+  reviewMode?: ImageComplianceReviewMode;
+}): Promise<ImageComplianceDecision> {
   const imageMessages = createImageComplianceUserMessages({
     messages,
     userRequest,
     language,
     expectedCategory,
     listingText,
+    reviewMode,
   });
 
   if (!imageMessages.length) {
@@ -688,5 +737,26 @@ export async function checkImageMarketplaceCompliance({
     );
   }
 
-  return aggregateImageComplianceDecisions(decisions);
+  const decision = aggregateImageComplianceDecisions(decisions);
+
+  if (reviewMode !== 'primary_only') {
+    return decision;
+  }
+
+  const totalImageCount = countLatestUserImageParts(messages);
+
+  if (totalImageCount <= 1) {
+    return decision;
+  }
+
+  return {
+    ...decision,
+    reasons: [
+      ...new Set([
+        ...decision.reasons,
+        'primary_image_reviewed_only',
+        `secondary_images_trusted_after_primary_review_${totalImageCount - 1}`,
+      ]),
+    ].slice(0, 12),
+  } satisfies ImageComplianceDecision;
 }

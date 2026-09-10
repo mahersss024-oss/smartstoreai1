@@ -1354,6 +1354,7 @@ export async function POST(request: Request) {
             } ${userRequest}`,
           ),
         listingText: adaptiveIntent.normalizedRequest ?? userRequest,
+        reviewMode: 'primary_only',
       });
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';

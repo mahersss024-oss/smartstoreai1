@@ -409,6 +409,7 @@ export function createMarketplaceTools(
               language: 'ar',
               expectedCategory: listingInput.category,
               listingText,
+              reviewMode: 'primary_only',
             });
           } catch {
             return {

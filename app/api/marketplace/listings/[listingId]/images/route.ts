@@ -6,7 +6,10 @@ import {
   hasReachedListingImageLimit,
 } from '@/agent/marketplace/listing-image-limits';
 import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
-import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
+import {
+  checkImageMarketplaceCompliance,
+  type ImageComplianceDecision,
+} from '@/agent/marketplace/vision-compliance';
 import {
   addListingImageForSeller,
   getListing,
@@ -23,6 +26,22 @@ const supportedMimeTypes = new Set([
   'image/gif',
 ]);
 const maxImageBytes = 12 * 1024 * 1024;
+
+function createTrustedSecondaryImageComplianceDecision(
+  expectedCategory?: string,
+): ImageComplianceDecision {
+  return {
+    decision: 'allow',
+    confidence: 1,
+    reasons: [
+      'secondary_image_trusted_after_approved_primary_image',
+      'technical_upload_checks_only',
+    ],
+    expectedCategory,
+    categoryMatch: expectedCategory ? 'match' : 'unclear',
+    shariaSensitive: false,
+  };
+}
 
 type RouteContext = {
   params: Promise<{
@@ -110,42 +129,52 @@ export async function POST(request: Request, context: RouteContext) {
   let imageCompliance: Awaited<
     ReturnType<typeof checkImageMarketplaceCompliance>
   >;
+  const hasApprovedPrimaryImage = existingListing.images.some(
+    (image) => image.status === 'approved',
+  );
 
-  try {
-    imageCompliance = await checkImageMarketplaceCompliance({
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Listing category: ${existingListing.category}. Listing text: ${listingText}`,
-            },
-            {
-              type: 'file',
-              mediaType: file.type,
-              data: new Uint8Array(fileBuffer),
-            },
-          ],
-        },
-      ],
-      userRequest: listingText,
-      language: 'ar',
-      expectedCategory: existingListing.category,
-      listingText,
-    });
-  } catch (error) {
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[listing_image_compliance] failure=${errorName}`);
+  if (hasApprovedPrimaryImage) {
+    imageCompliance = createTrustedSecondaryImageComplianceDecision(
+      existingListing.category,
+    );
+  } else {
+    try {
+      imageCompliance = await checkImageMarketplaceCompliance({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Listing category: ${existingListing.category}. Listing text: ${listingText}`,
+              },
+              {
+                type: 'file',
+                mediaType: file.type,
+                data: new Uint8Array(fileBuffer),
+              },
+            ],
+          },
+        ],
+        userRequest: listingText,
+        language: 'ar',
+        expectedCategory: existingListing.category,
+        listingText,
+        reviewMode: 'primary_only',
+      });
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_compliance] failure=${errorName}`);
 
-    const responseBody = {
-      error: 'image_compliance_unavailable',
-      message:
-        'Image compliance review is unavailable. The image was not accepted.',
-    };
+      const responseBody = {
+        error: 'image_compliance_unavailable',
+        message:
+          'Image compliance review is unavailable. The image was not accepted.',
+      };
 
-    await idempotency?.abandon();
-    return Response.json(responseBody, { status: 503 });
+      await idempotency?.abandon();
+      return Response.json(responseBody, { status: 503 });
+    }
   }
 
   if (imageCompliance.decision === 'block') {

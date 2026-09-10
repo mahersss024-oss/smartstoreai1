@@ -280,6 +280,56 @@ test('splits latest user images into independent visual compliance requests', ()
   );
 });
 
+test('can review only the primary image for listing uploads', () => {
+  const messages: ModelMessage[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'inspect listing images' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: new Uint8Array([10]),
+        },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: new Uint8Array([20]),
+        },
+        {
+          type: 'file',
+          mediaType: 'image/webp',
+          data: new Uint8Array([30]),
+        },
+      ],
+    },
+  ];
+
+  const imageMessages = createImageComplianceUserMessages({
+    messages,
+    userRequest: 'inspect listing images',
+    language: 'ar',
+    reviewMode: 'primary_only',
+  });
+
+  assert.equal(imageMessages.length, 1);
+
+  const content = Array.isArray(imageMessages[0].content)
+    ? imageMessages[0].content
+    : [];
+  const imageParts = content.filter((part) => part.type === 'file');
+
+  assert.equal(imageParts.length, 1);
+  assert.deepEqual(
+    (imageParts[0] as { data: Uint8Array }).data,
+    new Uint8Array([10]),
+  );
+  assert.match(
+    (content[0] as { text: string }).text,
+    /Primary listing image review mode/,
+  );
+});
+
 test('aggregates multi-image compliance using the strictest decision', () => {
   const decision = aggregateImageComplianceDecisions([
     {
