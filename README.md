@@ -4,6 +4,10 @@ SmartStore AI is a chat-first Saudi smart marketplace inspired by classifieds ap
 
 ## Setup
 
+- Node.js: 24.x to 26.x (24.x recommended for deployment parity)
+- pnpm: 10.32.1+
+- Production: set `SMARTSTORE_MARKETPLACE_STORE=database`
+
 ```bash
 pnpm install
 cp .env.example .env.local

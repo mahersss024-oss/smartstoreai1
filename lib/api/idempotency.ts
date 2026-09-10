@@ -17,9 +17,41 @@ type MemoryIdempotencyRecord = {
   status: 'pending' | 'completed';
   statusCode?: number;
   response?: unknown;
+  expiresAt: number;
+  updatedAt: number;
 };
 
 const memoryRecords = new Map<string, MemoryIdempotencyRecord>();
+const memoryPendingTtlMs = 2 * 60_000;
+const memoryCompletedTtlMs = 15 * 60_000;
+const memoryMaxEntries = 5_000;
+
+function pruneMemoryRecords(now = Date.now()) {
+  for (const [recordKey, record] of memoryRecords) {
+    if (record.expiresAt <= now) {
+      memoryRecords.delete(recordKey);
+    }
+  }
+
+  if (memoryRecords.size <= memoryMaxEntries) {
+    return;
+  }
+
+  const oldestRecords = [...memoryRecords.entries()].sort(
+    (a, b) => a[1].updatedAt - b[1].updatedAt,
+  );
+  const overflowCount = memoryRecords.size - memoryMaxEntries;
+
+  for (let index = 0; index < overflowCount; index += 1) {
+    const oldestRecord = oldestRecords[index];
+
+    if (!oldestRecord) {
+      break;
+    }
+
+    memoryRecords.delete(oldestRecord[0]);
+  }
+}
 
 function shouldUseDatabaseStore() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
@@ -44,7 +76,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function toJsonSafeValue(body: unknown) {
-  return JSON.parse(JSON.stringify(body)) as Prisma.InputJsonValue;
+  return structuredClone(body) as Prisma.InputJsonValue;
 }
 
 export async function reserveIdempotencyKey(
@@ -58,6 +90,9 @@ export async function reserveIdempotencyKey(
   }
 
   if (!shouldUseDatabaseStore()) {
+    const now = Date.now();
+    pruneMemoryRecords(now);
+
     const recordKey = memoryKey(input, key);
     const existing = memoryRecords.get(recordKey);
 
@@ -83,15 +118,24 @@ export async function reserveIdempotencyKey(
       };
     }
 
-    memoryRecords.set(recordKey, { status: 'pending' });
+    memoryRecords.set(recordKey, {
+      status: 'pending',
+      updatedAt: now,
+      expiresAt: now + memoryPendingTtlMs,
+    });
 
     return {
       complete: async (body, status = 200) => {
+        const completedAt = Date.now();
+        pruneMemoryRecords(completedAt);
         const safeBody = toJsonSafeValue(body);
+
         memoryRecords.set(recordKey, {
           status: 'completed',
           statusCode: status,
           response: safeBody,
+          updatedAt: completedAt,
+          expiresAt: completedAt + memoryCompletedTtlMs,
         });
 
         return jsonResponse(safeBody, status);

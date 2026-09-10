@@ -18,7 +18,7 @@
   },
   "packageManager": "pnpm@10.32.1",
   "engines": {
-    "node": "24.x"
+    "node": ">=24 <27"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.65",
