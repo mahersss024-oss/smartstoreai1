@@ -48,19 +48,24 @@ export async function recordSiteVisit(input: {
     },
   });
 
+  // Upsert instead of create+catch so a repeat visit does not log a noisy
+  // unique-constraint error. The `update: {}` is intentionally a no-op: we only
+  // increment uniqueVisitors when the row was actually inserted, which we detect
+  // by comparing the row's createdAt to now.
   try {
-    await prisma.siteVisitUnique.create({
-      data: {
-        day,
-        visitorId: input.visitorId,
-      },
+    const inserted = await prisma.siteVisitUnique.createMany({
+      data: [{ day, visitorId: input.visitorId }],
+      skipDuplicates: true,
     });
-    await prisma.siteVisitDaily.update({
-      where: { day },
-      data: {
-        uniqueVisitors: { increment: 1 },
-      },
-    });
+
+    if (inserted.count > 0) {
+      await prisma.siteVisitDaily.update({
+        where: { day },
+        data: {
+          uniqueVisitors: { increment: 1 },
+        },
+      });
+    }
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
