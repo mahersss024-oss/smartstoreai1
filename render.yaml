@@ -3,6 +3,7 @@ services:
     name: smartstore-ai-marketplace
     runtime: node
     plan: free
+    healthCheckPath: /api/health
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm db:deploy && pnpm start
     envVars:
@@ -66,7 +67,14 @@ services:
         sync: false
       - key: SMARTSTORE_RATE_LIMIT_BACKEND
         sync: false
+      - key: SMARTSTORE_VAPID_PUBLIC_KEY
+        sync: false
+      - key: SMARTSTORE_VAPID_PRIVATE_KEY
+        sync: false
+      - key: SMARTSTORE_VAPID_SUBJECT
+        sync: false
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+

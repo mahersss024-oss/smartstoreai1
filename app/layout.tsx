@@ -1,9 +1,12 @@
 import { Suspense, type CSSProperties } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
+import { NativeAppBridge } from "@/components/native-app-bridge";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
@@ -11,6 +14,16 @@ const themeCookieName = "theme";
 export const metadata: Metadata = {
   title: appConfig.metadata.title,
   description: appConfig.metadata.description,
+  applicationName: "SmartStore AI",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "SmartStore AI",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -19,6 +32,16 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#e8edf3" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a111c" },
+  ],
 };
 
 const themeStyle: CSSProperties = {
@@ -80,12 +103,45 @@ export default function RootLayout({
           id="smartstore-theme-init"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=1170x2532"
+          media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=1179x2556"
+          media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=1284x2778"
+          media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=1290x2796"
+          media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=1536x2048"
+          media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash?size=2048x2732"
+          media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+        />
       </head>
       <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>
+        <ServiceWorkerRegistrar />
+        <NativeAppBridge />
         {children}
+        <PwaInstallPrompt />
         <MobileBottomNavigation />
       </body>
     </html>

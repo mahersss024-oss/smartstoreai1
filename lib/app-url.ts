@@ -39,3 +39,7 @@ export function getAppBaseUrl(request?: Request) {
     ? productionCanonicalUrl
     : 'http://localhost:3000';
 }
+
+// Static base URL resolved once for client/server use where a Request is
+// unavailable (e.g. building share/deep links in the browser).
+export const appUrl = getAppBaseUrl();

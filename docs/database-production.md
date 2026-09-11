@@ -47,6 +47,7 @@ The Prisma schema includes:
 - `Report`
 - `Commission`
 - `AdminAuditLog`
+- `PushSubscription`
 
 ## Runtime Store
 

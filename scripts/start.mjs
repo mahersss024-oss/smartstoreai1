@@ -49,6 +49,13 @@ assertSupportedNodeVersion();
 assertProductionDatabaseStoreMode();
 
 const port = process.env.PORT || '3000';
+const shutdownGraceMs = Number.parseInt(
+  process.env.SMARTSTORE_SHUTDOWN_GRACE_MS ?? '',
+  10,
+);
+const gracefulShutdownMs = Number.isFinite(shutdownGraceMs)
+  ? Math.max(0, shutdownGraceMs)
+  : 10_000;
 
 const child = spawn(
   process.execPath,
@@ -59,6 +66,31 @@ const child = spawn(
   },
 );
 
+let shuttingDown = false;
+
+function forwardSignal(signal) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  console.log(`[startup] received ${signal}, shutting down gracefully...`);
+
+  const forceExitTimer = setTimeout(() => {
+    console.error('[startup] graceful shutdown timed out, forcing exit.');
+    child.kill('SIGKILL');
+  }, gracefulShutdownMs);
+
+  forceExitTimer.unref?.();
+
+  child.once('exit', () => clearTimeout(forceExitTimer));
+  child.kill(signal);
+}
+
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => forwardSignal(signal));
+}
+
 child.on('exit', (code, signal) => {
   if (signal) {
     process.kill(process.pid, signal);
@@ -67,3 +99,4 @@ child.on('exit', (code, signal) => {
 
   process.exit(code ?? 0);
 });
+

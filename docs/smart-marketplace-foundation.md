@@ -188,3 +188,16 @@ SMARTSTORE_MARKETPLACE_STORE=file
 ```
 
 This writes marketplace state to `.data/marketplace-store.json` and uploaded listing images under `public/uploads/`. Both paths are git-ignored. Production should replace this with a database and object storage.
+
+## Progressive Web App
+
+SmartStore AI ships as an installable mobile web app.
+
+- `app/manifest.ts` serves `/manifest.webmanifest` with `standalone` display, RTL/Arabic metadata, and 180x180 + 512x512 icons (including a maskable icon).
+- `app/layout.tsx` exports a Next.js `Viewport` with `viewport-fit=cover`, mobile theme colors, and `appleWebApp` metadata so iOS and Android can install the app to the home screen.
+- `public/sw.js` precaches the app shell and the `/offline` route, never caches `/api/*` responses, and falls back to `/offline` when a navigation request fails offline.
+- `components/service-worker-registrar.tsx` registers the service worker only on HTTPS (or localhost).
+- `components/pwa-install-prompt.tsx` shows a dismissible install prompt on mobile when the browser fires `beforeinstallprompt`.
+- `app/offline/page.tsx` is the offline fallback page.
+
+The `proxy.ts` matcher excludes `sw.js` and `manifest.webmanifest` so they are never redirected or rewritten in production.

@@ -88,6 +88,7 @@ model User {
   reports                     Report[]                @relation("ReporterReports")
   commissions                 Commission[]
   adminAuditLogs              AdminAuditLog[]
+  pushSubscriptions           PushSubscription[]
 
   @@index([email])
 }
@@ -166,6 +167,32 @@ model SiteVisitUnique {
 
   @@unique([day, visitorId])
   @@index([day, createdAt])
+}
+
+enum PushPlatform {
+  web
+  ios
+  android
+}
+
+model PushSubscription {
+  id         String       @id @default(cuid())
+  userId     String?
+  endpoint   String       @unique
+  p256dh     String
+  auth       String
+  platform   PushPlatform @default(web)
+  userAgent  String?
+  locale     String?
+  isActive   Boolean      @default(true)
+  lastSeenAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  user       User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([isActive, updatedAt])
 }
 
 model ListingImage {

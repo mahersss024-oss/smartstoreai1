@@ -15,16 +15,6 @@ import { getAuthSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
-type ListingsResponsePayload = {
-  listings: Awaited<ReturnType<typeof listMarketplaceListings>>;
-  pagination: {
-    page: number;
-    limit: number;
-    hasMore: boolean;
-    nextPage: number | null;
-  };
-};
-
 const createListingSchema = z.object({
   category: z.string().min(2),
   title: z.string().min(2).optional(),

@@ -164,11 +164,29 @@
 }
 
 @layer base {
+  :root {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Prevent iOS Safari from zooming when focusing form controls. */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
   }
 
   button:not(:disabled),
@@ -283,6 +301,8 @@
     background-color: var(--header);
     color: var(--header-foreground);
     border-bottom: 1px solid var(--header-border);
+    padding-top: var(--safe-area-top);
+    height: calc(4rem + var(--safe-area-top));
   }
 
   .chat-mobile-new-chat,

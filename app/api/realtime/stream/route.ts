@@ -11,6 +11,17 @@ import type { RealtimeEvent } from '@/lib/realtime/events';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Close idle SSE connections so serverless/edge runtimes and proxies that cap
+// long-lived requests can recycle them cleanly. Clients reconnect automatically
+// and replay with Last-Event-ID.
+const maxConnectionLifetimeMs = Number.parseInt(
+  process.env.SMARTSTORE_SSE_MAX_LIFETIME_MS ?? '',
+  10,
+);
+const connectionLifetimeMs = Number.isFinite(maxConnectionLifetimeMs)
+  ? Math.max(15_000, maxConnectionLifetimeMs)
+  : 5 * 60_000;
+
 function parseLastEventId(value: string | null) {
   if (!value) {
     return null;
@@ -47,6 +58,9 @@ export async function GET(request: Request) {
     start(controller) {
       const encoder = new TextEncoder();
       let closed = false;
+      let unsubscribe: (() => void) | null = null;
+      let heartbeatId: ReturnType<typeof setInterval> | null = null;
+      let lifetimeId: ReturnType<typeof setTimeout> | null = null;
 
       const write = (value: string) => {
         if (closed) {
@@ -62,8 +76,18 @@ export async function GET(request: Request) {
         }
 
         closed = true;
+
+        if (heartbeatId !== null) {
         clearInterval(heartbeatId);
-        unsubscribe();
+          heartbeatId = null;
+        }
+
+        if (lifetimeId !== null) {
+          clearTimeout(lifetimeId);
+          lifetimeId = null;
+        }
+        unsubscribe?.();
+        unsubscribe = null;
         request.signal.removeEventListener('abort', onAbort);
 
         try {
@@ -91,10 +115,14 @@ export async function GET(request: Request) {
         sendEvent(event);
       }
 
-      const unsubscribe = subscribeRealtimeEvents(context, sendEvent);
-      const heartbeatId = setInterval(() => {
+      unsubscribe = subscribeRealtimeEvents(context, sendEvent);
+      heartbeatId = setInterval(() => {
         write(toSseHeartbeat());
       }, 15_000);
+      lifetimeId = setTimeout(() => {
+        // Graceful end-of-life close; the client reconnects and replays.
+        close();
+      }, connectionLifetimeMs);
 
       request.signal.addEventListener('abort', onAbort, { once: true });
       cleanup = close;
@@ -114,3 +142,4 @@ export async function GET(request: Request) {
     },
   });
 }
+

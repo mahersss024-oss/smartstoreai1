@@ -19,6 +19,12 @@ function getCanonicalUrl() {
 export function proxy(request: NextRequest) {
   const canonicalUrl = getCanonicalUrl();
 
+  // Health checks must answer on the platform host (e.g. *.onrender.com)
+  // so the hosting provider can probe the running instance directly.
+  if (request.nextUrl.pathname === '/api/health') {
+    return NextResponse.next();
+  }
+
   if (
     process.env.NODE_ENV === 'production' &&
     request.nextUrl.hostname.endsWith('.onrender.com') &&
@@ -35,5 +41,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|splash).*)'],
 };
+
+
