@@ -41,11 +41,17 @@ export function buildContentSecurityPolicy() {
     imgSrc.push(publicImageOrigin);
   }
 
+  // Next.js (Turbopack) evaluates its runtime chunks with eval()/new Function()
+  // in the browser, so `'unsafe-eval'` is required for the framework to boot.
+  // It is scoped to script-src only and still forbids remote scripts, keeping
+  // the meaningful protections (no third-party code execution) intact.
+  const scriptSrc = ["'self'", "'unsafe-inline'", "'unsafe-eval'"].join(' ');
+
   const directives = [
     "default-src 'self'",
     `img-src ${imgSrc.join(' ')}`,
     `connect-src 'self' ${connectOrigins.join(' ')}`,
-    "script-src 'self' 'unsafe-inline'",
+    `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "media-src 'self' blob: data:",

@@ -33,6 +33,19 @@ test('csp locks down framing and object embedding', () => {
   assert.match(csp, /upgrade-insecure-requests/);
 });
 
+test('csp permits framework eval but no remote scripts', () => {
+  const csp = buildContentSecurityPolicy();
+  const scriptSrc = csp
+    .split('; ')
+    .find((directive) => directive.startsWith('script-src'));
+
+  assert.ok(scriptSrc);
+  assert.match(scriptSrc, /'unsafe-eval'/);
+  assert.match(scriptSrc, /'self'/);
+  // No remote script origin is allowed to execute JavaScript.
+  assert.equal(/https?:\/\//.test(scriptSrc.replace("'self'", '')), false);
+});
+
 test('csp allows the marketplace image and auth origins', () => {
   const csp = buildContentSecurityPolicy();
 
