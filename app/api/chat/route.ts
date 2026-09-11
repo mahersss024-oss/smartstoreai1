@@ -754,15 +754,15 @@ function getImageUploadValidationResponse(
     return 'Attach product images only as JPG, PNG, or WEBP files.';
   }
 
-  if (reason === 'too_many_images') {
-    return 'ط£ط±ظپظ‚ ط­طھظ‰ 8 طµظˆط± ظپظ‚ط· ظپظٹ ط±ط³ط§ظ„ط© ط§ظ„ط´ط§طھ ط§ظ„ظˆط§ط­ط¯ط©.';
+    if (reason === 'too_many_images') {
+    return 'أرفق حتى 8 صور فقط في رسالة الشات الواحدة.';
   }
 
   if (reason === 'image_too_large') {
-    return 'ط­ط¬ظ… ظƒظ„ طµظˆط±ط© ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† 12 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ط£ظˆ ط£ظ‚ظ„.';
+    return 'حجم كل صورة يجب أن يكون 12 ميغابايت أو أقل.';
   }
 
-  return 'ط£ط±ظپظ‚ طµظˆط± ط§ظ„ظ…ظ†طھط¬ ظپظ‚ط· ط¨طµظٹط؛ط© JPG ط£ظˆ PNG ط£ظˆ WEBP.';
+  return 'أرفق صور المنتج فقط بصيغة JPG أو PNG أو WEBP.';
 }
 
 function createImageComplianceContextMessage(

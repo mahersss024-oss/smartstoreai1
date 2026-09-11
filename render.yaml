@@ -50,6 +50,8 @@ services:
         sync: false
       - key: SMARTSTORE_COMMISSION_STC_PAY_NUMBER
         sync: false
+      - key: SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT
+        sync: false
       - key: SMARTSTORE_OBJECT_STORAGE_ENDPOINT
         sync: false
       - key: SMARTSTORE_OBJECT_STORAGE_BUCKET

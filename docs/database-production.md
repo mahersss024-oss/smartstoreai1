@@ -100,8 +100,13 @@ SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER=...
 SMARTSTORE_COMMISSION_SNB_IBAN=SA...
 
 SMARTSTORE_COMMISSION_STC_PAY_NAME=SmartStore AI
-SMARTSTORE_COMMISSION_STC_PAY_NUMBER=05...
+SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT=...
 ```
+
+`SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT` holds the STC Pay account number and is
+shown to sellers as "رقم الحساب". `SMARTSTORE_COMMISSION_STC_PAY_NUMBER` is
+accepted as a legacy alias when `..._ACCOUNT` is not set. Set only one of them
+in production; the account key takes priority when both are present.
 
 Keep these values managed in the Render dashboard so payment recipients can be
 changed without a code deployment.

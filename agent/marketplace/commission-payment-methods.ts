@@ -14,6 +14,7 @@ type PaymentMethodDefinition = Omit<CommissionPaymentMethod, 'fields'> & {
   fields: Array<{
     label: string;
     envKey: string;
+    fallbackEnvKeys?: string[];
   }>;
 };
 
@@ -47,7 +48,11 @@ const paymentMethodDefinitions: PaymentMethodDefinition[] = [
     logoLabel: 'stc pay',
     fields: [
       { label: 'اسم المستفيد', envKey: 'SMARTSTORE_COMMISSION_STC_PAY_NAME' },
-      { label: 'رقم الجوال', envKey: 'SMARTSTORE_COMMISSION_STC_PAY_NUMBER' },
+      {
+        label: 'رقم الحساب',
+        envKey: 'SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT',
+        fallbackEnvKeys: ['SMARTSTORE_COMMISSION_STC_PAY_NUMBER'],
+      },
     ],
   },
 ];
@@ -59,6 +64,27 @@ function getEnvValue(
   return env[key]?.trim() ?? '';
 }
 
+function getFieldValue(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
+  field: PaymentMethodDefinition['fields'][number],
+) {
+  const primaryValue = getEnvValue(env, field.envKey);
+
+  if (primaryValue) {
+    return primaryValue;
+  }
+
+  for (const fallbackEnvKey of field.fallbackEnvKeys ?? []) {
+    const fallbackValue = getEnvValue(env, fallbackEnvKey);
+
+    if (fallbackValue) {
+      return fallbackValue;
+    }
+  }
+
+  return '';
+}
+
 export function getCommissionPaymentMethods(
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): CommissionPaymentMethod[] {
@@ -67,7 +93,7 @@ export function getCommissionPaymentMethods(
       ...method,
       fields: method.fields
         .map((field) => {
-          const value = getEnvValue(env, field.envKey);
+          const value = getFieldValue(env, field);
 
           return value
             ? {
