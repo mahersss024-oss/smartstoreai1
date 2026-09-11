@@ -1238,6 +1238,9 @@ export default function Page() {
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const listingsRequestIdRef = useRef(0);
+  const listingsAbortControllerRef = useRef<AbortController | null>(null);
+  const realtimeRefreshTimerRef = useRef<number | null>(null);
+  const activeListingQueryRef = useRef('');
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -1274,12 +1277,16 @@ export default function Page() {
       marketplaceListings,
       searchToolListings,
     });
-  }, [marketplaceListings, searchToolListings, shouldPreferSearchToolListings]);
+  }, [marketplaceListings, searchToolListings]);
   const canLoadMoreListings = getCanLoadMoreListings({
     hasMore: listingPagination.hasMore,
     displayedCount: displayedMarketplaceListings.length,
     hasSearchToolListings: shouldPreferSearchToolListings,
   });
+
+  useEffect(() => {
+    activeListingQueryRef.current = activeListingQuery;
+  }, [activeListingQuery]);
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isCompactViewport) {
@@ -1506,11 +1513,21 @@ export default function Page() {
   const refreshMarketplaceListings = useCallback((
     query?: string,
     page = 1,
-    options?: { showLoading?: boolean },
+    options?: { showLoading?: boolean; abortPrevious?: boolean },
   ) => {
     const requestId = ++listingsRequestIdRef.current;
     const params = new URLSearchParams();
     const showLoading = options?.showLoading ?? true;
+    const abortPrevious = options?.abortPrevious ?? page <= 1;
+    const requestController = new AbortController();
+
+    if (abortPrevious && listingsAbortControllerRef.current) {
+      listingsAbortControllerRef.current.abort();
+    }
+
+    if (abortPrevious) {
+      listingsAbortControllerRef.current = requestController;
+    }
 
     if (showLoading) {
       setIsLoadingListings(true);
@@ -1525,7 +1542,10 @@ export default function Page() {
 
     const endpoint = `/api/marketplace/listings?${params.toString()}`;
 
-    return fetch(endpoint, { cache: 'no-store' })
+    return fetch(endpoint, {
+      cache: 'no-store',
+      signal: requestController.signal,
+    })
       .then((response) =>
         response.json() as Promise<ListingsResponsePayload>,
       )
@@ -1558,8 +1578,12 @@ export default function Page() {
           hasMore: Boolean(payload.pagination?.hasMore),
         });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (requestId !== listingsRequestIdRef.current) {
+          return;
+        }
+
+        if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
 
@@ -1569,10 +1593,45 @@ export default function Page() {
         setListingPagination({ page: 1, hasMore: false });
       })
       .finally(() => {
+        if (
+          abortPrevious &&
+          listingsAbortControllerRef.current === requestController
+        ) {
+          listingsAbortControllerRef.current = null;
+        }
+
         if (requestId === listingsRequestIdRef.current) {
           setIsLoadingListings(false);
         }
       });
+  }, []);
+
+  const scheduleRealtimeListingsRefresh = useCallback(() => {
+    if (realtimeRefreshTimerRef.current !== null) {
+      return;
+    }
+
+    realtimeRefreshTimerRef.current = window.setTimeout(() => {
+      realtimeRefreshTimerRef.current = null;
+      void refreshMarketplaceListings(activeListingQueryRef.current, 1, {
+        showLoading: false,
+        abortPrevious: true,
+      });
+    }, 250);
+  }, [refreshMarketplaceListings]);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeRefreshTimerRef.current !== null) {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+
+      if (listingsAbortControllerRef.current) {
+        listingsAbortControllerRef.current.abort();
+        listingsAbortControllerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -1757,24 +1816,18 @@ export default function Page() {
           return;
         }
 
-        void refreshMarketplaceListings(activeListingQuery, 1, {
-          showLoading: false,
-        });
+        scheduleRealtimeListingsRefresh();
         return;
       }
 
-      void refreshMarketplaceListings(activeListingQuery, 1, {
-        showLoading: false,
-      });
+      scheduleRealtimeListingsRefresh();
     },
     onResync: ({ reason }) => {
       if (reason === 'event') {
         return;
       }
 
-      return refreshMarketplaceListings(activeListingQuery, 1, {
-        showLoading: false,
-      });
+      scheduleRealtimeListingsRefresh();
     },
   });
 
