@@ -675,5 +675,179 @@
       display: none !important;
     }
   }
+
+  /* First-visit welcome overlay: an animated, on-brand brand moment that plays
+     once per browser session before the app appears. */
+  .app-welcome {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 50% 8%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 62%),
+      linear-gradient(180deg, var(--background), color-mix(in oklab, var(--background) 86%, var(--primary)));
+    opacity: 0;
+    transition: opacity 600ms cubic-bezier(0.22, 1, 0.36, 1);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app-welcome--in {
+    opacity: 1;
+  }
+
+  .app-welcome--out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .app-welcome__glow {
+    position: absolute;
+    width: min(78vmin, 620px);
+    height: min(78vmin, 620px);
+    border-radius: 9999px;
+    background: radial-gradient(circle, color-mix(in oklab, var(--primary) 42%, transparent), transparent 68%);
+    filter: blur(28px);
+    opacity: 0.7;
+    animation: app-welcome-pulse 3.4s ease-in-out infinite;
+  }
+
+  .app-welcome__content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.15rem;
+    padding: 0 1.5rem;
+    text-align: center;
+    transform: translateY(10px) scale(0.96);
+    opacity: 0;
+  }
+
+  .app-welcome--in .app-welcome__content {
+    animation: app-welcome-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards;
+  }
+
+  .app-welcome__logo {
+    width: clamp(104px, 26vmin, 168px);
+    height: clamp(104px, 26vmin, 168px);
+    border-radius: 24%;
+    box-shadow:
+      0 24px 60px color-mix(in oklab, var(--primary) 34%, transparent),
+      0 4px 14px rgb(0 0 0 / 14%);
+    animation: app-welcome-float 3.4s ease-in-out infinite;
+  }
+
+  .app-welcome__logo svg {
+    width: 100%;
+    height: 100%;
+    border-radius: 24%;
+    display: block;
+  }
+
+  .app-welcome__title {
+    margin: 0;
+    font-size: clamp(1.7rem, 7vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+    background: linear-gradient(100deg, #1c98d2, #67d8ff, #1c98d2);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: app-welcome-shimmer 3s linear infinite;
+  }
+
+  .app-welcome__tagline {
+    margin: 0;
+    font-size: clamp(0.9rem, 3.4vw, 1.05rem);
+    color: var(--muted-foreground);
+    letter-spacing: 0.01em;
+  }
+
+  .app-welcome__loader {
+    position: relative;
+    width: min(184px, 46vw);
+    height: 4px;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: color-mix(in oklab, var(--foreground) 12%, transparent);
+    margin-top: 0.4rem;
+  }
+
+  .app-welcome__loader span {
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #0e4fa2, #1c98d2, #67d8ff);
+    animation: app-welcome-load 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+
+  @keyframes app-welcome-pulse {
+    0%,
+    100% {
+      transform: scale(0.92);
+      opacity: 0.55;
+    }
+    50% {
+      transform: scale(1.06);
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes app-welcome-rise {
+    to {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes app-welcome-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes app-welcome-shimmer {
+    from {
+      background-position: 0% 50%;
+    }
+    to {
+      background-position: 200% 50%;
+    }
+  }
+
+  @keyframes app-welcome-load {
+    0% {
+      transform: translateX(-110%);
+    }
+    100% {
+      transform: translateX(360%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-welcome,
+    .app-welcome__glow,
+    .app-welcome__logo,
+    .app-welcome__title,
+    .app-welcome__loader span {
+      animation: none !important;
+    }
+
+    .app-welcome__content {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 

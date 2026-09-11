@@ -2,6 +2,7 @@ import { Suspense, type CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
+import { AppWelcomeSplash } from "@/components/app-welcome-splash";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
@@ -135,6 +136,7 @@ export default function RootLayout({
         />
       </head>
       <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
+        <AppWelcomeSplash />
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>
