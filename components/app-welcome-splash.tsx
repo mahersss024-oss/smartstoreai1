@@ -1,113 +1,67 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
-const SESSION_KEY = 'smartstore_welcome_seen';
-const MIN_VISIBLE_MS = 1500;
-const FADE_OUT_MS = 600;
-
-function shouldSkipWelcome() {
-  if (typeof window === 'undefined') {
-    return true;
-  }
-
-  try {
-    if (window.sessionStorage.getItem(SESSION_KEY) === '1') {
-      return true;
-    }
-  } catch {
-    // Ignore storage access failures (private mode, etc.).
-  }
-
-  // Respect users who prefer reduced motion: skip the animated overlay.
-  if (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) {
-    return true;
-  }
-
-  return false;
-}
+import {
+  WELCOME_FADE_MS,
+  WELCOME_ID,
+  WELCOME_SESSION_KEY,
+  WELCOME_VISIBLE_MS,
+} from '@/lib/welcome/config';
 
 /**
- * First-visit welcome overlay: a polished, animated brand moment shown once per
- * browser session before the app appears. Mobile/tablet-first, RTL-aware, and
- * theme-aware (light/dark). It never blocks navigation for long and always
- * cleans itself up.
+ * First-visit welcome overlay. The markup is rendered on the server so it is
+ * present (and animating) on the very first paint — no post-hydration flash.
+ * React only clears it away afterwards, and a matching head script removes it
+ * instantly for returning visitors.
  */
-type SplashPhase = 'idle' | 'visible' | 'leaving' | 'done';
-
 export function AppWelcomeSplash() {
-  const [phase, setPhase] = useState<SplashPhase>('idle');
-  const [mounted, setMounted] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (shouldSkipWelcome()) {
+    const root = rootRef.current;
+    if (!root) {
       return;
     }
 
-    // Defer the first paint to the next frame so the mount does not trigger a
-    // synchronous cascading render inside this effect.
-    let exitTimer: ReturnType<typeof setTimeout> | null = null;
-    let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+    // If the head script already flagged this as a returning visit, React takes
+    // over removal so the element does not linger in the DOM.
+    if (document.documentElement.getAttribute('data-welcome') === 'skip') {
+      root.remove();
+      return;
+    }
 
-    const raf = window.requestAnimationFrame(() => {
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      setPhase('visible');
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      const prefersReducedMotion =
-        typeof window.matchMedia === 'function' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const visibleMs = prefersReducedMotion ? 300 : MIN_VISIBLE_MS;
+    if (prefersReducedMotion) {
+      root.remove();
+      return;
+    }
 
-      exitTimer = setTimeout(() => {
-        setPhase('leaving');
-        fadeTimer = setTimeout(() => {
-          setPhase('done');
-          document.body.style.overflow = previousOverflow;
-          try {
-            window.sessionStorage.setItem(SESSION_KEY, '1');
-          } catch {
-            // Ignore storage failures.
-          }
-        }, FADE_OUT_MS);
-      }, visibleMs);
-    });
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const startExit = window.setTimeout(() => {
+      document.body.style.overflow = previousOverflow;
+      try {
+        window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1');
+      } catch {
+        // Ignore storage failures.
+      }
+      root.classList.add('app-welcome--out');
+      window.setTimeout(() => root.remove(), WELCOME_FADE_MS);
+    }, WELCOME_VISIBLE_MS);
 
     return () => {
-      window.cancelAnimationFrame(raf);
-      if (exitTimer !== null) {
-        clearTimeout(exitTimer);
-      }
-      if (fadeTimer !== null) {
-        clearTimeout(fadeTimer);
-      }
-      document.body.style.overflow = '';
+      window.clearTimeout(startExit);
+      document.body.style.overflow = previousOverflow;
     };
   }, []);
 
-  useEffect(() => {
-    if (phase === 'visible') {
-      const raf = window.requestAnimationFrame(() => setMounted(true));
-      return () => window.cancelAnimationFrame(raf);
-    }
-  }, [phase]);
-
-  if (phase === 'idle' || phase === 'done') {
-    return null;
-  }
-
-  const leaving = phase === 'leaving';
-
   return (
-    <div
-      aria-hidden={leaving}
-      className={`app-welcome ${mounted ? 'app-welcome--in' : ''} ${
-        leaving ? 'app-welcome--out' : ''
-      }`}
-    >
+    <div id={WELCOME_ID} className="app-welcome" role="presentation">
       <div className="app-welcome__glow" />
       <div className="app-welcome__content">
         <div className="app-welcome__logo" aria-hidden="true">

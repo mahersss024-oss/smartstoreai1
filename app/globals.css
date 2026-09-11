@@ -689,14 +689,18 @@
     background:
       radial-gradient(120% 90% at 50% 8%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 62%),
       linear-gradient(180deg, var(--background), color-mix(in oklab, var(--background) 86%, var(--primary)));
-    opacity: 0;
-    transition: opacity 600ms cubic-bezier(0.22, 1, 0.36, 1);
+    /* Visible by default: it is server-rendered so it shows on the very first
+       paint. The head script (data-welcome="skip") removes it before paint for
+       returning visitors, so there is never a flash of the app behind it. */
+    opacity: 1;
+    transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  .app-welcome--in {
-    opacity: 1;
+  /* Returning visitor / reduced motion: hide before the first paint. */
+  [data-welcome="skip"] .app-welcome {
+    display: none !important;
   }
 
   .app-welcome--out {
@@ -723,12 +727,7 @@
     gap: 1.15rem;
     padding: 0 1.5rem;
     text-align: center;
-    transform: translateY(10px) scale(0.96);
-    opacity: 0;
-  }
-
-  .app-welcome--in .app-welcome__content {
-    animation: app-welcome-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards;
+    animation: app-welcome-rise 1000ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .app-welcome__logo {
@@ -801,6 +800,10 @@
   }
 
   @keyframes app-welcome-rise {
+    from {
+      transform: translateY(12px) scale(0.96);
+      opacity: 0;
+    }
     to {
       transform: translateY(0) scale(1);
       opacity: 1;

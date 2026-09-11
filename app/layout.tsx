@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
 import { AppWelcomeSplash } from "@/components/app-welcome-splash";
+import { buildWelcomeInitScript } from "@/lib/welcome/config";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
@@ -103,6 +104,10 @@ export default function RootLayout({
         <script
           id="smartstore-theme-init"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
+        <script
+          id="smartstore-welcome-init"
+          dangerouslySetInnerHTML={{ __html: buildWelcomeInitScript() }}
         />
         <link
           rel="apple-touch-startup-image"
