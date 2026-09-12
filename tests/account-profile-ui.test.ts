@@ -11,5 +11,8 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
   assert.match(page, /حفظ البيانات/);
+  assert.match(page, /الرقم الرسمي المحفوظ/);
+  assert.match(page, /تعديل/);
+  assert.match(page, /حذف/);
+  assert.match(page, /countContactPhoneCandidates/);
 });
-

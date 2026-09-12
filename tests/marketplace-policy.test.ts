@@ -131,12 +131,13 @@ test('blocks forbidden terms inside buyer seller conversations', () => {
   assert.ok(decision.reasons.includes('forbidden_or_regulated_marketplace_terms'));
 });
 
-test('allows inspection coordination messages with direct contact details', () => {
+test('blocks direct contact details even with inspection coordination', () => {
   const decision = evaluateConversationMessageSafety(
     'ممكن موعد معاينة السيارة بكرة وهذا رقمي 0501234567',
   );
 
-  assert.equal(decision.decision, 'allow');
+  assert.equal(decision.decision, 'block');
+  assert.ok(decision.reasons.includes('external_contact_attempt'));
 });
 
 test('still blocks off-platform app handoff even with inspection intent', () => {

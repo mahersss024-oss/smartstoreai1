@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   addConversationMessage,
   getConversationForUser,
+  shareSellerContact,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -15,6 +16,10 @@ export const dynamic = 'force-dynamic';
 const sendMessageSchema = z.object({
   body: z.string().trim().min(1).max(1000),
 });
+const shareContactSchema = z.object({
+  action: z.literal('share_contact'),
+});
+const conversationPostSchema = z.union([sendMessageSchema, shareContactSchema]);
 const maxConversationMessageRequestBytes = 8 * 1024;
 
 type RouteContext = {
@@ -88,7 +93,7 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const parsed = sendMessageSchema.safeParse(payload);
+  const parsed = conversationPostSchema.safeParse(payload);
 
   if (!parsed.success) {
     return Response.json(
@@ -98,8 +103,11 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { conversationId } = await context.params;
+  const action = 'action' in parsed.data ? parsed.data.action : 'send_message';
+  const messageBody = 'body' in parsed.data ? parsed.data.body : '';
   const idempotency = await reserveIdempotencyKey(request, {
-    namespace: 'message_send',
+    namespace:
+      action === 'share_contact' ? 'seller_contact_share' : 'message_send',
     actorKey: `${session.user.id}:${conversationId}`,
   });
 
@@ -107,11 +115,14 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency.response;
   }
 
-  const result = await addConversationMessage(
-    conversationId,
-    session.user,
-    parsed.data.body,
-  );
+  const result =
+    action === 'share_contact'
+      ? await shareSellerContact(conversationId, session.user)
+      : await addConversationMessage(
+          conversationId,
+          session.user,
+          messageBody,
+        );
 
   if (result.status === 'not_found') {
     const responseBody = { error: 'conversation_not_found' };
@@ -132,12 +143,36 @@ export async function POST(request: Request, context: RouteContext) {
       : Response.json(responseBody, { status: 409 });
   }
 
+  if (result.status === 'not_seller') {
+    const responseBody = {
+      error: 'seller_only',
+      message: 'Only the seller can share official contact information.',
+      conversation: result.conversation,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 403)
+      : Response.json(responseBody, { status: 403 });
+  }
+
+  if (result.status === 'missing_phone') {
+    const responseBody = {
+      error: 'seller_phone_required',
+      message: 'Add your mobile number in account settings before sharing it.',
+      conversation: result.conversation,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
+  }
+
   if (result.status === 'message_blocked') {
     const responseBody = {
       error: 'message_blocked',
       message:
-        'Keep communication and payment arrangements inside SmartStore AI.',
-      blockedMessage: result.message,
+        'Manual phone numbers and emails are not allowed in buyer-seller chat. Use the official contact sharing button.',
+      reasons: result.reasons,
       conversation: result.conversation,
     };
 

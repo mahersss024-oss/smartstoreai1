@@ -84,7 +84,9 @@ export type ConversationMessage = {
   senderId: string;
   body: string;
   status: 'sent' | 'blocked';
+  type: 'text' | 'contact_share';
   reasons: string[];
+  metadata: Record<string, unknown>;
   createdAt: string;
 };
 

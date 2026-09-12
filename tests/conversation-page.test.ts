@@ -34,3 +34,14 @@ test('seller buyer conversation preserves newer draft text after send', () => {
   assert.match(source, /const messageBody = draft\.trim\(\)/);
   assert.match(source, /currentDraft\.trim\(\) === messageBody/);
 });
+
+test('seller buyer conversation hides blocked messages and uses official contact sharing', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /message\.status === 'sent'/);
+  assert.match(source, /shareOfficialContact/);
+  assert.match(source, /action: 'share_contact'/);
+  assert.match(source, /message\.type === 'contact_share'/);
+  assert.match(source, /مشاركة الرقم/);
+  assert.doesNotMatch(source, /محجوبة/);
+});

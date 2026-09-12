@@ -29,6 +29,14 @@ function normalizeDigits(value: string) {
   return value.replace(/[٠-٩۰-۹]/g, (digit) => arabicDigitMap[digit] ?? digit);
 }
 
+export function countContactPhoneCandidates(value: string) {
+  const normalized = normalizeDigits(value);
+
+  return Array.from(
+    normalized.matchAll(/(?:\+?\s*966|00966|0)?\s*5(?:[\s().-]*\d){8}/g),
+  ).length;
+}
+
 export function normalizeContactPhoneNumber(
   value: unknown,
 ): ContactPhoneValidationResult {
@@ -43,6 +51,13 @@ export function normalizeContactPhoneNumber(
 
   if (!trimmed) {
     return { ok: true, phoneNumber: null };
+  }
+
+  if (countContactPhoneCandidates(trimmed) > 1) {
+    return {
+      ok: false,
+      message: 'يمكن حفظ رقم تواصل رسمي واحد فقط.',
+    };
   }
 
   const compact = trimmed.replace(/[\s().-]/g, '');

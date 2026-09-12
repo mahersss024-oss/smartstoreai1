@@ -111,6 +111,16 @@ function paginateListings<T>(listings: T[], filters: MarketplaceListingFilters) 
   return listings.slice(pagination.skip, pagination.skip + pagination.limit);
 }
 
+function normalizeConversationMessages(
+  messages: Conversation['messages'] = [],
+) {
+  return messages.map((message) => ({
+    ...message,
+    type: message.type ?? 'text',
+    metadata: message.metadata ?? {},
+  }));
+}
+
 function persistStore() {
   if (!shouldPersistStore()) {
     return;
@@ -163,7 +173,7 @@ function loadStore() {
       if (conversation.id) {
         conversations.set(conversation.id, {
           ...conversation,
-          messages: conversation.messages ?? [],
+          messages: normalizeConversationMessages(conversation.messages),
         });
       }
     }
@@ -709,7 +719,7 @@ export function listUserConversations(userId: string) {
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((conversation) => ({
       ...conversation,
-      messages: conversation.messages ?? [],
+      messages: normalizeConversationMessages(conversation.messages),
       listing: listings.get(conversation.listingId) ?? null,
     }));
 }
@@ -727,7 +737,7 @@ export function getConversationForUser(conversationId: string, userId: string) {
 
   return {
     ...conversation,
-    messages: conversation.messages ?? [],
+    messages: normalizeConversationMessages(conversation.messages),
     listing: listings.get(conversation.listingId) ?? null,
   };
 }
@@ -771,7 +781,10 @@ export function createConversationForListing(listingId: string, buyerId: string)
   if (existing) {
     return {
       status: 'existing' as const,
-      conversation: existing,
+      conversation: {
+        ...existing,
+        messages: normalizeConversationMessages(existing.messages),
+      },
     };
   }
 
@@ -828,14 +841,26 @@ export function addConversationMessage(
 
   const trimmedBody = body.trim();
   const safety = evaluateConversationMessageSafety(trimmedBody);
+
+  if (safety.decision !== 'allow') {
+    return {
+      status: 'message_blocked' as const,
+      message: null,
+      conversation,
+      reasons: safety.reasons,
+    };
+  }
+
   const timestamp = nowIso();
   const message: ConversationMessage = {
     id: randomUUID(),
     conversationId,
     senderId,
     body: trimmedBody,
-    status: safety.decision === 'allow' ? 'sent' : 'blocked',
+    status: 'sent',
+    type: 'text',
     reasons: safety.reasons,
+    metadata: {},
     createdAt: timestamp,
   };
 
@@ -844,16 +869,81 @@ export function addConversationMessage(
   conversations.set(conversation.id, conversation);
   persistStore();
 
-  if (message.status === 'blocked') {
+  return {
+    status: 'sent' as const,
+    message,
+    conversation,
+  };
+}
+
+export function shareSellerContact(
+  conversationId: string,
+  sellerId: string,
+  phoneNumber?: string | null,
+) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (!conversation) {
     return {
-      status: 'message_blocked' as const,
-      message,
+      status: 'not_found' as const,
+      message: null,
+      conversation: null,
+    };
+  }
+
+  if (conversation.buyerId !== sellerId && conversation.sellerId !== sellerId) {
+    return {
+      status: 'not_found' as const,
+      message: null,
+      conversation: null,
+    };
+  }
+
+  if (conversation.sellerId !== sellerId) {
+    return {
+      status: 'not_seller' as const,
+      message: null,
       conversation,
     };
   }
 
+  if (conversation.status !== 'open') {
+    return {
+      status: 'conversation_closed' as const,
+      message: null,
+      conversation,
+    };
+  }
+
+  if (!phoneNumber) {
+    return {
+      status: 'missing_phone' as const,
+      message: null,
+      conversation,
+    };
+  }
+
+  const timestamp = nowIso();
+  const message: ConversationMessage = {
+    id: randomUUID(),
+    conversationId,
+    senderId: sellerId,
+    body: 'official_contact_share',
+    status: 'sent',
+    type: 'contact_share',
+    reasons: ['official_contact_share'],
+    metadata: { phoneNumber },
+    createdAt: timestamp,
+  };
+
+  conversation.messages = [...(conversation.messages ?? []), message];
+  conversation.updatedAt = timestamp;
+  conversations.set(conversation.id, conversation);
+  persistStore();
+
   return {
-    status: 'sent' as const,
+    status: 'shared' as const,
     message,
     conversation,
   };

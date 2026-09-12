@@ -16,6 +16,7 @@ import {
   BadgeCheck,
   Bot,
   MessageCircle,
+  Phone,
   Send,
   ShieldCheck,
   Store,
@@ -35,6 +36,7 @@ type AuthUser = {
   email: string;
   name?: string;
   picture?: string;
+  phoneNumber?: string;
 };
 
 type AuthSessionPayload = {
@@ -48,7 +50,9 @@ type ConversationMessage = {
   senderId: string;
   body: string;
   status: 'sent' | 'blocked';
+  type?: 'text' | 'contact_share';
   reasons: string[];
+  metadata?: Record<string, unknown>;
   createdAt: string;
 };
 
@@ -137,6 +141,50 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
+function normalizeContactDigits(value: string) {
+  const digitMap: Record<string, string> = {
+    '٠': '0',
+    '١': '1',
+    '٢': '2',
+    '٣': '3',
+    '٤': '4',
+    '٥': '5',
+    '٦': '6',
+    '٧': '7',
+    '٨': '8',
+    '٩': '9',
+    '۰': '0',
+    '۱': '1',
+    '۲': '2',
+    '۳': '3',
+    '۴': '4',
+    '۵': '5',
+    '۶': '6',
+    '۷': '7',
+    '۸': '8',
+    '۹': '9',
+  };
+
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => digitMap[digit] ?? digit);
+}
+
+function containsManualContactDetails(value: string) {
+  const normalized = normalizeContactDigits(value);
+  const compact = normalized.replace(/[\s().-]/g, '');
+
+  return (
+    /(?:05|5)\d{8}/.test(compact) ||
+    /\+9665\d{8}/.test(compact) ||
+    /\b[^@\s]+@[^@\s]+\.[A-Za-z]{2,}\b/.test(normalized)
+  );
+}
+
+function getSharedPhoneNumber(message: ConversationMessage) {
+  const phoneNumber = message.metadata?.phoneNumber;
+
+  return typeof phoneNumber === 'string' ? phoneNumber : '';
+}
+
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams<{ conversationId: string }>();
@@ -152,14 +200,18 @@ export default function ConversationPage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isSharingContact, setIsSharingContact] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const isSeller = session.user?.id === conversation?.sellerId;
   const roleLabel = isSeller ? 'أنت البائع' : 'أنت المشتري';
   const visibleMessages = useMemo(
-    () => conversation?.messages ?? [],
+    () =>
+      conversation?.messages.filter((message) => message.status === 'sent') ??
+      [],
     [conversation?.messages],
   );
+  const draftHasManualContact = containsManualContactDetails(draft);
 
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
@@ -286,6 +338,13 @@ export default function ConversationPage() {
         return;
       }
 
+      if (containsManualContactDetails(messageBody)) {
+        setNotice(
+          'لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا داخل المحادثة. استخدم زر مشاركة رقم التواصل الرسمي.',
+        );
+        return;
+      }
+
       setIsSending(true);
       setNotice('');
 
@@ -319,16 +378,8 @@ export default function ConversationPage() {
 
         if (response.status === 422) {
           setNotice(
-            'تم حظر الرسالة. استخدم الشات لترتيب المعاينة وتجنب مشاركة طرق دفع أو تحويل خارج المنصة.',
+            'لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا داخل المحادثة. استخدم زر مشاركة رقم التواصل الرسمي.',
           );
-          if (payload.conversation) {
-            setConversation((currentConversation) =>
-              pickLatestConversation(
-                currentConversation,
-                payload.conversation as ConversationRecord,
-              ),
-            );
-          }
           return;
         }
 
@@ -353,6 +404,76 @@ export default function ConversationPage() {
     },
     [conversationId, draft, isSending, refreshConversation, router],
   );
+
+  const shareOfficialContact = useCallback(async () => {
+    if (!conversation || isSharingContact) {
+      return;
+    }
+
+    setIsSharingContact(true);
+    setNotice('');
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/conversations/${conversationId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('contact-share'),
+          },
+          body: JSON.stringify({ action: 'share_contact' }),
+        },
+      );
+      let payload: {
+        conversation?: ConversationRecord;
+        error?: string;
+      } = {};
+
+      try {
+        payload = (await response.json()) as typeof payload;
+      } catch {
+        payload = {};
+      }
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (payload.conversation) {
+        setConversation((currentConversation) =>
+          pickLatestConversation(
+            currentConversation,
+            payload.conversation as ConversationRecord,
+          ),
+        );
+      }
+
+      if (payload.error === 'seller_phone_required') {
+        setNotice(
+          'أضف رقم الجوال من صفحة حسابي أولًا، ثم ارجع للمحادثة لمشاركته رسميًا.',
+        );
+        return;
+      }
+
+      if (!response.ok || !payload.conversation) {
+        setNotice('تعذر مشاركة رقم التواصل الآن.');
+        return;
+      }
+
+      setNotice('تمت مشاركة رقم التواصل الرسمي داخل المحادثة.');
+      void refreshConversation({ showLoading: false, clearNotice: false });
+    } finally {
+      setIsSharingContact(false);
+    }
+  }, [
+    conversation,
+    conversationId,
+    isSharingContact,
+    refreshConversation,
+    router,
+  ]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -425,25 +546,46 @@ export default function ConversationPage() {
                 <div className="flex min-h-full flex-col justify-end gap-3">
                   {visibleMessages.map((message) => {
                     const mine = message.senderId === session.user?.id;
+                    const sharedPhoneNumber = getSharedPhoneNumber(message);
 
                     return (
                       <div
                         key={message.id}
                         className={`grid max-w-[78%] gap-1 ${mine ? 'justify-self-start text-right' : 'justify-self-end text-right'}`}
                       >
-                        <div
-                          className={`rounded-md border px-3 py-2 text-sm leading-7 shadow-sm ${
-                            mine
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white text-foreground dark:bg-card'
-                          } ${message.status === 'blocked' ? 'border-destructive bg-destructive/10 text-destructive' : ''}`}
-                        >
-                          {message.body}
-                        </div>
+                        {message.type === 'contact_share' ? (
+                          <div className="grid gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-7 text-emerald-950 shadow-sm dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-50">
+                            <div className="flex items-center gap-2 font-bold">
+                              <Phone className="size-4" />
+                              رقم التواصل الرسمي من البائع
+                            </div>
+                            {sharedPhoneNumber ? (
+                              <a
+                                className="w-fit rounded-md bg-white px-3 py-1 font-semibold text-emerald-800 underline-offset-4 hover:underline dark:bg-background dark:text-emerald-100"
+                                dir="ltr"
+                                href={`tel:${sharedPhoneNumber}`}
+                              >
+                                {sharedPhoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-xs text-emerald-800 dark:text-emerald-100">
+                                تمت مشاركة رقم التواصل الرسمي.
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            className={`rounded-md border px-3 py-2 text-sm leading-7 shadow-sm ${
+                              mine
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-foreground dark:bg-card'
+                            }`}
+                          >
+                            {message.body}
+                          </div>
+                        )}
                         <span className="text-[11px] text-muted-foreground">
-                          {message.status === 'blocked'
-                            ? 'محجوبة'
-                            : formatMessageTime(message.createdAt)}
+                          {formatMessageTime(message.createdAt)}
                         </span>
                       </div>
                     );
@@ -467,19 +609,47 @@ export default function ConversationPage() {
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}
               />
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="size-4 text-blue-600" />
-                  التواصل والدفع داخل SmartStore AI
+              {draftHasManualContact && (
+                <p className="text-xs leading-6 text-amber-700 dark:text-amber-200">
+                  لا تظهر أرقام الجوال أو الإيميلات داخل الشات. استخدم مشاركة الرقم الرسمية من البائع.
+                </p>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="size-4 shrink-0 text-blue-600" />
+                  <span className="truncate">التواصل والدفع داخل SmartStore AI</span>
                 </div>
-                <Button
-                  className="rounded-md bg-blue-600 hover:bg-blue-700"
-                  disabled={!draft.trim() || isSending || !conversation}
-                  type="submit"
-                >
-                  <Send className="size-4" />
-                  إرسال
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {isSeller && (
+                    <Button
+                      className="rounded-md"
+                      disabled={
+                        isSharingContact ||
+                        !conversation ||
+                        conversation.status !== 'open'
+                      }
+                      onClick={shareOfficialContact}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Phone className="size-4" />
+                      {isSharingContact ? 'جار المشاركة...' : 'مشاركة الرقم'}
+                    </Button>
+                  )}
+                  <Button
+                    className="rounded-md bg-blue-600 hover:bg-blue-700"
+                    disabled={
+                      !draft.trim() ||
+                      draftHasManualContact ||
+                      isSending ||
+                      !conversation
+                    }
+                    type="submit"
+                  >
+                    <Send className="size-4" />
+                    إرسال
+                  </Button>
+                </div>
               </div>
             </form>
           </section>

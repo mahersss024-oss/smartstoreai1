@@ -89,7 +89,9 @@ type DatabaseConversationRecord = {
     senderId: string;
     body: string;
     status: string;
+    type?: string;
     reasons: string[];
+    metadata?: unknown;
     createdAt: Date;
   }>;
   listing?: DatabaseListingRecord | null;
@@ -424,7 +426,12 @@ function toConversationRecord(
             senderId: message.senderId,
             body: message.body,
             status: message.status,
+            type:
+              message.type === 'contact_share'
+                ? 'contact_share'
+                : 'text',
             reasons: message.reasons,
+            metadata: asRecord(message.metadata),
             createdAt: message.createdAt.toISOString(),
           }) as ConversationMessage,
       ) ?? [],
@@ -1656,13 +1663,25 @@ export async function addConversationMessage(
 
   const trimmedBody = body.trim();
   const safety = evaluateConversationMessageSafety(trimmedBody);
+
+  if (safety.decision !== 'allow') {
+    return {
+      status: 'message_blocked' as const,
+      message: null,
+      conversation,
+      reasons: safety.reasons,
+    };
+  }
+
   const message = await prisma.conversationMessage.create({
     data: {
       conversationId,
       senderId,
       body: trimmedBody,
-      status: safety.decision === 'allow' ? 'sent' : 'blocked',
+      status: 'sent',
+      type: 'text',
       reasons: safety.reasons,
+      metadata: toPrismaJsonObject({}),
     },
   });
 
@@ -1681,7 +1700,9 @@ export async function addConversationMessage(
     senderId: message.senderId,
     body: message.body,
     status: message.status as ConversationMessage['status'],
+    type: message.type === 'contact_share' ? 'contact_share' : 'text',
     reasons: message.reasons,
+    metadata: asRecord(message.metadata),
     createdAt: message.createdAt.toISOString(),
   };
 
@@ -1719,16 +1740,133 @@ export async function addConversationMessage(
     });
   }
 
-  if (mappedMessage.status === 'blocked') {
+  return {
+    status: 'sent' as const,
+    message: mappedMessage,
+    conversation: updatedConversation,
+  };
+}
+
+export async function shareSellerContact(conversationId: string, seller: Actor) {
+  const sellerId = getActorId(seller);
+
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.shareSellerContact(
+      conversationId,
+      sellerId,
+      typeof seller === 'string' ? null : seller.phoneNumber,
+    );
+  }
+
+  const conversation = await getConversationForUser(conversationId, sellerId);
+
+  if (!conversation) {
     return {
-      status: 'message_blocked' as const,
-      message: mappedMessage,
-      conversation: updatedConversation,
+      status: 'not_found' as const,
+      message: null,
+      conversation: null,
     };
   }
 
+  if (conversation.sellerId !== sellerId) {
+    return {
+      status: 'not_seller' as const,
+      message: null,
+      conversation,
+    };
+  }
+
+  if (conversation.status !== 'open') {
+    return {
+      status: 'conversation_closed' as const,
+      message: null,
+      conversation,
+    };
+  }
+
+  const sellerProfile = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { phoneNumber: true },
+  });
+  const phoneNumber = sellerProfile?.phoneNumber;
+
+  if (!phoneNumber) {
+    return {
+      status: 'missing_phone' as const,
+      message: null,
+      conversation,
+    };
+  }
+
+  const message = await prisma.conversationMessage.create({
+    data: {
+      conversationId,
+      senderId: sellerId,
+      body: 'official_contact_share',
+      status: 'sent',
+      type: 'contact_share',
+      reasons: ['official_contact_share'],
+      metadata: toPrismaJsonObject({ phoneNumber }),
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() },
+  });
+
+  const updatedConversation = await getConversationForUser(
+    conversationId,
+    sellerId,
+  );
+  const mappedMessage: ConversationMessage = {
+    id: message.id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    body: message.body,
+    status: 'sent',
+    type: 'contact_share',
+    reasons: message.reasons,
+    metadata: asRecord(message.metadata),
+    createdAt: message.createdAt.toISOString(),
+  };
+
+  if (updatedConversation) {
+    safelyPublishRealtimeEvent({
+      type: 'message_created',
+      payload: {
+        conversationId: updatedConversation.id,
+        listingId: updatedConversation.listingId,
+        sellerId: updatedConversation.sellerId,
+        buyerId: updatedConversation.buyerId,
+        messageId: mappedMessage.id,
+        senderId: mappedMessage.senderId,
+        status: mappedMessage.status,
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [updatedConversation.sellerId, updatedConversation.buyerId],
+      },
+    });
+
+    safelyPublishRealtimeEvent({
+      type: 'conversation_updated',
+      payload: {
+        conversationId: updatedConversation.id,
+        listingId: updatedConversation.listingId,
+        sellerId: updatedConversation.sellerId,
+        buyerId: updatedConversation.buyerId,
+        status: updatedConversation.status,
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [updatedConversation.sellerId, updatedConversation.buyerId],
+      },
+    });
+  }
+
   return {
-    status: 'sent' as const,
+    status: 'shared' as const,
     message: mappedMessage,
     conversation: updatedConversation,
   };

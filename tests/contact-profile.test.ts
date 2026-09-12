@@ -37,3 +37,12 @@ test('rejects invalid account profile phone numbers', () => {
     assert.match(result.message, /رقم جوال سعودي صحيح/);
   }
 });
+
+test('rejects multiple saved contact phone numbers', () => {
+  const result = normalizeContactPhoneNumber('0501234567 0551234567');
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.message, /رقم تواصل رسمي واحد/);
+  }
+});

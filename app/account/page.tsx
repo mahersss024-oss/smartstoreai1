@@ -31,6 +31,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { createNormalizedImageFile } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -349,6 +350,8 @@ export default function AccountPage() {
   const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
   const [profilePhone, setProfilePhone] = useState('');
+  const [savedProfilePhone, setSavedProfilePhone] = useState('');
+  const [isEditingProfilePhone, setIsEditingProfilePhone] = useState(false);
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -361,6 +364,9 @@ export default function AccountPage() {
     };
   }, [listings]);
   const isAdmin = session.user?.role === 'admin';
+  const hasSavedProfilePhone = Boolean(savedProfilePhone);
+  const isProfilePhoneInputLocked =
+    hasSavedProfilePhone && !isEditingProfilePhone;
 
   const refreshSession = useCallback(() => {
     return fetch('/api/auth/session', { cache: 'no-store' })
@@ -368,10 +374,14 @@ export default function AccountPage() {
       .then((payload) => {
         setSession(payload);
         setProfilePhone(payload.user?.phoneNumber ?? '');
+        setSavedProfilePhone(payload.user?.phoneNumber ?? '');
+        setIsEditingProfilePhone(false);
       })
       .catch(() => {
         setSession({ authenticated: false, user: null });
         setProfilePhone('');
+        setSavedProfilePhone('');
+        setIsEditingProfilePhone(false);
       });
   }, []);
 
@@ -482,11 +492,21 @@ export default function AccountPage() {
       setListingsPagination(null);
       setSession({ authenticated: false, user: null });
       setProfilePhone('');
+      setSavedProfilePhone('');
+      setIsEditingProfilePhone(false);
       setProfileNotice(null);
     });
   }, []);
 
-  const saveProfile = useCallback(async () => {
+  const saveProfile = useCallback(async (nextPhoneNumber = profilePhone) => {
+    if (countContactPhoneCandidates(nextPhoneNumber) > 1) {
+      setProfileNotice({
+        tone: 'danger',
+        message: 'يمكن حفظ رقم تواصل رسمي واحد فقط. احذف الرقم الإضافي ثم احفظ.',
+      });
+      return;
+    }
+
     setIsSavingProfile(true);
     setProfileNotice(null);
 
@@ -494,7 +514,7 @@ export default function AccountPage() {
       const response = await fetch('/api/account/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: profilePhone }),
+        body: JSON.stringify({ phoneNumber: nextPhoneNumber }),
       });
       const payload = (await response.json().catch(() => null)) as {
         user?: AuthUser;
@@ -525,6 +545,8 @@ export default function AccountPage() {
           : payload.user ?? null,
       }));
       setProfilePhone(payload.user.phoneNumber ?? '');
+      setSavedProfilePhone(payload.user.phoneNumber ?? '');
+      setIsEditingProfilePhone(false);
       setProfileNotice({
         tone: 'success',
         message: payload.user.phoneNumber
@@ -540,6 +562,19 @@ export default function AccountPage() {
       setIsSavingProfile(false);
     }
   }, [profilePhone, router]);
+
+  const editProfilePhone = useCallback(() => {
+    setProfilePhone(savedProfilePhone);
+    setIsEditingProfilePhone(true);
+    setProfileNotice({
+      tone: 'info',
+      message: 'عدّل الرقم الرسمي ثم اضغط حفظ البيانات.',
+    });
+  }, [savedProfilePhone]);
+
+  const deleteProfilePhone = useCallback(() => {
+    void saveProfile('');
+  }, [saveProfile]);
 
   const controlListing = useCallback(
     (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {
@@ -1025,6 +1060,7 @@ export default function AccountPage() {
                   رقم الجوال
                   <input
                     className="h-11 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    disabled={isProfilePhoneInputLocked || isSavingProfile}
                     dir="ltr"
                     inputMode="tel"
                     placeholder="05xxxxxxxx"
@@ -1035,14 +1071,48 @@ export default function AccountPage() {
                 </label>
                 <Button
                   className="self-end rounded-md bg-blue-600 hover:bg-blue-700"
-                  disabled={isSavingProfile}
-                  onClick={saveProfile}
+                  disabled={isSavingProfile || isProfilePhoneInputLocked}
+                  onClick={() => void saveProfile()}
                   type="button"
                 >
                   <Save className="size-4" />
                   {isSavingProfile ? 'جار الحفظ...' : 'حفظ البيانات'}
                 </Button>
               </div>
+              {savedProfilePhone ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
+                      الرقم الرسمي المحفوظ
+                    </div>
+                    <div className="mt-1 truncate font-semibold" dir="ltr">
+                      {savedProfilePhone}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      className="rounded-md"
+                      disabled={isSavingProfile}
+                      onClick={editProfilePhone}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Pencil className="size-4" />
+                      تعديل
+                    </Button>
+                    <Button
+                      className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                      disabled={isSavingProfile}
+                      onClick={deleteProfilePhone}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 className="size-4" />
+                      حذف
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {profileNotice ? (
                 <div
                   className={`rounded-md border px-3 py-2 text-xs font-semibold ${

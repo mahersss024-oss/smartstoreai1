@@ -25,6 +25,7 @@ import {
   setReportModerationStatus,
   setCommissionStatusForAdmin,
   setListingStatusForSeller,
+  shareSellerContact,
   toggleFavoriteListing,
   updateCommissionSaleAmountForSeller,
 } from '@/agent/marketplace/store';
@@ -243,11 +244,16 @@ test('blocks conversation messages that move contact outside the platform', () =
   );
 
   assert.equal(blocked.status, 'message_blocked');
-  assert.equal(blocked.message?.status, 'blocked');
-  assert.equal(blocked.message?.reasons.includes('external_contact_attempt'), true);
+  assert.equal(blocked.message, null);
+  assert.equal(blocked.reasons.includes('external_contact_attempt'), true);
+  assert.equal(
+    getConversationForUser(opened.conversation?.id ?? '', 'buyer:messages-2')
+      ?.messages.length,
+    0,
+  );
 });
 
-test('allows sharing direct contact for inspection coordination', () => {
+test('blocks manual direct contact even for inspection coordination', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-3',
     category: 'cars',
@@ -262,8 +268,51 @@ test('allows sharing direct contact for inspection coordination', () => {
     'ممكن موعد معاينة اليوم مساءً وهذا رقمي 0501234567',
   );
 
-  assert.equal(sent.status, 'sent');
-  assert.equal(sent.message?.status, 'sent');
+  assert.equal(sent.status, 'message_blocked');
+  assert.equal(sent.message, null);
+});
+
+test('lets the seller share the official saved phone number', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:messages-4',
+    category: 'cars',
+    title: 'سيارة نظيفة للبيع',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:messages-4');
+  const shared = shareSellerContact(
+    opened.conversation?.id ?? '',
+    'seller:messages-4',
+    '+966501234567',
+  );
+
+  assert.equal(shared.status, 'shared');
+  assert.equal(shared.message?.type, 'contact_share');
+  assert.equal(shared.message?.metadata.phoneNumber, '+966501234567');
+  assert.equal(
+    getConversationForUser(opened.conversation?.id ?? '', 'buyer:messages-4')
+      ?.messages[0]?.type,
+    'contact_share',
+  );
+});
+
+test('requires a saved seller phone before official contact sharing', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:messages-5',
+    category: 'cars',
+    title: 'سيارة نظيفة للبيع',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:messages-5');
+  const shared = shareSellerContact(
+    opened.conversation?.id ?? '',
+    'seller:messages-5',
+  );
+
+  assert.equal(shared.status, 'missing_phone');
+  assert.equal(shared.message, null);
 });
 
 test('toggles favorite listings and updates the listing favorite count', () => {
