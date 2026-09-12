@@ -81,7 +81,7 @@ export function AppWelcomeSplash() {
 
   return (
     <div id={WELCOME_ID} className="app-welcome" role="presentation">
-      <div className="app-welcome__glow" />
+      <div className="app-welcome__backdrop" aria-hidden="true" />
       <div className="app-welcome__content">
         <div className="app-welcome__logo">
           {/* eslint-disable-next-line @next/next/no-img-element -- static brand

@@ -108,6 +108,7 @@ test('welcome css includes a shorter standalone lifecycle', () => {
 
   assert.match(globals, /\[data-app-display="standalone"\] \.app-welcome/);
   assert.match(globals, /app-welcome-standalone-lifecycle/);
+  assert.match(globals, /app-welcome-standalone-content-exit/);
 });
 
 test('boot cover has a shorter fallback in installed app mode', () => {
@@ -118,4 +119,17 @@ test('boot cover has a shorter fallback in installed app mode', () => {
     /html\[data-app-display='standalone'\] #smartstore-boot-cover/,
   );
   assert.match(layout, /animation-delay: 2\.75s/);
+});
+
+test('welcome presentation avoids the old floating glow treatment', () => {
+  const component = readFileSync(
+    join(process.cwd(), 'components', 'app-welcome-splash.tsx'),
+    'utf8',
+  );
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+
+  assert.match(component, /app-welcome__backdrop/);
+  assert.doesNotMatch(component, /app-welcome__glow/);
+  assert.doesNotMatch(globals, /app-welcome-pulse/);
+  assert.doesNotMatch(globals, /app-welcome-float/);
 });
