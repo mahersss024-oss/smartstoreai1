@@ -64,6 +64,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /hasActiveAssistantSearch/);
   assert.match(homePage, /assistantResultListings\.map/);
   assert.match(homePage, /exploreMarketplaceListings\.map/);
+  assert.match(homePage, /نتائج ذكية من مساعد SmartStore AI/);
+  assert.doesNotMatch(homePage, /activeListingQuery \|\|/);
   assert.match(homePage, /الأقرب لطلبك/);
   assert.match(homePage, /مختارة حسب طلبك/);
   assert.match(

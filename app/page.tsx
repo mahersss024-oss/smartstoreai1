@@ -2182,7 +2182,7 @@ export default function Page() {
                         بحث نشط
                       </div>
                       <p className="mt-1 truncate text-sm font-semibold">
-                        {activeListingQuery || 'نتائج من مساعد SmartStore AI'}
+                        نتائج ذكية من مساعد SmartStore AI
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
