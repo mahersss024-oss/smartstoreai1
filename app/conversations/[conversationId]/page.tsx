@@ -1,7 +1,14 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -145,6 +152,7 @@ export default function ConversationPage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const isSeller = session.user?.id === conversation?.sellerId;
   const roleLabel = isSeller ? 'أنت البائع' : 'أنت المشتري';
@@ -209,6 +217,21 @@ export default function ConversationPage() {
     void refreshConversation();
   }, [refreshConversation]);
 
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({
+        block: 'end',
+        behavior: 'smooth',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isLoading, visibleMessages.length]);
+
   useSmartstoreRealtime({
     enabled: Boolean(conversationId),
     fallbackIntervalMs: 4000,
@@ -257,7 +280,9 @@ export default function ConversationPage() {
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      if (!draft.trim() || isSending) {
+      const messageBody = draft.trim();
+
+      if (!messageBody || isSending) {
         return;
       }
 
@@ -273,13 +298,19 @@ export default function ConversationPage() {
               'Content-Type': 'application/json',
               'Idempotency-Key': createClientIdempotencyKey('message-send'),
             },
-            body: JSON.stringify({ body: draft }),
+            body: JSON.stringify({ body: messageBody }),
           },
         );
-        const payload = (await response.json()) as {
+        let payload: {
           conversation?: ConversationRecord;
           error?: string;
-        };
+        } = {};
+
+        try {
+          payload = (await response.json()) as typeof payload;
+        } catch {
+          payload = {};
+        }
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -306,7 +337,9 @@ export default function ConversationPage() {
           return;
         }
 
-        setDraft('');
+        setDraft((currentDraft) =>
+          currentDraft.trim() === messageBody ? '' : currentDraft,
+        );
         setConversation((currentConversation) =>
           pickLatestConversation(
             currentConversation,
@@ -353,7 +386,7 @@ export default function ConversationPage() {
         </header>
 
         <section className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex min-h-[36rem] flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
+          <section className="flex min-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card lg:h-[calc(100vh-8.5rem)] lg:min-h-[36rem]">
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid size-9 place-items-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -389,7 +422,7 @@ export default function ConversationPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-3">
+                <div className="flex min-h-full flex-col justify-end gap-3">
                   {visibleMessages.map((message) => {
                     const mine = message.senderId === session.user?.id;
 
@@ -415,6 +448,7 @@ export default function ConversationPage() {
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} aria-hidden="true" />
                 </div>
               )}
             </div>
@@ -425,7 +459,7 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="grid gap-2 border-t p-3" onSubmit={sendConversationMessage}>
+            <form className="grid gap-2 border-t bg-white p-3 dark:bg-card" onSubmit={sendConversationMessage}>
               <Textarea
                 className="min-h-20 resize-none"
                 disabled={conversation?.status !== 'open'}

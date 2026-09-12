@@ -7,6 +7,7 @@ import {
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic';
 const sendMessageSchema = z.object({
   body: z.string().trim().min(1).max(1000),
 });
+const maxConversationMessageRequestBytes = 8 * 1024;
 
 type RouteContext = {
   params: Promise<{
@@ -66,6 +68,16 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxConversationMessageRequestBytes,
+    'Conversation message request body is too large.',
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

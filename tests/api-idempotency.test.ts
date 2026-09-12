@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { PATCH as updateCommission } from '@/app/api/marketplace/commissions/[commissionId]/route';
+import { POST as sendConversationMessage } from '@/app/api/marketplace/conversations/[conversationId]/route';
 import { POST as createConversation } from '@/app/api/marketplace/conversations/route';
 import {
   createListingDraft,
@@ -174,4 +175,31 @@ test('deduplicates seller commission sale amount updates', async () => {
       process.env.SMARTSTORE_MARKETPLACE_STORE = originalStore;
     }
   }
+});
+
+test('rejects oversized conversation messages before parsing JSON', async () => {
+  const cookie = createSessionCookie({
+    id: 'buyer:conversation-message-size',
+    email: 'buyer-message-size@example.com',
+  });
+  const response = await sendConversationMessage(
+    new Request(
+      'https://smartstore.test/api/marketplace/conversations/conversation:size',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '9000',
+          cookie,
+        },
+        body: '{}',
+      },
+    ),
+    {
+      params: Promise.resolve({ conversationId: 'conversation:size' }),
+    },
+  );
+
+  assert.equal(response.status, 413);
+  assert.equal(await response.text(), 'Conversation message request body is too large.');
 });
