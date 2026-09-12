@@ -1282,7 +1282,7 @@ export default function Page() {
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const listingsRequestIdRef = useRef(0);
-  const listingsAbortControllerRef = useRef<AbortController | null>(null);
+  const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const activeListingQueryRef = useRef('');
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
@@ -1557,21 +1557,13 @@ export default function Page() {
   const refreshMarketplaceListings = useCallback((
     query?: string,
     page = 1,
-    options?: { showLoading?: boolean; abortPrevious?: boolean },
+    options?: { showLoading?: boolean },
   ) => {
     const requestId = ++listingsRequestIdRef.current;
     const params = new URLSearchParams();
     const showLoading = options?.showLoading ?? true;
-    const abortPrevious = options?.abortPrevious ?? page <= 1;
     const requestController = new AbortController();
-
-    if (abortPrevious && listingsAbortControllerRef.current) {
-      listingsAbortControllerRef.current.abort();
-    }
-
-    if (abortPrevious) {
-      listingsAbortControllerRef.current = requestController;
-    }
+    listingsAbortControllersRef.current.add(requestController);
 
     if (showLoading) {
       setIsLoadingListings(true);
@@ -1637,12 +1629,7 @@ export default function Page() {
         setListingPagination({ page: 1, hasMore: false });
       })
       .finally(() => {
-        if (
-          abortPrevious &&
-          listingsAbortControllerRef.current === requestController
-        ) {
-          listingsAbortControllerRef.current = null;
-        }
+        listingsAbortControllersRef.current.delete(requestController);
 
         if (requestId === listingsRequestIdRef.current) {
           setIsLoadingListings(false);
@@ -1659,22 +1646,23 @@ export default function Page() {
       realtimeRefreshTimerRef.current = null;
       void refreshMarketplaceListings(activeListingQueryRef.current, 1, {
         showLoading: false,
-        abortPrevious: true,
       });
     }, 250);
   }, [refreshMarketplaceListings]);
 
   useEffect(() => {
+    const listingsAbortControllers = listingsAbortControllersRef.current;
+
     return () => {
       if (realtimeRefreshTimerRef.current !== null) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
       }
 
-      if (listingsAbortControllerRef.current) {
-        listingsAbortControllerRef.current.abort();
-        listingsAbortControllerRef.current = null;
-      }
+      listingsAbortControllers.forEach((controller) => {
+        controller.abort();
+      });
+      listingsAbortControllers.clear();
     };
   }, []);
 
