@@ -14,7 +14,9 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  Ban,
   Bot,
+  Flag,
   MessageCircle,
   Phone,
   Send,
@@ -78,6 +80,13 @@ type ConversationRecord = {
   messages: ConversationMessage[];
   updatedAt: string;
   listing: ConversationListing | null;
+};
+
+type ConversationBlockStatus = {
+  blocked: boolean;
+  blockedByMe: boolean;
+  blockerId?: string;
+  blockedUserId?: string;
 };
 
 const missingListingImageDataUrl =
@@ -201,6 +210,10 @@ export default function ConversationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isSharingContact, setIsSharingContact] = useState(false);
+  const [isReportingUser, setIsReportingUser] = useState(false);
+  const [isBlockingUser, setIsBlockingUser] = useState(false);
+  const [blockStatus, setBlockStatus] =
+    useState<ConversationBlockStatus | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const isSeller = session.user?.id === conversation?.sellerId;
@@ -212,6 +225,7 @@ export default function ConversationPage() {
     [conversation?.messages],
   );
   const draftHasManualContact = containsManualContactDetails(draft);
+  const isConversationBlocked = Boolean(blockStatus?.blocked);
 
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
@@ -252,10 +266,12 @@ export default function ConversationPage() {
 
       const payload = (await conversationResponse.json()) as {
         conversation: ConversationRecord;
+        blockStatus?: ConversationBlockStatus | null;
       };
       setConversation((currentConversation) =>
         pickLatestConversation(currentConversation, payload.conversation),
       );
+      setBlockStatus(payload.blockStatus ?? null);
     } finally {
       if (showLoading) {
         setIsLoading(false);
@@ -334,7 +350,7 @@ export default function ConversationPage() {
 
       const messageBody = draft.trim();
 
-      if (!messageBody || isSending) {
+      if (!messageBody || isSending || isConversationBlocked) {
         return;
       }
 
@@ -362,6 +378,7 @@ export default function ConversationPage() {
         );
         let payload: {
           conversation?: ConversationRecord;
+          blockStatus?: ConversationBlockStatus;
           error?: string;
         } = {};
 
@@ -380,6 +397,12 @@ export default function ConversationPage() {
           setNotice(
             'لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا داخل المحادثة. استخدم زر مشاركة رقم التواصل الرسمي.',
           );
+          return;
+        }
+
+        if (response.status === 409 && payload.error === 'conversation_blocked') {
+          setBlockStatus(payload.blockStatus ?? { blocked: true, blockedByMe: false });
+          setNotice('لا يمكن إرسال رسائل جديدة في هذه المحادثة بعد الحظر.');
           return;
         }
 
@@ -402,11 +425,18 @@ export default function ConversationPage() {
         setIsSending(false);
       }
     },
-    [conversationId, draft, isSending, refreshConversation, router],
+    [
+      conversationId,
+      draft,
+      isConversationBlocked,
+      isSending,
+      refreshConversation,
+      router,
+    ],
   );
 
   const shareOfficialContact = useCallback(async () => {
-    if (!conversation || isSharingContact) {
+    if (!conversation || isSharingContact || isConversationBlocked) {
       return;
     }
 
@@ -427,6 +457,7 @@ export default function ConversationPage() {
       );
       let payload: {
         conversation?: ConversationRecord;
+        blockStatus?: ConversationBlockStatus;
         error?: string;
       } = {};
 
@@ -457,6 +488,12 @@ export default function ConversationPage() {
         return;
       }
 
+      if (payload.error === 'conversation_blocked') {
+        setBlockStatus(payload.blockStatus ?? { blocked: true, blockedByMe: false });
+        setNotice('لا يمكن مشاركة رقم التواصل بعد حظر هذه المحادثة.');
+        return;
+      }
+
       if (!response.ok || !payload.conversation) {
         setNotice('تعذر مشاركة رقم التواصل الآن.');
         return;
@@ -470,7 +507,111 @@ export default function ConversationPage() {
   }, [
     conversation,
     conversationId,
+    isConversationBlocked,
     isSharingContact,
+    refreshConversation,
+    router,
+  ]);
+
+  const reportConversationUser = useCallback(async () => {
+    if (!conversation || isReportingUser) {
+      return;
+    }
+
+    const details = window.prompt('اكتب سبب البلاغ للإدارة')?.trim();
+
+    if (details === undefined) {
+      return;
+    }
+
+    setIsReportingUser(true);
+    setNotice('');
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/conversations/${conversationId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('user-report'),
+          },
+          body: JSON.stringify({
+            action: 'report_user',
+            reason: 'conversation_report',
+            details: details || undefined,
+          }),
+        },
+      );
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok) {
+        setNotice('تعذر إرسال البلاغ الآن.');
+        return;
+      }
+
+      setNotice('تم إرسال البلاغ للإدارة.');
+    } finally {
+      setIsReportingUser(false);
+    }
+  }, [conversation, conversationId, isReportingUser, router]);
+
+  const blockConversationParticipant = useCallback(async () => {
+    if (!conversation || isBlockingUser || isConversationBlocked) {
+      return;
+    }
+
+    if (!window.confirm('هل تؤكد حظر هذا المستخدم وإيقاف الرسائل الجديدة؟')) {
+      return;
+    }
+
+    setIsBlockingUser(true);
+    setNotice('');
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/conversations/${conversationId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('user-block'),
+          },
+          body: JSON.stringify({
+            action: 'block_user',
+            reason: 'conversation_block',
+          }),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        blockStatus?: ConversationBlockStatus;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok) {
+        setNotice('تعذر حظر المستخدم الآن.');
+        return;
+      }
+
+      setBlockStatus(payload?.blockStatus ?? { blocked: true, blockedByMe: true });
+      setNotice('تم حظر المستخدم. لن يتم إرسال رسائل جديدة في هذه المحادثة.');
+      void refreshConversation({ showLoading: false, clearNotice: false });
+    } finally {
+      setIsBlockingUser(false);
+    }
+  }, [
+    conversation,
+    conversationId,
+    isBlockingUser,
+    isConversationBlocked,
     refreshConversation,
     router,
   ]);
@@ -518,13 +659,37 @@ export default function ConversationPage() {
                     {conversation?.listing?.title ?? 'محادثة إعلان'}
                   </h2>
                   <p className="truncate text-xs text-muted-foreground">
-                    {session.authenticated ? roleLabel : 'يتطلب تسجيل Google'}
+                    {session.authenticated ? roleLabel : 'يتطلب تسجيل الدخول'}
                   </p>
                 </div>
               </div>
-              <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                {conversation?.status === 'open' ? 'مفتوحة' : 'مغلقة'}
-              </span>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <Button
+                  className="rounded-md"
+                  disabled={!conversation || isReportingUser}
+                  onClick={() => void reportConversationUser()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Flag className="size-3.5" />
+                  {isReportingUser ? 'جار الإبلاغ...' : 'إبلاغ'}
+                </Button>
+                <Button
+                  className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                  disabled={!conversation || isBlockingUser || isConversationBlocked}
+                  onClick={() => void blockConversationParticipant()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Ban className="size-3.5" />
+                  {isConversationBlocked ? 'محظورة' : isBlockingUser ? 'جار الحظر...' : 'حظر'}
+                </Button>
+                <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                  {conversation?.status === 'open' ? 'مفتوحة' : 'مغلقة'}
+                </span>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-[#f7f9fc] p-4 dark:bg-background">
@@ -600,11 +765,16 @@ export default function ConversationPage() {
                 {notice}
               </div>
             )}
+            {isConversationBlocked && !notice && (
+              <div className="border-t bg-red-50 px-4 py-2 text-sm leading-7 text-red-900 dark:bg-red-400/10 dark:text-red-100">
+                لا يمكن إرسال رسائل جديدة في هذه المحادثة بعد الحظر.
+              </div>
+            )}
 
             <form className="grid gap-2 border-t bg-white p-3 dark:bg-card" onSubmit={sendConversationMessage}>
               <Textarea
                 className="min-h-20 resize-none"
-                disabled={conversation?.status !== 'open'}
+                disabled={conversation?.status !== 'open' || isConversationBlocked}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}
@@ -626,7 +796,8 @@ export default function ConversationPage() {
                       disabled={
                         isSharingContact ||
                         !conversation ||
-                        conversation.status !== 'open'
+                        conversation.status !== 'open' ||
+                        isConversationBlocked
                       }
                       onClick={shareOfficialContact}
                       type="button"
@@ -642,7 +813,8 @@ export default function ConversationPage() {
                       !draft.trim() ||
                       draftHasManualContact ||
                       isSending ||
-                      !conversation
+                      !conversation ||
+                      isConversationBlocked
                     }
                     type="submit"
                   >

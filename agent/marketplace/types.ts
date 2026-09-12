@@ -107,6 +107,34 @@ export type ReportRecord = {
   createdAt: string;
 };
 
+export type UserReportRecord = {
+  id: string;
+  reporterId: string;
+  targetUserId: string;
+  conversationId?: string;
+  reason: string;
+  details?: string;
+  status: 'open' | 'reviewed' | 'dismissed';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserBlockRecord = {
+  id: string;
+  blockerId: string;
+  blockedId: string;
+  conversationId?: string;
+  reason?: string;
+  createdAt: string;
+};
+
+export type ConversationBlockStatus = {
+  blocked: boolean;
+  blockedByMe: boolean;
+  blockerId?: string;
+  blockedUserId?: string;
+};
+
 export type CommissionStatus =
   | 'pending_amount'
   | 'due'

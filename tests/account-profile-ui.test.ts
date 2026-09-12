@@ -7,6 +7,7 @@ test('account page exposes official contact profile settings', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 
   assert.match(page, /\/api\/account\/profile/);
+  assert.match(page, /method: 'DELETE'/);
   assert.match(page, /بيانات التواصل الرسمية/);
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
@@ -14,5 +15,6 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /الرقم الرسمي المحفوظ/);
   assert.match(page, /تعديل/);
   assert.match(page, /حذف/);
+  assert.match(page, /حذف الحساب/);
   assert.match(page, /countContactPhoneCandidates/);
 });

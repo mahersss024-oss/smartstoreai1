@@ -22,12 +22,15 @@ import type {
   CommissionRecord,
   CommissionStatus,
   Conversation,
+  ConversationBlockStatus,
   ConversationMessage,
   FavoriteRecord,
   ListingDraft,
   ListingImage,
   ListingStatus,
   ReportRecord,
+  UserBlockRecord,
+  UserReportRecord,
 } from './types';
 
 export type CreateListingDraftInput = {
@@ -56,6 +59,8 @@ const listings = new Map<string, ListingRecord>();
 const conversations = new Map<string, Conversation>();
 const favorites = new Map<string, FavoriteRecord>();
 const reports = new Map<string, ReportRecord>();
+const userReports = new Map<string, UserReportRecord>();
+const userBlocks = new Map<string, UserBlockRecord>();
 const commissions = new Map<string, CommissionRecord>();
 let storeLoaded = false;
 const storeFilePath = join(process.cwd(), '.data', 'marketplace-store.json');
@@ -65,6 +70,8 @@ type PersistedMarketplaceStore = {
   conversations: Conversation[];
   favorites?: FavoriteRecord[];
   reports?: ReportRecord[];
+  userReports?: UserReportRecord[];
+  userBlocks?: UserBlockRecord[];
   commissions?: CommissionRecord[];
 };
 
@@ -135,6 +142,8 @@ function persistStore() {
         conversations: [...conversations.values()],
         favorites: [...favorites.values()],
         reports: [...reports.values()],
+        userReports: [...userReports.values()],
+        userBlocks: [...userBlocks.values()],
         commissions: [...commissions.values()],
       } satisfies PersistedMarketplaceStore,
       null,
@@ -187,6 +196,18 @@ function loadStore() {
     for (const report of parsed.reports ?? []) {
       if (report.id) {
         reports.set(report.id, report);
+      }
+    }
+
+    for (const report of parsed.userReports ?? []) {
+      if (report.id) {
+        userReports.set(report.id, report);
+      }
+    }
+
+    for (const block of parsed.userBlocks ?? []) {
+      if (block.id) {
+        userBlocks.set(block.id, block);
       }
     }
 
@@ -742,6 +763,159 @@ export function getConversationForUser(conversationId: string, userId: string) {
   };
 }
 
+function getOtherConversationUser(conversation: Conversation, userId: string) {
+  if (conversation.buyerId === userId) {
+    return conversation.sellerId;
+  }
+
+  if (conversation.sellerId === userId) {
+    return conversation.buyerId;
+  }
+
+  return null;
+}
+
+export function getConversationBlockStatus(
+  conversationId: string,
+  userId: string,
+): ConversationBlockStatus | null {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (!conversation) {
+    return null;
+  }
+
+  const otherUserId = getOtherConversationUser(conversation, userId);
+
+  if (!otherUserId) {
+    return null;
+  }
+
+  const block = [...userBlocks.values()].find(
+    (candidate) =>
+      (candidate.blockerId === userId && candidate.blockedId === otherUserId) ||
+      (candidate.blockerId === otherUserId && candidate.blockedId === userId),
+  );
+
+  if (!block) {
+    return { blocked: false, blockedByMe: false };
+  }
+
+  return {
+    blocked: true,
+    blockedByMe: block.blockerId === userId,
+    blockerId: block.blockerId,
+    blockedUserId: block.blockedId,
+  };
+}
+
+export function reportConversationUser(
+  conversationId: string,
+  reporterId: string,
+  input: { reason: string; details?: string },
+) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      report: null,
+      conversation: null,
+    };
+  }
+
+  const targetUserId = getOtherConversationUser(conversation, reporterId);
+
+  if (!targetUserId) {
+    return {
+      status: 'not_found' as const,
+      report: null,
+      conversation: null,
+    };
+  }
+
+  const timestamp = nowIso();
+  const report: UserReportRecord = {
+    id: randomUUID(),
+    reporterId,
+    targetUserId,
+    conversationId,
+    reason: input.reason,
+    details: input.details,
+    status: 'open',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  userReports.set(report.id, report);
+  persistStore();
+
+  return {
+    status: 'reported' as const,
+    report,
+    conversation,
+  };
+}
+
+export function blockConversationUser(
+  conversationId: string,
+  blockerId: string,
+  reason?: string,
+) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+    };
+  }
+
+  const blockedId = getOtherConversationUser(conversation, blockerId);
+
+  if (!blockedId) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+    };
+  }
+
+  const existingBlock = [...userBlocks.values()].find(
+    (block) => block.blockerId === blockerId && block.blockedId === blockedId,
+  );
+
+  if (existingBlock) {
+    return {
+      status: 'blocked' as const,
+      block: existingBlock,
+      conversation,
+    };
+  }
+
+  const block: UserBlockRecord = {
+    id: randomUUID(),
+    blockerId,
+    blockedId,
+    conversationId,
+    reason,
+    createdAt: nowIso(),
+  };
+
+  userBlocks.set(block.id, block);
+  persistStore();
+
+  return {
+    status: 'blocked' as const,
+    block,
+    conversation,
+  };
+}
+
 export function listUserFavorites(userId: string) {
   seedListings();
 
@@ -839,6 +1013,17 @@ export function addConversationMessage(
     };
   }
 
+  const blockStatus = getConversationBlockStatus(conversationId, senderId);
+
+  if (blockStatus?.blocked) {
+    return {
+      status: 'conversation_blocked' as const,
+      message: null,
+      conversation,
+      blockStatus,
+    };
+  }
+
   const trimmedBody = body.trim();
   const safety = evaluateConversationMessageSafety(trimmedBody);
 
@@ -913,6 +1098,17 @@ export function shareSellerContact(
       status: 'conversation_closed' as const,
       message: null,
       conversation,
+    };
+  }
+
+  const blockStatus = getConversationBlockStatus(conversationId, sellerId);
+
+  if (blockStatus?.blocked) {
+    return {
+      status: 'conversation_blocked' as const,
+      message: null,
+      conversation,
+      blockStatus,
     };
   }
 

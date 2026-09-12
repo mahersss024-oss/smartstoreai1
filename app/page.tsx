@@ -999,6 +999,14 @@ function SignInCard({ text }: { text: string }) {
           المتابعة باستخدام Google
         </a>
       </Button>
+      <Button asChild className="h-9 w-full rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+        <a href="/api/auth/apple/start">
+          <span className="grid size-5 place-items-center rounded-full border border-white/30 text-sm font-bold">
+            A
+          </span>
+          المتابعة باستخدام Apple
+        </a>
+      </Button>
     </div>
   );
 }

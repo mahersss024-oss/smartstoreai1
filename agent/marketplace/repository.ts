@@ -24,6 +24,7 @@ import type {
   CommissionRecord,
   CommissionStatus,
   Conversation,
+  ConversationBlockStatus,
   ConversationMessage,
   FavoriteRecord,
   ListingCondition,
@@ -1392,6 +1393,59 @@ export async function getConversationForUser(
   return conversation ? toConversationRecord(conversation) : null;
 }
 
+function getOtherConversationUserId(conversation: Conversation, userId: string) {
+  if (conversation.buyerId === userId) {
+    return conversation.sellerId;
+  }
+
+  if (conversation.sellerId === userId) {
+    return conversation.buyerId;
+  }
+
+  return null;
+}
+
+export async function getConversationBlockStatus(
+  conversationId: string,
+  userId: string,
+): Promise<ConversationBlockStatus | null> {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.getConversationBlockStatus(conversationId, userId);
+  }
+
+  const conversation = await getConversationForUser(conversationId, userId);
+
+  if (!conversation) {
+    return null;
+  }
+
+  const otherUserId = getOtherConversationUserId(conversation, userId);
+
+  if (!otherUserId) {
+    return null;
+  }
+
+  const block = await prisma.userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerId: userId, blockedId: otherUserId },
+        { blockerId: otherUserId, blockedId: userId },
+      ],
+    },
+  });
+
+  if (!block) {
+    return { blocked: false, blockedByMe: false };
+  }
+
+  return {
+    blocked: true,
+    blockedByMe: block.blockerId === userId,
+    blockerId: block.blockerId,
+    blockedUserId: block.blockedId,
+  };
+}
+
 export async function createConversationForListing(
   listingId: string,
   buyer: Actor,
@@ -1590,6 +1644,163 @@ export async function createConversationForListing(
   };
 }
 
+export async function reportConversationUser(
+  conversationId: string,
+  reporter: Actor,
+  input: { reason: string; details?: string },
+) {
+  const reporterId = getActorId(reporter);
+
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.reportConversationUser(conversationId, reporterId, input);
+  }
+
+  const conversation = await getConversationForUser(conversationId, reporterId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      report: null,
+      conversation: null,
+    };
+  }
+
+  const targetUserId = getOtherConversationUserId(conversation, reporterId);
+
+  if (!targetUserId) {
+    return {
+      status: 'not_found' as const,
+      report: null,
+      conversation: null,
+    };
+  }
+
+  await ensureActorUser(reporter);
+
+  const report = await prisma.userReport.create({
+    data: {
+      reporterId,
+      targetUserId,
+      conversationId,
+      reason: input.reason,
+      details: input.details,
+      status: 'open',
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: conversation.id,
+      listingId: conversation.listingId,
+      sellerId: conversation.sellerId,
+      buyerId: conversation.buyerId,
+      status: conversation.status,
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [conversation.sellerId, conversation.buyerId],
+    },
+  });
+
+  return {
+    status: 'reported' as const,
+    report: {
+      id: report.id,
+      reporterId: report.reporterId,
+      targetUserId: report.targetUserId,
+      conversationId: report.conversationId ?? undefined,
+      reason: report.reason,
+      details: report.details ?? undefined,
+      status: report.status,
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString(),
+    },
+    conversation,
+  };
+}
+
+export async function blockConversationUser(
+  conversationId: string,
+  blocker: Actor,
+  reason?: string,
+) {
+  const blockerId = getActorId(blocker);
+
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.blockConversationUser(conversationId, blockerId, reason);
+  }
+
+  const conversation = await getConversationForUser(conversationId, blockerId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+    };
+  }
+
+  const blockedId = getOtherConversationUserId(conversation, blockerId);
+
+  if (!blockedId) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+    };
+  }
+
+  await ensureActorUser(blocker);
+
+  const block = await prisma.userBlock.upsert({
+    where: {
+      blockerId_blockedId: {
+        blockerId,
+        blockedId,
+      },
+    },
+    create: {
+      blockerId,
+      blockedId,
+      conversationId,
+      reason,
+    },
+    update: {
+      conversationId,
+      reason,
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: conversation.id,
+      listingId: conversation.listingId,
+      sellerId: conversation.sellerId,
+      buyerId: conversation.buyerId,
+      status: conversation.status,
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [conversation.sellerId, conversation.buyerId],
+    },
+  });
+
+  return {
+    status: 'blocked' as const,
+    block: {
+      id: block.id,
+      blockerId: block.blockerId,
+      blockedId: block.blockedId,
+      conversationId: block.conversationId ?? undefined,
+      reason: block.reason ?? undefined,
+      createdAt: block.createdAt.toISOString(),
+    },
+    conversation,
+  };
+}
+
 export async function addConversationMessage(
   conversationId: string,
   sender: Actor,
@@ -1656,6 +1867,17 @@ export async function addConversationMessage(
       status: 'conversation_closed' as const,
       message: null,
       conversation,
+    };
+  }
+
+  const blockStatus = await getConversationBlockStatus(conversationId, senderId);
+
+  if (blockStatus?.blocked) {
+    return {
+      status: 'conversation_blocked' as const,
+      message: null,
+      conversation,
+      blockStatus,
     };
   }
 
@@ -1781,6 +2003,17 @@ export async function shareSellerContact(conversationId: string, seller: Actor) 
       status: 'conversation_closed' as const,
       message: null,
       conversation,
+    };
+  }
+
+  const blockStatus = await getConversationBlockStatus(conversationId, sellerId);
+
+  if (blockStatus?.blocked) {
+    return {
+      status: 'conversation_blocked' as const,
+      message: null,
+      conversation,
+      blockStatus,
     };
   }
 

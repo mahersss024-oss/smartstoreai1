@@ -19,6 +19,16 @@ test('seller buyer conversation scrolls to the latest message', () => {
   assert.match(source, /flex min-h-full flex-col justify-end gap-3/);
 });
 
+test('seller buyer conversation exposes report and block controls', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /reportConversationUser/);
+  assert.match(source, /blockConversationParticipant/);
+  assert.match(source, /action: 'report_user'/);
+  assert.match(source, /action: 'block_user'/);
+  assert.match(source, /isConversationBlocked/);
+});
+
 test('seller buyer conversation handles non-json send failures safely', () => {
   const source = readConversationPage();
 

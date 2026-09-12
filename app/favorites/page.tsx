@@ -208,13 +208,19 @@ export default function FavoritesPage() {
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض المفضلة</h2>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  حفظ المنتجات مرتبط بحساب Google الخاص بالعميل.
+                  حفظ المنتجات مرتبط بحساب العميل المسجل في المنصة.
                 </p>
               </div>
               <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
                 <a href="/api/auth/google/start">
                   <User className="size-4" />
                   دخول Google
+                </a>
+              </Button>
+              <Button asChild className="rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+                <a href="/api/auth/apple/start">
+                  <User className="size-4" />
+                  دخول Apple
                 </a>
               </Button>
             </div>

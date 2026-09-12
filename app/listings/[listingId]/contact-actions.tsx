@@ -78,7 +78,7 @@ export function ListingContactActions({ listingId }: { listingId: string }) {
       </Button>
       <div className="flex items-start gap-2 rounded-md border bg-blue-50 p-3 text-xs leading-6 text-blue-950 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-50">
         <ShieldCheck className="mt-1 size-4 shrink-0 text-blue-600 dark:text-blue-200" />
-        <span>المحادثة تتم داخل SmartStore AI، وقد يُطلب تسجيل Google قبل التواصل.</span>
+        <span>المحادثة تتم داخل SmartStore AI، وقد يُطلب تسجيل الدخول قبل التواصل.</span>
       </div>
       {message && (
         <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground dark:bg-card">

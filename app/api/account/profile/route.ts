@@ -5,6 +5,7 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
 import {
+  clearSessionCookie,
   getAuthSession,
   getConfiguredRoleForEmail,
 } from '@/lib/auth/session';
@@ -119,4 +120,60 @@ export async function PATCH(request: Request) {
     },
     { headers: noStoreHeaders },
   );
+}
+
+export async function DELETE(request: Request) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return NextResponse.json(
+      {
+        error: 'auth_required',
+        message: 'Google sign-in is required to delete account data.',
+      },
+      { status: 401, headers: noStoreHeaders },
+    );
+  }
+
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'account_profile_delete',
+    actorId: session.user.id,
+    maxRequests: 5,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  if (!shouldPersistUserProfile()) {
+    return NextResponse.json(
+      {
+        error: 'profile_storage_unavailable',
+        message: 'Account profile storage is not configured.',
+      },
+      { status: 503, headers: noStoreHeaders },
+    );
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: session.user.id }, { email: session.user.email }],
+    },
+    select: { id: true },
+  });
+
+  if (user) {
+    await prisma.user.delete({
+      where: { id: user.id },
+    });
+  }
+
+  const response = NextResponse.json(
+    { status: 'deleted' },
+    { headers: noStoreHeaders },
+  );
+  response.headers.append('Set-Cookie', clearSessionCookie());
+
+  return response;
 }

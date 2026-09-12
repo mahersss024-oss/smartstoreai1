@@ -72,7 +72,10 @@ When the database store is enabled, listings, images, conversations, messages, f
 - Use hosted object storage for listing images before public launch; database `data:` image URLs are only a development fallback.
 - Run `pnpm db:deploy` during deployment after setting `DATABASE_URL`.
 - Set `SMARTSTORE_MARKETPLACE_STORE=database` in production.
-- Keep `SMARTSTORE_ADMIN_EMAILS` restricted to trusted admin Google accounts.
+- Keep `SMARTSTORE_ADMIN_EMAILS` restricted to trusted admin account emails.
+- Configure `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and
+  `APPLE_PRIVATE_KEY` before submitting an iOS app that also offers Google
+  sign-in.
 
 ## Listing Image Storage
 

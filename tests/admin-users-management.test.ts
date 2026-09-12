@@ -20,6 +20,9 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /\/api\/admin\/users/);
   assert.match(page, /roleFilter/);
   assert.match(page, /phoneNumber/);
+  assert.match(page, /userReportsReceived/);
+  assert.match(page, /حذف المستخدم/);
+  assert.match(page, /method: 'DELETE'/);
   assert.match(page, /حفظ التعديلات/);
   assert.match(page, /اتفاقية العمولة/);
 });
@@ -36,9 +39,12 @@ test('admin users api is server-side admin protected and audited', () => {
   );
 
   assert.match(listRoute, /isAdminSession/);
+  assert.match(listRoute, /userReportsReceived/);
   assert.match(updateRoute, /isAdminSession/);
   assert.match(updateRoute, /cannot_downgrade_self/);
+  assert.match(updateRoute, /cannot_delete_self/);
   assert.match(updateRoute, /normalizeContactPhoneNumber/);
   assert.match(updateRoute, /update_user/);
+  assert.match(updateRoute, /delete_user/);
   assert.match(updateRoute, /adminAuditLog\.create/);
 });

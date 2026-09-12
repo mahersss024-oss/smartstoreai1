@@ -9,7 +9,9 @@ import { getAppBaseUrl } from '@/lib/app-url';
 
 export async function GET(request: Request) {
   if (!hasCommissionAgreement(request)) {
-    return NextResponse.redirect(new URL('/commission-agreement', getAppBaseUrl(request)));
+    return NextResponse.redirect(
+      new URL('/commission-agreement?provider=google', getAppBaseUrl(request)),
+    );
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();

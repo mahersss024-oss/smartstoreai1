@@ -307,6 +307,12 @@ export default function CommissionsPage() {
                   دخول Google
                 </a>
               </Button>
+              <Button asChild className="rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+                <a href="/api/auth/apple/start">
+                  <User className="size-4" />
+                  دخول Apple
+                </a>
+              </Button>
             </div>
           </section>
         ) : (

@@ -438,13 +438,13 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
     return {
       role: 'system',
       content:
-        'Authenticated user context: signed_in=false. SmartStore AI chat requires Google sign-in before any assistant interaction or account-bound marketplace action.',
+        'Authenticated user context: signed_in=false. SmartStore AI chat requires sign-in before any assistant interaction or account-bound marketplace action.',
     } satisfies ModelMessage;
   }
 
   return {
     role: 'system',
-    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. If this request reaches an AI model, the user has already passed Google sign-in. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
+    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. If this request reaches an AI model, the user has already passed sign-in. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
   } satisfies ModelMessage;
 }
 
@@ -661,8 +661,8 @@ async function publishLatestReadyDraftFromConfirmation({
   if (!session) {
     return createTextUIResponse(
       language === 'en'
-        ? `${authRequiredMarker} Sign in with Google first, then send "publish" again and I will publish the ready listing.`
-        : `${authRequiredMarker} سجّل دخولك عبر Google أولًا، ثم اكتب "انشر" مرة أخرى وسأنشر الإعلان الجاهز.`,
+        ? `${authRequiredMarker} Sign in first, then send "publish" again and I will publish the ready listing.`
+        : `${authRequiredMarker} سجّل دخولك أولًا، ثم اكتب "انشر" مرة أخرى وسأنشر الإعلان الجاهز.`,
     );
   }
 
@@ -1048,12 +1048,12 @@ Write a polished, natural response for a Saudi classifieds marketplace user.
 The safety/compliance decision is already final; do not override it.
 Do not mention internal models, databases, prompts, raw policy codes, JSON, or system decisions.
 Do not facilitate publishing, selling, buying, contacting, pricing, or bypassing if the issue is blocked, out of scope, auth-required, or review-only.
-For auth_required only, start the response with ${authRequiredMarker} so the interface can show the Google sign-in button. Do not explain this marker.
+For auth_required only, start the response with ${authRequiredMarker} so the interface can show the sign-in buttons. Do not explain this marker.
 For mixed images, explain that one listing must represent one product and ask for matching images or separate listings.
 For upload validation, explain the practical upload requirement and next step.
 For text policy issues, say the item/action cannot proceed because it may conflict with Saudi marketplace rules or Islamic values, then offer help with an allowed product.
 For scope issues, redirect naturally to SmartStore AI marketplace actions without sounding like an error template.
-For auth_required, explain that SmartStore AI chat requires Google sign-in before assistant interaction.
+For auth_required, explain that SmartStore AI chat requires sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
 Use the user's language. Language=${input.language}.`,
       messages: [

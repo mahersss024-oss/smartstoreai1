@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 import {
   addConversationMessage,
+  blockConversationUser,
+  getConversationBlockStatus,
   getConversationForUser,
+  reportConversationUser,
   shareSellerContact,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
@@ -19,7 +22,21 @@ const sendMessageSchema = z.object({
 const shareContactSchema = z.object({
   action: z.literal('share_contact'),
 });
-const conversationPostSchema = z.union([sendMessageSchema, shareContactSchema]);
+const reportUserSchema = z.object({
+  action: z.literal('report_user'),
+  reason: z.string().trim().min(2).max(120).default('conversation_report'),
+  details: z.string().trim().max(1000).optional(),
+});
+const blockUserSchema = z.object({
+  action: z.literal('block_user'),
+  reason: z.string().trim().max(120).optional(),
+});
+const conversationPostSchema = z.union([
+  sendMessageSchema,
+  shareContactSchema,
+  reportUserSchema,
+  blockUserSchema,
+]);
 const maxConversationMessageRequestBytes = 8 * 1024;
 
 type RouteContext = {
@@ -48,7 +65,15 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json({ error: 'conversation_not_found' }, { status: 404 });
   }
 
-  return Response.json({ conversation }, { headers: noStoreHeaders });
+  const blockStatus = await getConversationBlockStatus(
+    conversationId,
+    session.user.id,
+  );
+
+  return Response.json(
+    { conversation, blockStatus },
+    { headers: noStoreHeaders },
+  );
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -107,7 +132,13 @@ export async function POST(request: Request, context: RouteContext) {
   const messageBody = 'body' in parsed.data ? parsed.data.body : '';
   const idempotency = await reserveIdempotencyKey(request, {
     namespace:
-      action === 'share_contact' ? 'seller_contact_share' : 'message_send',
+      action === 'share_contact'
+        ? 'seller_contact_share'
+        : action === 'report_user'
+          ? 'conversation_user_report'
+          : action === 'block_user'
+            ? 'conversation_user_block'
+            : 'message_send',
     actorKey: `${session.user.id}:${conversationId}`,
   });
 
@@ -115,14 +146,32 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency.response;
   }
 
-  const result =
-    action === 'share_contact'
-      ? await shareSellerContact(conversationId, session.user)
-      : await addConversationMessage(
-          conversationId,
-          session.user,
-          messageBody,
-        );
+  let result:
+    | Awaited<ReturnType<typeof shareSellerContact>>
+    | Awaited<ReturnType<typeof reportConversationUser>>
+    | Awaited<ReturnType<typeof blockConversationUser>>
+    | Awaited<ReturnType<typeof addConversationMessage>>;
+
+  if ('body' in parsed.data) {
+    result = await addConversationMessage(
+      conversationId,
+      session.user,
+      messageBody,
+    );
+  } else if (parsed.data.action === 'share_contact') {
+    result = await shareSellerContact(conversationId, session.user);
+  } else if (parsed.data.action === 'report_user') {
+    result = await reportConversationUser(conversationId, session.user, {
+      reason: parsed.data.reason,
+      details: parsed.data.details,
+    });
+  } else {
+    result = await blockConversationUser(
+      conversationId,
+      session.user,
+      parsed.data.reason,
+    );
+  }
 
   if (result.status === 'not_found') {
     const responseBody = { error: 'conversation_not_found' };
@@ -136,6 +185,19 @@ export async function POST(request: Request, context: RouteContext) {
     const responseBody = {
       error: 'conversation_closed',
       conversation: result.conversation,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
+  }
+
+  if (result.status === 'conversation_blocked') {
+    const responseBody = {
+      error: 'conversation_blocked',
+      message: 'This conversation is blocked.',
+      conversation: result.conversation,
+      blockStatus: result.blockStatus,
     };
 
     return idempotency
@@ -179,6 +241,22 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency
       ? idempotency.complete(responseBody, 422)
       : Response.json(responseBody, { status: 422 });
+  }
+
+  if (result.status === 'blocked') {
+    const responseBody = {
+      ...result,
+      blockStatus: {
+        blocked: true,
+        blockedByMe: true,
+        blockerId: session.user.id,
+        blockedUserId: result.block?.blockedId,
+      },
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 201)
+      : Response.json(responseBody, { status: 201 });
   }
 
   return idempotency

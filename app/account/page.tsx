@@ -354,6 +354,7 @@ export default function AccountPage() {
   const [isEditingProfilePhone, setIsEditingProfilePhone] = useState(false);
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const stats = useMemo(() => {
     return {
@@ -575,6 +576,60 @@ export default function AccountPage() {
   const deleteProfilePhone = useCallback(() => {
     void saveProfile('');
   }, [saveProfile]);
+
+  const deleteAccount = useCallback(async () => {
+    if (
+      !window.confirm(
+        'هل تؤكد حذف الحساب؟ سيتم حذف الإعلانات والمحادثات والبيانات المرتبطة بهذا الحساب من المنصة.',
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setProfileNotice(null);
+
+    try {
+      const response = await fetch('/api/account/profile', {
+        method: 'DELETE',
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok) {
+        setProfileNotice({
+          tone: 'danger',
+          message:
+            payload?.message ??
+            payload?.error ??
+            'تعذر حذف الحساب الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setListings([]);
+      setListingsPagination(null);
+      setSession({ authenticated: false, user: null });
+      setProfilePhone('');
+      setSavedProfilePhone('');
+      setIsEditingProfilePhone(false);
+      router.push('/');
+    } catch {
+      setProfileNotice({
+        tone: 'danger',
+        message: 'تعذر حذف الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, [router]);
 
   const controlListing = useCallback(
     (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {
@@ -962,13 +1017,19 @@ export default function AccountPage() {
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض حسابك</h2>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل Google.
+                  هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل الدخول.
                 </p>
               </div>
               <Button asChild className="w-full max-w-sm justify-center rounded-md bg-blue-600 hover:bg-blue-700">
                 <a href="/api/auth/google/start">
                   <User className="size-4" />
                   دخول Google
+                </a>
+              </Button>
+              <Button asChild className="w-full max-w-sm justify-center rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+                <a href="/api/auth/apple/start">
+                  <User className="size-4" />
+                  دخول Apple
                 </a>
               </Button>
             </div>
@@ -1126,6 +1187,27 @@ export default function AccountPage() {
                   {profileNotice.message}
                 </div>
               ) : null}
+            </section>
+
+            <section className="grid gap-3 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-red-700 dark:text-red-200">حذف الحساب</h2>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    هذا الخيار يحذف بيانات الحساب المرتبطة بالمنصة ويخرجك من الجلسة الحالية.
+                  </p>
+                </div>
+                <Button
+                  className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                  disabled={isDeletingAccount}
+                  onClick={() => void deleteAccount()}
+                  type="button"
+                  variant="outline"
+                >
+                  <Trash2 className="size-4" />
+                  {isDeletingAccount ? 'جار الحذف...' : 'حذف الحساب'}
+                </Button>
+              </div>
             </section>
 
             <section className="grid gap-3 sm:grid-cols-4">

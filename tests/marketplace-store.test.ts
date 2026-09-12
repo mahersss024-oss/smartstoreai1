@@ -7,9 +7,11 @@ import { defaultMaxListingImages } from '@/agent/marketplace/listing-image-limit
 import {
   addConversationMessage,
   addListingImageForSeller,
+  blockConversationUser,
   createConversationForListing,
   createListingDraft,
   deleteListingImageForSeller,
+  getConversationBlockStatus,
   getConversationForUser,
   listModerationQueue,
   listMarketplaceListings,
@@ -19,6 +21,7 @@ import {
   listUserConversations,
   listUserFavorites,
   publishListing,
+  reportConversationUser,
   reportListing,
   setListingModerationStatus,
   setPrimaryListingImageForSeller,
@@ -313,6 +316,51 @@ test('requires a saved seller phone before official contact sharing', () => {
 
   assert.equal(shared.status, 'missing_phone');
   assert.equal(shared.message, null);
+});
+
+test('lets conversation participants report and block the other user', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:messages-block',
+    category: 'cars',
+    title: 'سيارة للبيع',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(
+    listing.id,
+    'buyer:messages-block',
+  );
+
+  const report = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:messages-block',
+    {
+      reason: 'conversation_report',
+      details: 'رسائل غير مناسبة',
+    },
+  );
+  const block = blockConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:messages-block',
+    'conversation_block',
+  );
+  const afterBlock = addConversationMessage(
+    opened.conversation?.id ?? '',
+    'seller:messages-block',
+    'هل ما زلت مهتمًا؟',
+  );
+  const blockStatus = getConversationBlockStatus(
+    opened.conversation?.id ?? '',
+    'buyer:messages-block',
+  );
+
+  assert.equal(report.status, 'reported');
+  assert.equal(report.report?.targetUserId, 'seller:messages-block');
+  assert.equal(block.status, 'blocked');
+  assert.equal(blockStatus?.blocked, true);
+  assert.equal(blockStatus?.blockedByMe, true);
+  assert.equal(afterBlock.status, 'conversation_blocked');
+  assert.equal(afterBlock.message, null);
 });
 
 test('toggles favorite listings and updates the listing favorite count', () => {

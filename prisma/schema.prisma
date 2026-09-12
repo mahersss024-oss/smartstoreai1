@@ -68,6 +68,7 @@ enum AdminAuditAction {
   dismiss_report
   update_commission
   update_user
+  delete_user
 }
 
 model User {
@@ -89,6 +90,10 @@ model User {
   messages                    ConversationMessage[]
   favorites                   Favorite[]
   reports                     Report[]                @relation("ReporterReports")
+  userReportsCreated          UserReport[]            @relation("UserReportsCreated")
+  userReportsReceived         UserReport[]            @relation("UserReportsReceived")
+  userBlocksCreated           UserBlock[]             @relation("UserBlocksCreated")
+  userBlocksReceived          UserBlock[]             @relation("UserBlocksReceived")
   commissions                 Commission[]
   adminAuditLogs              AdminAuditLog[]
   pushSubscriptions           PushSubscription[]
@@ -229,6 +234,8 @@ model Conversation {
   seller      User                    @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
   buyer       User                    @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
   messages    ConversationMessage[]
+  userReports UserReport[]
+  userBlocks  UserBlock[]
 
   @@unique([listingId, sellerId, buyerId])
   @@index([buyerId, updatedAt])
@@ -281,6 +288,44 @@ model Report {
 
   @@index([status, createdAt])
   @@index([listingId])
+}
+
+model UserReport {
+  id             String       @id @default(cuid())
+  reporterId     String
+  targetUserId   String
+  conversationId String?
+  reason         String       @db.VarChar(120)
+  details        String?      @db.VarChar(1000)
+  status         ReportStatus @default(open)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reporter       User         @relation("UserReportsCreated", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUser     User         @relation("UserReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reporterId, createdAt])
+  @@index([targetUserId, status])
+  @@index([conversationId])
+}
+
+model UserBlock {
+  id             String        @id @default(cuid())
+  blockerId      String
+  blockedId      String
+  conversationId String?
+  reason         String?       @db.VarChar(120)
+  createdAt      DateTime      @default(now())
+
+  blocker        User          @relation("UserBlocksCreated", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked        User          @relation("UserBlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId, createdAt])
+  @@index([conversationId])
 }
 
 model Commission {

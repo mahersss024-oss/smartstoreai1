@@ -38,7 +38,12 @@ export default function CommissionAgreementPage() {
         return;
       }
 
-      router.push('/api/auth/google/start');
+      const provider =
+        new URLSearchParams(window.location.search).get('provider') === 'apple'
+          ? 'apple'
+          : 'google';
+
+      router.push(`/api/auth/${provider}/start`);
     } finally {
       setIsLoading(false);
     }

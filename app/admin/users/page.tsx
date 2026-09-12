@@ -14,6 +14,7 @@ import {
   Search,
   ShieldCheck,
   Store,
+  Trash2,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ type AdminUserRecord = {
     messages: number;
     favorites: number;
     reports: number;
+    userReportsReceived?: number;
     commissions: number;
     pushSubscriptions: number;
   };
@@ -93,6 +95,7 @@ export default function AdminUsersPage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const totalUsers = pagination?.total ?? users.length;
   const usersWithPhone = useMemo(
@@ -255,6 +258,58 @@ export default function AdminUsersPage() {
     [drafts, router],
   );
 
+  const deleteUser = useCallback(
+    async (user: AdminUserRecord) => {
+      if (
+        !window.confirm(
+          `هل تؤكد حذف المستخدم ${user.email}؟ سيتم حذف بياناته المرتبطة بالحساب من المنصة.`,
+        )
+      ) {
+        return;
+      }
+
+      setDeletingUserId(user.id);
+      setNotice('');
+
+      try {
+        const response = await fetch(`/api/admin/users/${user.id}`, {
+          method: 'DELETE',
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+          error?: string;
+        } | null;
+
+        if (response.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
+
+        if (!response.ok) {
+          setNotice(
+            payload?.message ??
+              payload?.error ??
+              'تعذر حذف المستخدم الآن.',
+          );
+          return;
+        }
+
+        setUsers((currentUsers) =>
+          currentUsers.filter((currentUser) => currentUser.id !== user.id),
+        );
+        setDrafts((currentDrafts) => {
+          const nextDrafts = { ...currentDrafts };
+          delete nextDrafts[user.id];
+          return nextDrafts;
+        });
+        setNotice('تم حذف المستخدم من المنصة.');
+      } finally {
+        setDeletingUserId(null);
+      }
+    },
+    [router],
+  );
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
@@ -358,6 +413,7 @@ export default function AdminUsersPage() {
                 phoneNumber: user.phoneNumber ?? '',
               };
               const isSaving = savingUserId === user.id;
+              const isDeleting = deletingUserId === user.id;
 
               return (
                 <article key={user.id} className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
@@ -388,7 +444,7 @@ export default function AdminUsersPage() {
                       الدور
                       <select
                         className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                        disabled={isSaving}
+                        disabled={isSaving || isDeleting}
                         onChange={(event) =>
                           updateDraft(user.id, {
                             role: normalizeRole(event.target.value),
@@ -407,7 +463,7 @@ export default function AdminUsersPage() {
                         <input
                           className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                           dir="ltr"
-                          disabled={isSaving}
+                          disabled={isSaving || isDeleting}
                           inputMode="tel"
                           onChange={(event) =>
                             updateDraft(user.id, {
@@ -420,7 +476,7 @@ export default function AdminUsersPage() {
                         />
                         <Button
                           className="rounded-md"
-                          disabled={isSaving || !draft.phoneNumber}
+                          disabled={isSaving || isDeleting || !draft.phoneNumber}
                           onClick={() => void saveUser(user.id, '')}
                           type="button"
                           variant="outline"
@@ -456,6 +512,9 @@ export default function AdminUsersPage() {
                       الرسائل: {formatNumber(user.counts.messages)}
                     </div>
                     <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                      بلاغات المستخدم: {formatNumber(user.counts.userReportsReceived ?? 0)}
+                    </div>
+                    <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
                       آخر تحديث: {formatDate(user.updatedAt)}
                     </div>
                     <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
@@ -469,8 +528,18 @@ export default function AdminUsersPage() {
                       أي تعديل إداري يتم تسجيله في سجل الإدارة.
                     </div>
                     <Button
+                      className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                      disabled={isSaving || isDeleting}
+                      onClick={() => void deleteUser(user)}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 className="size-4" />
+                      {isDeleting ? 'جار الحذف...' : 'حذف المستخدم'}
+                    </Button>
+                    <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      disabled={isSaving}
+                      disabled={isSaving || isDeleting}
                       onClick={() => void saveUser(user.id)}
                       type="button"
                     >

@@ -31,6 +31,7 @@ function mapUser(user: {
     messages: number;
     favorites: number;
     reports: number;
+    userReportsReceived: number;
     commissions: number;
     pushSubscriptions: number;
   };
@@ -55,6 +56,7 @@ function mapUser(user: {
       messages: user._count.messages,
       favorites: user._count.favorites,
       reports: user._count.reports,
+      userReportsReceived: user._count.userReportsReceived,
       commissions: user._count.commissions,
       pushSubscriptions: user._count.pushSubscriptions,
     },
@@ -116,6 +118,7 @@ export async function GET(request: Request) {
             messages: true,
             favorites: true,
             reports: true,
+            userReportsReceived: true,
             commissions: true,
             pushSubscriptions: true,
           },
