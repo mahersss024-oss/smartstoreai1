@@ -74,6 +74,8 @@ model User {
   email                       String                  @unique
   name                        String?
   picture                     String?
+  phoneNumber                 String?                 @db.VarChar(32)
+  phoneUpdatedAt              DateTime?
   role                        String                  @default("user")
   commissionAgreementVersion  String?
   commissionAgreementAccepted DateTime?

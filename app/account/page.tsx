@@ -18,6 +18,7 @@ import {
   Pause,
   Pencil,
   Percent,
+  Phone,
   Save,
   ShieldCheck,
   Star,
@@ -39,6 +40,7 @@ type AuthUser = {
   email: string;
   name?: string;
   picture?: string;
+  phoneNumber?: string;
   role?: string;
 };
 
@@ -123,6 +125,11 @@ type ListingEditNotice = {
   tone: 'info' | 'warning' | 'danger';
   message: string;
   reasons?: string[];
+};
+
+type ProfileNotice = {
+  tone: 'success' | 'danger' | 'info';
+  message: string;
 };
 
 const listingCategoryOptions = [
@@ -341,6 +348,9 @@ export default function AccountPage() {
   });
   const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const stats = useMemo(() => {
     return {
@@ -355,8 +365,14 @@ export default function AccountPage() {
   const refreshSession = useCallback(() => {
     return fetch('/api/auth/session', { cache: 'no-store' })
       .then((response) => response.json() as Promise<AuthSessionPayload>)
-      .then(setSession)
-      .catch(() => setSession({ authenticated: false, user: null }));
+      .then((payload) => {
+        setSession(payload);
+        setProfilePhone(payload.user?.phoneNumber ?? '');
+      })
+      .catch(() => {
+        setSession({ authenticated: false, user: null });
+        setProfilePhone('');
+      });
   }, []);
 
   const refreshListings = useCallback(async (page = 1) => {
@@ -465,8 +481,65 @@ export default function AccountPage() {
       setListings([]);
       setListingsPagination(null);
       setSession({ authenticated: false, user: null });
+      setProfilePhone('');
+      setProfileNotice(null);
     });
   }, []);
+
+  const saveProfile = useCallback(async () => {
+    setIsSavingProfile(true);
+    setProfileNotice(null);
+
+    try {
+      const response = await fetch('/api/account/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: profilePhone }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        user?: AuthUser;
+        message?: string;
+        error?: string;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok || !payload?.user) {
+        setProfileNotice({
+          tone: 'danger',
+          message:
+            payload?.message ??
+            payload?.error ??
+            'تعذر حفظ بيانات الحساب الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setSession((currentSession) => ({
+        ...currentSession,
+        user: currentSession.user
+          ? { ...currentSession.user, ...payload.user }
+          : payload.user ?? null,
+      }));
+      setProfilePhone(payload.user.phoneNumber ?? '');
+      setProfileNotice({
+        tone: 'success',
+        message: payload.user.phoneNumber
+          ? 'تم حفظ رقم التواصل الرسمي في حسابك.'
+          : 'تم حذف رقم التواصل من حسابك.',
+      });
+    } catch {
+      setProfileNotice({
+        tone: 'danger',
+        message: 'تعذر حفظ بيانات الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }, [profilePhone, router]);
 
   const controlListing = useCallback(
     (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {
@@ -933,6 +1006,56 @@ export default function AccountPage() {
                   </Button>
                 )}
               </div>
+            </section>
+
+            <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex items-start gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <Phone className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-bold">بيانات التواصل الرسمية</h2>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    يستخدم هذا الرقم لاحقًا عند مشاركة التواصل داخل محادثة بيع رسمية، ولا يتم السماح بإرساله كنص عشوائي داخل الرسائل.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <label className="grid gap-1 text-sm font-semibold">
+                  رقم الجوال
+                  <input
+                    className="h-11 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    dir="ltr"
+                    inputMode="tel"
+                    placeholder="05xxxxxxxx"
+                    type="tel"
+                    value={profilePhone}
+                    onChange={(event) => setProfilePhone(event.target.value)}
+                  />
+                </label>
+                <Button
+                  className="self-end rounded-md bg-blue-600 hover:bg-blue-700"
+                  disabled={isSavingProfile}
+                  onClick={saveProfile}
+                  type="button"
+                >
+                  <Save className="size-4" />
+                  {isSavingProfile ? 'جار الحفظ...' : 'حفظ البيانات'}
+                </Button>
+              </div>
+              {profileNotice ? (
+                <div
+                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                    profileNotice.tone === 'success'
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                      : profileNotice.tone === 'danger'
+                        ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-200'
+                        : 'border-blue-500/40 bg-blue-500/10 text-blue-800 dark:text-blue-100'
+                  }`}
+                >
+                  {profileNotice.message}
+                </div>
+              ) : null}
             </section>
 
             <section className="grid gap-3 sm:grid-cols-4">

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+
+test('account page exposes official contact profile settings', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /\/api\/account\/profile/);
+  assert.match(page, /بيانات التواصل الرسمية/);
+  assert.match(page, /inputMode="tel"/);
+  assert.match(page, /placeholder="05xxxxxxxx"/);
+  assert.match(page, /حفظ البيانات/);
+});
+

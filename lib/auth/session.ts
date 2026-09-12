@@ -5,6 +5,7 @@ export type AuthSessionUser = {
   email: string;
   name?: string;
   picture?: string;
+  phoneNumber?: string;
   role?: 'user' | 'moderator' | 'admin' | string;
 };
 

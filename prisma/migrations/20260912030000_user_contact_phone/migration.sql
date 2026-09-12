@@ -1,0 +1,3 @@
+ALTER TABLE "User" ADD COLUMN "phoneNumber" VARCHAR(32);
+ALTER TABLE "User" ADD COLUMN "phoneUpdatedAt" TIMESTAMP(3);
+
