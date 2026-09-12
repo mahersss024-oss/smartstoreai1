@@ -67,6 +67,7 @@ enum AdminAuditAction {
   review_report
   dismiss_report
   update_commission
+  update_user
 }
 
 model User {

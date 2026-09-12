@@ -209,6 +209,12 @@ export default function AdminHomePage() {
   const quickLinks = useMemo(
     () => [
       {
+        href: '/admin/users',
+        icon: <Users className="size-4" />,
+        label: 'إدارة المستخدمين',
+        text: 'عرض العملاء، بيانات التواصل الرسمية، الأدوار، ونشاط الحسابات.',
+      },
+      {
         href: '/admin/listings',
         icon: <Megaphone className="size-4" />,
         label: 'إدارة الإعلانات',
