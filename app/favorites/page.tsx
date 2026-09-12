@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowRight, Heart, MapPin, Store, User } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -211,15 +212,15 @@ export default function FavoritesPage() {
                   حفظ المنتجات مرتبط بحساب العميل المسجل في المنصة.
                 </p>
               </div>
-              <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
+              <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
-                  <User className="size-4" />
+                  <GoogleMark className="size-5" />
                   دخول Google
                 </a>
               </Button>
-              <Button asChild className="rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+              <Button asChild className="justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
                 <a href="/api/auth/apple/start">
-                  <User className="size-4" />
+                  <AppleMark className="size-5" />
                   دخول Apple
                 </a>
               </Button>

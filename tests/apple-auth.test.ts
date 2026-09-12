@@ -76,3 +76,17 @@ test('home login control offers Google and Apple choices', () => {
   assert.match(homePage, /api\/auth\/apple\/start/);
   assert.doesNotMatch(homePage, /NEXT_PUBLIC_ENABLE_APPLE_SIGN_IN/);
 });
+
+test('login provider controls use brand marks instead of letter placeholders', () => {
+  const providerMarks = readProjectFile('components', 'auth-provider-mark.tsx');
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(providerMarks, /export function GoogleMark/);
+  assert.match(providerMarks, /#4285F4/);
+  assert.match(providerMarks, /#34A853/);
+  assert.match(providerMarks, /#FBBC05/);
+  assert.match(providerMarks, /#EA4335/);
+  assert.match(providerMarks, /export function AppleMark/);
+  assert.match(homePage, /<GoogleMark className="size-5" \/>/);
+  assert.match(homePage, /<AppleMark className="size-5/);
+});

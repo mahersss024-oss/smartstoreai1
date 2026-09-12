@@ -61,6 +61,7 @@ import {
   usePromptInputAttachments,
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
+import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -999,20 +1000,16 @@ function SignInCard({ text }: { text: string }) {
         <ShieldCheck className="mt-1 size-4 shrink-0 text-blue-700 dark:text-blue-300" />
         <p className="text-sm leading-7">{text.replace(authRequiredMarker, '').trim()}</p>
       </div>
-      <Button asChild className="h-9 w-full rounded-md bg-white text-[#1f1f1f] hover:bg-white/90">
+      <Button asChild className="h-10 w-full justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
         <a href="/api/auth/google/start">
-          <span className="grid size-5 place-items-center rounded-full border text-sm font-bold text-blue-600">
-            G
-          </span>
-          المتابعة باستخدام Google
+          <GoogleMark className="size-5" />
+          <span>المتابعة باستخدام Google</span>
         </a>
       </Button>
-      <Button asChild className="h-9 w-full rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+      <Button asChild className="h-10 w-full justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
         <a href="/api/auth/apple/start">
-          <span className="grid size-5 place-items-center rounded-full border border-white/30 text-sm font-bold">
-            A
-          </span>
-          المتابعة باستخدام Apple
+          <AppleMark className="size-5" />
+          <span>المتابعة باستخدام Apple</span>
         </a>
       </Button>
     </div>
@@ -1028,21 +1025,21 @@ function AuthProviderMenu() {
           دخول
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" className="w-56 border-slate-200/70 p-1.5 shadow-xl dark:border-white/10">
         <DropdownMenuLabel className="text-right text-xs text-muted-foreground">
           اختر طريقة الدخول
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="justify-end">
+        <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
           <a href="/api/auth/google/start">
             <span>دخول Google</span>
-            <User className="size-4" />
+            <GoogleMark className="size-5" />
           </a>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="justify-end">
+        <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
           <a href="/api/auth/apple/start">
             <span>دخول Apple</span>
-            <ShieldCheck className="size-4" />
+            <AppleMark className="size-5 text-foreground" />
           </a>
         </DropdownMenuItem>
       </DropdownMenuContent>

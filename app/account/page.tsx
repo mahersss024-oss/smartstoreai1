@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { createNormalizedImageFile } from '@/lib/client-image-normalization';
@@ -1020,15 +1021,15 @@ export default function AccountPage() {
                   هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل الدخول.
                 </p>
               </div>
-              <Button asChild className="w-full max-w-sm justify-center rounded-md bg-blue-600 hover:bg-blue-700">
+              <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
-                  <User className="size-4" />
+                  <GoogleMark className="size-5" />
                   دخول Google
                 </a>
               </Button>
-              <Button asChild className="w-full max-w-sm justify-center rounded-md bg-[#111827] text-white hover:bg-[#111827]/90">
+              <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
                 <a href="/api/auth/apple/start">
-                  <User className="size-4" />
+                  <AppleMark className="size-5" />
                   دخول Apple
                 </a>
               </Button>
