@@ -5,10 +5,14 @@ import test from 'node:test';
 
 import {
   APP_READY_FLAG,
+  APP_DISPLAY_MODE_ATTR,
+  APP_DISPLAY_MODE_STANDALONE,
   buildWelcomeInitScript,
   WELCOME_FADE_MS,
   WELCOME_ID,
   WELCOME_SESSION_KEY,
+  WELCOME_STANDALONE_FADE_MS,
+  WELCOME_STANDALONE_VISIBLE_MS,
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
@@ -28,6 +32,15 @@ test('welcome init script hides the overlay before paint for returning visits', 
   assert.match(script, /setAttribute\('data-welcome','skip'\)/);
   // And it must respect reduced-motion users.
   assert.match(script, /prefers-reduced-motion: reduce/);
+});
+
+test('welcome init script marks installed app display mode before paint', () => {
+  const script = buildWelcomeInitScript();
+
+  assert.ok(script.includes(APP_DISPLAY_MODE_ATTR));
+  assert.ok(script.includes(APP_DISPLAY_MODE_STANDALONE));
+  assert.match(script, /navigator\.standalone/);
+  assert.match(script, /display-mode: standalone/);
 });
 
 test('welcome init script is a self-contained IIFE', () => {
@@ -56,6 +69,11 @@ test('welcome overlay uses a stable id and sane timings', () => {
   assert.ok(WELCOME_VISIBLE_MS <= 4000, 'overlay should not overstay');
   assert.ok(WELCOME_FADE_MS >= 400, 'fade should be smooth');
   assert.ok(WELCOME_FADE_MS <= 1000, 'fade should not feel sluggish');
+  assert.ok(
+    WELCOME_STANDALONE_VISIBLE_MS < WELCOME_VISIBLE_MS,
+    'installed app welcome should be shorter after the native launch screen',
+  );
+  assert.ok(WELCOME_STANDALONE_FADE_MS <= WELCOME_FADE_MS);
 });
 
 test('welcome logo asset exists in public assets', () => {
@@ -83,4 +101,21 @@ test('welcome surfaces use the dark teal brand palette', () => {
     assert.match(source, /#08111d/);
     assert.match(source, /#117c8b/);
   }
+});
+
+test('welcome css includes a shorter standalone lifecycle', () => {
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+
+  assert.match(globals, /\[data-app-display="standalone"\] \.app-welcome/);
+  assert.match(globals, /app-welcome-standalone-lifecycle/);
+});
+
+test('boot cover has a shorter fallback in installed app mode', () => {
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  assert.match(
+    layout,
+    /html\[data-app-display='standalone'\] #smartstore-boot-cover/,
+  );
+  assert.match(layout, /animation-delay: 2\.75s/);
 });

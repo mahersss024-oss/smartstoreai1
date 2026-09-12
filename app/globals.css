@@ -706,6 +706,11 @@
     display: none !important;
   }
 
+  [data-app-display="standalone"] .app-welcome {
+    animation-duration: 1950ms;
+    animation-name: app-welcome-standalone-lifecycle;
+  }
+
   .app-welcome__glow {
     position: absolute;
     width: min(82vmin, 640px);
@@ -800,6 +805,19 @@
     }
     /* ~2.6s visible, then a ~0.7s fade. */
     79% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+
+  @keyframes app-welcome-standalone-lifecycle {
+    0% {
+      opacity: 1;
+    }
+    72% {
       opacity: 1;
     }
     100% {

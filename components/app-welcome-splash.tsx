@@ -3,9 +3,13 @@
 import { useEffect, useRef } from 'react';
 
 import {
+  APP_DISPLAY_MODE_ATTR,
+  APP_DISPLAY_MODE_STANDALONE,
   WELCOME_FADE_MS,
   WELCOME_ID,
   WELCOME_SESSION_KEY,
+  WELCOME_STANDALONE_FADE_MS,
+  WELCOME_STANDALONE_VISIBLE_MS,
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
@@ -46,6 +50,13 @@ export function AppWelcomeSplash() {
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const isStandalone =
+      document.documentElement.getAttribute(APP_DISPLAY_MODE_ATTR) ===
+      APP_DISPLAY_MODE_STANDALONE;
+    const visibleMs = isStandalone
+      ? WELCOME_STANDALONE_VISIBLE_MS
+      : WELCOME_VISIBLE_MS;
+    const fadeMs = isStandalone ? WELCOME_STANDALONE_FADE_MS : WELCOME_FADE_MS;
 
     // The visual lifecycle (hold + fade) is driven by CSS so the overlay always
     // disappears even if this script is interrupted. JS only records the visit,
@@ -60,7 +71,7 @@ export function AppWelcomeSplash() {
       root.remove();
       // Reveal the app and drop the brand boot cover at the same moment.
       document.documentElement.setAttribute('data-app-ready', '1');
-    }, WELCOME_VISIBLE_MS + WELCOME_FADE_MS);
+    }, visibleMs + fadeMs);
 
     return () => {
       window.clearTimeout(removeTimer);

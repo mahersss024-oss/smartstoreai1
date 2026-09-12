@@ -85,6 +85,9 @@ html, body { background-color: #08111d; }
   animation: smartstore-boot-cover-hide 0s linear 4.5s forwards;
 }
 html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
+html[data-app-display='standalone'] #smartstore-boot-cover {
+  animation-delay: 2.75s;
+}
 @keyframes smartstore-boot-cover-hide { to { opacity: 0; visibility: hidden; } }
 `;
 
