@@ -330,6 +330,7 @@ export default function AccountPage() {
     authenticated: false,
     user: null,
   });
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [listings, setListings] = useState<ListingCard[]>([]);
   const [listingsPagination, setListingsPagination] =
     useState<PaginationMeta | null>(null);
@@ -371,6 +372,8 @@ export default function AccountPage() {
     hasSavedProfilePhone && !isEditingProfilePhone;
 
   const refreshSession = useCallback(() => {
+    setIsSessionLoading(true);
+
     return fetch('/api/auth/session', { cache: 'no-store' })
       .then((response) => response.json() as Promise<AuthSessionPayload>)
       .then((payload) => {
@@ -384,6 +387,9 @@ export default function AccountPage() {
         setProfilePhone('');
         setSavedProfilePhone('');
         setIsEditingProfilePhone(false);
+      })
+      .finally(() => {
+        setIsSessionLoading(false);
       });
   }, []);
 
@@ -493,6 +499,7 @@ export default function AccountPage() {
       setListings([]);
       setListingsPagination(null);
       setSession({ authenticated: false, user: null });
+      setIsSessionLoading(false);
       setProfilePhone('');
       setSavedProfilePhone('');
       setIsEditingProfilePhone(false);
@@ -1009,7 +1016,21 @@ export default function AccountPage() {
           </div>
         </header>
 
-        {!session.authenticated ? (
+        {isSessionLoading ? (
+          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+            <div className="grid max-w-md gap-4">
+              <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                <ShieldCheck className="size-7" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  نتحقق من جلسة الدخول قبل عرض بيانات حسابك.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : !session.authenticated ? (
           <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">

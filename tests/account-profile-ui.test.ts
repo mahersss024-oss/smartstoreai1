@@ -18,3 +18,13 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /حذف الحساب/);
   assert.match(page, /countContactPhoneCandidates/);
 });
+
+test('account page does not flash sign-in controls while session is loading', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /const \[isSessionLoading, setIsSessionLoading\] = useState\(true\)/);
+  assert.match(page, /setIsSessionLoading\(false\)/);
+  assert.match(page, /isSessionLoading \? \(/);
+  assert.match(page, /جاري التحقق من الحساب/);
+  assert.match(page, /: !session\.authenticated \? \(/);
+});
