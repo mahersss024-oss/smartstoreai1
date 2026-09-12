@@ -143,18 +143,17 @@ test('welcome css includes a shorter standalone lifecycle', () => {
 
   assert.match(globals, /\[data-app-display="standalone"\] \.app-welcome/);
   assert.match(globals, /app-welcome-standalone-lifecycle/);
-  assert.match(globals, /app-welcome-standalone-content-exit/);
 });
 
-test('welcome content exits in sync with the overlay background', () => {
+test('welcome content fades only with the overlay background', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
   assert.match(globals, /app-welcome-lifecycle 2920ms/);
-  assert.match(globals, /app-welcome-content-exit 2920ms/);
-  assert.match(globals, /animation-duration: 640ms, 1700ms/);
-  assert.match(globals, /@keyframes app-welcome-content-exit[\s\S]*0%,\s*82%/);
-  assert.match(globals, /@keyframes app-welcome-standalone-content-exit[\s\S]*0%,\s*74%/);
+  assert.match(globals, /animation: app-welcome-rise 820ms/);
+  assert.match(globals, /animation-duration: 640ms/);
+  assert.doesNotMatch(globals, /app-welcome-content-exit/);
+  assert.doesNotMatch(globals, /app-welcome-standalone-content-exit/);
   assert.match(layout, /app-welcome-lifecycle 2920ms/);
   assert.match(layout, /animation-duration: 1700ms/);
 });
