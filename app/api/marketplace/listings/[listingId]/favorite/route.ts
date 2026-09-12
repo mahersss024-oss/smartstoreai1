@@ -16,7 +16,7 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to save favorites.',
+        message: 'Sign-in is required to save favorites.',
       },
       { status: 401 },
     );

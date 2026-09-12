@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to view conversations.',
+        message: 'Sign-in is required to view conversations.',
       },
       { status: 401 },
     );

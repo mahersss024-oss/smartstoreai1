@@ -137,8 +137,8 @@ export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDeci
 
 export function getAuthRequiredResponse(language: 'ar' | 'en') {
   return language === 'en'
-    ? '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] Sign in with Google first to use SmartStore AI chat and continue marketplace assistance.'
-    : '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] سجّل دخولك عبر Google أولًا لاستخدام مساعد SmartStore AI ومتابعة خدمات السوق.';
+    ? '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] Sign in with Google or Apple first to use SmartStore AI chat and continue marketplace assistance.'
+    : '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] سجّل دخولك عبر Google أو Apple أولًا لاستخدام مساعد SmartStore AI ومتابعة خدمات السوق.';
 }
 
 export function getComplianceBlockResponse(language: 'ar' | 'en') {

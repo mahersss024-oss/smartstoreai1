@@ -39,7 +39,7 @@ function authRequired() {
   return {
     status: 'auth_required' as const,
     message:
-      'Google sign-in is required before using SmartStore AI chat or account-bound marketplace actions.',
+      'Sign-in with Google or Apple is required before using SmartStore AI chat or account-bound marketplace actions.',
   };
 }
 
@@ -527,7 +527,7 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires Google sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. Price changes and destructive actions must be confirmed by the user before using this tool.',
+        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. Price changes and destructive actions must be confirmed by the user before using this tool.',
       inputSchema: updateListingDetailsInputSchema,
       execute: async ({ listingId, ...updates }) => {
         if (!session) {
@@ -578,7 +578,7 @@ export function createMarketplaceTools(
 
     addUploadedImagesToListing: tool({
       description:
-        'Attach the latest uploaded chat images to a seller-owned listing after the user clearly asks to add/update listing photos. Requires Google sign-in and a clear listingId. Use only truth-preserving product images already uploaded in this chat turn or retained listing image context.',
+        'Attach the latest uploaded chat images to a seller-owned listing after the user clearly asks to add/update listing photos. Requires sign-in and a clear listingId. Use only truth-preserving product images already uploaded in this chat turn or retained listing image context.',
       inputSchema: z.object({
         listingId: z.string().min(1),
       }),
@@ -617,7 +617,7 @@ export function createMarketplaceTools(
 
     deleteListingImage: tool({
       description:
-        'Delete one image from a seller-owned listing. Requires Google sign-in, clear listingId and imageId, and explicit user confirmation.',
+        'Delete one image from a seller-owned listing. Requires sign-in, clear listingId and imageId, and explicit user confirmation.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         imageId: z.string().min(1),
@@ -649,7 +649,7 @@ export function createMarketplaceTools(
 
     setPrimaryListingImage: tool({
       description:
-        'Set one image as the primary image for a seller-owned listing. Requires Google sign-in and clear listingId and imageId.',
+        'Set one image as the primary image for a seller-owned listing. Requires sign-in and clear listingId and imageId.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         imageId: z.string().min(1),
@@ -755,7 +755,7 @@ export function createMarketplaceTools(
 
     openMarketplaceConversation: tool({
       description:
-        'Open an internal buyer-seller conversation for a published listing. Requires Google sign-in and must not expose phone numbers.',
+        'Open an internal buyer-seller conversation for a published listing. Requires sign-in and must not expose phone numbers.',
       inputSchema: z.object({
         listingId: z.string().min(1),
       }),
@@ -770,7 +770,7 @@ export function createMarketplaceTools(
 
     toggleFavoriteListing: tool({
       description:
-        'Save or remove a published listing from the current user favorites. Requires Google sign-in.',
+        'Save or remove a published listing from the current user favorites. Requires sign-in.',
       inputSchema: z.object({
         listingId: z.string().min(1),
       }),
@@ -785,7 +785,7 @@ export function createMarketplaceTools(
 
     reportMarketplaceListing: tool({
       description:
-        'Report a published listing for moderation review when the user says it is prohibited, fraudulent, counterfeit, misleading, abusive, or in the wrong category. Requires Google sign-in.',
+        'Report a published listing for moderation review when the user says it is prohibited, fraudulent, counterfeit, misleading, abusive, or in the wrong category. Requires sign-in.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         reason: z.enum([

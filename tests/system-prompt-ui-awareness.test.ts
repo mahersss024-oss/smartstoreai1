@@ -12,6 +12,7 @@ test('system prompt knows assistant search can be cleared without changing model
 });
 
 test('system prompt guides signed-in users through platform account help safely', () => {
+  assert.match(systemPrompt, /Sign-in with Google or Apple/);
   assert.match(systemPrompt, /platform-help questions/);
   assert.match(systemPrompt, /\/account/);
   assert.match(systemPrompt, /saved contact phone/);
@@ -22,5 +23,7 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /\/terms/);
   assert.match(systemPrompt, /\/privacy/);
   assert.match(systemPrompt, /manual phone numbers and emails remain blocked/);
+  assert.match(systemPrompt, /Do not claim you can navigate the app/);
+  assert.match(systemPrompt, /tell the user what to tap/);
   assert.match(systemPrompt, /Do not invent account data/);
 });

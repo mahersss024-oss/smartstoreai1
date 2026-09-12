@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to message a seller.',
+        message: 'Sign-in is required to message a seller.',
       },
       { status: 401 },
     );

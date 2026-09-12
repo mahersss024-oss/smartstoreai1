@@ -52,7 +52,7 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to view this conversation.',
+        message: 'Sign-in is required to view this conversation.',
       },
       { status: 401 },
     );
@@ -83,7 +83,7 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to send messages.',
+        message: 'Sign-in is required to send messages.',
       },
       { status: 401 },
     );

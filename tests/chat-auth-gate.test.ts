@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { POST } from '@/app/api/chat/route';
 
-test('requires Google sign-in before any chat model interaction', async () => {
+test('requires sign-in before any chat model interaction', async () => {
   const response = await POST(
     new Request('http://localhost/api/chat', {
       method: 'POST',

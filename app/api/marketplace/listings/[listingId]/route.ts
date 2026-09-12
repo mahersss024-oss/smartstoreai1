@@ -68,7 +68,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to control a listing.',
+        message: 'Sign-in is required to control a listing.',
       },
       { status: 401 },
     );

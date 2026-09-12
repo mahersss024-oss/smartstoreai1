@@ -125,7 +125,7 @@ export default function CommissionAgreementPage() {
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="flex items-start gap-2 text-xs leading-6 text-muted-foreground">
                 <BadgeCheck className="mt-1 size-4 shrink-0 text-blue-600" />
-                يتم حفظ الإقرار قبل تحويلك إلى تسجيل Google.
+                يتم حفظ الإقرار قبل تحويلك إلى مزود الدخول المختار.
               </div>
               <Button
                 className="rounded-md bg-blue-600 hover:bg-blue-700"

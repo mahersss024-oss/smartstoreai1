@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to view seller listings.',
+        message: 'Sign-in is required to view seller listings.',
       },
       { status: 401 },
     );

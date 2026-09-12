@@ -149,9 +149,11 @@ test('still blocks off-platform app handoff even with inspection intent', () => 
   assert.ok(decision.reasons.includes('external_contact_attempt'));
 });
 
-test('marks auth response with a frontend-renderable Google sign-in marker', () => {
+test('marks auth response with a frontend-renderable sign-in marker', () => {
   assert.match(
     getAuthRequiredResponse('ar'),
     /\[\[SMARTSTORE_GOOGLE_AUTH_REQUIRED\]\]/,
   );
+  assert.match(getAuthRequiredResponse('ar'), /Google أو Apple/);
+  assert.match(getAuthRequiredResponse('en'), /Google or Apple/);
 });

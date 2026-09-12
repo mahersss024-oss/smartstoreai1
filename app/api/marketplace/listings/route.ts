@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to create a listing draft.',
+        message: 'Sign-in is required to create a listing draft.',
       },
       { status: 401 },
     );

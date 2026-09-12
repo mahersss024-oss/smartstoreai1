@@ -31,7 +31,7 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to report a listing.',
+        message: 'Sign-in is required to report a listing.',
       },
       { status: 401 },
     );

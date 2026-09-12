@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to view commission payment methods.',
+        message: 'Sign-in is required to view commission payment methods.',
       },
       { status: 401 },
     );

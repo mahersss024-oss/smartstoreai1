@@ -22,7 +22,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to update commissions.',
+        message: 'Sign-in is required to update commissions.',
       },
       { status: 401 },
     );

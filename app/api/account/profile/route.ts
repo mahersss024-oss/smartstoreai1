@@ -26,7 +26,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to update account data.',
+        message: 'Sign-in is required to update account data.',
       },
       { status: 401, headers: noStoreHeaders },
     );
@@ -129,7 +129,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to delete account data.',
+        message: 'Sign-in is required to delete account data.',
       },
       { status: 401, headers: noStoreHeaders },
     );

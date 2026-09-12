@@ -26,7 +26,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to update listing images.',
+        message: 'Sign-in is required to update listing images.',
       },
       { status: 401 },
     );
@@ -98,7 +98,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     return Response.json(
       {
         error: 'auth_required',
-        message: 'Google sign-in is required to delete listing images.',
+        message: 'Sign-in is required to delete listing images.',
       },
       { status: 401 },
     );

@@ -77,6 +77,13 @@ test('home login control offers Google and Apple choices', () => {
   assert.doesNotMatch(homePage, /NEXT_PUBLIC_ENABLE_APPLE_SIGN_IN/);
 });
 
+test('commission agreement copy does not imply Google is the only provider', () => {
+  const agreementPage = readProjectFile('app', 'commission-agreement', 'page.tsx');
+
+  assert.match(agreementPage, /مزود الدخول المختار/);
+  assert.doesNotMatch(agreementPage, /تسجيل Google/);
+});
+
 test('login provider controls use brand marks instead of letter placeholders', () => {
   const providerMarks = readProjectFile('components', 'auth-provider-mark.tsx');
   const homePage = readProjectFile('app', 'page.tsx');
