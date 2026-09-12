@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import {
   APP_DISPLAY_MODE_ATTR,
   APP_DISPLAY_MODE_STANDALONE,
+  WELCOME_COOKIE_NAME,
   WELCOME_FADE_MS,
   WELCOME_ID,
   WELCOME_SESSION_KEY,
@@ -55,6 +56,7 @@ export function AppWelcomeSplash() {
     } catch {
       // Ignore storage failures.
     }
+    document.cookie = `${WELCOME_COOKIE_NAME}=1; Path=/; SameSite=Lax`;
     const isStandalone =
       document.documentElement.getAttribute(APP_DISPLAY_MODE_ATTR) ===
       APP_DISPLAY_MODE_STANDALONE;

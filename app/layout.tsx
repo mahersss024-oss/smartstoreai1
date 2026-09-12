@@ -88,6 +88,7 @@ html:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartsto
   animation: smartstore-boot-cover-hide 0s linear 8s forwards;
 }
 html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
+html[data-welcome='skip'] #smartstore-boot-cover { display: none !important; }
 html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
 #smartstore-welcome {
   position: fixed;
@@ -177,6 +178,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <script
+          id="smartstore-welcome-init"
+          dangerouslySetInnerHTML={{ __html: buildWelcomeInitScript() }}
+        />
         <style
           id="smartstore-boot-cover-style"
           dangerouslySetInnerHTML={{ __html: bootCoverStyle }}
@@ -184,10 +189,6 @@ export default function RootLayout({
         <script
           id="smartstore-theme-init"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
-        />
-        <script
-          id="smartstore-welcome-init"
-          dangerouslySetInnerHTML={{ __html: buildWelcomeInitScript() }}
         />
         <link
           rel="apple-touch-startup-image"

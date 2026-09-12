@@ -8,6 +8,7 @@ import {
   APP_DISPLAY_MODE_ATTR,
   APP_DISPLAY_MODE_STANDALONE,
   buildWelcomeInitScript,
+  WELCOME_COOKIE_NAME,
   WELCOME_FADE_MS,
   WELCOME_ID,
   WELCOME_SESSION_KEY,
@@ -22,6 +23,10 @@ test('welcome init script references the shared session key', () => {
   assert.ok(
     script.includes(WELCOME_SESSION_KEY),
     'script must read the same sessionStorage key as the component',
+  );
+  assert.ok(
+    script.includes(WELCOME_COOKIE_NAME),
+    'script must also read the cookie fallback before paint',
   );
 });
 
@@ -107,13 +112,19 @@ test('welcome component records the visit before its removal timer', () => {
     'utf8',
   );
   const storageIndex = component.indexOf('window.sessionStorage.setItem');
+  const cookieIndex = component.indexOf('document.cookie');
   const timerIndex = component.indexOf('window.setTimeout');
 
   assert.ok(storageIndex > -1, 'component should record the viewed welcome');
+  assert.ok(cookieIndex > -1, 'component should write a cookie fallback');
   assert.ok(timerIndex > -1, 'component should still remove itself after the CSS lifecycle');
   assert.ok(
     storageIndex < timerIndex,
     'welcome should be marked seen before a route change can cancel the timer',
+  );
+  assert.ok(
+    cookieIndex < timerIndex,
+    'welcome cookie fallback should be written before route changes can cancel the timer',
   );
 });
 
@@ -153,6 +164,7 @@ test('boot cover keeps app content hidden until the welcome is ready', () => {
 
   assert.match(layout, /html:not\(\[data-app-ready='1'\]\) body > :not\(#smartstore-boot-cover\):not\(#smartstore-welcome\)/);
   assert.match(layout, /visibility: hidden/);
+  assert.match(layout, /html\[data-welcome='skip'\] #smartstore-boot-cover/);
   assert.doesNotMatch(layout, /visibility: hidden !important/);
   assert.match(layout, /smartstore-app-shell-fallback-reveal/);
   assert.doesNotMatch(layout, /animation-delay: 2\.75s/);
@@ -161,6 +173,11 @@ test('boot cover keeps app content hidden until the welcome is ready', () => {
 test('welcome has critical first-paint styles in the document head', () => {
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
+  assert.ok(
+    layout.indexOf('id="smartstore-welcome-init"') <
+      layout.indexOf('id="smartstore-boot-cover-style"'),
+    'welcome state must be decided before the boot cover CSS can paint',
+  );
   assert.match(layout, /#smartstore-welcome \{/);
   assert.match(layout, /z-index: 9999/);
   assert.match(layout, /html\[data-app-display='standalone'\] #smartstore-welcome/);
