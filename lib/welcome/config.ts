@@ -30,7 +30,7 @@ export const WELCOME_STANDALONE_FADE_MS = 450;
  * overlay, and a first-time visitor sees it immediately (no post-hydration pop).
  */
 export function buildWelcomeInitScript() {
-  return `(function(){var d=document.documentElement;try{var m=window.matchMedia;var standalone=(window.navigator&&window.navigator.standalone===true)||(m&&((m('(display-mode: standalone)').matches)||(m('(display-mode: fullscreen)').matches)));if(standalone){d.setAttribute('${APP_DISPLAY_MODE_ATTR}','${APP_DISPLAY_MODE_STANDALONE}');}var stored=false;try{stored=window.sessionStorage.getItem('${WELCOME_SESSION_KEY}')==='1';}catch(e){}var cookie=(document.cookie||'').indexOf('${WELCOME_COOKIE_NAME}=1')!==-1;var reduce=m&&m('(prefers-reduced-motion: reduce)').matches;if(stored||cookie||reduce){d.setAttribute('data-welcome','skip');d.setAttribute('data-app-ready','1');}}catch(e){}})();`;
+  return `(function(){var d=document.documentElement;try{var m=window.matchMedia;var standalone=(window.navigator&&window.navigator.standalone===true)||(m&&((m('(display-mode: standalone)').matches)||(m('(display-mode: fullscreen)').matches)));if(standalone){d.setAttribute('${APP_DISPLAY_MODE_ATTR}','${APP_DISPLAY_MODE_STANDALONE}');}var stored=false;try{stored=window.sessionStorage.getItem('${WELCOME_SESSION_KEY}')==='1';}catch(e){}var cookie=(document.cookie||'').indexOf('${WELCOME_COOKIE_NAME}=1')!==-1;var reduce=m&&m('(prefers-reduced-motion: reduce)').matches;if(stored||cookie||reduce){d.setAttribute('data-welcome','skip');d.setAttribute('data-app-ready','1');}else{d.setAttribute('data-welcome','show');}}catch(e){d.setAttribute('data-welcome','skip');d.setAttribute('data-app-ready','1');}})();`;
 }
 
 /**

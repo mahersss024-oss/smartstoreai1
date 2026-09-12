@@ -33,7 +33,8 @@ export function AppWelcomeSplash() {
 
     // If the head script already flagged this as a returning visit, React takes
     // over removal so the element does not linger in the DOM.
-    if (document.documentElement.getAttribute('data-welcome') === 'skip') {
+    const welcomeState = document.documentElement.getAttribute('data-welcome');
+    if (welcomeState !== 'show') {
       root.remove();
       document.documentElement.setAttribute('data-app-ready', '1');
       return;

@@ -70,13 +70,14 @@ const themeStyle: CSSProperties = {
 // The welcome overlay (also server-rendered) then draws on top of it.
 const bootCoverStyle = `
 html, body { background-color: #08111d; }
-html:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartstore-welcome) {
+html[data-welcome='show']:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartstore-welcome) {
   visibility: hidden;
   animation: smartstore-app-shell-fallback-reveal 0s linear 8s forwards;
 }
 #smartstore-boot-cover {
   position: fixed;
   inset: 0;
+  display: none;
   /* Sits just below the welcome overlay (z-index 9999) so the animated welcome
      plays on top of it, but above the app content so nothing flashes through. */
   z-index: 9998;
@@ -87,6 +88,7 @@ html:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartsto
     linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   animation: smartstore-boot-cover-hide 0s linear 8s forwards;
 }
+html[data-welcome='show'] #smartstore-boot-cover { display: block; }
 html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
 html[data-welcome='skip'] #smartstore-boot-cover { display: none !important; }
 html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
@@ -94,7 +96,7 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   position: fixed;
   inset: 0;
   z-index: 9999;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -103,6 +105,7 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   padding-bottom: env(safe-area-inset-bottom);
   animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+html[data-welcome='show'] #smartstore-welcome { display: flex; }
 html[data-app-display='standalone'] #smartstore-welcome {
   animation-duration: 1700ms;
   animation-name: app-welcome-standalone-lifecycle;

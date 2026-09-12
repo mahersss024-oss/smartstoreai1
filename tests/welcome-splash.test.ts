@@ -35,6 +35,7 @@ test('welcome init script hides the overlay before paint for returning visits', 
 
   // It must set the skip flag the CSS relies on to avoid a flash.
   assert.match(script, /setAttribute\('data-welcome','skip'\)/);
+  assert.match(script, /setAttribute\('data-welcome','show'\)/);
   // And it must respect reduced-motion users.
   assert.match(script, /prefers-reduced-motion: reduce/);
 });
@@ -126,6 +127,11 @@ test('welcome component records the visit before its removal timer', () => {
     cookieIndex < timerIndex,
     'welcome cookie fallback should be written before route changes can cancel the timer',
   );
+  assert.match(
+    component,
+    /welcomeState !== 'show'/,
+    'component should not start the overlay lifecycle unless the head script explicitly opted in',
+  );
 });
 
 test('welcome surfaces use the dark teal brand palette', () => {
@@ -161,8 +167,10 @@ test('welcome content fades only with the overlay background', () => {
 test('boot cover keeps app content hidden until the welcome is ready', () => {
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
-  assert.match(layout, /html:not\(\[data-app-ready='1'\]\) body > :not\(#smartstore-boot-cover\):not\(#smartstore-welcome\)/);
+  assert.match(layout, /html\[data-welcome='show'\]:not\(\[data-app-ready='1'\]\) body > :not\(#smartstore-boot-cover\):not\(#smartstore-welcome\)/);
   assert.match(layout, /visibility: hidden/);
+  assert.match(layout, /#smartstore-boot-cover[\s\S]*display: none/);
+  assert.match(layout, /html\[data-welcome='show'\] #smartstore-boot-cover \{ display: block; \}/);
   assert.match(layout, /html\[data-welcome='skip'\] #smartstore-boot-cover/);
   assert.doesNotMatch(layout, /visibility: hidden !important/);
   assert.match(layout, /smartstore-app-shell-fallback-reveal/);

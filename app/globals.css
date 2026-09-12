@@ -682,7 +682,7 @@
     position: fixed;
     inset: 0;
     z-index: 9999;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     overflow: hidden;
@@ -697,6 +697,10 @@
        (forwards fill). JS only adds the "seen this session" shortcut. */
     animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1)
       forwards;
+  }
+
+  [data-welcome="show"] .app-welcome {
+    display: flex;
   }
 
   /* Returning visitor / reduced motion: hide before the first paint. */
