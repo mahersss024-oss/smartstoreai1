@@ -50,6 +50,11 @@ export function AppWelcomeSplash() {
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    try {
+      window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1');
+    } catch {
+      // Ignore storage failures.
+    }
     const isStandalone =
       document.documentElement.getAttribute(APP_DISPLAY_MODE_ATTR) ===
       APP_DISPLAY_MODE_STANDALONE;
@@ -59,14 +64,10 @@ export function AppWelcomeSplash() {
     const fadeMs = isStandalone ? WELCOME_STANDALONE_FADE_MS : WELCOME_FADE_MS;
 
     // The visual lifecycle (hold + fade) is driven by CSS so the overlay always
-    // disappears even if this script is interrupted. JS only records the visit,
-    // reveals the app, and removes the now-hidden node from the DOM.
+    // disappears even if this script is interrupted. The visit is recorded
+    // before the timer so route changes/reloads during the animation do not
+    // replay the welcome screen on the next page.
     const removeTimer = window.setTimeout(() => {
-      try {
-        window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1');
-      } catch {
-        // Ignore storage failures.
-      }
       document.body.style.overflow = previousOverflow;
       root.remove();
       // Reveal the app and drop the brand boot cover at the same moment.

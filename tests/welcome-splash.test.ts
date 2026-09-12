@@ -101,6 +101,22 @@ test('welcome component uses the icon-only welcome logo', () => {
   assert.doesNotMatch(component, /\/smartstore-logo\.png/);
 });
 
+test('welcome component records the visit before its removal timer', () => {
+  const component = readFileSync(
+    join(process.cwd(), 'components', 'app-welcome-splash.tsx'),
+    'utf8',
+  );
+  const storageIndex = component.indexOf('window.sessionStorage.setItem');
+  const timerIndex = component.indexOf('window.setTimeout');
+
+  assert.ok(storageIndex > -1, 'component should record the viewed welcome');
+  assert.ok(timerIndex > -1, 'component should still remove itself after the CSS lifecycle');
+  assert.ok(
+    storageIndex < timerIndex,
+    'welcome should be marked seen before a route change can cancel the timer',
+  );
+});
+
 test('welcome surfaces use the dark teal brand palette', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
