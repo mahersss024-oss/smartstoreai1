@@ -661,9 +661,6 @@ function formatCategory(category: string) {
 
 type SearchToolOutput = {
   status?: unknown;
-  count?: unknown;
-  candidateCount?: unknown;
-  rankedCount?: unknown;
   listings?: unknown;
 };
 
@@ -922,18 +919,6 @@ function isSearchToolOutput(value: unknown): value is SearchToolOutput {
     (value.status === 'searched' || value.status === 'compared') &&
     Array.isArray(value.listings)
   );
-}
-
-function getSearchToolResultCount(output: SearchToolOutput | null) {
-  if (!output) {
-    return 0;
-  }
-
-  const count = [output.candidateCount, output.rankedCount, output.count].find(
-    (value) => typeof value === 'number' && Number.isFinite(value),
-  );
-
-  return typeof count === 'number' ? Math.max(0, count) : 0;
 }
 
 function getLatestSearchToolOutput(messages: UIMessage[]) {
@@ -1342,10 +1327,6 @@ export default function Page() {
       searchToolListings: hasActiveAssistantSearch ? assistantResultListings : [],
     });
   }, [assistantResultListings, hasActiveAssistantSearch, marketplaceListings]);
-  const searchResultCount = Math.max(
-    getSearchToolResultCount(latestSearchToolOutput),
-    searchToolListings.length,
-  );
   const canLoadMoreListings = getCanLoadMoreExploreListings({
     hasMore: listingPagination.hasMore,
     displayedCount: marketplaceListings.length,
@@ -2206,9 +2187,7 @@ export default function Page() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="hidden rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200 sm:inline-flex">
-                        {searchResultCount > 0
-                          ? `${searchResultCount} نتيجة مطابقة`
-                          : 'لا توجد نتائج مطابقة'}
+                        مختارة حسب طلبك
                       </span>
                       <Button
                         variant="ghost"
@@ -2224,7 +2203,7 @@ export default function Page() {
 
                   <div className="flex items-center justify-end gap-2 text-base font-bold">
                     <Sparkles className="size-4 text-blue-600" />
-                    مطابق لطلبك
+                    الأقرب لطلبك
                   </div>
 
                   {assistantResultListings.length > 0 ? (
@@ -2241,7 +2220,7 @@ export default function Page() {
                     </div>
                   ) : (
                     <div className="rounded-md border border-dashed bg-white p-4 text-center text-sm text-muted-foreground dark:bg-card">
-                      لا توجد نتائج مطابقة لهذا البحث. جرّب تضييق أو تعديل الطلب في المساعد.
+                      لم أجد إعلانًا مناسبًا لهذا الطلب حاليًا.
                     </div>
                   )}
                 </div>

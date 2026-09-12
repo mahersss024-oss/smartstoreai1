@@ -64,6 +64,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /hasActiveAssistantSearch/);
   assert.match(homePage, /assistantResultListings\.map/);
   assert.match(homePage, /exploreMarketplaceListings\.map/);
+  assert.match(homePage, /الأقرب لطلبك/);
+  assert.match(homePage, /مختارة حسب طلبك/);
   assert.match(
     homePage,
     /searchToolListings: hasActiveAssistantSearch \? assistantResultListings : \[\]/,
@@ -71,4 +73,6 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /clearAssistantSearch/);
   assert.doesNotMatch(homePage, /displayedMarketplaceListings/);
   assert.doesNotMatch(homePage, /refreshMarketplaceListings\(activeListingQuery/);
+  assert.doesNotMatch(homePage, /searchResultCount/);
+  assert.doesNotMatch(homePage, /نتيجة مطابقة/);
 });
