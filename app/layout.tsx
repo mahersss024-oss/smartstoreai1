@@ -70,6 +70,10 @@ const themeStyle: CSSProperties = {
 // The welcome overlay (also server-rendered) then draws on top of it.
 const bootCoverStyle = `
 html, body { background-color: #08111d; }
+html:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartstore-welcome) {
+  visibility: hidden;
+  animation: smartstore-app-shell-fallback-reveal 0s linear 8s forwards;
+}
 #smartstore-boot-cover {
   position: fixed;
   inset: 0;
@@ -81,13 +85,58 @@ html, body { background-color: #08111d; }
      never trap the user on a blank brand screen. */
   background:
     linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
-  animation: smartstore-boot-cover-hide 0s linear 4.5s forwards;
+  animation: smartstore-boot-cover-hide 0s linear 8s forwards;
 }
 html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
-html[data-app-display='standalone'] #smartstore-boot-cover {
-  animation-delay: 2.75s;
+html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
+#smartstore-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: app-welcome-lifecycle 3300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+html[data-app-display='standalone'] #smartstore-welcome {
+  animation-duration: 1950ms;
+  animation-name: app-welcome-standalone-lifecycle;
+}
+#smartstore-welcome .app-welcome__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.15rem;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+#smartstore-welcome .app-welcome__logo {
+  width: clamp(108px, 27vmin, 172px);
+  height: clamp(108px, 27vmin, 172px);
+  border-radius: 24%;
+  overflow: hidden;
+}
+#smartstore-welcome .app-welcome__logo img {
+  width: 100%;
+  height: 100%;
+  border-radius: 24%;
+  display: block;
+}
+@keyframes smartstore-app-shell-fallback-reveal { to { visibility: visible; } }
 @keyframes smartstore-boot-cover-hide { to { opacity: 0; visibility: hidden; } }
+@keyframes app-welcome-lifecycle {
+  0%, 79% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+@keyframes app-welcome-standalone-lifecycle {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
 `;
 
 const themeInitScript = `

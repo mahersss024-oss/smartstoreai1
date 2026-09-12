@@ -111,14 +111,23 @@ test('welcome css includes a shorter standalone lifecycle', () => {
   assert.match(globals, /app-welcome-standalone-content-exit/);
 });
 
-test('boot cover has a shorter fallback in installed app mode', () => {
+test('boot cover keeps app content hidden until the welcome is ready', () => {
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
-  assert.match(
-    layout,
-    /html\[data-app-display='standalone'\] #smartstore-boot-cover/,
-  );
-  assert.match(layout, /animation-delay: 2\.75s/);
+  assert.match(layout, /html:not\(\[data-app-ready='1'\]\) body > :not\(#smartstore-boot-cover\):not\(#smartstore-welcome\)/);
+  assert.match(layout, /visibility: hidden/);
+  assert.doesNotMatch(layout, /visibility: hidden !important/);
+  assert.match(layout, /smartstore-app-shell-fallback-reveal/);
+  assert.doesNotMatch(layout, /animation-delay: 2\.75s/);
+});
+
+test('welcome has critical first-paint styles in the document head', () => {
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  assert.match(layout, /#smartstore-welcome \{/);
+  assert.match(layout, /z-index: 9999/);
+  assert.match(layout, /html\[data-app-display='standalone'\] #smartstore-welcome/);
+  assert.match(layout, /app-welcome-standalone-lifecycle/);
 });
 
 test('welcome presentation avoids the old floating glow treatment', () => {
