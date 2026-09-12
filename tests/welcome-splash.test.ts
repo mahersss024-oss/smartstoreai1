@@ -132,6 +132,7 @@ test('welcome presentation avoids the old floating glow treatment', () => {
   assert.doesNotMatch(component, /app-welcome__glow/);
   assert.doesNotMatch(globals, /app-welcome-pulse/);
   assert.doesNotMatch(globals, /app-welcome-float/);
+  assert.doesNotMatch(globals, /app-welcome-sheen/);
 });
 
 test('welcome background stays smooth without grid texture', () => {
