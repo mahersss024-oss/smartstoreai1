@@ -43,19 +43,21 @@ export function AppWelcomeSplash() {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const startExit = window.setTimeout(() => {
-      document.body.style.overflow = previousOverflow;
+    // The visual lifecycle (hold + fade) is driven by CSS so the overlay always
+    // disappears even if this script is interrupted. JS only records the visit
+    // and removes the now-hidden node from the DOM.
+    const removeTimer = window.setTimeout(() => {
       try {
         window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1');
       } catch {
         // Ignore storage failures.
       }
-      root.classList.add('app-welcome--out');
-      window.setTimeout(() => root.remove(), WELCOME_FADE_MS);
-    }, WELCOME_VISIBLE_MS);
+      document.body.style.overflow = previousOverflow;
+      root.remove();
+    }, WELCOME_VISIBLE_MS + WELCOME_FADE_MS);
 
     return () => {
-      window.clearTimeout(startExit);
+      window.clearTimeout(removeTimer);
       document.body.style.overflow = previousOverflow;
     };
   }, []);
