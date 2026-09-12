@@ -67,3 +67,12 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
   assert.match(callbackRoute, /getOauthState/);
 });
+
+test('home login control offers Google and Apple choices', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /function AuthProviderMenu/);
+  assert.match(homePage, /api\/auth\/google\/start/);
+  assert.match(homePage, /api\/auth\/apple\/start/);
+  assert.doesNotMatch(homePage, /NEXT_PUBLIC_ENABLE_APPLE_SIGN_IN/);
+});

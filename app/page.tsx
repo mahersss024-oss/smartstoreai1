@@ -73,6 +73,14 @@ import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -1008,6 +1016,37 @@ function SignInCard({ text }: { text: string }) {
         </a>
       </Button>
     </div>
+  );
+}
+
+function AuthProviderMenu() {
+  return (
+    <DropdownMenu dir="rtl">
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" className="rounded-md bg-blue-600 hover:bg-blue-700">
+          <User className="size-4" />
+          دخول
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-right text-xs text-muted-foreground">
+          اختر طريقة الدخول
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="justify-end">
+          <a href="/api/auth/google/start">
+            <span>دخول Google</span>
+            <User className="size-4" />
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="justify-end">
+          <a href="/api/auth/apple/start">
+            <span>دخول Apple</span>
+            <ShieldCheck className="size-4" />
+          </a>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -2124,12 +2163,7 @@ export default function Page() {
                   </Button>
                 </>
               ) : (
-                <Button asChild size="sm" className="rounded-md bg-blue-600 hover:bg-blue-700">
-                  <a href="/api/auth/google/start">
-                    <User className="size-4" />
-                    دخول
-                  </a>
-                </Button>
+                <AuthProviderMenu />
               )}
             </div>
           </header>
