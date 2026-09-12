@@ -10,7 +10,7 @@ import type {
   PublishRealtimeEventInput,
   RealtimeEventVisibility,
 } from '@/lib/realtime/events';
-import type { AdminAuditAction, Prisma } from '@prisma/client';
+import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
@@ -257,6 +257,17 @@ function asRecord(value: unknown) {
 
 function toPrismaJsonObject(value: Record<string, unknown>) {
   return value as Prisma.InputJsonObject;
+}
+
+function isPrismaKnownRequestError(error: unknown, code: string) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === code
+  );
+}
+
+function waitForSerializableRetry(attempt: number) {
+  return new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
 }
 
 function getActorId(actor: Actor) {
@@ -684,37 +695,59 @@ export async function createListingDraft(
 
   await ensureUser(user);
 
-  const sellerListingCount = await prisma.listing.count({
-    where: {
-      sellerId: user.id,
-      status: { not: 'deleted' },
-    },
-  });
+  const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
+  let listing: DatabaseListingRecord | null = null;
 
-  if (hasReachedSellerListingLimit(sellerListingCount)) {
-    throw new ListingLimitReachedError();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      listing = await prisma.$transaction(
+        async (tx) => {
+          const sellerListingCount = await tx.listing.count({
+            where: {
+              sellerId: user.id,
+              status: { not: 'deleted' },
+            },
+          });
+
+          if (hasReachedSellerListingLimit(sellerListingCount)) {
+            throw new ListingLimitReachedError();
+          }
+
+          return tx.listing.create({
+            data: {
+              sellerId: user.id,
+              category: input.category,
+              title: input.title,
+              description: input.description,
+              price: toNumericPrice(input.price),
+              priceMode: toPriceMode(input.price),
+              city: input.city,
+              condition: input.condition,
+              attributes: toPrismaJsonObject(input.attributes ?? {}),
+              searchText: toNormalizedListingSearchText(input),
+              compliance: toPrismaJsonObject(
+                compliance as unknown as Record<string, unknown>,
+              ),
+              status: chooseInitialStatus(compliance),
+            },
+            include: { images: true },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      break;
+    } catch (error) {
+      if (!isPrismaKnownRequestError(error, 'P2034') || attempt === 2) {
+        throw error;
+      }
+
+      await waitForSerializableRetry(attempt);
+    }
   }
 
-  const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
-  const listing = await prisma.listing.create({
-    data: {
-      sellerId: user.id,
-      category: input.category,
-      title: input.title,
-      description: input.description,
-      price: toNumericPrice(input.price),
-      priceMode: toPriceMode(input.price),
-      city: input.city,
-      condition: input.condition,
-      attributes: toPrismaJsonObject(input.attributes ?? {}),
-      searchText: toNormalizedListingSearchText(input),
-      compliance: toPrismaJsonObject(
-        compliance as unknown as Record<string, unknown>,
-      ),
-      status: chooseInitialStatus(compliance),
-    },
-    include: { images: true },
-  });
+  if (!listing) {
+    throw new Error('Listing draft transaction did not return a listing.');
+  }
 
   const mappedListing = toListingRecord(listing);
 
@@ -1448,12 +1481,47 @@ export async function createConversationForListing(
     };
   }
 
-  const conversation = await prisma.$transaction(async (tx) => {
-    const created = await tx.conversation.create({
-      data: {
-        listingId,
-        sellerId: listing.sellerId,
-        buyerId,
+  let conversation: DatabaseConversationRecord;
+
+  try {
+    conversation = await prisma.$transaction(async (tx) => {
+      const created = await tx.conversation.create({
+        data: {
+          listingId,
+          sellerId: listing.sellerId,
+          buyerId,
+        },
+        include: {
+          messages: { orderBy: { createdAt: 'asc' } },
+          listing: {
+            include: {
+              images: {
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+              },
+            },
+          },
+        },
+      });
+
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { messageCount: { increment: 1 } },
+      });
+
+      return created;
+    });
+  } catch (error) {
+    if (!isPrismaKnownRequestError(error, 'P2002')) {
+      throw error;
+    }
+
+    const racedConversation = await prisma.conversation.findUnique({
+      where: {
+        listingId_sellerId_buyerId: {
+          listingId,
+          sellerId: listing.sellerId,
+          buyerId,
+        },
       },
       include: {
         messages: { orderBy: { createdAt: 'asc' } },
@@ -1467,13 +1535,15 @@ export async function createConversationForListing(
       },
     });
 
-    await tx.listing.update({
-      where: { id: listingId },
-      data: { messageCount: { increment: 1 } },
-    });
+    if (!racedConversation) {
+      throw error;
+    }
 
-    return created;
-  });
+    return {
+      status: 'existing' as const,
+      conversation: toConversationRecord(racedConversation),
+    };
+  }
 
   const mappedConversation = toConversationRecord(conversation);
 

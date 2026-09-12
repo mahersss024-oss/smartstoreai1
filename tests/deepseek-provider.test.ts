@@ -8,6 +8,7 @@ import {
   fetchDeepseekWithRetry,
   getDeepseekApiKey,
   getDeepseekMaxConcurrentRequests,
+  getDeepseekMaxQueuedRequests,
   getDeepseekModelName,
   getDeepseekQueueTimeoutMs,
   isTransientDeepseekResponse,
@@ -23,6 +24,7 @@ const modelEnvKeys = [
   'DEEPSEEK_MODERATION_MODEL',
   'DEEPSEEK_VISION_MODEL',
   'SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS',
+  'SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS',
   'SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS',
 ] as const;
 
@@ -122,6 +124,7 @@ test('prefers local DeepSeek key over stale machine environment key', () => {
 test('uses load-tested DeepSeek concurrency defaults', () => {
   withModelEnvironment({}, () => {
     assert.equal(getDeepseekMaxConcurrentRequests(), 100);
+    assert.equal(getDeepseekMaxQueuedRequests(), 2_000);
     assert.equal(getDeepseekQueueTimeoutMs(), 60_000);
   });
 });
@@ -251,6 +254,85 @@ test('times out queued DeepSeek requests before they hang', async () => {
       delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
     } else {
       process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+    }
+
+    if (previousTimeout === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS = previousTimeout;
+    }
+  }
+});
+
+test('rejects DeepSeek requests when the in-memory queue is full', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  const previousQueueLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS;
+  const previousTimeout = process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS;
+  let releaseActiveRequest: () => void = () => {
+    throw new Error('Expected the active DeepSeek request to be releasable.');
+  };
+  let fetchCalls = 0;
+  const activeRequestStarted = new Promise<void>((resolve) => {
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+
+      if (fetchCalls > 1) {
+        return new Response('ok', { status: 200 });
+      }
+
+      resolve();
+      await new Promise<void>((release) => {
+        releaseActiveRequest = release;
+      });
+
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+  });
+
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    process.env.SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS = '1';
+    process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS = '5000';
+
+    const firstRequest = fetchDeepseekWithRetry('https://api.deepseek.test', {
+      method: 'POST',
+    });
+
+    await activeRequestStarted;
+
+    const queuedRequest = fetchDeepseekWithRetry(
+      'https://api.deepseek.test',
+      { method: 'POST' },
+      1,
+    );
+
+    await assert.rejects(
+      fetchDeepseekWithRetry(
+        'https://api.deepseek.test',
+        { method: 'POST' },
+        1,
+      ),
+      { name: 'AbortError' },
+    );
+
+    releaseActiveRequest();
+
+    await Promise.all([firstRequest, queuedRequest]);
+    assert.equal(getDeepseekMaxQueuedRequests(), 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+
+    if (previousLimit === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+    }
+
+    if (previousQueueLimit === undefined) {
+      delete process.env.SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS;
+    } else {
+      process.env.SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS = previousQueueLimit;
     }
 
     if (previousTimeout === undefined) {

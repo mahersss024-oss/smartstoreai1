@@ -17,6 +17,7 @@ import {
 import type { ListingImage } from '@/agent/marketplace/types';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 
 const supportedMimeTypes = new Set([
@@ -26,6 +27,7 @@ const supportedMimeTypes = new Set([
   'image/gif',
 ]);
 const maxImageBytes = 12 * 1024 * 1024;
+const maxImageUploadRequestBytes = maxImageBytes + 1024 * 1024;
 
 function createTrustedSecondaryImageComplianceDecision(
   expectedCategory?: string,
@@ -71,6 +73,16 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxImageUploadRequestBytes,
+    'Image upload request body is too large.',
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   const { listingId } = await context.params;

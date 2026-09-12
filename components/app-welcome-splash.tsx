@@ -11,7 +11,7 @@ import {
 
 // The canonical brand logo. Reusing the exact asset used across the app
 // guarantees the splash shows the real project logo (never a divergent copy).
-const LOGO_SRC = '/smartstore-logo.svg';
+const LOGO_SRC = '/smartstore-logo.png';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is

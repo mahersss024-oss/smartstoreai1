@@ -12,6 +12,9 @@ SmartStore AI is standardized on PostgreSQL with Prisma.
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public
 SMARTSTORE_MAX_LISTINGS_PER_SELLER=100
+SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS=100
+SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS=2000
+SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS=60000
 ```
 
 Keep this value server-side only.
@@ -20,6 +23,12 @@ seller account. It defaults to `100` when unset. Any positive integer configured
 in Render is used as the active limit; this does not limit the total platform
 listings across all sellers. Keep this variable managed in the Render dashboard
 so production can raise or lower the limit without a code change.
+
+The DeepSeek concurrency defaults above were validated with real staged load
+tests up to 500 concurrent chat users. `SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS`
+caps active provider calls, `SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS` prevents
+unbounded in-memory queue growth, and `SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS`
+keeps overloaded requests from hanging indefinitely.
 
 ## Local And Production Commands
 

@@ -60,6 +60,7 @@ import {
   stripImageAttachmentsFromModelMessages,
 } from '@/agent/vision-messages';
 import type { AppLanguage } from '@/app/i18n';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
 import { checkChatRateLimit } from '@/lib/rate-limit';
@@ -68,6 +69,7 @@ const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
 const maxImagesPerChatMessage = defaultMaxListingImages;
 const maxChatImageBytes = 12 * 1024 * 1024;
+const maxChatRequestBytes = 140 * 1024 * 1024;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const policyFacilitationIntents = new Set([
   'search_listing',
@@ -1104,6 +1106,16 @@ Use the user's language. Language=${input.language}.`,
 }
 
 export async function POST(request: Request) {
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxChatRequestBytes,
+    'Chat request body is too large.',
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
+  }
+
   let body: ChatRequestBody;
 
   try {

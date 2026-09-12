@@ -7,6 +7,7 @@ import { appConfig } from '@/app/app-config';
 export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
 
 const defaultDeepseekMaxConcurrentRequests = 100;
+const defaultDeepseekMaxQueuedRequests = 2_000;
 const defaultDeepseekQueueTimeoutMs = 60_000;
 const deepseekSlotQueue: Array<() => void> = [];
 let activeDeepseekRequests = 0;
@@ -204,6 +205,19 @@ export function getDeepseekMaxConcurrentRequests() {
   return Math.min(512, Math.max(1, configuredValue));
 }
 
+export function getDeepseekMaxQueuedRequests() {
+  const configuredValue = Number.parseInt(
+    process.env.SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS ?? '',
+    10,
+  );
+
+  if (!Number.isFinite(configuredValue) || configuredValue < 0) {
+    return defaultDeepseekMaxQueuedRequests;
+  }
+
+  return Math.min(10_000, configuredValue);
+}
+
 export function getDeepseekQueueTimeoutMs() {
   const configuredValue = Number.parseInt(
     process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS ?? '',
@@ -256,6 +270,10 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
       activeDeepseekRequests,
     );
     return Promise.resolve(releaseDeepseekSlot);
+  }
+
+  if (deepseekSlotQueue.length >= getDeepseekMaxQueuedRequests()) {
+    throw new DOMException('DeepSeek request queue is full.', 'AbortError');
   }
 
   return new Promise<() => void>((resolve, reject) => {

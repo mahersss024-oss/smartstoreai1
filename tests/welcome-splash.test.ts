@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -54,4 +56,11 @@ test('welcome overlay uses a stable id and sane timings', () => {
   assert.ok(WELCOME_VISIBLE_MS <= 4000, 'overlay should not overstay');
   assert.ok(WELCOME_FADE_MS >= 400, 'fade should be smooth');
   assert.ok(WELCOME_FADE_MS <= 1000, 'fade should not feel sluggish');
+});
+
+test('welcome logo asset exists in public assets', () => {
+  assert.equal(
+    existsSync(join(process.cwd(), 'public', 'smartstore-logo.png')),
+    true,
+  );
 });
