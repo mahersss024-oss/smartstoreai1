@@ -69,17 +69,19 @@ const themeStyle: CSSProperties = {
 // screen instantly with the brand gradient so that flash can never be seen.
 // The welcome overlay (also server-rendered) then draws on top of it.
 const bootCoverStyle = `
-html, body { background-color: #0e4fa2; }
+html, body { background-color: #08111d; }
 #smartstore-boot-cover {
   position: fixed;
   inset: 0;
   /* Sits just below the welcome overlay (z-index 9999) so the animated welcome
      plays on top of it, but above the app content so nothing flashes through. */
   z-index: 9998;
-  background: linear-gradient(150deg, #0e4fa2 0%, #1c98d2 56%, #67d8ff 100%);
   pointer-events: none;
   /* Safety net: fade the cover away on its own even if JS never runs, so it can
      never trap the user on a blank brand screen. */
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(143 255 199 / 24%), transparent 58%),
+    linear-gradient(150deg, #08111d 0%, #0f3f2f 48%, #117c8b 100%);
   animation: smartstore-boot-cover-hide 0s linear 4.5s forwards;
 }
 html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
@@ -182,4 +184,3 @@ export default function RootLayout({
     </html>
   );
 }
-

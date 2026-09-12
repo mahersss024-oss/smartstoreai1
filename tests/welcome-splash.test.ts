@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -63,4 +63,24 @@ test('welcome logo asset exists in public assets', () => {
     existsSync(join(process.cwd(), 'public', 'smartstore-welcome-logo.png')),
     true,
   );
+});
+
+test('welcome component uses the icon-only welcome logo', () => {
+  const component = readFileSync(
+    join(process.cwd(), 'components', 'app-welcome-splash.tsx'),
+    'utf8',
+  );
+
+  assert.match(component, /\/smartstore-welcome-logo\.png/);
+  assert.doesNotMatch(component, /\/smartstore-logo\.png/);
+});
+
+test('welcome surfaces use the dark teal brand palette', () => {
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  for (const source of [globals, layout]) {
+    assert.match(source, /#08111d/);
+    assert.match(source, /#117c8b/);
+  }
 });

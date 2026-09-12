@@ -686,11 +686,12 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    /* Brand identity: the exact logo gradient (0E4FA2 -> 1C98D2 -> 67D8FF)
-       so the splash matches the product's visual signature. */
+    /* Brand identity: the dark app surface blended with the welcome icon's
+       green/teal gradient, plus the product's blue accent glow. */
     background:
-      radial-gradient(130% 100% at 50% 0%, rgb(103 216 255 / 28%), transparent 60%),
-      linear-gradient(150deg, #0e4fa2 0%, #1c98d2 56%, #67d8ff 100%);
+      radial-gradient(120% 90% at 50% 0%, rgb(143 255 199 / 24%), transparent 58%),
+      radial-gradient(84% 72% at 50% 100%, rgb(90 200 255 / 18%), transparent 62%),
+      linear-gradient(150deg, #08111d 0%, #0f3f2f 48%, #117c8b 100%);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     /* Safety net: the overlay auto-hides via pure CSS even if JS never runs.
@@ -705,18 +706,12 @@
     display: none !important;
   }
 
-  .app-welcome--out {
-    opacity: 0;
-    pointer-events: none;
-    visibility: hidden;
-  }
-
   .app-welcome__glow {
     position: absolute;
     width: min(82vmin, 640px);
     height: min(82vmin, 640px);
     border-radius: 9999px;
-    background: radial-gradient(circle, rgb(103 216 255 / 55%), transparent 68%);
+    background: radial-gradient(circle, rgb(143 255 199 / 48%), transparent 68%);
     filter: blur(30px);
     opacity: 0.75;
     animation: app-welcome-pulse 3.4s ease-in-out infinite;
@@ -754,7 +749,7 @@
     margin: 0;
     font-size: clamp(1.7rem, 7vw, 2.5rem);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     color: #ffffff;
     text-shadow: 0 2px 18px rgb(8 17 29 / 32%);
   }
@@ -763,7 +758,7 @@
     margin: 0;
     font-size: clamp(0.9rem, 3.4vw, 1.05rem);
     color: rgb(244 252 255 / 88%);
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
   }
 
   .app-welcome__loader {
@@ -781,7 +776,7 @@
     inset: 0;
     width: 40%;
     border-radius: 9999px;
-    background: linear-gradient(90deg, rgb(244 252 255 / 35%), #ffffff, rgb(244 252 255 / 35%));
+    background: linear-gradient(90deg, rgb(90 200 255 / 32%), #ffffff, rgb(143 255 199 / 42%));
     animation: app-welcome-load 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
 
@@ -862,4 +857,3 @@
     }
   }
 }
-
