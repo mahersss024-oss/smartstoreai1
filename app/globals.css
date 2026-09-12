@@ -695,7 +695,7 @@
     /* Safety net: the overlay auto-hides via pure CSS even if JS never runs.
        The animation holds it visible, then fades it out and keeps it gone
        (forwards fill). JS only adds the "seen this session" shortcut. */
-    animation: app-welcome-lifecycle 3300ms cubic-bezier(0.22, 1, 0.36, 1)
+    animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1)
       forwards;
   }
 
@@ -705,7 +705,7 @@
   }
 
   [data-app-display="standalone"] .app-welcome {
-    animation-duration: 1950ms;
+    animation-duration: 1700ms;
     animation-name: app-welcome-standalone-lifecycle;
   }
 
@@ -728,12 +728,12 @@
     text-align: center;
     animation:
       app-welcome-rise 820ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
-      app-welcome-content-exit 3300ms cubic-bezier(0.22, 1, 0.36, 1)
+      app-welcome-content-exit 2920ms cubic-bezier(0.22, 1, 0.36, 1)
         forwards;
   }
 
   [data-app-display="standalone"] .app-welcome__content {
-    animation-duration: 680ms, 1950ms;
+    animation-duration: 640ms, 1700ms;
     animation-name: app-welcome-rise, app-welcome-standalone-content-exit;
   }
 
@@ -798,8 +798,8 @@
     0% {
       opacity: 1;
     }
-    /* ~2.6s visible, then a ~0.7s fade. */
-    79% {
+    /* ~2.4s visible, then a ~0.52s fade. */
+    82% {
       opacity: 1;
     }
     100% {
@@ -812,7 +812,7 @@
     0% {
       opacity: 1;
     }
-    72% {
+    74% {
       opacity: 1;
     }
     100% {
@@ -834,7 +834,7 @@
 
   @keyframes app-welcome-content-exit {
     0%,
-    78% {
+    82% {
       opacity: 1;
       transform: translateY(0) scale(1);
     }
@@ -846,7 +846,7 @@
 
   @keyframes app-welcome-standalone-content-exit {
     0%,
-    72% {
+    74% {
       opacity: 1;
       transform: translateY(0) scale(1);
     }

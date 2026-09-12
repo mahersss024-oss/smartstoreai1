@@ -100,10 +100,10 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  animation: app-welcome-lifecycle 3300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 html[data-app-display='standalone'] #smartstore-welcome {
-  animation-duration: 1950ms;
+  animation-duration: 1700ms;
   animation-name: app-welcome-standalone-lifecycle;
 }
 #smartstore-welcome .app-welcome__content {
@@ -130,11 +130,11 @@ html[data-app-display='standalone'] #smartstore-welcome {
 @keyframes smartstore-app-shell-fallback-reveal { to { visibility: visible; } }
 @keyframes smartstore-boot-cover-hide { to { opacity: 0; visibility: hidden; } }
 @keyframes app-welcome-lifecycle {
-  0%, 79% { opacity: 1; }
+  0%, 82% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
 }
 @keyframes app-welcome-standalone-lifecycle {
-  0%, 72% { opacity: 1; }
+  0%, 74% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
 }
 `;

@@ -11,13 +11,13 @@ export const APP_DISPLAY_MODE_ATTR = 'data-app-display';
 export const APP_DISPLAY_MODE_STANDALONE = 'standalone';
 
 // How long the overlay stays fully visible before it starts to fade.
-export const WELCOME_VISIBLE_MS = 2600;
+export const WELCOME_VISIBLE_MS = 2400;
 // Duration of the fade-out transition (mirrors the CSS transition duration).
-export const WELCOME_FADE_MS = 700;
+export const WELCOME_FADE_MS = 520;
 // Installed iOS/Android PWAs already show a native launch screen, so the
 // in-app welcome should be a shorter brand handoff rather than a second splash.
-export const WELCOME_STANDALONE_VISIBLE_MS = 1400;
-export const WELCOME_STANDALONE_FADE_MS = 550;
+export const WELCOME_STANDALONE_VISIBLE_MS = 1250;
+export const WELCOME_STANDALONE_FADE_MS = 450;
 
 /**
  * Tiny blocking script that runs in <head> before the first paint. It decides,

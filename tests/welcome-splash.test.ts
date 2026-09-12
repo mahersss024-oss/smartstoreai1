@@ -70,10 +70,18 @@ test('welcome overlay uses a stable id and sane timings', () => {
   assert.ok(WELCOME_FADE_MS >= 400, 'fade should be smooth');
   assert.ok(WELCOME_FADE_MS <= 1000, 'fade should not feel sluggish');
   assert.ok(
+    WELCOME_VISIBLE_MS + WELCOME_FADE_MS <= 3100,
+    'welcome should not leave a long empty background after the logo exits',
+  );
+  assert.ok(
     WELCOME_STANDALONE_VISIBLE_MS < WELCOME_VISIBLE_MS,
     'installed app welcome should be shorter after the native launch screen',
   );
   assert.ok(WELCOME_STANDALONE_FADE_MS <= WELCOME_FADE_MS);
+  assert.ok(
+    WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS <= 1900,
+    'installed app welcome should finish quickly after the native launch screen',
+  );
 });
 
 test('welcome logo asset exists in public assets', () => {
@@ -109,6 +117,19 @@ test('welcome css includes a shorter standalone lifecycle', () => {
   assert.match(globals, /\[data-app-display="standalone"\] \.app-welcome/);
   assert.match(globals, /app-welcome-standalone-lifecycle/);
   assert.match(globals, /app-welcome-standalone-content-exit/);
+});
+
+test('welcome content exits in sync with the overlay background', () => {
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  assert.match(globals, /app-welcome-lifecycle 2920ms/);
+  assert.match(globals, /app-welcome-content-exit 2920ms/);
+  assert.match(globals, /animation-duration: 640ms, 1700ms/);
+  assert.match(globals, /@keyframes app-welcome-content-exit[\s\S]*0%,\s*82%/);
+  assert.match(globals, /@keyframes app-welcome-standalone-content-exit[\s\S]*0%,\s*74%/);
+  assert.match(layout, /app-welcome-lifecycle 2920ms/);
+  assert.match(layout, /animation-duration: 1700ms/);
 });
 
 test('boot cover keeps app content hidden until the welcome is ready', () => {
