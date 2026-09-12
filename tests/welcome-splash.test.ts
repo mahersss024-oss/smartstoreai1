@@ -60,7 +60,7 @@ test('welcome overlay uses a stable id and sane timings', () => {
 
 test('welcome logo asset exists in public assets', () => {
   assert.equal(
-    existsSync(join(process.cwd(), 'public', 'smartstore-logo.png')),
+    existsSync(join(process.cwd(), 'public', 'smartstore-welcome-logo.png')),
     true,
   );
 });
