@@ -63,34 +63,11 @@ const themeStyle: CSSProperties = {
   ),
 };
 
-// Paints a solid brand background before ANY stylesheet loads. On iOS PWAs the
-// first frame can arrive before the CSS chunks do, which used to expose the raw
-// chat input as an unstyled "text bar" flash. This inline block covers the
-// screen instantly with the brand gradient so that flash can never be seen.
-// The welcome overlay (also server-rendered) then draws on top of it.
-const bootCoverStyle = `
+// Critical first-paint welcome styles. The overlay is hidden by default and is
+// shown only when the head script explicitly marks this load as a welcome launch.
+// This avoids any independent dark cover appearing during normal navigation.
+const welcomeCriticalStyle = `
 html, body { background-color: #08111d; }
-html[data-welcome='show']:not([data-app-ready='1']) body > :not(#smartstore-boot-cover):not(#smartstore-welcome) {
-  visibility: hidden;
-  animation: smartstore-app-shell-fallback-reveal 0s linear 8s forwards;
-}
-#smartstore-boot-cover {
-  position: fixed;
-  inset: 0;
-  display: none;
-  /* Sits just below the welcome overlay (z-index 9999) so the animated welcome
-     plays on top of it, but above the app content so nothing flashes through. */
-  z-index: 9998;
-  pointer-events: none;
-  /* Safety net: fade the cover away on its own even if JS never runs, so it can
-     never trap the user on a blank brand screen. */
-  background:
-    linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
-  animation: smartstore-boot-cover-hide 0s linear 8s forwards;
-}
-html[data-welcome='show'] #smartstore-boot-cover { display: block; }
-html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
-html[data-welcome='skip'] #smartstore-boot-cover { display: none !important; }
 html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
 #smartstore-welcome {
   position: fixed;
@@ -131,8 +108,6 @@ html[data-app-display='standalone'] #smartstore-welcome {
   border-radius: 24%;
   display: block;
 }
-@keyframes smartstore-app-shell-fallback-reveal { to { visibility: visible; } }
-@keyframes smartstore-boot-cover-hide { to { opacity: 0; visibility: hidden; } }
 @keyframes app-welcome-lifecycle {
   0%, 82% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
@@ -186,8 +161,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: buildWelcomeInitScript() }}
         />
         <style
-          id="smartstore-boot-cover-style"
-          dangerouslySetInnerHTML={{ __html: bootCoverStyle }}
+          id="smartstore-welcome-critical-style"
+          dangerouslySetInnerHTML={{ __html: welcomeCriticalStyle }}
         />
         <script
           id="smartstore-theme-init"
@@ -225,7 +200,6 @@ export default function RootLayout({
         />
       </head>
       <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
-        <div id="smartstore-boot-cover" aria-hidden="true" />
         <AppWelcomeSplash />
         <Suspense fallback={null}>
           <SiteVisitTracker />

@@ -56,16 +56,16 @@ test('welcome init script is a self-contained IIFE', () => {
   assert.ok(script.endsWith('})();'));
 });
 
-test('returning visits reveal the app before paint (hides boot cover)', () => {
+test('returning visits reveal the app before paint', () => {
   const script = buildWelcomeInitScript();
 
-  // Both the welcome overlay and the boot cover must be cleared instantly so no
-  // brand cover or overlay lingers for a returning visitor.
+  // The welcome overlay must be skipped instantly so no launch screen lingers
+  // for a returning visitor.
   assert.match(script, /data-welcome','skip'/);
   assert.ok(
     script.includes(`${APP_READY_FLAG}','1'`) ||
       script.includes(`'${APP_READY_FLAG}','1'`),
-    'returning visits must set the app-ready flag to drop the boot cover',
+    'returning visits must set the app-ready flag',
   );
 });
 
@@ -164,17 +164,14 @@ test('welcome content fades only with the overlay background', () => {
   assert.match(layout, /animation-duration: 1700ms/);
 });
 
-test('boot cover keeps app content hidden until the welcome is ready', () => {
+test('welcome overlay is opt-in and has no independent boot cover', () => {
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
-  assert.match(layout, /html\[data-welcome='show'\]:not\(\[data-app-ready='1'\]\) body > :not\(#smartstore-boot-cover\):not\(#smartstore-welcome\)/);
-  assert.match(layout, /visibility: hidden/);
-  assert.match(layout, /#smartstore-boot-cover[\s\S]*display: none/);
-  assert.match(layout, /html\[data-welcome='show'\] #smartstore-boot-cover \{ display: block; \}/);
-  assert.match(layout, /html\[data-welcome='skip'\] #smartstore-boot-cover/);
-  assert.doesNotMatch(layout, /visibility: hidden !important/);
-  assert.match(layout, /smartstore-app-shell-fallback-reveal/);
-  assert.doesNotMatch(layout, /animation-delay: 2\.75s/);
+  assert.match(layout, /#smartstore-welcome[\s\S]*display: none/);
+  assert.match(layout, /html\[data-welcome='show'\] #smartstore-welcome \{ display: flex; \}/);
+  assert.match(layout, /html\[data-welcome='skip'\] #smartstore-welcome/);
+  assert.doesNotMatch(layout, /smartstore-boot-cover/);
+  assert.doesNotMatch(layout, /smartstore-app-shell-fallback/);
 });
 
 test('welcome has critical first-paint styles in the document head', () => {
@@ -182,8 +179,8 @@ test('welcome has critical first-paint styles in the document head', () => {
 
   assert.ok(
     layout.indexOf('id="smartstore-welcome-init"') <
-      layout.indexOf('id="smartstore-boot-cover-style"'),
-    'welcome state must be decided before the boot cover CSS can paint',
+      layout.indexOf('id="smartstore-welcome-critical-style"'),
+    'welcome state must be decided before the critical welcome CSS can paint',
   );
   assert.match(layout, /#smartstore-welcome \{/);
   assert.match(layout, /z-index: 9999/);

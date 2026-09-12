@@ -73,7 +73,7 @@ export function AppWelcomeSplash() {
     const removeTimer = window.setTimeout(() => {
       document.body.style.overflow = previousOverflow;
       root.remove();
-      // Reveal the app and drop the brand boot cover at the same moment.
+      // Reveal the app at the same moment the welcome overlay leaves the DOM.
       document.documentElement.setAttribute('data-app-ready', '1');
     }, visibleMs + fadeMs);
 

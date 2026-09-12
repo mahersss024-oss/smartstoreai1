@@ -34,8 +34,7 @@ export function buildWelcomeInitScript() {
 }
 
 /**
- * Script that hides the boot cover as soon as the app is interactive. It runs on
- * the client after hydration; paired with `data-app-ready`, it guarantees the
- * brand cover is removed the instant the real UI is ready to be seen.
+ * Shared app-ready attribute used by the head script and client overlay to mark
+ * when the real UI is ready to be seen.
  */
 export const APP_READY_FLAG = 'data-app-ready';
