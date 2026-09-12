@@ -1,7 +1,7 @@
 // SmartStore AI service worker.
 // Kept intentionally minimal: precache the app shell and fall back safely.
 
-const CACHE_NAME = 'smartstore-shell-v1';
+const CACHE_NAME = 'smartstore-shell-v2';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_URLS = ['/', OFFLINE_URL];
@@ -88,3 +88,4 @@ self.addEventListener('fetch', (event) => {
     }),
   );
 });
+
