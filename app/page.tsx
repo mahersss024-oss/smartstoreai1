@@ -67,8 +67,9 @@ import {
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
 import {
-  getCanLoadMoreListings,
-  getDisplayedListings,
+  getAssistantResultListings,
+  getCanLoadMoreExploreListings,
+  getExploreListings,
 } from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -660,6 +661,9 @@ function formatCategory(category: string) {
 
 type SearchToolOutput = {
   status?: unknown;
+  count?: unknown;
+  candidateCount?: unknown;
+  rankedCount?: unknown;
   listings?: unknown;
 };
 
@@ -918,6 +922,18 @@ function isSearchToolOutput(value: unknown): value is SearchToolOutput {
     (value.status === 'searched' || value.status === 'compared') &&
     Array.isArray(value.listings)
   );
+}
+
+function getSearchToolResultCount(output: SearchToolOutput | null) {
+  if (!output) {
+    return 0;
+  }
+
+  const count = [output.candidateCount, output.rankedCount, output.count].find(
+    (value) => typeof value === 'number' && Number.isFinite(value),
+  );
+
+  return typeof count === 'number' ? Math.max(0, count) : 0;
 }
 
 function getLatestSearchToolOutput(messages: UIMessage[]) {
@@ -1284,7 +1300,6 @@ export default function Page() {
   const listingsRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
-  const activeListingQueryRef = useRef('');
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -1315,22 +1330,27 @@ export default function Page() {
       listingRecordToCard,
     );
   }, [latestSearchToolOutput]);
-  const shouldPreferSearchToolListings = searchToolListings.length > 0;
-  const displayedMarketplaceListings = useMemo(() => {
-    return getDisplayedListings({
-      marketplaceListings,
+  const assistantResultListings = useMemo(() => {
+    return getAssistantResultListings({
       searchToolListings,
     });
-  }, [marketplaceListings, searchToolListings]);
-  const canLoadMoreListings = getCanLoadMoreListings({
+  }, [searchToolListings]);
+  const hasActiveAssistantSearch = Boolean(activeListingQuery);
+  const exploreMarketplaceListings = useMemo(() => {
+    return getExploreListings({
+      marketplaceListings,
+      searchToolListings: hasActiveAssistantSearch ? assistantResultListings : [],
+    });
+  }, [assistantResultListings, hasActiveAssistantSearch, marketplaceListings]);
+  const searchResultCount = Math.max(
+    getSearchToolResultCount(latestSearchToolOutput),
+    searchToolListings.length,
+  );
+  const canLoadMoreListings = getCanLoadMoreExploreListings({
     hasMore: listingPagination.hasMore,
-    displayedCount: displayedMarketplaceListings.length,
-    hasSearchToolListings: shouldPreferSearchToolListings,
+    displayedCount: marketplaceListings.length,
   });
 
-  useEffect(() => {
-    activeListingQueryRef.current = activeListingQuery;
-  }, [activeListingQuery]);
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isCompactViewport) {
@@ -1644,7 +1664,7 @@ export default function Page() {
 
     realtimeRefreshTimerRef.current = window.setTimeout(() => {
       realtimeRefreshTimerRef.current = null;
-      void refreshMarketplaceListings(activeListingQueryRef.current, 1, {
+      void refreshMarketplaceListings(undefined, 1, {
         showLoading: false,
       });
     }, 250);
@@ -1811,14 +1831,13 @@ export default function Page() {
 
     lastSyncedAssistantMessageIdRef.current = lastAssistantMessage.id;
     const timeoutId = window.setTimeout(() => {
-      void refreshMarketplaceListings(activeListingQuery);
+      void refreshMarketplaceListings();
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
   }, [
-    activeListingQuery,
     filteredMessages,
     latestSearchToolOutput,
     refreshMarketplaceListings,
@@ -1907,7 +1926,6 @@ export default function Page() {
 
       if (nextListingQuery) {
         setActiveListingQuery(nextListingQuery);
-        void refreshMarketplaceListings(nextListingQuery);
       } else if (
         intent.kind === 'create_listing' ||
         intent.kind === 'open_conversation' ||
@@ -1940,7 +1958,6 @@ export default function Page() {
     [
       activeListingQuery,
       hasRestoredChat,
-      refreshMarketplaceListings,
       selectedListingContext,
       sendMessage,
       expandAssistant,
@@ -1973,7 +1990,6 @@ export default function Page() {
 
       if (nextListingQuery) {
         setActiveListingQuery(nextListingQuery);
-        void refreshMarketplaceListings(nextListingQuery);
       } else if (
         intent.kind === 'create_listing' ||
         intent.kind === 'open_conversation' ||
@@ -1996,7 +2012,6 @@ export default function Page() {
       activeListingQuery,
       hasRestoredChat,
       isLoading,
-      refreshMarketplaceListings,
       selectedListingContext,
       sendMessage,
       expandAssistant,
@@ -2044,11 +2059,11 @@ export default function Page() {
         }
 
         if (response.ok) {
-          void refreshMarketplaceListings(activeListingQuery);
+          void refreshMarketplaceListings();
         }
       });
     },
-    [activeListingQuery, refreshMarketplaceListings, router],
+    [refreshMarketplaceListings, router],
   );
 
   const handleLogout = useCallback(() => {
@@ -2063,12 +2078,8 @@ export default function Page() {
     }
 
     setIsLoadingListings(true);
-    void refreshMarketplaceListings(
-      activeListingQuery,
-      listingPagination.page + 1,
-    );
+    void refreshMarketplaceListings(undefined, listingPagination.page + 1);
   }, [
-    activeListingQuery,
     canLoadMoreListings,
     isLoadingListings,
     listingPagination.page,
@@ -2089,6 +2100,10 @@ export default function Page() {
     clearStoredChatState();
     void clearRetainedListingImages().catch(() => {});
   }, [setMessages]);
+
+  const clearAssistantSearch = useCallback(() => {
+    setActiveListingQuery('');
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
@@ -2177,15 +2192,70 @@ export default function Page() {
                 </Button>
               </div>
 
+              {hasActiveAssistantSearch && (
+                <div className="mb-5 grid gap-3">
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm dark:border-blue-400/20 dark:bg-card">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+                        <Sparkles className="size-3.5" />
+                        بحث نشط
+                      </div>
+                      <p className="mt-1 truncate text-sm font-semibold">
+                        {activeListingQuery || 'نتائج من مساعد SmartStore AI'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="hidden rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200 sm:inline-flex">
+                        {searchResultCount > 0
+                          ? `${searchResultCount} نتيجة مطابقة`
+                          : 'لا توجد نتائج مطابقة'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full"
+                        aria-label="مسح بحث المساعد"
+                        onClick={clearAssistantSearch}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 text-base font-bold">
+                    <Sparkles className="size-4 text-blue-600" />
+                    مطابق لطلبك
+                  </div>
+
+                  {assistantResultListings.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
+                      {assistantResultListings.map((listing) => (
+                        <ListingCardView
+                          key={listing.id ?? listing.title}
+                          listing={listing}
+                          onAsk={sendStarter}
+                          onFavorite={favoriteListing}
+                          onOpen={openListing}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed bg-white p-4 text-center text-sm text-muted-foreground dark:bg-card">
+                      لا توجد نتائج مطابقة لهذا البحث. جرّب تضييق أو تعديل الطلب في المساعد.
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mb-3 flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2 text-base font-bold">
                   <Sparkles className="size-4 text-blue-600" />
-                  الإعلانات المقترحة
+                  {hasActiveAssistantSearch ? 'استكشف أيضًا' : 'الإعلانات المقترحة'}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
-                {displayedMarketplaceListings.map((listing) => (
+                {exploreMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
                     listing={listing}
@@ -2211,13 +2281,13 @@ export default function Page() {
                 </div>
               )}
 
-              {displayedMarketplaceListings.length === 0 && (
+              {exploreMarketplaceListings.length === 0 && (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed bg-white p-6 text-center dark:bg-card">
                   <div className="grid max-w-sm gap-3">
                     <Sparkles className="mx-auto size-9 text-blue-600" />
-                    <h3 className="text-base font-bold">لا توجد نتائج مطابقة</h3>
+                    <h3 className="text-base font-bold">لا توجد إعلانات متاحة</h3>
                     <p className="text-sm leading-7 text-muted-foreground">
-                      اكتب طلبًا آخر في مساعد SmartStore AI.
+                      ستظهر الإعلانات هنا عند توفرها في السوق.
                     </p>
                   </div>
                 </div>
