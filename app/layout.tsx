@@ -63,6 +63,29 @@ const themeStyle: CSSProperties = {
   ),
 };
 
+// Paints a solid brand background before ANY stylesheet loads. On iOS PWAs the
+// first frame can arrive before the CSS chunks do, which used to expose the raw
+// chat input as an unstyled "text bar" flash. This inline block covers the
+// screen instantly with the brand gradient so that flash can never be seen.
+// The welcome overlay (also server-rendered) then draws on top of it.
+const bootCoverStyle = `
+html, body { background-color: #0e4fa2; }
+#smartstore-boot-cover {
+  position: fixed;
+  inset: 0;
+  /* Sits just below the welcome overlay (z-index 9999) so the animated welcome
+     plays on top of it, but above the app content so nothing flashes through. */
+  z-index: 9998;
+  background: linear-gradient(150deg, #0e4fa2 0%, #1c98d2 56%, #67d8ff 100%);
+  pointer-events: none;
+  /* Safety net: fade the cover away on its own even if JS never runs, so it can
+     never trap the user on a blank brand screen. */
+  animation: smartstore-boot-cover-hide 0s linear 4.5s forwards;
+}
+html[data-app-ready='1'] #smartstore-boot-cover { display: none !important; }
+@keyframes smartstore-boot-cover-hide { to { opacity: 0; visibility: hidden; } }
+`;
+
 const themeInitScript = `
 (function() {
   try {
@@ -101,6 +124,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <style
+          id="smartstore-boot-cover-style"
+          dangerouslySetInnerHTML={{ __html: bootCoverStyle }}
+        />
         <script
           id="smartstore-theme-init"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
@@ -141,6 +168,7 @@ export default function RootLayout({
         />
       </head>
       <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
+        <div id="smartstore-boot-cover" aria-hidden="true" />
         <AppWelcomeSplash />
         <Suspense fallback={null}>
           <SiteVisitTracker />

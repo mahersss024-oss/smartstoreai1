@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  APP_READY_FLAG,
   buildWelcomeInitScript,
   WELCOME_FADE_MS,
   WELCOME_ID,
@@ -32,6 +33,19 @@ test('welcome init script is a self-contained IIFE', () => {
 
   assert.ok(script.startsWith('(function(){'));
   assert.ok(script.endsWith('})();'));
+});
+
+test('returning visits reveal the app before paint (hides boot cover)', () => {
+  const script = buildWelcomeInitScript();
+
+  // Both the welcome overlay and the boot cover must be cleared instantly so no
+  // brand cover or overlay lingers for a returning visitor.
+  assert.match(script, /data-welcome','skip'/);
+  assert.ok(
+    script.includes(`${APP_READY_FLAG}','1'`) ||
+      script.includes(`'${APP_READY_FLAG}','1'`),
+    'returning visits must set the app-ready flag to drop the boot cover',
+  );
 });
 
 test('welcome overlay uses a stable id and sane timings', () => {

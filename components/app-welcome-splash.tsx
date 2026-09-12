@@ -32,6 +32,7 @@ export function AppWelcomeSplash() {
     // over removal so the element does not linger in the DOM.
     if (document.documentElement.getAttribute('data-welcome') === 'skip') {
       root.remove();
+      document.documentElement.setAttribute('data-app-ready', '1');
       return;
     }
 
@@ -41,6 +42,7 @@ export function AppWelcomeSplash() {
 
     if (prefersReducedMotion) {
       root.remove();
+      document.documentElement.setAttribute('data-app-ready', '1');
       return;
     }
 
@@ -48,8 +50,8 @@ export function AppWelcomeSplash() {
     document.body.style.overflow = 'hidden';
 
     // The visual lifecycle (hold + fade) is driven by CSS so the overlay always
-    // disappears even if this script is interrupted. JS only records the visit
-    // and removes the now-hidden node from the DOM.
+    // disappears even if this script is interrupted. JS only records the visit,
+    // reveals the app, and removes the now-hidden node from the DOM.
     const removeTimer = window.setTimeout(() => {
       try {
         window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1');
@@ -58,6 +60,8 @@ export function AppWelcomeSplash() {
       }
       document.body.style.overflow = previousOverflow;
       root.remove();
+      // Reveal the app and drop the brand boot cover at the same moment.
+      document.documentElement.setAttribute('data-app-ready', '1');
     }, WELCOME_VISIBLE_MS + WELCOME_FADE_MS);
 
     return () => {

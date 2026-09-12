@@ -23,5 +23,13 @@ export const WELCOME_FADE_MS = 700;
  * overlay, and a first-time visitor sees it immediately (no post-hydration pop).
  */
 export function buildWelcomeInitScript() {
-  return `(function(){try{var shown=window.sessionStorage.getItem('${WELCOME_SESSION_KEY}')==='1';var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(shown||reduce){document.documentElement.setAttribute('data-welcome','skip');}}catch(e){}})();`;
+  return `(function(){try{var shown=window.sessionStorage.getItem('${WELCOME_SESSION_KEY}')==='1';var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(shown||reduce){document.documentElement.setAttribute('data-welcome','skip');document.documentElement.setAttribute('data-app-ready','1');}}catch(e){}})();`;
 }
+
+/**
+ * Script that hides the boot cover as soon as the app is interactive. It runs on
+ * the client after hydration; paired with `data-app-ready`, it guarantees the
+ * brand cover is removed the instant the real UI is ready to be seen.
+ */
+export const APP_READY_FLAG = 'data-app-ready';
+
