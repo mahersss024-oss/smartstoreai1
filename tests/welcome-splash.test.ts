@@ -133,3 +133,13 @@ test('welcome presentation avoids the old floating glow treatment', () => {
   assert.doesNotMatch(globals, /app-welcome-pulse/);
   assert.doesNotMatch(globals, /app-welcome-float/);
 });
+
+test('welcome background stays smooth without grid texture', () => {
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  for (const source of [globals, layout]) {
+    assert.doesNotMatch(source, /44px 44px/);
+    assert.doesNotMatch(source, /0 1px, transparent 1px 100%/);
+  }
+});
