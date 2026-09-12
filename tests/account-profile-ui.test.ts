@@ -28,3 +28,19 @@ test('account page does not flash sign-in controls while session is loading', ()
   assert.match(page, /جاري التحقق من الحساب/);
   assert.match(page, /: !session\.authenticated \? \(/);
 });
+
+test('signed-in customer pages hide sign-in controls until session check finishes', () => {
+  const protectedPages = [
+    ['app', 'conversations', 'page.tsx'],
+    ['app', 'favorites', 'page.tsx'],
+    ['app', 'commissions', 'page.tsx'],
+  ];
+
+  for (const segments of protectedPages) {
+    const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
+
+    assert.match(page, /isLoading && !session\.authenticated \? \(/);
+    assert.match(page, /جاري التحقق من الحساب/);
+    assert.match(page, /: !session\.authenticated \? \(/);
+  }
+});

@@ -252,7 +252,19 @@ export default function ConversationsPage() {
           </div>
         </header>
 
-        {!session.authenticated ? (
+        {isLoading && !session.authenticated ? (
+          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+            <div className="grid max-w-md gap-4">
+              <ShieldCheck className="mx-auto size-12 text-blue-600" />
+              <div>
+                <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  نتحقق من جلسة الدخول قبل عرض محادثاتك.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : !session.authenticated ? (
           <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
