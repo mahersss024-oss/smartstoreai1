@@ -686,9 +686,11 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    /* Brand identity: the exact logo gradient (0E4FA2 -> 1C98D2 -> 67D8FF)
+       so the splash matches the product's visual signature. */
     background:
-      radial-gradient(120% 90% at 50% 8%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 62%),
-      linear-gradient(180deg, var(--background), color-mix(in oklab, var(--background) 86%, var(--primary)));
+      radial-gradient(130% 100% at 50% 0%, rgb(103 216 255 / 28%), transparent 60%),
+      linear-gradient(150deg, #0e4fa2 0%, #1c98d2 56%, #67d8ff 100%);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     /* Safety net: the overlay auto-hides via pure CSS even if JS never runs.
@@ -711,12 +713,12 @@
 
   .app-welcome__glow {
     position: absolute;
-    width: min(78vmin, 620px);
-    height: min(78vmin, 620px);
+    width: min(82vmin, 640px);
+    height: min(82vmin, 640px);
     border-radius: 9999px;
-    background: radial-gradient(circle, color-mix(in oklab, var(--primary) 42%, transparent), transparent 68%);
-    filter: blur(28px);
-    opacity: 0.7;
+    background: radial-gradient(circle, rgb(103 216 255 / 55%), transparent 68%);
+    filter: blur(30px);
+    opacity: 0.75;
     animation: app-welcome-pulse 3.4s ease-in-out infinite;
   }
 
@@ -732,16 +734,16 @@
   }
 
   .app-welcome__logo {
-    width: clamp(104px, 26vmin, 168px);
-    height: clamp(104px, 26vmin, 168px);
+    width: clamp(108px, 27vmin, 172px);
+    height: clamp(108px, 27vmin, 172px);
     border-radius: 24%;
     box-shadow:
-      0 24px 60px color-mix(in oklab, var(--primary) 34%, transparent),
-      0 4px 14px rgb(0 0 0 / 14%);
+      0 24px 64px rgb(8 17 29 / 42%),
+      0 4px 14px rgb(0 0 0 / 18%);
     animation: app-welcome-float 3.4s ease-in-out infinite;
   }
 
-  .app-welcome__logo svg {
+  .app-welcome__logo img {
     width: 100%;
     height: 100%;
     border-radius: 24%;
@@ -753,19 +755,14 @@
     font-size: clamp(1.7rem, 7vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.01em;
-    color: var(--foreground);
-    background: linear-gradient(100deg, #1c98d2, #67d8ff, #1c98d2);
-    background-size: 220% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: app-welcome-shimmer 3s linear infinite;
+    color: #ffffff;
+    text-shadow: 0 2px 18px rgb(8 17 29 / 32%);
   }
 
   .app-welcome__tagline {
     margin: 0;
     font-size: clamp(0.9rem, 3.4vw, 1.05rem);
-    color: var(--muted-foreground);
+    color: rgb(244 252 255 / 88%);
     letter-spacing: 0.01em;
   }
 
@@ -775,7 +772,7 @@
     height: 4px;
     border-radius: 9999px;
     overflow: hidden;
-    background: color-mix(in oklab, var(--foreground) 12%, transparent);
+    background: rgb(244 252 255 / 24%);
     margin-top: 0.4rem;
   }
 
@@ -784,7 +781,7 @@
     inset: 0;
     width: 40%;
     border-radius: 9999px;
-    background: linear-gradient(90deg, #0e4fa2, #1c98d2, #67d8ff);
+    background: linear-gradient(90deg, rgb(244 252 255 / 35%), #ffffff, rgb(244 252 255 / 35%));
     animation: app-welcome-load 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
 
@@ -837,15 +834,6 @@
     }
   }
 
-  @keyframes app-welcome-shimmer {
-    from {
-      background-position: 0% 50%;
-    }
-    to {
-      background-position: 200% 50%;
-    }
-  }
-
   @keyframes app-welcome-load {
     0% {
       transform: translateX(-110%);
@@ -864,7 +852,6 @@
 
     .app-welcome__glow,
     .app-welcome__logo,
-    .app-welcome__title,
     .app-welcome__loader span {
       animation: none !important;
     }
