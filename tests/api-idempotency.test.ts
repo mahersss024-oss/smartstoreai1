@@ -10,7 +10,10 @@ import {
   publishListing,
   setListingStatusForSeller,
 } from '@/agent/marketplace/store';
-import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import {
+  isStaleIdempotencyReservation,
+  reserveIdempotencyKey,
+} from '@/lib/api/idempotency';
 import { createSessionCookie } from '@/lib/auth/session';
 
 test('returns the stored idempotent response for duplicate keys', async () => {
@@ -60,6 +63,19 @@ test('scopes idempotency keys per actor', async () => {
 
   assert.equal(first?.response, undefined);
   assert.equal(secondActor?.response, undefined);
+});
+
+test('treats old pending idempotency reservations as retryable', () => {
+  const now = 1_000_000;
+
+  assert.equal(
+    isStaleIdempotencyReservation(new Date(now - 2 * 60_000), now),
+    true,
+  );
+  assert.equal(
+    isStaleIdempotencyReservation(new Date(now - 2 * 60_000 + 1), now),
+    false,
+  );
 });
 
 test('deduplicates customer conversation creation requests', async () => {

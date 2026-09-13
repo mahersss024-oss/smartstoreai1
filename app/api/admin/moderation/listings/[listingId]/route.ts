@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { setListingModerationStatus } from '@/agent/marketplace/repository';
-import { getAuthSession, isModeratorSession } from '@/lib/auth/session';
+import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 
 const moderationActionSchema = z.object({
   action: z.enum(['approve', 'reject', 'delete']),
@@ -32,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isModeratorSession(session)) {
+  if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

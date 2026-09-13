@@ -4,7 +4,9 @@ import test from 'node:test';
 import type { ModelMessage } from 'ai';
 
 import {
+  canUseImageDataUrlFallback,
   createPersistentImageDataUrl,
+  createPersistentListingImageUrl,
   extractLatestUploadedListingImages,
   saveUploadedListingImagesForSeller,
 } from '@/agent/marketplace/listing-image-storage';
@@ -93,6 +95,38 @@ test('creates a persistent image data URL for database-backed listings', () => {
   );
 
   assert.equal(url, 'data:image/png;base64,AQID');
+});
+
+test('disables listing image data URL fallback in production', async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const previousNodeEnv = env.NODE_ENV;
+  const previousStorage = env.SMARTSTORE_IMAGE_STORAGE;
+  env.NODE_ENV = 'production';
+  delete env.SMARTSTORE_IMAGE_STORAGE;
+
+  try {
+    assert.equal(canUseImageDataUrlFallback(), false);
+    await assert.rejects(
+      createPersistentListingImageUrl({
+        data: new Uint8Array([1, 2, 3]),
+        mediaType: 'image/png',
+        imageId: 'production-image',
+      }),
+      /object storage is required in production/,
+    );
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete env.NODE_ENV;
+    } else {
+      env.NODE_ENV = previousNodeEnv;
+    }
+
+    if (previousStorage === undefined) {
+      delete env.SMARTSTORE_IMAGE_STORAGE;
+    } else {
+      env.SMARTSTORE_IMAGE_STORAGE = previousStorage;
+    }
+  }
 });
 
 test('saves only the remaining available image slots for chat uploads', async () => {

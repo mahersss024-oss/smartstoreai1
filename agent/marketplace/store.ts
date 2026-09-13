@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { normalizePagination } from '@/lib/pagination';
+
 import { evaluateConversationMessageSafety } from './message-safety';
 import {
   ListingLimitReachedError,
@@ -103,12 +105,11 @@ function nowIso() {
 }
 
 function getListingPagination(filters: MarketplaceListingFilters) {
-  const limit = Math.min(Math.max(Math.floor(filters.limit ?? 24), 1), 80);
-  const page = Math.max(Math.floor(filters.page ?? 1), 1);
+  const pagination = normalizePagination(filters);
 
   return {
-    limit,
-    skip: (page - 1) * limit,
+    limit: pagination.limit,
+    skip: pagination.skip,
   };
 }
 

@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { POST as runMaintenanceCleanup } from '@/app/api/admin/maintenance/route';
+import { createSessionCookie } from '@/lib/auth/session';
+
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
@@ -38,13 +41,74 @@ test('admin users api is server-side admin protected and audited', () => {
     'route.ts',
   );
 
-  assert.match(listRoute, /isAdminSession/);
+  assert.match(listRoute, /hasVerifiedAdminAccess/);
   assert.match(listRoute, /userReportsReceived/);
-  assert.match(updateRoute, /isAdminSession/);
+  assert.match(updateRoute, /hasVerifiedAdminAccess/);
   assert.match(updateRoute, /cannot_downgrade_self/);
   assert.match(updateRoute, /cannot_delete_self/);
   assert.match(updateRoute, /normalizeContactPhoneNumber/);
   assert.match(updateRoute, /update_user/);
   assert.match(updateRoute, /delete_user/);
   assert.match(updateRoute, /adminAuditLog\.create/);
+});
+
+test('destructive admin maintenance cleanup is disabled by default in production', async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const previousNodeEnv = env.NODE_ENV;
+  const previousStore = env.SMARTSTORE_MARKETPLACE_STORE;
+  const previousCleanupFlag = env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
+  const previousAuthSecret = env.AUTH_SECRET;
+  env.NODE_ENV = 'production';
+  env.SMARTSTORE_MARKETPLACE_STORE = 'file';
+  env.AUTH_SECRET = 'test-admin-maintenance-secret';
+  delete env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
+
+  try {
+    const response = await runMaintenanceCleanup(
+      new Request('https://smartstore.test/api/admin/maintenance', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: createSessionCookie({
+            id: 'google:maintenance-admin',
+            email: 'maintenance-admin@example.com',
+            role: 'admin',
+          }),
+        },
+        body: JSON.stringify({
+          scope: 'marketplace_without_users',
+          confirmation: 'confirm',
+        }),
+      }),
+    );
+    assert.ok(response);
+    const body = (await response.json()) as { error?: string };
+
+    assert.equal(response.status, 403);
+    assert.equal(body.error, 'maintenance_cleanup_disabled');
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete env.NODE_ENV;
+    } else {
+      env.NODE_ENV = previousNodeEnv;
+    }
+
+    if (previousStore === undefined) {
+      delete env.SMARTSTORE_MARKETPLACE_STORE;
+    } else {
+      env.SMARTSTORE_MARKETPLACE_STORE = previousStore;
+    }
+
+    if (previousCleanupFlag === undefined) {
+      delete env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
+    } else {
+      env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP = previousCleanupFlag;
+    }
+
+    if (previousAuthSecret === undefined) {
+      delete env.AUTH_SECRET;
+    } else {
+      env.AUTH_SECRET = previousAuthSecret;
+    }
+  }
 });

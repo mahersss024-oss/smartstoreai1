@@ -73,6 +73,8 @@ When the database store is enabled, listings, images, conversations, messages, f
 - Run `pnpm db:deploy` during deployment after setting `DATABASE_URL`.
 - Set `SMARTSTORE_MARKETPLACE_STORE=database` in production.
 - Keep `SMARTSTORE_ADMIN_EMAILS` restricted to trusted admin account emails.
+- Keep `SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP=0` in production unless a
+  planned admin maintenance window explicitly requires destructive cleanup.
 - Configure `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and
   `APPLE_PRIVATE_KEY` before submitting an iOS app that also offers Google
   sign-in.

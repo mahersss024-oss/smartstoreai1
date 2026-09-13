@@ -1,6 +1,7 @@
 import { getSiteVisitStats } from '@/lib/analytics/site-visits';
 import { noStoreHeaders } from '@/lib/api/no-store';
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

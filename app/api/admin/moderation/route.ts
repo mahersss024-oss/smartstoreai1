@@ -1,6 +1,7 @@
 import { listModerationQueuePage } from '@/agent/marketplace/repository';
 import { noStoreHeaders } from '@/lib/api/no-store';
-import { getAuthSession, isModeratorSession } from '@/lib/auth/session';
+import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isModeratorSession(session)) {
+  if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

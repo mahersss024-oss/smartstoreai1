@@ -1,26 +1,37 @@
 import { noStoreHeaders } from '@/lib/api/no-store';
 import {
+  getVerifiedRoleForSession,
+  shouldVerifyRoleFromDatabase,
+} from '@/lib/auth/authorization';
+import {
   getAuthSession,
   getCommissionAgreement,
-  isAdminSession,
+  isConfiguredAdminEmail,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
 function shouldReadUserProfile() {
-  return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
+  return (
+    process.env.SMARTSTORE_MARKETPLACE_STORE === 'database' &&
+    Boolean(process.env.DATABASE_URL)
+  );
 }
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
   const commissionAgreement = getCommissionAgreement(request);
+  const verifiedRole = await getVerifiedRoleForSession(session);
+  const role = shouldVerifyRoleFromDatabase()
+    ? verifiedRole ?? 'user'
+    : verifiedRole ?? session?.user.role ?? 'user';
   const user = session
     ? {
         ...session.user,
-        role: isAdminSession(session) ? 'admin' : session.user.role ?? 'user',
+        role,
       }
     : null;
 
-  if (user && shouldReadUserProfile()) {
+  if (user && session && shouldReadUserProfile()) {
     try {
       const profile = await prisma.user.findUnique({
         where: { id: user.id },
@@ -29,7 +40,9 @@ export async function GET(request: Request) {
 
       if (profile) {
         user.phoneNumber = profile.phoneNumber ?? undefined;
-        user.role = isAdminSession(session) ? 'admin' : profile.role;
+        user.role = isConfiguredAdminEmail(session.user.email)
+          ? 'admin'
+          : profile.role;
       }
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';

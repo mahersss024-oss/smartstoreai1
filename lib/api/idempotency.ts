@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db/prisma';
 
@@ -79,6 +79,58 @@ function toJsonSafeValue(body: unknown) {
   return structuredClone(body) as Prisma.InputJsonValue;
 }
 
+export function isStaleIdempotencyReservation(updatedAt: Date, now = Date.now()) {
+  return updatedAt.getTime() <= now - memoryPendingTtlMs;
+}
+
+async function createDatabaseReservation(input: IdempotencyInput, key: string) {
+  await prisma.apiIdempotencyKey.create({
+    data: {
+      namespace: input.namespace,
+      actorKey: input.actorKey,
+      key,
+    },
+  });
+}
+
+function createDatabaseReservationHandle(
+  input: IdempotencyInput,
+  key: string,
+): IdempotencyReservation {
+  return {
+    complete: async (body, status = 200) => {
+      const safeBody = toJsonSafeValue(body);
+
+      await prisma.apiIdempotencyKey.update({
+        where: {
+          namespace_actorKey_key: {
+            namespace: input.namespace,
+            actorKey: input.actorKey,
+            key,
+          },
+        },
+        data: {
+          status: 'completed',
+          statusCode: status,
+          response: safeBody,
+        },
+      });
+
+      return jsonResponse(safeBody, status);
+    },
+    abandon: async () => {
+      await prisma.apiIdempotencyKey.deleteMany({
+        where: {
+          namespace: input.namespace,
+          actorKey: input.actorKey,
+          key,
+          status: 'pending',
+        },
+      });
+    },
+  };
+}
+
 export async function reserveIdempotencyKey(
   request: Request,
   input: IdempotencyInput,
@@ -147,13 +199,7 @@ export async function reserveIdempotencyKey(
   }
 
   try {
-    await prisma.apiIdempotencyKey.create({
-      data: {
-        namespace: input.namespace,
-        actorKey: input.actorKey,
-        key,
-      },
-    });
+    await createDatabaseReservation(input, key);
   } catch {
     const existing = await prisma.apiIdempotencyKey.findUnique({
       where: {
@@ -173,6 +219,30 @@ export async function reserveIdempotencyKey(
       };
     }
 
+    if (
+      existing?.status === 'pending' &&
+      isStaleIdempotencyReservation(existing.updatedAt)
+    ) {
+      const claimedReservation = await prisma.apiIdempotencyKey.updateMany({
+        where: {
+          namespace: input.namespace,
+          actorKey: input.actorKey,
+          key,
+          status: 'pending',
+          updatedAt: existing.updatedAt,
+        },
+        data: {
+          status: 'pending',
+          statusCode: null,
+          response: Prisma.DbNull,
+        },
+      });
+
+      if (claimedReservation.count === 1) {
+        return createDatabaseReservationHandle(input, key);
+      }
+    }
+
     return {
       response: jsonResponse(
         {
@@ -186,36 +256,5 @@ export async function reserveIdempotencyKey(
     };
   }
 
-  return {
-    complete: async (body, status = 200) => {
-      const safeBody = toJsonSafeValue(body);
-
-      await prisma.apiIdempotencyKey.update({
-        where: {
-          namespace_actorKey_key: {
-            namespace: input.namespace,
-            actorKey: input.actorKey,
-            key,
-          },
-        },
-        data: {
-          status: 'completed',
-          statusCode: status,
-          response: safeBody,
-        },
-      });
-
-      return jsonResponse(safeBody, status);
-    },
-    abandon: async () => {
-      await prisma.apiIdempotencyKey.deleteMany({
-        where: {
-          namespace: input.namespace,
-          actorKey: input.actorKey,
-          key,
-          status: 'pending',
-        },
-      });
-    },
-  };
+  return createDatabaseReservationHandle(input, key);
 }

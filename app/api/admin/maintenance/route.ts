@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
@@ -114,22 +115,29 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
   };
 }
 
-function requireAdmin(request: Request) {
+async function requireAdmin(request: Request) {
   const session = getAuthSession(request);
 
   if (!session) {
     return { response: Response.json({ error: 'auth_required' }, { status: 401 }) };
   }
 
-  if (!isAdminSession(session)) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return { response: Response.json({ error: 'admin_required' }, { status: 403 }) };
   }
 
   return { session };
 }
 
+function isDestructiveMaintenanceEnabled() {
+  return (
+    process.env.NODE_ENV !== 'production' ||
+    process.env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP === '1'
+  );
+}
+
 export async function GET(request: Request) {
-  const admin = requireAdmin(request);
+  const admin = await requireAdmin(request);
 
   if ('response' in admin) {
     return admin.response;
@@ -139,10 +147,21 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = requireAdmin(request);
+  const admin = await requireAdmin(request);
 
   if ('response' in admin) {
     return admin.response;
+  }
+
+  if (!isDestructiveMaintenanceEnabled()) {
+    return Response.json(
+      {
+        error: 'maintenance_cleanup_disabled',
+        message:
+          'Destructive maintenance cleanup is disabled in production.',
+      },
+      { status: 403 },
+    );
   }
 
   let payload: unknown;

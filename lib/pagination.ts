@@ -31,12 +31,15 @@ export function normalizePagination(
   {
     defaultLimit = 24,
     maxLimit = 80,
+    maxPage = 1000,
   }: {
     defaultLimit?: number;
     maxLimit?: number;
+    maxPage?: number;
   } = {},
 ): NormalizedPagination {
-  const page = toPositiveInteger(input.page) ?? 1;
+  const requestedPage = toPositiveInteger(input.page) ?? 1;
+  const page = Math.min(requestedPage, maxPage);
   const requestedLimit = toPositiveInteger(input.limit) ?? defaultLimit;
   const limit = Math.min(requestedLimit, maxLimit);
 

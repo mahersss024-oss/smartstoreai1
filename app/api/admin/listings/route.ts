@@ -1,4 +1,5 @@
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { parsePaginationFromRequest } from '@/lib/pagination';
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

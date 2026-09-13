@@ -1165,7 +1165,7 @@ export async function POST(request: Request) {
     return createTextUIResponse(getAuthRequiredResponse(language));
   }
 
-  const retryAfterSeconds = await checkChatRateLimit(getClientId(request));
+  const retryAfterSeconds = await checkChatRateLimit(`user:${session.user.id}`);
 
   if (retryAfterSeconds !== null) {
     return new Response('Too many requests. Please try again shortly.', {
@@ -1179,10 +1179,10 @@ export async function POST(request: Request) {
   const missingApiKeys = getMissingApiKeys();
 
   if (missingApiKeys.length) {
-    return new Response(
-      `Missing production environment variables: ${missingApiKeys.join(', ')}. Add them to your Render environment variables and redeploy.`,
-      { status: 500 },
+    console.warn(
+      `[chat_config] missing_required_env=${missingApiKeys.join(',')}`,
     );
+    return createTextUIResponse(getModelProviderFailureResponse(language));
   }
 
   const imageValidationFailure = validateChatImageAttachments(filteredMessages);

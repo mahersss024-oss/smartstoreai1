@@ -1,7 +1,5 @@
-import {
-  getAuthSession,
-  isAdminSession,
-} from '@/lib/auth/session';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import {
   getRealtimeEventsSince,
   subscribeRealtimeEvents,
@@ -44,9 +42,10 @@ function toSseHeartbeat() {
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
+  const isAdmin = await hasVerifiedAdminAccess(session);
   const context = {
     userId: session?.user.id ?? null,
-    isAdmin: isAdminSession(session),
+    isAdmin,
   };
   const url = new URL(request.url);
   const lastEventId =

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
-import { getAuthSession, isAdminSession } from '@/lib/auth/session';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
@@ -59,7 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 
@@ -226,7 +227,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!isAdminSession(session)) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

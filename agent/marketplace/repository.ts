@@ -282,13 +282,12 @@ function getPlaceholderEmail(userId: string) {
 }
 
 function getListingPagination(filters: MarketplaceListingFilters) {
-  const limit = Math.min(Math.max(Math.floor(filters.limit ?? 24), 1), 80);
-  const page = Math.max(Math.floor(filters.page ?? 1), 1);
+  const pagination = normalizePagination(filters);
 
   return {
-    limit,
-    page,
-    skip: (page - 1) * limit,
+    limit: pagination.limit,
+    page: pagination.page,
+    skip: pagination.skip,
   };
 }
 

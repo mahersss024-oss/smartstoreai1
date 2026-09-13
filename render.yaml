@@ -46,6 +46,8 @@ services:
         sync: false
       - key: SMARTSTORE_ADMIN_EMAILS
         sync: false
+      - key: SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP
+        value: "0"
       - key: SMARTSTORE_IMAGE_STORAGE
         sync: false
       - key: SMARTSTORE_MAX_IMAGES_PER_LISTING

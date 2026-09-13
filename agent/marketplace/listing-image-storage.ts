@@ -64,6 +64,10 @@ export function createPersistentImageDataUrl(
   return `data:${mediaType};base64,${Buffer.from(data).toString('base64')}`;
 }
 
+export function canUseImageDataUrlFallback() {
+  return process.env.NODE_ENV !== 'production';
+}
+
 export async function createPersistentListingImageUrl({
   data,
   mediaType,
@@ -86,7 +90,15 @@ export async function createPersistentListingImageUrl({
     fileName,
   });
 
-  return storedObject?.url ?? createPersistentImageDataUrl(data, mediaType);
+  if (storedObject?.url) {
+    return storedObject.url;
+  }
+
+  if (!canUseImageDataUrlFallback()) {
+    throw new Error('Listing image object storage is required in production.');
+  }
+
+  return createPersistentImageDataUrl(data, mediaType);
 }
 
 export function extractLatestUploadedListingImages(

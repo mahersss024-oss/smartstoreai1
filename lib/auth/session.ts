@@ -224,10 +224,12 @@ function getConfiguredAdminEmails() {
     .filter(Boolean);
 }
 
+export function isConfiguredAdminEmail(email: string) {
+  return getConfiguredAdminEmails().includes(email.toLowerCase());
+}
+
 export function getConfiguredRoleForEmail(email: string) {
-  return getConfiguredAdminEmails().includes(email.toLowerCase())
-    ? 'admin'
-    : 'user';
+  return isConfiguredAdminEmail(email) ? 'admin' : 'user';
 }
 
 export function isAdminSession(session: AuthSession | null) {
@@ -237,7 +239,7 @@ export function isAdminSession(session: AuthSession | null) {
 
   return (
     session.user.role === 'admin' ||
-    getConfiguredAdminEmails().includes(session.user.email.toLowerCase())
+    isConfiguredAdminEmail(session.user.email)
   );
 }
 
