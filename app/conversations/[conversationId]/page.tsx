@@ -787,7 +787,9 @@ export default function ConversationPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                   <ShieldCheck className="size-4 shrink-0 text-blue-600" />
-                  <span className="truncate">التواصل والدفع داخل SmartStore AI</span>
+                  <span className="leading-5">
+                    التواصل داخل SmartStore AI. تحويل الأموال بين البائع والمشتري مسؤولية الطرفين والمنصة لا تضمنه.
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {isSeller && (

@@ -26,4 +26,6 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /Do not claim to see hidden UI state, click buttons, navigate pages/);
   assert.match(systemPrompt, /The assistant only sees and acts through explicit platform capabilities/);
   assert.match(systemPrompt, /Do not invent listings, sellers, prices/);
+  assert.match(systemPrompt, /does not process, hold, transfer, guarantee, or mediate buyer-seller payment money/);
+  assert.match(systemPrompt, /fraud risk/);
 });

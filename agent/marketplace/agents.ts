@@ -46,6 +46,7 @@ Core experience:
 - Product category is inferred by the model. If the category is unclear, ask one clarifying question.
 - Use this taxonomy when possible: cars, auto_parts, mobile_phones, computers, real_estate, furniture, fashion, home_garden, sports, gaming_hobbies, books_education, kids, tools_equipment, watches_accessories, beauty, other.
 - Communication between buyer and seller is internal app chat, not phone-number based.
+- SmartStore AI does not process, hold, transfer, guarantee, or mediate buyer-seller payment money. Warn users that direct money transfers are their own responsibility and can carry fraud risk.
 - Before publishing, show a concise listing preview and ask for confirmation.
 - Dangerous actions need explicit confirmation: publish, delete, price change, mark sold, and republish.
 - Negotiation help is advisory only. Never intervene as a deal party, never send an offer or counteroffer to another user, never accept or reject an offer, never change price because of an offer, and never close or commit to a deal. The user must decide and send any negotiation message manually.

@@ -743,12 +743,19 @@ function toSelectedListingContext(
   };
 }
 
-function getLatestSearchToolOutput(messages: UIMessage[]) {
+function getLatestSearchToolOutput(
+  messages: UIMessage[],
+  options: { afterLatestUserOnly?: boolean } = {},
+) {
   const latestUserMessageIndex = messages.findLastIndex(
     (message) => message.role === 'user',
   );
   const firstEligibleAssistantIndex =
-    latestUserMessageIndex === -1 ? 0 : latestUserMessageIndex + 1;
+    options.afterLatestUserOnly === false
+      ? 0
+      : latestUserMessageIndex === -1
+        ? 0
+        : latestUserMessageIndex + 1;
 
   for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
     if (messageIndex < firstEligibleAssistantIndex) {
@@ -1157,21 +1164,31 @@ export default function Page() {
     () => getLatestSearchToolOutput(filteredMessages),
     [filteredMessages],
   );
+  const retainedSearchToolOutput = useMemo(
+    () =>
+      getLatestSearchToolOutput(filteredMessages, {
+        afterLatestUserOnly: false,
+      }),
+    [filteredMessages],
+  );
+  const hasActiveAssistantSearch = Boolean(activeListingQuery);
+  const visibleSearchToolOutput =
+    latestSearchToolOutput ??
+    (hasActiveAssistantSearch ? retainedSearchToolOutput : null);
   const searchToolListings = useMemo(() => {
-    if (!latestSearchToolOutput) {
+    if (!visibleSearchToolOutput) {
       return [];
     }
 
-    return (latestSearchToolOutput.listings as ApiListingRecord[]).map(
+    return (visibleSearchToolOutput.listings as ApiListingRecord[]).map(
       listingRecordToCard,
     );
-  }, [latestSearchToolOutput]);
+  }, [visibleSearchToolOutput]);
   const assistantResultListings = useMemo(() => {
     return getAssistantResultListings({
       searchToolListings,
     });
   }, [searchToolListings]);
-  const hasActiveAssistantSearch = Boolean(activeListingQuery);
   const exploreMarketplaceListings = useMemo(() => {
     return getExploreListings({
       marketplaceListings,

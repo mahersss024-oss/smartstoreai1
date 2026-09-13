@@ -62,6 +62,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
   const homePage = readProjectFile('app', 'page.tsx');
 
   assert.match(homePage, /hasActiveAssistantSearch/);
+  assert.match(homePage, /retainedSearchToolOutput/);
+  assert.match(homePage, /visibleSearchToolOutput/);
+  assert.match(homePage, /afterLatestUserOnly: false/);
+  assert.doesNotMatch(homePage, /setRetainedSearchToolOutput/);
   assert.match(homePage, /assistantResultListings\.map/);
   assert.match(homePage, /exploreMarketplaceListings\.map/);
   assert.match(homePage, /نتائج ذكية من مساعد SmartStore AI/);

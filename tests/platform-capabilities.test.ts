@@ -33,6 +33,8 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(renderedCapabilities, /structured/);
   assert.match(renderedCapabilities, /createListingDraft/);
   assert.match(renderedCapabilities, /The assistant only sees and acts through explicit platform capabilities/);
+  assert.match(renderedCapabilities, /not an escrow service, payment processor, money-transfer intermediary, or guarantor/);
+  assert.match(renderedCapabilities, /fraud risk/);
   assert.match(systemPrompt, /Available platform capabilities/);
   assert.match(marketplaceSystemInstructions, /Available platform capabilities/);
 });
