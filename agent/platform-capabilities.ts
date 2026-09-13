@@ -32,7 +32,7 @@ export const platformCapabilityRules = [
 export const platformCapabilities: PlatformCapability[] = [
   {
     action: 'search_listings',
-    canDo: 'Search and narrow published marketplace listings using buyer language, filters, and visible listing cards.',
+    canDo: 'Search and narrow published marketplace listings using dedicated structured buyer understanding, filters, and visible listing cards.',
     requiresAuth: true,
     requiresConfirmation: false,
     allowedTools: ['searchMarketplaceListings'],

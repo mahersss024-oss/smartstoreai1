@@ -30,6 +30,7 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(renderedCapabilities, /manual phone numbers and emails are blocked/i);
   assert.match(renderedCapabilities, /requires_confirmation=yes/);
   assert.match(renderedCapabilities, /searchMarketplaceListings/);
+  assert.match(renderedCapabilities, /structured/);
   assert.match(renderedCapabilities, /createListingDraft/);
   assert.match(renderedCapabilities, /The assistant only sees and acts through explicit platform capabilities/);
   assert.match(systemPrompt, /Available platform capabilities/);

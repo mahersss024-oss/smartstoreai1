@@ -25,14 +25,13 @@ import {
   updateListingForSeller,
   type CreateListingInput,
 } from '@/agent/marketplace/repository';
-import {
-  marketplaceSearchUnderstandingSchema,
-  searchMarketplaceWithState,
-} from '@/agent/marketplace/search-engine';
+import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
+import { marketplaceSearchUnderstandingSchema } from '@/agent/marketplace/search-understanding-schema';
 import { compareMarketplaceListings as compareListingsWithEngine } from '@/agent/marketplace/comparison-engine';
 import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
 import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine';
 import type { AuthSession } from '@/lib/auth/session';
+import type { AppLanguage } from '@/app/i18n';
 
 type MarketplaceListingResult = Awaited<
   ReturnType<typeof listMarketplaceListings>
@@ -272,6 +271,7 @@ export function createMarketplaceTools(
   options: {
     latestUploadedImages?: UploadedListingImage[];
     searchOwnerKey?: string;
+    language?: AppLanguage;
   } = {},
 ) {
   return {
@@ -289,6 +289,8 @@ export function createMarketplaceTools(
             (session ? `user:${session.user.id}` : 'anonymous'),
           query,
           understoodIntent,
+          language: options.language,
+          useModelUnderstanding: true,
         });
 
         return {

@@ -3,6 +3,7 @@ export const appConfig = {
   models: {
     chat: 'deepseek-v4-flash',
     scope: 'deepseek-v4-flash',
+    search: 'deepseek-v4-flash',
     moderation: 'deepseek-v4-flash',
     vision: 'deepseek-v4-flash-vision-exp',
   },

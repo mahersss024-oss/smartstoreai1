@@ -8,7 +8,12 @@ import {
   recordRuntimeDurationMs,
 } from '@/lib/observability/runtime-metrics';
 
-export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
+export type DeepseekModelProfile =
+  | 'chat'
+  | 'scope'
+  | 'search'
+  | 'moderation'
+  | 'vision';
 
 const defaultDeepseekMaxConcurrentRequests = 100;
 const defaultDeepseekMaxQueuedRequests = 2_000;
@@ -41,6 +46,7 @@ const deepseekProviderMetrics: DeepseekProviderMetrics = {
 const profileEnvironmentKeys = {
   chat: 'DEEPSEEK_CHAT_MODEL',
   scope: 'DEEPSEEK_SCOPE_MODEL',
+  search: 'DEEPSEEK_SEARCH_MODEL',
   moderation: 'DEEPSEEK_MODERATION_MODEL',
   vision: 'DEEPSEEK_VISION_MODEL',
 } satisfies Record<DeepseekModelProfile, string>;

@@ -3,6 +3,7 @@ import { ToolLoopAgent } from 'ai';
 import { appConfig } from '@/app/app-config';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AuthSession } from '@/lib/auth/session';
+import type { AppLanguage } from '@/app/i18n';
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import type { UploadedListingImage } from './marketplace/listing-image-storage';
 import { marketplaceSystemInstructions } from './marketplace/agents';
@@ -14,6 +15,7 @@ export function createChatAgent(
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
     searchOwnerKey?: string;
+    language?: AppLanguage;
     additionalInstructions?: string;
   } = {},
 ) {
@@ -30,6 +32,7 @@ export function createChatAgent(
       ...createMarketplaceTools(session, {
         latestUploadedImages: options.latestUploadedImages,
         searchOwnerKey: options.searchOwnerKey,
+        language: options.language,
       }),
     },
   });

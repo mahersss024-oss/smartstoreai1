@@ -42,7 +42,7 @@ Registration is gated by a signed commission acknowledgment cookie.
 
 ## Marketplace Agents
 
-The system is split into specialized agents. They have separate instructions, schemas, permissions, and model profiles. By default text agents use `deepseek-v4-flash`, image understanding uses `deepseek-v4-flash-vision-exp`, and deployment can override them with `DEEPSEEK_MODEL`, `DEEPSEEK_CHAT_MODEL`, `DEEPSEEK_SCOPE_MODEL`, `DEEPSEEK_MODERATION_MODEL`, and `DEEPSEEK_VISION_MODEL`.
+The system is split into specialized agents. They have separate instructions, schemas, permissions, and model profiles. By default text agents use `deepseek-v4-flash`, image understanding uses `deepseek-v4-flash-vision-exp`, and deployment can override them with `DEEPSEEK_MODEL`, `DEEPSEEK_CHAT_MODEL`, `DEEPSEEK_SCOPE_MODEL`, `DEEPSEEK_SEARCH_MODEL`, `DEEPSEEK_MODERATION_MODEL`, and `DEEPSEEK_VISION_MODEL`.
 
 - Intent Router
 - Auth Gate
@@ -50,7 +50,7 @@ The system is split into specialized agents. They have separate instructions, sc
 - Listing Intake
 - Listing Writer
 - Pricing Agent
-- Search Agent
+- Search Agent: a dedicated search-understanding model converts buyer language into structured filters before the deterministic retrieval and ranking engines run.
 - Ranking Agent
 - Comparison Agent
 - Conversation Agent
