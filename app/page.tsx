@@ -106,6 +106,7 @@ type AuthSessionPayload = {
 
 type ListingCard = {
   id?: string;
+  sellerId?: string;
   title: string;
   price: string;
   city: string;
@@ -123,6 +124,7 @@ type SelectedListingContext = Pick<
 
 type ApiListingRecord = {
   id: string;
+  sellerId?: string;
   category: string;
   title?: string;
   description?: string;
@@ -978,6 +980,7 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
 
   return {
     id: listing.id,
+    sellerId: listing.sellerId,
     title: listing.title ?? 'إعلان بدون عنوان',
     price: formatListingPrice(listing.price),
     city: listing.city ?? 'السعودية',
@@ -1085,12 +1088,14 @@ function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
 function ListingCardView({
   listing,
   isFavorite,
+  isOwnListing,
   onAsk,
   onFavorite,
   onOpen,
 }: {
   listing: ListingCard;
   isFavorite: boolean;
+  isOwnListing: boolean;
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
@@ -1119,6 +1124,7 @@ function ListingCardView({
             </div>
           </div>
         )}
+        {!isOwnListing && (
         <Button
           size="icon-sm"
           variant="ghost"
@@ -1137,6 +1143,7 @@ function ListingCardView({
         >
           <Heart className={cn('size-3.5 sm:size-4', isFavorite && 'fill-current')} />
         </Button>
+        )}
       </div>
       <div className="grid gap-1 p-2 text-right">
         <h3 className="line-clamp-1 text-xs font-bold leading-5">{listing.title}</h3>
@@ -2338,6 +2345,9 @@ export default function Page() {
                           isFavorite={Boolean(
                             listing.id && favoriteListingIds.has(listing.id),
                           )}
+                          isOwnListing={Boolean(
+                            listing.sellerId && session.user?.id === listing.sellerId,
+                          )}
                           onAsk={sendStarter}
                           onFavorite={favoriteListing}
                           onOpen={openListing}
@@ -2366,6 +2376,9 @@ export default function Page() {
                     listing={listing}
                     isFavorite={Boolean(
                       listing.id && favoriteListingIds.has(listing.id),
+                    )}
+                    isOwnListing={Boolean(
+                      listing.sellerId && session.user?.id === listing.sellerId,
                     )}
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}

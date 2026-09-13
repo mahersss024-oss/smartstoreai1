@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Flag, Heart, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -11,12 +11,57 @@ function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
 
-export function ListingSafetyActions({ listingId }: { listingId: string }) {
+type SessionPayload = {
+  authenticated: boolean;
+  user: { id: string } | null;
+};
+
+export function ListingSafetyActions({
+  listingId,
+  sellerId,
+}: {
+  listingId: string;
+  sellerId: string;
+}) {
   const router = useRouter();
   const [notice, setNotice] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const [canFavorite, setCanFavorite] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function checkFavoritePermission() {
+      try {
+        const response = await fetch('/api/auth/session', { cache: 'no-store' });
+
+        if (!response.ok) {
+          if (isCurrent) {
+            setCanFavorite(true);
+          }
+          return;
+        }
+
+        const session = (await response.json()) as SessionPayload;
+
+        if (isCurrent) {
+          setCanFavorite(session.user?.id !== sellerId);
+        }
+      } catch {
+        if (isCurrent) {
+          setCanFavorite(true);
+        }
+      }
+    }
+
+    checkFavoritePermission();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [sellerId]);
 
   const saveFavorite = async () => {
     setIsSaving(true);
@@ -107,7 +152,8 @@ export function ListingSafetyActions({ listingId }: { listingId: string }) {
 
   return (
     <div className="grid gap-2">
-      <div className="grid grid-cols-2 gap-2">
+      <div className={cn('grid gap-2', canFavorite ? 'grid-cols-2' : 'grid-cols-1')}>
+        {canFavorite && (
         <Button
           variant="outline"
           className={cn(
@@ -122,6 +168,7 @@ export function ListingSafetyActions({ listingId }: { listingId: string }) {
           <Heart className={cn('size-4', isFavorite && 'fill-current')} />
           حفظ
         </Button>
+        )}
         <Button
           variant="outline"
           className="rounded-md"

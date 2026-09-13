@@ -306,7 +306,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                 <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
               </div>
               <ListingContactActions listingId={listing.id} />
-              <ListingSafetyActions listingId={listing.id} />
+              <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
             </section>
 
             <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
