@@ -39,6 +39,7 @@ test('accepts snake case fields from the search understanding model', () => {
       min_price: 60000,
       max_price: 90000,
       year_min: 2020,
+      search_mode: 'new_search',
       mileage_max: 80000,
       sort_preference: 'lowest_mileage',
       descriptive_terms: ['hybrid'],
@@ -51,6 +52,7 @@ test('accepts snake case fields from the search understanding model', () => {
   assert.equal(understanding.minPrice, 60000);
   assert.equal(understanding.maxPrice, 90000);
   assert.equal(understanding.yearMin, 2020);
+  assert.equal(understanding.searchMode, 'new_search');
   assert.equal(understanding.mileageMax, 80000);
   assert.equal(understanding.sortPreference, 'lowest_mileage');
   assert.deepEqual(understanding.descriptiveTerms, ['hybrid']);

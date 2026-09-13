@@ -189,8 +189,6 @@ const currentChatStorageKey = 'smartstore-current-chat-v1';
 const retainedListingImagesDatabaseName = 'smartstore-listing-images-v1';
 const retainedListingImagesStoreName = 'listing-images';
 const retainedListingImagesRecordKey = 'latest';
-const maxStoredChatMessages = 60;
-const storedChatMaxAgeMs = 1000 * 60 * 60 * 24 * 14;
 const assistantDragThreshold = 60;
 const chatMaxAttachments = 8;
 const chatInputGroupStyle: CSSProperties = {
@@ -213,19 +211,6 @@ const chatSubmitButtonStyle: CSSProperties = {
 const chatAttachmentControlsStyle: CSSProperties = {
   gridColumn: '3',
   gridRow: '2',
-};
-
-type StoredChatState = {
-  activeListingQuery: string;
-  selectedListingContext?: SelectedListingContext | null;
-  messages: UIMessage[];
-  updatedAt: number;
-};
-
-type StoredListingImagesState = {
-  id: string;
-  images: RetainedListingImage[];
-  updatedAt: number;
 };
 
 type PendingChatAttachment = FileUIPart & { id: string };
@@ -674,135 +659,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function getStoredAttachmentLabel(part: UIMessage['parts'][number]) {
-  const filename =
-    'filename' in part && typeof part.filename === 'string'
-      ? part.filename
-      : '';
-  const mediaType =
-    'mediaType' in part && typeof part.mediaType === 'string'
-      ? part.mediaType
-      : '';
-
-  if (mediaType.startsWith('image/')) {
-    return filename
-      ? `صورة مرفقة محفوظة في السجل: ${filename}`
-      : 'صورة مرفقة محفوظة في السجل';
-  }
-
-  return filename
-    ? `ملف مرفق محفوظ في السجل: ${filename}`
-    : 'ملف مرفق محفوظ في السجل';
-}
-
-function sanitizeMessagesForStorage(messages: UIMessage[]) {
-  return messages
-    .filter((message) => message.role !== 'system')
-    .slice(-maxStoredChatMessages)
-    .map((message) => ({
-      ...message,
-      parts: message.parts.flatMap((part) => {
-        if (part.type === 'file') {
-          return [
-            {
-              type: 'text',
-              text: getStoredAttachmentLabel(part),
-            } satisfies UIMessage['parts'][number],
-          ];
-        }
-
-        return [part];
-      }),
-    }));
-}
-
-function compactMessagesForStorage(messages: UIMessage[]) {
-  return sanitizeMessagesForStorage(messages).map((message) => ({
-    ...message,
-    parts: message.parts.filter((part) => part.type === 'text'),
-  }));
-}
-
-function readStoredChatState(): StoredChatState | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const rawState = localStorage.getItem(currentChatStorageKey);
-
-    if (!rawState) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawState) as Partial<StoredChatState>;
-
-    if (
-      typeof parsed.updatedAt !== 'number' ||
-      Date.now() - parsed.updatedAt > storedChatMaxAgeMs ||
-      !Array.isArray(parsed.messages)
-    ) {
-      localStorage.removeItem(currentChatStorageKey);
-      return null;
-    }
-
-    return {
-      activeListingQuery:
-        typeof parsed.activeListingQuery === 'string'
-          ? parsed.activeListingQuery
-          : '',
-      selectedListingContext:
-        parsed.selectedListingContext &&
-        typeof parsed.selectedListingContext === 'object'
-          ? parsed.selectedListingContext
-          : null,
-      messages: sanitizeMessagesForStorage(parsed.messages),
-      updatedAt: parsed.updatedAt,
-    };
-  } catch {
-    localStorage.removeItem(currentChatStorageKey);
-    return null;
-  }
-}
-
-function writeStoredChatState(
-  messages: UIMessage[],
-  activeListingQuery: string,
-  selectedListingContext: SelectedListingContext | null,
-) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  if (messages.length === 0) {
-    localStorage.removeItem(currentChatStorageKey);
-    return;
-  }
-
-  const state: StoredChatState = {
-    activeListingQuery,
-    selectedListingContext,
-    messages: sanitizeMessagesForStorage(messages),
-    updatedAt: Date.now(),
-  };
-
-  try {
-    localStorage.setItem(currentChatStorageKey, JSON.stringify(state));
-  } catch {
-    localStorage.setItem(
-      currentChatStorageKey,
-      JSON.stringify({
-        ...state,
-        messages: compactMessagesForStorage(messages),
-      }),
-    );
-  }
+function clearStaleStoredChatState() {
+  clearStoredChatState();
 }
 
 function clearStoredChatState() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(currentChatStorageKey);
   }
+}
+
+async function resetAssistantSearchState() {
+  await fetch('/api/chat/reset', {
+    cache: 'no-store',
+    credentials: 'include',
+    method: 'POST',
+  });
 }
 
 function openRetainedListingImagesDatabase() {
@@ -829,57 +701,13 @@ function openRetainedListingImagesDatabase() {
 }
 
 async function readRetainedListingImages() {
-  const database = await openRetainedListingImagesDatabase();
-
-  return new Promise<RetainedListingImage[]>((resolve, reject) => {
-    const transaction = database.transaction(
-      retainedListingImagesStoreName,
-      'readonly',
-    );
-    const store = transaction.objectStore(retainedListingImagesStoreName);
-    const request = store.get(retainedListingImagesRecordKey);
-
-    request.onsuccess = () => {
-      const record = request.result as StoredListingImagesState | undefined;
-
-      if (
-        !record ||
-        Date.now() - record.updatedAt > storedChatMaxAgeMs ||
-        !Array.isArray(record.images)
-      ) {
-        resolve([]);
-        return;
-      }
-
-      resolve(record.images.filter(isRetainableListingImage).slice(0, 8));
-    };
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => reject(transaction.error);
-  });
+  await clearRetainedListingImages();
+  return [];
 }
 
 async function writeRetainedListingImages(images: RetainedListingImage[]) {
-  const database = await openRetainedListingImagesDatabase();
-
-  return new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(
-      retainedListingImagesStoreName,
-      'readwrite',
-    );
-    const store = transaction.objectStore(retainedListingImagesStoreName);
-
-    store.put({
-      id: retainedListingImagesRecordKey,
-      images: images.slice(0, 8),
-      updatedAt: Date.now(),
-    } satisfies StoredListingImagesState);
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
+  void images;
+  await clearRetainedListingImages();
 }
 
 async function clearRetainedListingImages() {
@@ -1319,6 +1147,7 @@ export default function Page() {
   const listingsRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
+  const shouldResetSearchStateRef = useRef(true);
   const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
@@ -1771,43 +1600,40 @@ export default function Page() {
 
   useEffect(() => {
     let cancelled = false;
-    const storedState = readStoredChatState();
+
+    clearStaleStoredChatState();
+    retainedListingImagesRef.current = [];
+    shouldResetSearchStateRef.current = true;
+    void clearRetainedListingImages().catch(() => {});
 
     queueMicrotask(() => {
       if (cancelled) {
         return;
       }
 
-      if (storedState) {
-        setMessages(storedState.messages);
-        setActiveListingQuery(storedState.activeListingQuery);
-        setSelectedListingContext(storedState.selectedListingContext ?? null);
-      }
-
-      setHasRestoredChat(true);
+      setMessages([]);
+      setActiveListingQuery('');
+      setSelectedListingContext(null);
     });
+
+    void resetAssistantSearchState()
+      .catch(() => {
+        // The first chat request also carries resetSearchState, so an offline
+        // reset call should not block the customer from opening the assistant.
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setHasRestoredChat(true);
+      });
 
     return () => {
       cancelled = true;
     };
   }, [setMessages]);
 
-  useEffect(() => {
-    if (!hasRestoredChat) {
-      return;
-    }
-
-    writeStoredChatState(
-      filteredMessages,
-      activeListingQuery,
-      selectedListingContext,
-    );
-  }, [
-    activeListingQuery,
-    filteredMessages,
-    hasRestoredChat,
-    selectedListingContext,
-  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1970,6 +1796,10 @@ export default function Page() {
         void writeRetainedListingImages(currentListingImages).catch(() => {});
       }
 
+      const resetSearchState =
+        shouldResetSearchStateRef.current || filteredMessages.length === 0;
+      shouldResetSearchStateRef.current = false;
+
       const nextListingQuery = getNextListingQuery(
         text,
         activeListingQuery,
@@ -2002,6 +1832,7 @@ export default function Page() {
           body: {
             locationSettings,
             retainedListingImages,
+            resetSearchState,
             selectedListing: selectedListingContext,
           },
         },
@@ -2013,6 +1844,7 @@ export default function Page() {
       selectedListingContext,
       sendMessage,
       expandAssistant,
+      filteredMessages.length,
     ],
   );
 
@@ -2033,6 +1865,9 @@ export default function Page() {
       const intent = inferClientIntent(prompt);
       setClientIntent(intent);
       expandAssistant();
+      const resetSearchState =
+        shouldResetSearchStateRef.current || filteredMessages.length === 0;
+      shouldResetSearchStateRef.current = false;
 
       const nextListingQuery = getNextListingQuery(
         prompt,
@@ -2055,6 +1890,7 @@ export default function Page() {
         {
           body: {
             locationSettings,
+            resetSearchState,
             selectedListing: nextSelectedListingContext,
           },
         },
@@ -2067,6 +1903,7 @@ export default function Page() {
       selectedListingContext,
       sendMessage,
       expandAssistant,
+      filteredMessages.length,
     ],
   );
 
@@ -2208,8 +2045,10 @@ export default function Page() {
     setActiveListingQuery('');
     setSelectedListingContext(null);
     retainedListingImagesRef.current = [];
+    shouldResetSearchStateRef.current = true;
     clearStoredChatState();
     void clearRetainedListingImages().catch(() => {});
+    void resetAssistantSearchState().catch(() => {});
   }, [setMessages]);
 
   const clearAssistantSearch = useCallback(() => {

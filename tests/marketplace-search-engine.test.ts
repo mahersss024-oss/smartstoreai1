@@ -336,6 +336,55 @@ test('chat marketplace search uses understood intent instead of raw query words'
   );
 });
 
+test('broad category search starts fresh instead of inheriting old filters', async () => {
+  const ownerKey = 'test:search-state-broad-category-resets-old-filters';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-nissan-patrol-old-filter',
+    title: 'Nissan Patrol LE 2025 - Tabuk',
+    price: 230000,
+    year: 2025,
+    mileage: 12000,
+    brand: 'Nissan',
+    model: 'Patrol',
+    city: 'Tabuk',
+  });
+  publishTestListing({
+    id: 'listing:p0-toyota-camry-broad-result',
+    title: 'Toyota Camry 2022 - Riyadh',
+    price: 84000,
+    year: 2022,
+    mileage: 70000,
+    brand: 'Toyota',
+    model: 'Camry',
+    city: 'Riyadh',
+  });
+
+  await searchMarketplaceWithState({
+    ownerKey,
+    query: 'Nissan Patrol in Tabuk',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Nissan',
+      model: 'Patrol',
+      city: 'Tabuk',
+    },
+  });
+  const result = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'I want a car',
+  });
+  const storedState = await getMarketplaceSearchState(ownerKey);
+
+  assert.equal(result.searchState.category, 'cars');
+  assert.equal(storedState?.searchMode, 'new_search');
+  assert.equal(storedState?.brand, undefined);
+  assert.equal(storedState?.model, undefined);
+  assert.equal(storedState?.city, undefined);
+  assert.equal(result.rankedCount >= 2, true);
+});
+
 test('structured Arabic search ignores connected brand and model words after extracting intent', () => {
   const intent = parseStructuredSearchIntent('ابي ونيسان والبترول');
 

@@ -32,8 +32,11 @@ export const sortPreferenceSchema = z.enum([
   'lowest_mileage',
 ]);
 
+export const searchModeSchema = z.enum(['new_search', 'refine']);
+
 export const structuredSearchIntentSchema = z.object({
   intent: z.literal('search_listing').default('search_listing'),
+  searchMode: searchModeSchema.optional(),
   category: z.string().min(1).optional(),
   brand: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
@@ -59,6 +62,7 @@ export const structuredSearchIntentSchema = z.object({
 export type StructuredSearchIntent = z.infer<typeof structuredSearchIntentSchema>;
 export type RankingPreference = z.infer<typeof rankingPreferenceSchema>;
 export type SortPreference = z.infer<typeof sortPreferenceSchema>;
+export type SearchMode = z.infer<typeof searchModeSchema>;
 
 const carModels = vehicleModelAliasEntries.map((entry) => ({
   patterns: entry.aliases,
@@ -257,9 +261,28 @@ export function parseStructuredSearchIntent(query: string | null | undefined) {
   const terms = parsed.terms.filter(
     (term) => !isIgnoredSearchTerm(term, ignoredTermValues),
   );
+  const condition = parseCondition(normalizedText);
+  const color = !isColorExclusion ? mentionedColor?.value : undefined;
+  const isBroadCategorySearch = Boolean(
+    parsed.category &&
+      !brandMatch &&
+      !modelMatch &&
+      !parsed.city &&
+      parsed.minPrice === undefined &&
+      parsed.maxPrice === undefined &&
+      parsed.yearMin === undefined &&
+      parsed.yearMax === undefined &&
+      !condition &&
+      !mileageValue &&
+      !color &&
+      requiredFeatures.length === 0 &&
+      excludedFeatures.length === 0 &&
+      terms.length === 0,
+  );
 
   return structuredSearchIntentSchema.parse({
     intent: 'search_listing',
+    searchMode: isBroadCategorySearch ? 'new_search' : undefined,
     category: parsed.category,
     brand: brandMatch?.brand,
     model: modelMatch?.model,
@@ -268,9 +291,9 @@ export function parseStructuredSearchIntent(query: string | null | undefined) {
     maxPrice: parsed.maxPrice,
     yearMin: parsed.yearMin,
     yearMax: parsed.yearMax,
-    condition: parseCondition(normalizedText),
+    condition,
     mileageMax: mileageValue,
-    color: !isColorExclusion ? mentionedColor?.value : undefined,
+    color,
     excludedColors: isColorExclusion && mentionedColor ? [mentionedColor.value] : [],
     requiredFeatures: uniqueValues(requiredFeatures),
     excludedFeatures: uniqueValues(excludedFeatures),

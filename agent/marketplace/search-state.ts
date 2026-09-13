@@ -54,6 +54,10 @@ function isDifferentPrimaryTarget(
     return false;
   }
 
+  if (next.searchMode === 'new_search') {
+    return true;
+  }
+
   if (next.category && current.category && next.category !== current.category) {
     return true;
   }
@@ -78,6 +82,7 @@ function mergeSearchState(
 
   return {
     intent: 'search_listing',
+    searchMode: next.searchMode,
     category: next.category ?? base?.category,
     brand: next.brand ?? base?.brand,
     model: next.model ?? base?.model,

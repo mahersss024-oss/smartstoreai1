@@ -2,6 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { POST } from '@/app/api/chat/route';
+import { POST as RESET_CHAT_POST } from '@/app/api/chat/reset/route';
+import {
+  getMarketplaceSearchState,
+  resetMarketplaceSearchState,
+  updateMarketplaceSearchState,
+} from '@/agent/marketplace/search-state';
+import {
+  createListingDraft,
+  listSellerListings,
+} from '@/agent/marketplace/repository';
 import { createSessionCookie } from '@/lib/auth/session';
 
 test('requires sign-in before any chat model interaction', async () => {
@@ -26,6 +36,59 @@ test('requires sign-in before any chat model interaction', async () => {
 
   assert.equal(response.status, 200);
   assert.match(text, /\[\[SMARTSTORE_GOOGLE_AUTH_REQUIRED\]\]/);
+});
+
+test('chat reset endpoint clears retained assistant search state', async () => {
+  const userId = 'google:chat-reset-user';
+  const ownerKey = `user:${userId}`;
+
+  await resetMarketplaceSearchState(ownerKey);
+  await updateMarketplaceSearchState(ownerKey, {
+    intent: 'search_listing',
+    category: 'cars',
+    brand: 'Nissan',
+    city: 'Tabuk',
+    requiredFeatures: [],
+    excludedFeatures: [],
+    excludedColors: [],
+    rankingPreferences: [],
+    terms: [],
+    rawQuery: 'old retained search',
+  });
+  const draft = await createListingDraft(
+    { id: userId, email: 'chat-reset@example.com' },
+    {
+      category: 'cars',
+      title: 'temporary assistant draft',
+      description: 'created from a previous assistant chat session',
+    },
+  );
+
+  assert.ok(await getMarketplaceSearchState(ownerKey));
+  assert.equal(draft.status, 'draft');
+  assert.equal(
+    (await listSellerListings(userId)).some((listing) => listing.id === draft.id),
+    true,
+  );
+
+  const response = await RESET_CHAT_POST(
+    new Request('http://localhost/api/chat/reset', {
+      method: 'POST',
+      headers: {
+        cookie: createSessionCookie({
+          id: userId,
+          email: 'chat-reset@example.com',
+        }),
+      },
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(await getMarketplaceSearchState(ownerKey), null);
+  assert.equal(
+    (await listSellerListings(userId)).some((listing) => listing.id === draft.id),
+    false,
+  );
 });
 
 test('rejects oversized chat bodies before model or auth work', async () => {

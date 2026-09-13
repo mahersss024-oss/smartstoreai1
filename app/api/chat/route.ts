@@ -1,8 +1,4 @@
 import {
-  createHash,
-} from 'node:crypto';
-
-import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -43,6 +39,7 @@ import {
 import {
   getListing,
   listSellerListings,
+  resetIncompleteSellerDrafts,
   setListingStatusForSeller,
 } from '@/agent/marketplace/repository';
 import {
@@ -59,10 +56,12 @@ import {
   normalizeModelMessageFileData,
   stripImageAttachmentsFromModelMessages,
 } from '@/agent/vision-messages';
+import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import type { AppLanguage } from '@/app/i18n';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
+import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 
 const maxMessagesPerRequest = 40;
@@ -107,32 +106,6 @@ function getMissingApiKeys() {
   return missingKeys;
 }
 
-function getClientId(request: Request) {
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  const firstForwardedIp = forwardedFor?.split(',')[0]?.trim();
-
-  return (
-    firstForwardedIp ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('cf-connecting-ip') ||
-    'anonymous'
-  );
-}
-
-function getSearchOwnerKey(
-  session: ReturnType<typeof getAuthSession>,
-  request: Request,
-) {
-  if (session) {
-    return `user:${session.user.id}`;
-  }
-
-  return `anon:${createHash('sha256')
-    .update(getClientId(request))
-    .digest('hex')
-    .slice(0, 32)}`;
-}
-
 function isPolicyFacilitationIntent(intent: string) {
   return policyFacilitationIntents.has(intent);
 }
@@ -143,6 +116,7 @@ type ChatRequestBody = {
   locationSettings?: LocationSettings;
   retainedListingImages?: unknown;
   selectedListing?: unknown;
+  resetSearchState?: unknown;
   data?: {
     model?: string;
     [key: string]: unknown;
@@ -1227,7 +1201,13 @@ export async function POST(request: Request) {
     });
   }
 
-  const searchOwnerKey = getSearchOwnerKey(session, request);
+  const searchOwnerKey = getChatSearchOwnerKey(session, request);
+
+  if (body.resetSearchState === true) {
+    await resetMarketplaceSearchState(searchOwnerKey);
+    await resetIncompleteSellerDrafts(session.user.id);
+  }
+
   const marketplaceInterfaceContext = await buildMarketplaceInterfaceContext({
     selectedListing: body.selectedListing,
     session,

@@ -277,7 +277,7 @@ export function createMarketplaceTools(
   return {
     searchMarketplaceListings: tool({
       description:
-        'Search current published SmartStore AI marketplace listings for a buyer. Understand the buyer request first, pass structured understoodIntent fields when possible, and use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying listings are unavailable. This is read-only and never stores raw user search text as listing data.',
+        'Search current published SmartStore AI marketplace listings for a buyer. Understand the buyer request first, pass structured understoodIntent fields when possible, set searchMode="new_search" for a fresh broad product/category request, and set searchMode="refine" only when the buyer clearly narrows existing results. Use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying listings are unavailable. This is read-only and never stores raw user search text as listing data.',
       inputSchema: z.object({
         query: z.string().trim().min(1).max(300).optional(),
         understoodIntent: marketplaceSearchUnderstandingSchema.optional(),

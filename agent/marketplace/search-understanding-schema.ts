@@ -2,10 +2,16 @@ import { z } from 'zod';
 
 import {
   rankingPreferenceSchema,
+  searchModeSchema,
   sortPreferenceSchema,
 } from './structured-search-intent';
 
 export const marketplaceSearchUnderstandingSchema = z.object({
+  searchMode: searchModeSchema
+    .describe(
+      'Use new_search for a fresh broad product/category request. Use refine only when the buyer clearly narrows existing results.',
+    )
+    .optional(),
   category: z.string().trim().min(1).max(80).optional(),
   brand: z.string().trim().min(1).max(80).optional(),
   model: z.string().trim().min(1).max(80).optional(),

@@ -38,6 +38,11 @@ const searchUnderstandingModelSchema = z.preprocess((value) => {
     ...candidate,
     minPrice: candidate.minPrice ?? candidate.min_price,
     maxPrice: candidate.maxPrice ?? candidate.max_price,
+    searchMode:
+      candidate.searchMode ??
+      candidate.search_mode ??
+      candidate.mode ??
+      candidate.merge_mode,
     yearMin: candidate.yearMin ?? candidate.year_min,
     yearMax: candidate.yearMax ?? candidate.year_max,
     mileageMin: candidate.mileageMin ?? candidate.mileage_min,
@@ -87,6 +92,7 @@ function mergeUnderstanding(
 
   return {
     category: next?.category ?? base?.category,
+    searchMode: next?.searchMode ?? base?.searchMode,
     brand: next?.brand ?? base?.brand,
     model: next?.model ?? base?.model,
     city: next?.city ?? base?.city,
@@ -185,12 +191,14 @@ Understand Arabic, Saudi dialect, Arabizi, English brands/models, misspellings, 
 Do not copy the full user sentence into search terms.
 Do not treat words like search, find, want, need, show me, listing, marketplace, SmartStore AI, ابحث, اريد, ابي, دور, اعلان, سوق, or منتج as product data.
 Use structured fields whenever possible: category, brand, model, city, minPrice, maxPrice, yearMin, yearMax, condition, mileageMin, mileageMax, color, requiredFeatures, excludedFeatures, excludedColors, rankingPreferences, sortPreference, locationPreference.
+Set searchMode="new_search" when the buyer starts a fresh search or asks broadly for a product/category such as "ابي سيارة". Set searchMode="refine" only when the buyer is clearly narrowing the existing results, such as adding budget, city, mileage, color, or "show cheaper".
 Use descriptiveTerms only for concrete product descriptors that are not already represented by structured fields.
 Never invent listings, sellers, prices, availability, or unsupported platform actions.
 If the request is too broad, still return the safe structured signals you understand instead of asking a question. Language=${language ?? 'ar'}.`,
         prompt: JSON.stringify({
           required_json_schema: {
             category: 'optional marketplace category',
+            searchMode: 'optional: new_search | refine',
             brand: 'optional brand, canonical when clear',
             model: 'optional product model, canonical when clear',
             city: 'optional city',

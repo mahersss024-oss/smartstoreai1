@@ -678,6 +678,97 @@ export async function listSellerListingsPage(
   return toPaginatedResponse(listings.map(toListingRecord), pagination);
 }
 
+async function deleteListingObjectsBestEffort(listing: memoryStore.ListingRecord) {
+  await Promise.all(
+    listing.images.map(async (image) => {
+      try {
+        await deleteListingObject({ imageId: image.id });
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[listing_draft_storage_delete] failure=${errorName}`);
+      }
+    }),
+  );
+}
+
+function publishDeletedListingEvents(listing: memoryStore.ListingRecord) {
+  safelyPublishRealtimeEvent({
+    type: 'ad_status_changed',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      previousStatus: 'draft',
+      status: listing.status,
+    },
+    visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'ad_deleted',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+    },
+    visibility: {
+      includePublic: true,
+      includeAdmins: true,
+      userIds: [listing.sellerId],
+    },
+  });
+}
+
+export async function resetIncompleteSellerDrafts(sellerId: string) {
+  if (!shouldUseDatabaseStore()) {
+    const deletedDrafts = memoryStore.resetIncompleteSellerDrafts(sellerId);
+
+    for (const listing of deletedDrafts) {
+      publishDeletedListingEvents(listing);
+    }
+
+    return deletedDrafts.length;
+  }
+
+  const deletedDrafts = await prisma.$transaction(async (tx) => {
+    const drafts = await tx.listing.findMany({
+      where: {
+        sellerId,
+        status: 'draft',
+      },
+      include: {
+        images: true,
+      },
+    });
+
+    if (!drafts.length) {
+      return [];
+    }
+
+    const updatedDrafts: DatabaseListingRecord[] = [];
+
+    for (const draft of drafts) {
+      const updatedDraft = await tx.listing.update({
+        where: { id: draft.id },
+        data: { status: 'deleted' },
+        include: { images: true },
+      });
+
+      updatedDrafts.push(updatedDraft);
+    }
+
+    return updatedDrafts;
+  });
+
+  const mappedDrafts = deletedDrafts.map(toListingRecord);
+
+  await Promise.all(mappedDrafts.map(deleteListingObjectsBestEffort));
+
+  for (const listing of mappedDrafts) {
+    publishDeletedListingEvents(listing);
+  }
+
+  return mappedDrafts.length;
+}
+
 export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,

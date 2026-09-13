@@ -59,6 +59,7 @@ function mergeSearchUnderstanding(
 
   return structuredSearchIntentSchema.parse({
     ...parsed,
+    searchMode: understood?.searchMode ?? parsed.searchMode,
     category: understood?.category ?? parsed.category,
     brand: understood?.brand ?? parsed.brand,
     model: understood?.model ?? parsed.model,
@@ -117,6 +118,7 @@ function summarizeRecommendations(recommendations: MarketplaceRecommendation[]) 
 
 function summarizeSearchState(state: MarketplaceSearchState) {
   return {
+    searchMode: state.searchMode,
     category: state.category,
     brand: state.brand,
     model: state.model,
