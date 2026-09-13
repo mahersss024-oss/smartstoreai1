@@ -158,3 +158,14 @@ test('resolves image uploads without calling the model router', async () => {
   assert.equal(intent.execution, 'analyze_images');
   assert.equal(intent.reasonCode, 'marketplace_image_upload');
 });
+
+test('search intent searches first instead of only asking for narrowing', () => {
+  const intent = parseAdaptiveMarketplaceIntent(
+    '{"intent":"search_listing","execution":"ask_clarifying_question","confidence":0.81,"reasonCode":"broad_buyer_search","searchQuery":"I want a car","requiresAuth":false,"requiresConfirmation":false}',
+  );
+
+  assert.equal(intent.intent, 'search_listing');
+  assert.equal(intent.execution, 'search_listings');
+  assert.equal(intent.searchQuery, 'I want a car');
+  assert.match(intent.reasonCode, /search_first/);
+});

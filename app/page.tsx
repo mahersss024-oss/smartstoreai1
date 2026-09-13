@@ -912,20 +912,27 @@ function ListingCardView({
   listing,
   isFavorite,
   isOwnListing,
+  className,
   onAsk,
   onFavorite,
   onOpen,
+  style,
 }: {
   listing: ListingCard;
   isFavorite: boolean;
   isOwnListing: boolean;
+  className?: string;
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
+  style?: CSSProperties;
 }) {
   return (
     <article
-      className="w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]"
+      className={cn(
+        'w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]',
+        className,
+      )}
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -934,6 +941,7 @@ function ListingCardView({
         }
       }}
       role="button"
+      style={style}
       tabIndex={0}
     >
       <div className="relative aspect-[16/10] bg-slate-100">
@@ -2148,7 +2156,7 @@ export default function Page() {
               </div>
 
               {hasActiveAssistantSearch && (
-                <div className="mb-5 grid gap-3">
+                <div className="smart-assistant-results-panel mb-5 grid gap-3">
                   <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm dark:border-blue-400/20 dark:bg-card">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
@@ -2181,10 +2189,11 @@ export default function Page() {
                   </div>
 
                   {assistantResultListings.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
-                      {assistantResultListings.map((listing) => (
+                    <div className="smart-assistant-results-grid grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
+                      {assistantResultListings.map((listing, index) => (
                         <ListingCardView
                           key={listing.id ?? listing.title}
+                          className="smart-assistant-result-card"
                           listing={listing}
                           isFavorite={Boolean(
                             listing.id && favoriteListingIds.has(listing.id),
@@ -2195,6 +2204,9 @@ export default function Page() {
                           onAsk={sendStarter}
                           onFavorite={favoriteListing}
                           onOpen={openListing}
+                          style={{
+                            animationDelay: `${Math.min(index, 8) * 45}ms`,
+                          }}
                         />
                       ))}
                     </div>

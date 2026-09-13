@@ -60,6 +60,7 @@ test('allows load-more for marketplace exploration with remaining pages', () => 
 
 test('home marketplace renders assistant search as a separate active layer', () => {
   const homePage = readProjectFile('app', 'page.tsx');
+  const globalCss = readProjectFile('app', 'globals.css');
 
   assert.match(homePage, /hasActiveAssistantSearch/);
   assert.match(homePage, /retainedSearchToolOutput/);
@@ -81,4 +82,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.doesNotMatch(homePage, /refreshMarketplaceListings\(activeListingQuery/);
   assert.doesNotMatch(homePage, /searchResultCount/);
   assert.doesNotMatch(homePage, /نتيجة مطابقة/);
+  assert.match(homePage, /smart-assistant-results-panel/);
+  assert.match(homePage, /smart-assistant-result-card/);
+  assert.match(homePage, /animationDelay/);
+  assert.match(globalCss, /smart-assistant-results-panel-in/);
+  assert.match(globalCss, /smart-assistant-result-card-in/);
+  assert.match(globalCss, /prefers-reduced-motion: reduce/);
 });

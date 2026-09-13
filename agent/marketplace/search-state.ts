@@ -79,10 +79,12 @@ function mergeSearchState(
 ): MarketplaceSearchState {
   const base = isDifferentPrimaryTarget(current, next) ? null : current;
   const updatedAt = new Date().toISOString();
+  const searchMode =
+    next.searchMode ?? (base ? 'refine' : 'new_search');
 
   return {
     intent: 'search_listing',
-    searchMode: next.searchMode,
+    searchMode,
     category: next.category ?? base?.category,
     brand: next.brand ?? base?.brand,
     model: next.model ?? base?.model,

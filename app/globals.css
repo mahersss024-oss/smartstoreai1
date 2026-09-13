@@ -212,6 +212,46 @@
 }
 
 @layer components {
+  .smart-assistant-results-panel {
+    animation: smart-assistant-results-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .smart-assistant-result-card {
+    animation: smart-assistant-result-card-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
+  }
+
+  @keyframes smart-assistant-results-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes smart-assistant-result-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .smart-assistant-results-panel,
+    .smart-assistant-result-card {
+      animation: none !important;
+      transform: none !important;
+      will-change: auto;
+    }
+  }
+
   /* Chat Layout */
   .chat-container {
     @apply relative flex w-screen overflow-hidden bg-background text-foreground;

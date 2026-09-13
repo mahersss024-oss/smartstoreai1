@@ -28,4 +28,6 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /Do not invent listings, sellers, prices/);
   assert.match(systemPrompt, /does not process, hold, transfer, guarantee, or mediate buyer-seller payment money/);
   assert.match(systemPrompt, /fraud risk/);
+  assert.match(systemPrompt, /call the search tool first/);
+  assert.match(systemPrompt, /after visible matches exist/);
 });

@@ -137,6 +137,92 @@ test('keeps one accumulated server search state across buyer followups', async (
   assert.equal(withoutWhite.searchState.excludedColors.includes('أبيض'), true);
 });
 
+test('refined chat searches replace smart cards with accumulated matching listings', async () => {
+  const ownerKey = 'test:search-state-refined-smart-cards';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-camry-2024-refine',
+    title: 'Toyota Camry 2024 - Riyadh',
+    price: 90000,
+    year: 2024,
+    mileage: 35000,
+    city: 'Riyadh',
+    brand: 'Toyota',
+    model: 'Camry',
+  });
+  publishTestListing({
+    id: 'listing:p0-camry-2025-budget-refine',
+    title: 'Toyota Camry 2025 - Riyadh',
+    price: 98000,
+    year: 2025,
+    mileage: 12000,
+    city: 'Riyadh',
+    brand: 'Toyota',
+    model: 'Camry',
+  });
+  publishTestListing({
+    id: 'listing:p0-camry-2025-expensive-refine',
+    title: 'Toyota Camry 2025 - Jeddah',
+    price: 135000,
+    year: 2025,
+    mileage: 9000,
+    city: 'Jeddah',
+    brand: 'Toyota',
+    model: 'Camry',
+  });
+
+  const broadResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'I want a Camry',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Toyota',
+      model: 'Camry',
+    },
+  });
+  const broadIds = broadResult.listings.map((ranked) => ranked.listing.id);
+
+  assert.equal(broadResult.searchState.searchMode, 'new_search');
+  assert.equal(broadIds.includes('listing:p0-camry-2024-refine'), true);
+  assert.equal(broadIds.includes('listing:p0-camry-2025-budget-refine'), true);
+  assert.equal(broadIds.includes('listing:p0-camry-2025-expensive-refine'), true);
+
+  const yearResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'model 2025',
+    understoodIntent: {
+      yearMin: 2025,
+      yearMax: 2025,
+    },
+  });
+  const yearIds = yearResult.listings.map((ranked) => ranked.listing.id);
+
+  assert.equal(yearResult.searchState.searchMode, 'refine');
+  assert.equal(yearResult.searchState.brand, 'Toyota');
+  assert.equal(yearResult.searchState.model, 'Camry');
+  assert.equal(yearIds.includes('listing:p0-camry-2024-refine'), false);
+  assert.equal(yearIds.includes('listing:p0-camry-2025-budget-refine'), true);
+  assert.equal(yearIds.includes('listing:p0-camry-2025-expensive-refine'), true);
+
+  const budgetResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'between 90000 and 100000',
+    understoodIntent: {
+      minPrice: 90000,
+      maxPrice: 100000,
+    },
+  });
+  const budgetIds = budgetResult.listings.map((ranked) => ranked.listing.id);
+
+  assert.equal(budgetResult.searchState.searchMode, 'refine');
+  assert.equal(budgetResult.searchState.yearMin, 2025);
+  assert.equal(budgetResult.searchState.yearMax, 2025);
+  assert.equal(budgetIds.includes('listing:p0-camry-2025-budget-refine'), true);
+  assert.equal(budgetIds.includes('listing:p0-camry-2025-expensive-refine'), false);
+  assert.equal(budgetIds.includes('listing:p0-camry-2024-refine'), false);
+});
+
 test('ranking profile raises mileage weight when buyer prioritizes low mileage', () => {
   const defaultWeights = buildRankingWeights({
     intent: 'search_listing',
