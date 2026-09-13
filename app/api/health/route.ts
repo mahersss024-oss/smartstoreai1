@@ -1,4 +1,5 @@
 import { getSiteVisitStats } from '@/lib/analytics/site-visits';
+import { getRuntimeMetricsSnapshot } from '@/lib/observability/runtime-metrics';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -8,6 +9,10 @@ type HealthStatus = 'ok' | 'degraded';
 function getDatabaseMode() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE?.trim().toLowerCase() ===
     'database';
+}
+
+function shouldIncludeMetrics() {
+  return process.env.SMARTSTORE_HEALTH_INCLUDE_METRICS === '1';
 }
 
 async function checkDatabase(): Promise<{ ok: boolean; error?: string }> {
@@ -48,6 +53,9 @@ export async function GET() {
       store: getDatabaseMode() ? 'database' : 'file',
       uptimeSeconds: Math.round(process.uptime()),
       responseTimeMs: Date.now() - startedAt,
+      ...(shouldIncludeMetrics()
+        ? { metrics: getRuntimeMetricsSnapshot() }
+        : {}),
     },
     {
       status: database.ok ? 200 : 503,
@@ -57,4 +65,3 @@ export async function GET() {
     },
   );
 }
-

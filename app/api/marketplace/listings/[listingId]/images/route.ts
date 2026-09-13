@@ -19,6 +19,10 @@ import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+import {
+  incrementRuntimeCounter,
+  recordRuntimeDurationMs,
+} from '@/lib/observability/runtime-metrics';
 
 const supportedMimeTypes = new Set([
   'image/jpeg',
@@ -52,9 +56,14 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
+  const startedAt = Date.now();
+  incrementRuntimeCounter('listing.image_upload.attempt');
   const session = getAuthSession(request);
 
   if (!session) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'auth_required',
+    });
     return Response.json(
       {
         error: 'auth_required',
@@ -72,6 +81,9 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   if (rateLimitResponse) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'rate_limit',
+    });
     return rateLimitResponse;
   }
 
@@ -82,6 +94,9 @@ export async function POST(request: Request, context: RouteContext) {
   );
 
   if (oversizedRequestResponse) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'request_too_large',
+    });
     return oversizedRequestResponse;
   }
 
@@ -89,12 +104,18 @@ export async function POST(request: Request, context: RouteContext) {
   const existingListing = await getListing(listingId);
 
   if (!existingListing || existingListing.sellerId !== session.user.id) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'listing_not_found',
+    });
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
   const maxImages = getMaxListingImagesPerListing();
 
   if (hasReachedListingImageLimit(existingListing.images)) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'image_limit',
+    });
     return Response.json(
       {
         error: 'listing_image_limit_reached',
@@ -110,20 +131,32 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     formData = await request.formData();
   } catch {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'invalid_multipart',
+    });
     return Response.json({ error: 'invalid_multipart_form_data' }, { status: 400 });
   }
 
   const file = formData.get('image');
 
   if (!(file instanceof File)) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'missing_image',
+    });
     return Response.json({ error: 'missing_image' }, { status: 400 });
   }
 
   if (!supportedMimeTypes.has(file.type)) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'unsupported_type',
+    });
     return Response.json({ error: 'unsupported_image_type' }, { status: 415 });
   }
 
   if (file.size > maxImageBytes) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'image_too_large',
+    });
     return Response.json({ error: 'image_too_large' }, { status: 413 });
   }
 
@@ -192,11 +225,17 @@ export async function POST(request: Request, context: RouteContext) {
       };
 
       await idempotency?.abandon();
+      incrementRuntimeCounter('listing.image_upload.failed', {
+        reason: 'compliance_unavailable',
+      });
       return Response.json(responseBody, { status: 503 });
     }
   }
 
   if (imageCompliance.decision === 'block') {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'policy_blocked',
+    });
     const responseBody = {
       error: 'image_policy_blocked',
       message:
@@ -230,10 +269,16 @@ export async function POST(request: Request, context: RouteContext) {
     };
 
     await idempotency?.abandon();
+    incrementRuntimeCounter('listing.image_upload.failed', {
+      reason: 'storage_unavailable',
+    });
     return Response.json(responseBody, { status: 503 });
   }
 
   if (!imageUrl) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason: 'unsupported_type',
+    });
     const responseBody = { error: 'unsupported_image_type' };
 
     return idempotency
@@ -276,6 +321,12 @@ export async function POST(request: Request, context: RouteContext) {
     listing,
   };
   const responseStatus = image.status === 'pending_review' ? 202 : 201;
+  incrementRuntimeCounter('listing.image_upload.saved', {
+    status: image.status,
+  });
+  recordRuntimeDurationMs('listing.image_upload.duration_ms', Date.now() - startedAt, {
+    status: responseStatus,
+  });
 
   return idempotency
     ? idempotency.complete(responseBody, responseStatus)

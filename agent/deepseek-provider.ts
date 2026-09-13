@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { appConfig } from '@/app/app-config';
+import {
+  incrementRuntimeCounter,
+  recordRuntimeDurationMs,
+} from '@/lib/observability/runtime-metrics';
 
 export type DeepseekModelProfile = 'chat' | 'scope' | 'moderation' | 'vision';
 
@@ -273,6 +277,7 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
   }
 
   if (deepseekSlotQueue.length >= getDeepseekMaxQueuedRequests()) {
+    incrementRuntimeCounter('ai.deepseek.queue_rejected');
     throw new DOMException('DeepSeek request queue is full.', 'AbortError');
   }
 
@@ -295,6 +300,7 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
     const timeout = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       removeQueuedSlot(waiter);
+      incrementRuntimeCounter('ai.deepseek.queue_timeout');
       reject(new DOMException('DeepSeek request queue timed out.', 'AbortError'));
     }, getDeepseekQueueTimeoutMs());
 
@@ -313,26 +319,45 @@ async function fetchDeepseekWithConcurrencyLimit(
     deepseekProviderMetrics.queueWaitMs,
     Date.now() - queueStartedAt,
   );
+  recordRuntimeDurationMs(
+    'ai.deepseek.queue_wait_ms',
+    Date.now() - queueStartedAt,
+  );
 
   try {
     const fetchStartedAt = Date.now();
 
     try {
       deepseekProviderMetrics.attempts += 1;
+      incrementRuntimeCounter('ai.deepseek.fetch_attempt');
       const response = await fetch(input, init);
       deepseekProviderMetrics.completed += 1;
+      incrementRuntimeCounter('ai.deepseek.fetch_completed', {
+        status: response.status,
+      });
       recordStatusMetric(response.status);
       recordMetricSample(
         deepseekProviderMetrics.providerFetchMs,
         Date.now() - fetchStartedAt,
       );
+      recordRuntimeDurationMs(
+        'ai.deepseek.provider_fetch_ms',
+        Date.now() - fetchStartedAt,
+        { status: response.status },
+      );
 
       return response;
     } catch (error) {
       deepseekProviderMetrics.fetchErrors += 1;
+      incrementRuntimeCounter('ai.deepseek.fetch_error');
       recordMetricSample(
         deepseekProviderMetrics.providerFetchMs,
         Date.now() - fetchStartedAt,
+      );
+      recordRuntimeDurationMs(
+        'ai.deepseek.provider_fetch_ms',
+        Date.now() - fetchStartedAt,
+        { status: 'error' },
       );
       throw error;
     }

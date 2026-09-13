@@ -151,6 +151,10 @@ type ListingsResponsePayload = {
   };
 };
 
+type FavoriteListingRecord = {
+  listingId: string;
+};
+
 type ClientIntentKind =
   | 'general_info'
   | 'search_listing'
@@ -1018,15 +1022,27 @@ function SignInCard({ text }: { text: string }) {
 }
 
 function AuthProviderMenu() {
+  const [open, setOpen] = useState(false);
+
   return (
-    <DropdownMenu dir="rtl">
+    <DropdownMenu dir="rtl" open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="rounded-md bg-blue-600 hover:bg-blue-700">
+        <Button
+          size="sm"
+          className="rounded-md bg-blue-600 hover:bg-blue-700"
+          data-testid="auth-provider-trigger"
+          onClick={() => setOpen(true)}
+          onPointerUp={() => setOpen(true)}
+        >
           <User className="size-4" />
           دخول
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-slate-200/70 p-1.5 shadow-xl dark:border-white/10">
+      <DropdownMenuContent
+        align="end"
+        className="w-56 border-slate-200/70 p-1.5 shadow-xl dark:border-white/10"
+        data-testid="auth-provider-menu"
+      >
         <DropdownMenuLabel className="text-right text-xs text-muted-foreground">
           اختر طريقة الدخول
         </DropdownMenuLabel>
@@ -1068,11 +1084,13 @@ function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
 
 function ListingCardView({
   listing,
+  isFavorite,
   onAsk,
   onFavorite,
   onOpen,
 }: {
   listing: ListingCard;
+  isFavorite: boolean;
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
@@ -1104,14 +1122,20 @@ function ListingCardView({
         <Button
           size="icon-sm"
           variant="ghost"
-          className="absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-white hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100 sm:left-2 sm:top-2 sm:size-8"
+          className={cn(
+            'absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white sm:left-2 sm:top-2 sm:size-8',
+            isFavorite
+              ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
+              : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
+          )}
           aria-label="حفظ الإعلان"
+          aria-pressed={isFavorite}
           onClick={(event) => {
             event.stopPropagation();
             onFavorite(listing);
           }}
         >
-          <Heart className="size-3.5 sm:size-4" />
+          <Heart className={cn('size-3.5 sm:size-4', isFavorite && 'fill-current')} />
         </Button>
       </div>
       <div className="grid gap-1 p-2 text-right">
@@ -1263,6 +1287,9 @@ export default function Page() {
   });
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
+  const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [listingPagination, setListingPagination] = useState({
     page: 1,
     hasMore: false,
@@ -1638,6 +1665,38 @@ export default function Page() {
       });
   }, []);
 
+  const refreshFavoriteListingIds = useCallback(() => {
+    return fetch('/api/marketplace/me/favorites?page=1&limit=48', {
+      cache: 'no-store',
+    })
+      .then((response) => {
+        if (!response.ok) {
+          setFavoriteListingIds(new Set());
+          return null;
+        }
+
+        return response.json() as Promise<{
+          favorites?: FavoriteListingRecord[];
+        }>;
+      })
+      .then((payload) => {
+        if (!payload?.favorites) {
+          return;
+        }
+
+        setFavoriteListingIds(
+          new Set(
+            payload.favorites
+              .map((favorite) => favorite.listingId)
+              .filter(Boolean),
+          ),
+        );
+      })
+      .catch(() => {
+        setFavoriteListingIds(new Set());
+      });
+  }, []);
+
   const scheduleRealtimeListingsRefresh = useCallback(() => {
     if (realtimeRefreshTimerRef.current !== null) {
       return;
@@ -1767,6 +1826,11 @@ export default function Page() {
       .then((payload) => {
         if (mounted) {
           setSession(payload);
+          if (payload.authenticated) {
+            void refreshFavoriteListingIds();
+          } else {
+            setFavoriteListingIds(new Set());
+          }
         }
       })
       .catch(() => {
@@ -1778,7 +1842,7 @@ export default function Page() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [refreshFavoriteListingIds]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -2028,6 +2092,21 @@ export default function Page() {
         return;
       }
 
+      const listingId = listing.id;
+      const wasFavorite = favoriteListingIds.has(listingId);
+
+      setFavoriteListingIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+
+        if (wasFavorite) {
+          nextIds.delete(listingId);
+        } else {
+          nextIds.add(listingId);
+        }
+
+        return nextIds;
+      });
+
       void fetch(`/api/marketplace/listings/${listing.id}/favorite`, {
         method: 'POST',
         headers: {
@@ -2035,21 +2114,65 @@ export default function Page() {
         },
       }).then((response) => {
         if (response.status === 401) {
+          setFavoriteListingIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+            nextIds.delete(listingId);
+            return nextIds;
+          });
           router.push('/api/auth/google/start');
           return;
         }
 
-        if (response.ok) {
-          void refreshMarketplaceListings();
+        if (!response.ok) {
+          setFavoriteListingIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+
+            if (wasFavorite) {
+              nextIds.add(listingId);
+            } else {
+              nextIds.delete(listingId);
+            }
+
+            return nextIds;
+          });
+          return;
         }
+
+        void response.json().then((payload: { status?: string }) => {
+          setFavoriteListingIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+
+            if (payload.status === 'removed') {
+              nextIds.delete(listingId);
+            } else {
+              nextIds.add(listingId);
+            }
+
+            return nextIds;
+          });
+        });
+        void refreshMarketplaceListings();
+      }).catch(() => {
+        setFavoriteListingIds((currentIds) => {
+          const nextIds = new Set(currentIds);
+
+          if (wasFavorite) {
+            nextIds.add(listingId);
+          } else {
+            nextIds.delete(listingId);
+          }
+
+          return nextIds;
+        });
       });
     },
-    [refreshMarketplaceListings, router],
+    [favoriteListingIds, refreshMarketplaceListings, router],
   );
 
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       setSession({ authenticated: false, user: null });
+      setFavoriteListingIds(new Set());
     });
   }, []);
 
@@ -2212,6 +2335,9 @@ export default function Page() {
                         <ListingCardView
                           key={listing.id ?? listing.title}
                           listing={listing}
+                          isFavorite={Boolean(
+                            listing.id && favoriteListingIds.has(listing.id),
+                          )}
                           onAsk={sendStarter}
                           onFavorite={favoriteListing}
                           onOpen={openListing}
@@ -2238,6 +2364,9 @@ export default function Page() {
                   <ListingCardView
                     key={listing.id ?? listing.title}
                     listing={listing}
+                    isFavorite={Boolean(
+                      listing.id && favoriteListingIds.has(listing.id),
+                    )}
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
