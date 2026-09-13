@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
+
+const maxAdminCommissionStatusRequestBytes = 4 * 1024;
 
 const commissionStatusSchema = z.object({
   status: z.enum(['due', 'paid', 'waived', 'disputed']),
@@ -25,6 +28,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxAdminCommissionStatusRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

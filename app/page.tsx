@@ -85,6 +85,7 @@ import {
 } from '@ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 import { cn } from '@/lib/utils';
+import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
 
 type LocationSettings = {
   country: 'SA';
@@ -650,11 +651,6 @@ function formatCategory(category: string) {
   return labels[category] ?? category;
 }
 
-type SearchToolOutput = {
-  status?: unknown;
-  listings?: unknown;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -747,14 +743,6 @@ function toSelectedListingContext(
   };
 }
 
-function isSearchToolOutput(value: unknown): value is SearchToolOutput {
-  return (
-    isRecord(value) &&
-    (value.status === 'searched' || value.status === 'compared') &&
-    Array.isArray(value.listings)
-  );
-}
-
 function getLatestSearchToolOutput(messages: UIMessage[]) {
   const latestUserMessageIndex = messages.findLastIndex(
     (message) => message.role === 'user',
@@ -781,7 +769,7 @@ function getLatestSearchToolOutput(messages: UIMessage[]) {
         'state' in part &&
         part.state === 'output-available' &&
         'output' in part &&
-        isSearchToolOutput(part.output)
+        isAssistantSearchToolOutput(part.output)
       ) {
         return part.output;
       }
@@ -791,7 +779,7 @@ function getLatestSearchToolOutput(messages: UIMessage[]) {
         'state' in part &&
         part.state === 'output-available' &&
         'output' in part &&
-        isSearchToolOutput(part.output)
+        isAssistantSearchToolOutput(part.output)
       ) {
         return part.output;
       }

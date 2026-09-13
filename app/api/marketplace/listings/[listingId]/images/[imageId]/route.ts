@@ -6,7 +6,10 @@ import {
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxImageActionRequestBytes = 4 * 1024;
 
 const imageActionSchema = z.object({
   action: z.enum(['set_primary']),
@@ -41,6 +44,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxImageActionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

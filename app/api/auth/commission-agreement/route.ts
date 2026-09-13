@@ -1,6 +1,18 @@
 import { createCommissionAgreementCookie } from '@/lib/auth/session';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
+
+const maxCommissionAgreementRequestBytes = 1024;
 
 export async function POST(request: Request) {
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxCommissionAgreementRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
+  }
+
   let payload: unknown;
 
   try {

@@ -8,6 +8,7 @@ const productionEnv = {
   AUTH_SECRET: 'x'.repeat(40),
   DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/smartstore',
   DEEPSEEK_API_KEY: 'deepseek-key',
+  NEXT_PUBLIC_APP_URL: 'https://www.smartstore-ai.com',
   GOOGLE_CLIENT_ID: 'google-client',
   GOOGLE_CLIENT_SECRET: 'google-secret',
   SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS: '100',
@@ -58,6 +59,21 @@ test('readiness rejects unsafe DeepSeek queue configuration', () => {
     result.checks.some(
       (check) =>
         check.name === 'deepseek_concurrency' && check.status === 'fail',
+    ),
+  );
+});
+
+test('readiness rejects untrusted production public app urls', () => {
+  const result = evaluateReadiness({
+    ...productionEnv,
+    NEXT_PUBLIC_APP_URL: 'https://attacker.example',
+  });
+
+  assert.equal(result.status, 'fail');
+  assert.ok(
+    result.checks.some(
+      (check) =>
+        check.name === 'NEXT_PUBLIC_APP_URL' && check.status === 'fail',
     ),
   );
 });

@@ -5,6 +5,7 @@ import {
   getRequestContentLength,
   rejectOversizedRequest,
 } from '@/lib/api/request-size';
+import { POST as acceptCommissionAgreement } from '@/app/api/auth/commission-agreement/route';
 
 test('parses valid request content length headers', () => {
   const request = new Request('http://localhost/api/test', {
@@ -44,4 +45,22 @@ test('rejects requests whose declared body size exceeds the configured limit', (
   const response = rejectOversizedRequest(request, 1024);
 
   assert.equal(response?.status, 413);
+});
+
+test('rejects oversized JSON API requests before parsing the body', async () => {
+  const request = new Request(
+    'http://localhost/api/auth/commission-agreement',
+    {
+      method: 'POST',
+      headers: {
+        'content-length': '1025',
+        'content-type': 'application/json',
+      },
+      body: '{"accepted":true}',
+    },
+  );
+
+  const response = await acceptCommissionAgreement(request);
+
+  assert.equal(response.status, 413);
 });

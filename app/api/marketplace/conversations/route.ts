@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { createConversationForListing } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxCreateConversationRequestBytes = 4 * 1024;
 
 const createConversationSchema = z.object({
   listingId: z.string().min(1),
@@ -31,6 +34,15 @@ export async function POST(request: Request) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxCreateConversationRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

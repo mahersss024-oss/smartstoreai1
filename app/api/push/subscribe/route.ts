@@ -6,24 +6,27 @@ import {
 } from '@/agent/marketplace/push-subscriptions';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { noStoreHeaders } from '@/lib/api/no-store';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { isPushConfigured, getVapidConfig } from '@/lib/push/web-push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const maxPushSubscriptionRequestBytes = 8 * 1024;
+
 const subscribeSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().max(2048),
   keys: z.object({
-    p256dh: z.string().min(1),
-    auth: z.string().min(1),
+    p256dh: z.string().min(1).max(512),
+    auth: z.string().min(1).max(512),
   }),
   platform: z.enum(['web', 'ios', 'android']).optional(),
   locale: z.string().max(10).optional(),
 });
 
 const unsubscribeSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().max(2048),
 });
 
 export async function GET() {
@@ -54,6 +57,15 @@ export async function POST(request: Request) {
       { error: 'push_not_configured' },
       { status: 503, headers: noStoreHeaders },
     );
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxPushSubscriptionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;
@@ -88,6 +100,15 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxPushSubscriptionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
+  }
+
   let payload: unknown;
 
   try {
@@ -109,4 +130,3 @@ export async function DELETE(request: Request) {
 
   return Response.json({ ok: true }, { headers: noStoreHeaders });
 }
-

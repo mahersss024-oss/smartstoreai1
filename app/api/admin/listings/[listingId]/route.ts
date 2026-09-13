@@ -2,18 +2,21 @@ import { z } from 'zod';
 
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
+const maxAdminListingUpdateRequestBytes = 64 * 1024;
+
 const adminListingUpdateSchema = z.object({
-  category: z.string().min(2).optional(),
-  title: z.string().min(2).optional(),
-  description: z.string().min(2).optional(),
+  category: z.string().min(2).max(80).optional(),
+  title: z.string().min(2).max(140).optional(),
+  description: z.string().min(2).max(4000).optional(),
   price: z.number().nonnegative().nullable().optional(),
   priceMode: z.enum(['bid', 'negotiable']).nullable().optional(),
-  city: z.string().min(2).nullable().optional(),
+  city: z.string().min(2).max(80).nullable().optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).nullable().optional(),
   status: z
     .enum(['draft', 'pending', 'published', 'paused', 'sold', 'rejected', 'deleted'])
@@ -62,6 +65,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxAdminListingUpdateRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

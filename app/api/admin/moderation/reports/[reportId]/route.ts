@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxReportModerationActionRequestBytes = 4 * 1024;
 
 const reportActionSchema = z.object({
   action: z.enum(['review', 'dismiss']),
@@ -27,6 +30,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxReportModerationActionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

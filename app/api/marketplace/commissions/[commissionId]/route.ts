@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { updateCommissionSaleAmountForSeller } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxUpdateCommissionRequestBytes = 4 * 1024;
 
 const updateCommissionSchema = z.object({
   productValue: z.number().positive(),
@@ -37,6 +40,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxUpdateCommissionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

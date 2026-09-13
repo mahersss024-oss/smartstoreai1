@@ -61,6 +61,10 @@ import type { AppLanguage } from '@/app/i18n';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
+import {
+  extractAssistantSearchToolResults,
+  type AssistantSearchToolResult,
+} from '@/lib/chat-tool-results';
 import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 
@@ -426,14 +430,31 @@ function getRequestLanguage(settings: LocationSettings | undefined): AppLanguage
   return settings?.language === 'en' ? 'en' : 'ar';
 }
 
-function createTextUIResponse(text: string) {
-  const messageId = `guard-message-${Date.now()}`;
-  const textId = `guard-text-${Date.now()}`;
+function createTextUIResponse(
+  text: string,
+  options: { toolResults?: AssistantSearchToolResult[] } = {},
+) {
+  const timestamp = Date.now();
+  const messageId = `guard-message-${timestamp}`;
+  const textId = `guard-text-${timestamp}`;
 
   return createUIMessageStreamResponse({
     stream: createUIMessageStream<UIMessage>({
       execute: ({ writer }) => {
         writer.write({ type: 'start', messageId });
+        for (const toolResult of options.toolResults ?? []) {
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId: toolResult.toolCallId,
+            toolName: toolResult.toolName,
+            input: toolResult.input,
+          });
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId: toolResult.toolCallId,
+            output: toolResult.output,
+          });
+        }
         writer.write({ type: 'text-start', id: textId });
         writer.write({ type: 'text-delta', id: textId, delta: text });
         writer.write({ type: 'text-end', id: textId });
@@ -882,6 +903,8 @@ async function generateCheckedAssistantResponse(
     });
     const firstResult = await chatAgent.generate({ messages: promptMessages });
     const firstText = getSafeAssistantText(firstResult.text);
+    const firstSearchToolResults =
+      extractAssistantSearchToolResults(firstResult);
 
     if (firstText) {
       const firstOutputDecision = await checkOutputScope({
@@ -890,11 +913,15 @@ async function generateCheckedAssistantResponse(
       });
 
       if (firstOutputDecision.decision === 'ALLOW') {
-        return createTextUIResponse(firstText);
+        return createTextUIResponse(firstText, {
+          toolResults: firstSearchToolResults,
+        });
       }
 
       if (isOutputCheckerProviderFailure(firstOutputDecision)) {
-        return createTextUIResponse(firstText);
+        return createTextUIResponse(firstText, {
+          toolResults: firstSearchToolResults,
+        });
       }
     }
 
@@ -912,6 +939,8 @@ async function generateCheckedAssistantResponse(
       messages: promptMessages,
     });
     const retryText = getSafeAssistantText(retryResult.text);
+    const retrySearchToolResults =
+      extractAssistantSearchToolResults(retryResult);
 
     if (retryText) {
       const retryOutputDecision = await checkOutputScope({
@@ -920,11 +949,15 @@ async function generateCheckedAssistantResponse(
       });
 
       if (retryOutputDecision.decision === 'ALLOW') {
-        return createTextUIResponse(retryText);
+        return createTextUIResponse(retryText, {
+          toolResults: retrySearchToolResults,
+        });
       }
 
       if (isOutputCheckerProviderFailure(retryOutputDecision)) {
-        return createTextUIResponse(retryText);
+        return createTextUIResponse(retryText, {
+          toolResults: retrySearchToolResults,
+        });
       }
     }
   } catch (error) {

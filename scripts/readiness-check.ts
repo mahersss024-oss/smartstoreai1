@@ -16,6 +16,7 @@ const maxDeepseekQueueTimeoutMs = 60_000;
 const defaultDeepseekConcurrency = 100;
 const defaultDeepseekQueueLimit = 2_000;
 const defaultDeepseekQueueTimeoutMs = 60_000;
+const productionAppHosts = new Set(['www.smartstore-ai.com', 'smartstore-ai.com']);
 
 function present(env: Env, key: string) {
   return Boolean(env[key]?.trim());
@@ -145,6 +146,57 @@ function validateAuth(checks: ReadinessCheck[], env: Env, production: boolean) {
     authSecret.length >= 32
       ? 'AUTH_SECRET length is acceptable.'
       : 'AUTH_SECRET should be at least 32 characters.',
+  );
+}
+
+function validateAppUrl(checks: ReadinessCheck[], env: Env, production: boolean) {
+  const configuredUrl = env.NEXT_PUBLIC_APP_URL?.trim() ?? '';
+
+  if (!configuredUrl) {
+    pushCheck(
+      checks,
+      'NEXT_PUBLIC_APP_URL',
+      production ? 'fail' : 'warn',
+      'Application public URL is missing.',
+    );
+    return;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(configuredUrl);
+  } catch {
+    pushCheck(
+      checks,
+      'NEXT_PUBLIC_APP_URL',
+      'fail',
+      'Application public URL is not a valid URL.',
+    );
+    return;
+  }
+
+  if (production) {
+    const trusted =
+      url.protocol === 'https:' &&
+      productionAppHosts.has(url.hostname.toLowerCase());
+
+    pushCheck(
+      checks,
+      'NEXT_PUBLIC_APP_URL',
+      trusted ? 'pass' : 'fail',
+      trusted
+        ? 'Application public URL is trusted for production.'
+        : 'Production application public URL must use the canonical SmartStore domain over HTTPS.',
+    );
+    return;
+  }
+
+  pushCheck(
+    checks,
+    'NEXT_PUBLIC_APP_URL',
+    'pass',
+    'Application public URL is configured.',
   );
 }
 
@@ -291,6 +343,7 @@ export function evaluateReadiness(env: Env = process.env) {
   );
   validateStore(checks, env, production);
   validateAuth(checks, env, production);
+  validateAppUrl(checks, env, production);
   validateDeepseek(checks, env, production);
   validateAuthProviders(checks, env, production);
   validateImageStorage(checks, env, production);

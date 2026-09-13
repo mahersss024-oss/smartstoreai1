@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { reportListing } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxReportRequestBytes = 8 * 1024;
 
 const reportSchema = z.object({
   reason: z.enum([
@@ -46,6 +49,15 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxReportRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

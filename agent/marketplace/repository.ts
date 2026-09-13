@@ -270,6 +270,14 @@ function isPrismaKnownRequestError(error: unknown, code: string) {
   );
 }
 
+function isRetryablePrismaWriteConflict(error: unknown) {
+  return (
+    isPrismaKnownRequestError(error, 'P2002') ||
+    isPrismaKnownRequestError(error, 'P2025') ||
+    isPrismaKnownRequestError(error, 'P2034')
+  );
+}
+
 function waitForSerializableRetry(attempt: number) {
   return new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
 }
@@ -2319,101 +2327,121 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
 
   await ensureActorUser(actor);
 
-  const existing = await prisma.favorite.findUnique({
-    where: {
-      listingId_userId: {
-        listingId,
-        userId,
-      },
-    },
-  });
+  let result:
+    | {
+        status: 'saved';
+        favorite: FavoriteRecord;
+        listing: memoryStore.ListingRecord;
+      }
+    | {
+        status: 'removed';
+        favorite: null;
+        listing: memoryStore.ListingRecord;
+      }
+    | null = null;
 
-  if (existing) {
-    const updatedListing = await prisma.$transaction(async (tx) => {
-      await tx.favorite.delete({ where: { id: existing.id } });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      result = await prisma.$transaction(
+        async (tx) => {
+          const existingFavorite = await tx.favorite.findUnique({
+            where: {
+              listingId_userId: {
+                listingId,
+                userId,
+              },
+            },
+          });
+          let favorite: FavoriteRecord | null = null;
+          let status: 'saved' | 'removed';
 
-      return tx.listing.update({
-        where: { id: listingId },
-        data: { favoriteCount: { decrement: 1 } },
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          },
+          if (existingFavorite) {
+            await tx.favorite.delete({
+              where: {
+                listingId_userId: {
+                  listingId,
+                  userId,
+                },
+              },
+            });
+            status = 'removed';
+          } else {
+            const createdFavorite = await tx.favorite.create({
+              data: {
+                listingId,
+                userId,
+              },
+            });
+            favorite = {
+              id: createdFavorite.id,
+              listingId: createdFavorite.listingId,
+              userId: createdFavorite.userId,
+              createdAt: createdFavorite.createdAt.toISOString(),
+            };
+            status = 'saved';
+          }
+
+          const favoriteCount = await tx.favorite.count({
+            where: { listingId },
+          });
+          const updatedListing = await tx.listing.update({
+            where: { id: listingId },
+            data: { favoriteCount },
+            include: {
+              images: {
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+              },
+            },
+          });
+
+          return {
+            status,
+            favorite,
+            listing: toListingRecord(updatedListing),
+          } as
+            | {
+                status: 'saved';
+                favorite: FavoriteRecord;
+                listing: memoryStore.ListingRecord;
+              }
+            | {
+                status: 'removed';
+                favorite: null;
+                listing: memoryStore.ListingRecord;
+              };
         },
-      });
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      break;
+    } catch (error) {
+      if (!isRetryablePrismaWriteConflict(error) || attempt === 2) {
+        throw error;
+      }
 
-    const result = {
-      status: 'removed' as const,
-      favorite: null,
-      listing: toListingRecord(updatedListing),
-    };
-
-    safelyPublishRealtimeEvent({
-      type: 'ad_updated',
-      payload: {
-        listingId: result.listing.id,
-        sellerId: result.listing.sellerId,
-        status: result.listing.status,
-        reason: 'favorite_count',
-      },
-      visibility: {
-        includePublic: true,
-        includeAdmins: true,
-        userIds: [userId, result.listing.sellerId],
-      },
-    });
-
-    return result;
+      await waitForSerializableRetry(attempt);
+    }
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const favorite = await tx.favorite.create({
-      data: {
-        listingId,
-        userId,
-      },
-    });
-    const updatedListing = await tx.listing.update({
-      where: { id: listingId },
-      data: { favoriteCount: { increment: 1 } },
-      include: {
-        images: {
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        },
-      },
-    });
-
-    return { favorite, listing: updatedListing };
-  });
-
-  const response = {
-    status: 'saved' as const,
-    favorite: {
-      id: result.favorite.id,
-      listingId: result.favorite.listingId,
-      userId: result.favorite.userId,
-      createdAt: result.favorite.createdAt.toISOString(),
-    } satisfies FavoriteRecord,
-    listing: toListingRecord(result.listing),
-  };
+  if (!result) {
+    throw new Error('Favorite toggle transaction did not return a result.');
+  }
 
   safelyPublishRealtimeEvent({
     type: 'ad_updated',
     payload: {
-      listingId: response.listing.id,
-      sellerId: response.listing.sellerId,
-      status: response.listing.status,
+      listingId: result.listing.id,
+      sellerId: result.listing.sellerId,
+      status: result.listing.status,
       reason: 'favorite_count',
     },
     visibility: {
       includePublic: true,
       includeAdmins: true,
-      userIds: [userId, response.listing.sellerId],
+      userIds: [userId, result.listing.sellerId],
     },
   });
 
-  return response;
+  return result;
 }
 
 export async function reportListing(

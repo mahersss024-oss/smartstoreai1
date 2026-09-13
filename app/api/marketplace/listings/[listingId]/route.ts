@@ -8,18 +8,21 @@ import {
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
+const maxUpdateListingRequestBytes = 64 * 1024;
+
 const updateListingSchema = z.object({
-  title: z.string().min(2).optional(),
-  description: z.string().min(2).optional(),
+  title: z.string().min(2).max(140).optional(),
+  description: z.string().min(2).max(4000).optional(),
   price: z
     .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
     .optional(),
-  city: z.string().min(2).optional(),
-  category: z.string().min(2).optional(),
+  city: z.string().min(2).max(80).optional(),
+  category: z.string().min(2).max(80).optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
@@ -83,6 +86,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxUpdateListingRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   const { listingId } = await context.params;

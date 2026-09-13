@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
+
+const maxMaintenanceCleanupRequestBytes = 4 * 1024;
 
 const cleanupSchema = z.object({
   scope: z.enum([
@@ -162,6 +165,15 @@ export async function POST(request: Request) {
       },
       { status: 403 },
     );
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxMaintenanceCleanupRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

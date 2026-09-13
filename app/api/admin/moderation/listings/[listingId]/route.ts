@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 import { setListingModerationStatus } from '@/agent/marketplace/repository';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
+
+const maxModerationListingActionRequestBytes = 4 * 1024;
 
 const moderationActionSchema = z.object({
   action: z.enum(['approve', 'reject', 'delete']),
@@ -35,6 +38,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxModerationListingActionRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

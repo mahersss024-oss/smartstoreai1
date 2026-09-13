@@ -11,19 +11,22 @@ import {
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
 
+const maxCreateListingRequestBytes = 64 * 1024;
+
 const createListingSchema = z.object({
-  category: z.string().min(2),
-  title: z.string().min(2).optional(),
-  description: z.string().min(2).optional(),
+  category: z.string().min(2).max(80),
+  title: z.string().min(2).max(140).optional(),
+  description: z.string().min(2).max(4000).optional(),
   price: z
     .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
     .optional(),
-  city: z.string().min(2).optional(),
+  city: z.string().min(2).max(80).optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
@@ -89,6 +92,15 @@ export async function POST(request: Request) {
 
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  const oversizedRequestResponse = rejectOversizedRequest(
+    request,
+    maxCreateListingRequestBytes,
+  );
+
+  if (oversizedRequestResponse) {
+    return oversizedRequestResponse;
   }
 
   let payload: unknown;

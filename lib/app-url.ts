@@ -1,15 +1,30 @@
 const productionCanonicalUrl = 'https://www.smartstore-ai.com';
+const productionHosts = new Set(['www.smartstore-ai.com', 'smartstore-ai.com']);
 
 function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');
 }
 
-function isRenderUrl(value: string) {
+function getUrl(value: string) {
   try {
-    return new URL(value).hostname.endsWith('.onrender.com');
+    return new URL(value);
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isRenderUrl(value: string) {
+  return getUrl(value)?.hostname.endsWith('.onrender.com') ?? false;
+}
+
+function isTrustedProductionOrigin(value: string) {
+  const url = getUrl(value);
+
+  return Boolean(
+    url &&
+      url.protocol === 'https:' &&
+      productionHosts.has(url.hostname.toLowerCase()),
+  );
 }
 
 export function getAppBaseUrl(request?: Request) {
@@ -25,11 +40,10 @@ export function getAppBaseUrl(request?: Request) {
   if (request) {
     const requestOrigin = new URL(request.url).origin;
 
-    if (
-      process.env.NODE_ENV === 'production' &&
-      requestOrigin.endsWith('.onrender.com')
-    ) {
-      return productionCanonicalUrl;
+    if (process.env.NODE_ENV === 'production') {
+      return isTrustedProductionOrigin(requestOrigin)
+        ? requestOrigin
+        : productionCanonicalUrl;
     }
 
     return requestOrigin;
