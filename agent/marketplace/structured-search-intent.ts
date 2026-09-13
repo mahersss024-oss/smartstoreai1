@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
 import {
+  getMarketplaceSearchTermVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
 } from './search';
+import {
+  vehicleBrandAliasEntries,
+  vehicleModelAliasEntries,
+} from './search-lexicon';
 import type { ListingCondition } from './types';
 
 export const rankingPreferenceSchema = z.enum([
@@ -55,48 +60,16 @@ export type StructuredSearchIntent = z.infer<typeof structuredSearchIntentSchema
 export type RankingPreference = z.infer<typeof rankingPreferenceSchema>;
 export type SortPreference = z.infer<typeof sortPreferenceSchema>;
 
-const carModels = [
-  {
-    patterns: ['كامري', 'camry'],
-    brand: 'Toyota',
-    model: 'Camry',
-  },
-  {
-    patterns: ['كورولا', 'corolla'],
-    brand: 'Toyota',
-    model: 'Corolla',
-  },
-  {
-    patterns: ['يارس', 'yaris'],
-    brand: 'Toyota',
-    model: 'Yaris',
-  },
-  {
-    patterns: ['النترا', 'إلنترا', 'elantra'],
-    brand: 'Hyundai',
-    model: 'Elantra',
-  },
-  {
-    patterns: ['سوناتا', 'sonata'],
-    brand: 'Hyundai',
-    model: 'Sonata',
-  },
-  {
-    patterns: ['اكورد', 'أكورد', 'accord'],
-    brand: 'Honda',
-    model: 'Accord',
-  },
-];
+const carModels = vehicleModelAliasEntries.map((entry) => ({
+  patterns: entry.aliases,
+  brand: entry.brand,
+  model: entry.model,
+}));
 
-const brandMatchers = [
-  { brand: 'Toyota', patterns: ['تويوتا', 'تايوتا', 'toyota'] },
-  { brand: 'Nissan', patterns: ['نيسان', 'nissan'] },
-  { brand: 'Hyundai', patterns: ['هيونداي', 'hyundai'] },
-  { brand: 'Kia', patterns: ['كيا', 'kia'] },
-  { brand: 'Honda', patterns: ['هوندا', 'honda'] },
-  { brand: 'Lexus', patterns: ['لكزس', 'lexus'] },
-  { brand: 'Mercedes-Benz', patterns: ['مرسيدس', 'mercedes'] },
-];
+const brandMatchers = vehicleBrandAliasEntries.map((entry) => ({
+  brand: entry.canonical,
+  patterns: entry.aliases,
+}));
 
 const colorMatchers = [
   { value: 'أبيض', patterns: ['ابيض', 'أبيض', 'white'] },
@@ -123,6 +96,14 @@ function includesAny(normalizedText: string, patterns: string[]) {
 
 function uniqueValues<T extends string>(values: T[]) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function isIgnoredSearchTerm(term: string, ignoredTermValues: Set<string>) {
+  const variants = getMarketplaceSearchTermVariants(term).map(
+    normalizeMarketplaceSearchText,
+  );
+
+  return variants.some((variant) => ignoredTermValues.has(variant));
 }
 
 function parseMileage(normalizedText: string) {
@@ -248,7 +229,21 @@ export function parseStructuredSearchIntent(query: string | null | undefined) {
       : []),
   ];
   const mileageValue = parseMileage(normalizedText);
-  const ignoredTermValues = [
+  const ignoredTermValues = new Set([
+    ...(brandMatch
+      ? [
+          brandMatch.brand,
+          ...brandMatch.patterns,
+          ...getMarketplaceSearchTermVariants(brandMatch.brand),
+        ]
+      : []),
+    ...(modelMatch
+      ? [
+          modelMatch.model,
+          ...modelMatch.patterns,
+          ...getMarketplaceSearchTermVariants(modelMatch.model),
+        ]
+      : []),
     ...(mentionedColor?.patterns ?? []),
     'قليل',
     'قليله',
@@ -258,9 +253,9 @@ export function parseStructuredSearchIntent(query: string | null | undefined) {
     'ممشاها',
     'ماشيه',
     'ماشية',
-  ].map(normalizeMarketplaceSearchText);
+  ].map(normalizeMarketplaceSearchText));
   const terms = parsed.terms.filter(
-    (term) => !ignoredTermValues.includes(normalizeMarketplaceSearchText(term)),
+    (term) => !isIgnoredSearchTerm(term, ignoredTermValues),
   );
 
   return structuredSearchIntentSchema.parse({

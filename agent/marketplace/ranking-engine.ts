@@ -1,7 +1,7 @@
 import {
   getMarketplaceCitySearchVariants,
+  getMarketplaceSearchTermVariants,
   normalizeMarketplaceSearchText,
-  parseMarketplaceSearchQuery,
 } from './search';
 import type { MarketplaceSearchState } from './search-state';
 import type { ListingRecord } from './store';
@@ -235,7 +235,7 @@ function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
   }
 
   const matched = desiredTerms.filter((term) => {
-    const variants = parseMarketplaceSearchQuery(term).termGroups[0] ?? [term];
+    const variants = getMarketplaceSearchTermVariants(term);
     return textIncludesAny(text, variants);
   }).length;
 

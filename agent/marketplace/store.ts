@@ -15,6 +15,7 @@ import {
 } from './listing-image-limits';
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
+  getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
@@ -255,9 +256,7 @@ function getFilterTermGroups(filters: MarketplaceListingFilters) {
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
   const terms = filters.terms?.length ? filters.terms : parsedQuery.terms;
 
-  return terms.map(
-    (term) => parseMarketplaceSearchQuery(term).termGroups[0] ?? [term],
-  );
+  return terms.map(getMarketplaceSearchTermVariants);
 }
 
 function toListingSearchText(listing: ListingRecord) {

@@ -3,6 +3,7 @@ import {
   rankMarketplaceListings,
   type RankedMarketplaceListing,
 } from './ranking-engine';
+import { getMarketplaceSearchTermVariants } from './search';
 import type { MarketplaceSearchState } from './search-state';
 
 export type MarketplaceSearchEngineResult = {
@@ -21,15 +22,15 @@ const featureSearchTerms = new Map([
   ['no_accident_history', ['بدون حوادث', 'لا يوجد حوادث']],
 ]);
 
-function buildRetrievalTermGroups(state: MarketplaceSearchState) {
+export function buildRetrievalTermGroups(state: MarketplaceSearchState) {
   return [
-    ...(state.brand ? [[state.brand]] : []),
-    ...(state.model ? [[state.model]] : []),
-    ...(state.color ? [[state.color]] : []),
+    ...(state.brand ? [getMarketplaceSearchTermVariants(state.brand)] : []),
+    ...(state.model ? [getMarketplaceSearchTermVariants(state.model)] : []),
+    ...(state.color ? [getMarketplaceSearchTermVariants(state.color)] : []),
     ...state.requiredFeatures.map(
       (feature) => featureSearchTerms.get(feature) ?? [feature],
     ),
-    ...state.terms.map((term) => [term]),
+    ...state.terms.map((term) => getMarketplaceSearchTermVariants(term)),
   ];
 }
 

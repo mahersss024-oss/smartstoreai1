@@ -14,6 +14,7 @@ import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
 import {
+  getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
   normalizeMarketplaceSearchText,
   parseMarketplaceSearchQuery,
@@ -506,7 +507,7 @@ export async function listMarketplaceListings(
   const termGroups =
     filters.termGroups ??
     (filters.terms?.length ? filters.terms : parsedQuery.terms).map(
-      (term) => parseMarketplaceSearchQuery(term).termGroups[0] ?? [term],
+      getMarketplaceSearchTermVariants,
     );
 
   if (category) {

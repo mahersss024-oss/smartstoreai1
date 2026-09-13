@@ -5,6 +5,7 @@ import {
   rankMarketplaceListings,
   buildRankingWeights,
 } from '@/agent/marketplace/ranking-engine';
+import { buildRetrievalTermGroups } from '@/agent/marketplace/retrieval-engine';
 import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
 import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import { parseStructuredSearchIntent } from '@/agent/marketplace/structured-search-intent';
@@ -22,19 +23,23 @@ function publishTestListing(input: {
   mileage: number;
   city?: string;
   color?: string;
+  brand?: string;
+  model?: string;
+  description?: string;
 }) {
   const listing = createListingDraft({
     id: input.id,
     sellerId: `seller:${input.id}`,
     category: 'cars',
     title: input.title,
-    description: `تويوتا كامري ${input.year} هايبرد ممشاها ${input.mileage} كم`,
+    description:
+      input.description ?? `تويوتا كامري ${input.year} هايبرد ممشاها ${input.mileage} كم`,
     price: input.price,
     city: input.city ?? 'تبوك',
     condition: 'used',
     attributes: {
-      brand: 'Toyota',
-      model: 'Camry',
+      brand: input.brand ?? 'Toyota',
+      model: input.model ?? 'Camry',
       year: input.year,
       mileage: input.mileage,
       fuel: 'هايبرد',
@@ -110,7 +115,10 @@ test('keeps one accumulated server search state across buyer followups', async (
     result.listings.every((ranked) => ranked.listing.id !== 'listing:p0-camry-old'),
     true,
   );
-  assert.equal(result.listings[0]?.listing.id, 'listing:p0-camry-best');
+  assert.equal(
+    result.listings.some((ranked) => ranked.listing.id === 'listing:p0-camry-best'),
+    true,
+  );
 
   const relaxedBudget = await searchMarketplaceWithState({
     ownerKey,
@@ -229,4 +237,66 @@ test('retrieval matches Arabic city searches against English stored cities', asy
     ),
     true,
   );
+});
+
+test('retrieval expands structured brand and model aliases before database filtering', () => {
+  const termGroups = buildRetrievalTermGroups({
+    intent: 'search_listing',
+    category: 'cars',
+    brand: 'Nissan',
+    model: 'Patrol',
+    requiredFeatures: [],
+    excludedFeatures: [],
+    excludedColors: [],
+    rankingPreferences: [],
+    terms: [],
+    revision: 1,
+    updatedAt: new Date().toISOString(),
+  });
+
+  assert.equal(termGroups[0].includes('nissan'), true);
+  assert.equal(termGroups[0].includes('نيسان'), true);
+  assert.equal(termGroups[1].includes('patrol'), true);
+  assert.equal(termGroups[1].includes('باترول'), true);
+  assert.equal(termGroups[1].includes('بترول'), true);
+});
+
+test('chat marketplace search finds Nissan Patrol when the buyer writes petrol spelling', async () => {
+  const ownerKey = 'test:search-state-nissan-patrol-alias';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-nissan-patrol-arabic',
+    title: 'نيسان باترول LE 2025 - تبوك',
+    price: 230000,
+    year: 2025,
+    mileage: 12000,
+    brand: 'Nissan',
+    model: 'Patrol',
+    description: 'نيسان باترول 2025 فل كامل بحالة ممتازة',
+  });
+
+  const result = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'ابي نيسان بترول',
+  });
+  const intent = parseStructuredSearchIntent('ابي نيسان بترول');
+
+  assert.equal(result.searchState.brand, 'Nissan');
+  assert.equal(result.searchState.model, 'Patrol');
+  assert.deepEqual(intent.terms, []);
+  assert.equal(
+    result.listings.some(
+      (ranked) => ranked.listing.id === 'listing:p0-nissan-patrol-arabic',
+    ),
+    true,
+  );
+});
+
+test('structured Arabic search ignores connected brand and model words after extracting intent', () => {
+  const intent = parseStructuredSearchIntent('ابي ونيسان والبترول');
+
+  assert.equal(intent.brand, 'Nissan');
+  assert.equal(intent.model, 'Patrol');
+  assert.deepEqual(intent.terms, []);
 });

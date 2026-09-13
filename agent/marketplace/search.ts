@@ -1,3 +1,10 @@
+import {
+  marketplaceTermAliasEntries,
+  vehicleBrandAliasEntries,
+  vehicleModelAliasEntries,
+  type SearchAliasEntry,
+} from './search-lexicon';
+
 export type ParsedMarketplaceSearchQuery = {
   category?: string;
   city?: string;
@@ -95,6 +102,27 @@ const searchStopWords = new Set([
   'ريال',
   'ر',
   'س',
+  'بيع',
+  'للبيع',
+  'شراء',
+  'اشتري',
+  'اشترى',
+  'مطلوب',
+  'اعرض',
+  'أعرض',
+  'اظهر',
+  'أظهر',
+  'وريني',
+  'ارني',
+  'أرني',
+  'متوفر',
+  'متوفره',
+  'موجود',
+  'موجوده',
+  'فيه',
+  'فيها',
+  'حول',
+  'يقبل',
   'search',
   'find',
   'looking',
@@ -226,32 +254,43 @@ const cityMatchers: Array<{ city: string; patterns: RegExp[]; stopWords: string[
   },
 ];
 
-const termSynonyms = new Map([
-  ['كانون', ['كانون', 'canon']],
-  ['canon', ['canon', 'كانون']],
-  ['نيكون', ['نيكون', 'nikon']],
-  ['nikon', ['nikon', 'نيكون']],
-  ['تايوتا', ['تايوتا', 'تويوتا', 'toyota']],
-  ['تويوتا', ['تويوتا', 'تايوتا', 'toyota']],
-  ['toyota', ['toyota', 'تويوتا', 'تايوتا']],
-  ['كامري', ['كامري', 'camry']],
-  ['camry', ['camry', 'كامري']],
-  ['ايفون', ['ايفون', 'آيفون', 'iphone']],
-  ['آيفون', ['آيفون', 'ايفون', 'iphone']],
-  ['iphone', ['iphone', 'ايفون', 'آيفون']],
-]);
-
 function normalizeDigits(value: string) {
-  return value.replace(/[٠-٩]/g, (digit) => arabicDigitMap.get(digit) ?? digit);
+  return value.replace(/[\u0660-\u0669\u06f0-\u06f9]/g, (digit) => {
+    const mappedDigit = arabicDigitMap.get(digit);
+
+    if (mappedDigit) {
+      return mappedDigit;
+    }
+
+    const code = digit.charCodeAt(0);
+
+    if (code >= 0x0660 && code <= 0x0669) {
+      return String(code - 0x0660);
+    }
+
+    if (code >= 0x06f0 && code <= 0x06f9) {
+      return String(code - 0x06f0);
+    }
+
+    return digit;
+  });
 }
 
 export function normalizeMarketplaceSearchText(value: string) {
   return normalizeDigits(value)
+    .normalize('NFKC')
     .toLowerCase()
     .replace(/[\u064b-\u065f\u0670\u0640]/g, '')
-    .replace(/[إأآا]/g, 'ا')
+    .replace(/[\u200c\u200e\u200f]/g, ' ')
+    .replace(/[إأآٱا]/g, 'ا')
+    .replace(/[ؤ]/g, 'و')
+    .replace(/[ئ]/g, 'ي')
+    .replace(/[ء]/g, '')
+    .replace(/[ک]/g, 'ك')
+    .replace(/[ی]/g, 'ي')
     .replace(/[ة]/g, 'ه')
     .replace(/[ى]/g, 'ي')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -286,6 +325,78 @@ function tokenizeSearchQuery(query: string) {
 
 function uniqueValues(values: string[]) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function buildSearchAliasMap(entries: SearchAliasEntry[]) {
+  const aliases = new Map<string, string[]>();
+
+  for (const entry of entries) {
+    const values = uniqueValues([entry.canonical, ...entry.aliases]);
+
+    for (const value of values) {
+      aliases.set(normalizeMarketplaceSearchText(value), values);
+    }
+  }
+
+  return aliases;
+}
+
+const termSynonyms = buildSearchAliasMap([
+  ...marketplaceTermAliasEntries,
+  ...vehicleBrandAliasEntries,
+  ...vehicleModelAliasEntries,
+]);
+
+function isArabicSearchTerm(value: string) {
+  return /\p{Script=Arabic}/u.test(value);
+}
+
+function getArabicArticleVariants(value: string) {
+  const normalizedValue = normalizeMarketplaceSearchText(value);
+
+  if (!normalizedValue || !isArabicSearchTerm(normalizedValue)) {
+    return [value, normalizedValue];
+  }
+
+  const baseValues = [normalizedValue];
+
+  if (normalizedValue.startsWith('و') && normalizedValue.length > 4) {
+    baseValues.push(normalizedValue.slice(1));
+  }
+
+  const variants = [value, normalizedValue];
+
+  for (const baseValue of baseValues) {
+    variants.push(baseValue);
+
+    if (baseValue.startsWith('ال') && baseValue.length > 4) {
+      variants.push(baseValue.slice(2));
+    } else {
+      variants.push(`ال${baseValue}`);
+    }
+
+    if (baseValue.startsWith('لل') && baseValue.length > 4) {
+      const withoutLamPrefix = baseValue.slice(2);
+      variants.push(withoutLamPrefix, `ال${withoutLamPrefix}`);
+    }
+  }
+
+  return uniqueValues(variants);
+}
+
+function getArabicEndingVariants(value: string) {
+  const normalizedValue = normalizeMarketplaceSearchText(value);
+  const variants = [value, normalizedValue];
+
+  if (normalizedValue.endsWith('ه')) {
+    variants.push(`${normalizedValue.slice(0, -1)}ة`);
+  }
+
+  if (value.endsWith('ة')) {
+    variants.push(`${value.slice(0, -1)}ه`);
+  }
+
+  return uniqueValues(variants);
 }
 
 function parseNumberValue(value: string) {
@@ -425,12 +536,13 @@ function getPriceBounds(normalizedQuery: string) {
   };
 }
 
-function getSearchTermVariants(term: string) {
-  const baseTerms = termSynonyms.get(term) ?? [term];
-  const variants = baseTerms.flatMap((baseTerm) => [
-    baseTerm,
-    baseTerm.replace(/ه/g, 'ة'),
-  ]);
+export function getMarketplaceSearchTermVariants(term: string) {
+  const normalizedTerm = normalizeMarketplaceSearchText(term);
+  const baseTerms = termSynonyms.get(normalizedTerm) ?? termSynonyms.get(term) ?? [term];
+  const variants = uniqueValues([term, normalizedTerm, ...baseTerms]).flatMap(
+    (baseTerm) =>
+      getArabicArticleVariants(baseTerm).flatMap(getArabicEndingVariants),
+  );
 
   return uniqueValues(variants.map(normalizeMarketplaceSearchText).concat(variants));
 }
@@ -512,6 +624,6 @@ export function parseMarketplaceSearchQuery(
     yearMin: yearBounds.yearMin,
     yearMax: yearBounds.yearMax,
     terms,
-    termGroups: terms.map(getSearchTermVariants),
+    termGroups: terms.map(getMarketplaceSearchTermVariants),
   };
 }

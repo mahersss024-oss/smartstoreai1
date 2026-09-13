@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
+import {
+  getMarketplaceSearchTermVariants,
+  normalizeMarketplaceSearchText,
+  parseMarketplaceSearchQuery,
+} from '@/agent/marketplace/search';
 
 test('treats search wording as intent and not database search terms', () => {
   const parsed = parseMarketplaceSearchQuery('أبحث عن سيارة في الرياض');
@@ -27,14 +31,15 @@ test('keeps real product details as marketplace search terms', () => {
 
   assert.equal(parsed.category, 'cars');
   assert.deepEqual(parsed.terms, ['تايوتا', 'كامري', '2020']);
-  assert.deepEqual(parsed.termGroups[0], ['تايوتا', 'تويوتا', 'toyota']);
+  assert.equal(parsed.termGroups[0].includes('تويوتا'), true);
+  assert.equal(parsed.termGroups[0].includes('toyota'), true);
 });
 
 test('removes generic words while preserving product attributes', () => {
   const parsed = parseMarketplaceSearchQuery('أريد أبحث عن ساعة زرقاء في الرياض');
 
   assert.equal(parsed.city, 'الرياض');
-  assert.deepEqual(parsed.terms, ['ساعه', 'زرقاء']);
+  assert.deepEqual(parsed.terms, ['ساعه', 'زرقا']);
 });
 
 test('keeps car model year while extracting max price', () => {
@@ -50,5 +55,32 @@ test('extracts camera category and brand from Arabic buyer search', () => {
 
   assert.equal(parsed.category, 'cameras');
   assert.deepEqual(parsed.terms, ['تصوير', 'نوع', 'كانون']);
-  assert.deepEqual(parsed.termGroups.at(-1), ['كانون', 'canon']);
+  assert.equal(parsed.termGroups.at(-1)?.includes('كانون'), true);
+  assert.equal(parsed.termGroups.at(-1)?.includes('canon'), true);
+});
+
+test('expands vehicle brand and model aliases across Arabic and English spellings', () => {
+  const nissanVariants = getMarketplaceSearchTermVariants('Nissan');
+  const patrolVariants = getMarketplaceSearchTermVariants('بترول');
+
+  assert.equal(nissanVariants.includes('nissan'), true);
+  assert.equal(nissanVariants.includes('نيسان'), true);
+  assert.equal(patrolVariants.includes('بترول'), true);
+  assert.equal(patrolVariants.includes('باترول'), true);
+  assert.equal(patrolVariants.includes('patrol'), true);
+});
+
+test('normalizes common Arabic writing differences for marketplace search', () => {
+  assert.equal(normalizeMarketplaceSearchText('آيفون ١٥'), 'ايفون 15');
+  assert.equal(normalizeMarketplaceSearchText('إكس تريل ۲۰۲۵'), 'اكس تريل 2025');
+  assert.equal(normalizeMarketplaceSearchText('کیا جدید'), 'كيا جديد');
+});
+
+test('expands Arabic definite article and conjunction variants', () => {
+  const sofaVariants = getMarketplaceSearchTermVariants('والكنبة');
+
+  assert.equal(sofaVariants.includes('والكنبه'), true);
+  assert.equal(sofaVariants.includes('الكنبه'), true);
+  assert.equal(sofaVariants.includes('كنبه'), true);
+  assert.equal(sofaVariants.includes('كنبة'), true);
 });
