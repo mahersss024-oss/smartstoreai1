@@ -1,4 +1,5 @@
 export const defaultMaxListingImages = 8;
+export const hardMaxListingImages = defaultMaxListingImages;
 
 export function getMaxListingImagesPerListing() {
   const configuredValue = Number.parseInt(
@@ -10,7 +11,7 @@ export function getMaxListingImagesPerListing() {
     return defaultMaxListingImages;
   }
 
-  return configuredValue;
+  return Math.min(configuredValue, hardMaxListingImages);
 }
 
 export function hasReachedListingImageLimit(images: { length: number }) {

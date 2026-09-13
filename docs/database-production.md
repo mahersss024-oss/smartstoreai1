@@ -93,11 +93,9 @@ SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
 Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
-`SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Any positive
-integer configured in Render is used as the active limit. Larger values increase
-storage, bandwidth, and listing page work. Keep this variable managed in the
-Render dashboard so production can raise or lower the limit without a code
-change.
+`SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Production can
+lower this value, but the application caps it at `8` to protect storage,
+bandwidth, and listing page work.
 
 ## Manual Commission Payment Methods
 

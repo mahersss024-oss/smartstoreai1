@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import {
   clearOauthStateCookie,
   commissionAgreementVersion,
@@ -120,34 +121,54 @@ export async function GET(request: Request) {
   }
 
   const redirectUri = new URL('/api/auth/google/callback', getAppBaseUrl(request));
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri.toString(),
-      grant_type: 'authorization_code',
-    }),
-  });
-  const tokenJson = (await tokenResponse.json()) as GoogleTokenResponse;
+  let tokenResponse: Response;
 
-  if (!tokenResponse.ok || !tokenJson.access_token) {
+  try {
+    tokenResponse = await fetchWithTimeout('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri.toString(),
+        grant_type: 'authorization_code',
+      }),
+    });
+  } catch {
     return new Response('Google token exchange failed.', { status: 502 });
   }
 
-  const userInfoResponse = await fetch(
-    'https://www.googleapis.com/oauth2/v3/userinfo',
-    {
-      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-    },
-  );
-  const userInfo = (await userInfoResponse.json()) as GoogleUserInfo;
+  const tokenJson = (await tokenResponse.json().catch(() => null)) as
+    | GoogleTokenResponse
+    | null;
+
+  if (!tokenResponse.ok || !tokenJson?.access_token) {
+    return new Response('Google token exchange failed.', { status: 502 });
+  }
+
+  let userInfoResponse: Response;
+
+  try {
+    userInfoResponse = await fetchWithTimeout(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+      },
+    );
+  } catch {
+    return new Response('Google account email could not be verified.', {
+      status: 502,
+    });
+  }
+
+  const userInfo = (await userInfoResponse.json().catch(() => null)) as
+    | GoogleUserInfo
+    | null;
 
   if (
     !userInfoResponse.ok ||
-    !userInfo.sub ||
+    !userInfo?.sub ||
     !userInfo.email ||
     userInfo.email_verified === false
   ) {

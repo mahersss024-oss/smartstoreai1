@@ -1051,46 +1051,63 @@ export async function addListingImageForSeller(
     return listing;
   }
 
-  const existing = await prisma.listing.findUnique({
-    where: { id: listingId },
-    include: { images: true },
-  });
+  let listing: DatabaseListingRecord | null = null;
 
-  if (!existing || existing.sellerId !== sellerId) {
-    return null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      listing = await prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.listing.findUnique({
+            where: { id: listingId },
+            include: { images: true },
+          });
+
+          if (!existing || existing.sellerId !== sellerId) {
+            return null;
+          }
+
+          if (hasReachedListingImageLimit(existing.images)) {
+            return existing;
+          }
+
+          const isFirstApprovedImage = !existing.images.some(
+            (currentImage) => currentImage.status === 'approved',
+          );
+
+          await tx.listingImage.create({
+            data: {
+              id: image.id,
+              listingId,
+              originalUrl: image.originalUrl,
+              displayUrl: image.displayUrl,
+              thumbnailUrl: image.thumbnailUrl,
+              isPrimary: image.isPrimary || isFirstApprovedImage,
+              qualityScore: image.qualityScore,
+              status: image.status,
+              enhancements: image.enhancements,
+            },
+          });
+
+          return tx.listing.findUnique({
+            where: { id: listingId },
+            include: {
+              images: {
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+              },
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      break;
+    } catch (error) {
+      if (!isPrismaKnownRequestError(error, 'P2034') || attempt === 2) {
+        throw error;
+      }
+
+      await waitForSerializableRetry(attempt);
+    }
   }
-
-  if (hasReachedListingImageLimit(existing.images)) {
-    return toListingRecord(existing);
-  }
-
-  const isFirstApprovedImage = !existing.images.some(
-    (currentImage) => currentImage.status === 'approved',
-  );
-
-  await prisma.listingImage.create({
-    data: {
-      id: image.id,
-      listingId,
-      originalUrl: image.originalUrl,
-      displayUrl: image.displayUrl,
-      thumbnailUrl: image.thumbnailUrl,
-      isPrimary: image.isPrimary || isFirstApprovedImage,
-      qualityScore: image.qualityScore,
-      status: image.status,
-      enhancements: image.enhancements,
-    },
-  });
-
-  const listing = await prisma.listing.findUnique({
-    where: { id: listingId },
-    include: {
-      images: {
-        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        take: getMaxListingImagesPerListing(),
-      },
-    },
-  });
 
   const mappedListing = listing ? toListingRecord(listing) : null;
 

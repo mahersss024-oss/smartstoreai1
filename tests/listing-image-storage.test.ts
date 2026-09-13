@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import type { ModelMessage } from 'ai';
 
+import { POST as uploadListingImage } from '@/app/api/marketplace/listings/[listingId]/images/route';
 import {
   canUseImageDataUrlFallback,
   createPersistentImageDataUrl,
@@ -16,6 +18,7 @@ import {
   createListingDraft,
   listSellerListings,
 } from '@/agent/marketplace/store';
+import { createSessionCookie } from '@/lib/auth/session';
 
 test('extracts the latest uploaded product images from prior chat context', () => {
   const messages: ModelMessage[] = [
@@ -127,6 +130,46 @@ test('disables listing image data URL fallback in production', async () => {
       env.SMARTSTORE_IMAGE_STORAGE = previousStorage;
     }
   }
+});
+
+test('returns a controlled error for malformed listing image uploads', async () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:malformed-image-upload',
+    category: 'cars',
+    title: 'Malformed upload listing',
+  });
+  const response = await uploadListingImage(
+    new Request(
+      `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'multipart/form-data; boundary=broken',
+          cookie: createSessionCookie({
+            id: 'seller:malformed-image-upload',
+            email: 'malformed-upload@example.com',
+          }),
+        },
+        body: 'not-a-valid-multipart-body',
+      },
+    ),
+    { params: Promise.resolve({ listingId: listing.id }) },
+  );
+  const body = (await response.json()) as { error?: string };
+
+  assert.equal(response.status, 400);
+  assert.equal(body.error, 'invalid_multipart_form_data');
+});
+
+test('database listing image writes use serializable transactions', () => {
+  const repository = readFileSync(
+    'agent/marketplace/repository.ts',
+    'utf8',
+  );
+
+  assert.match(repository, /addListingImageForSeller/);
+  assert.match(repository, /prisma\.\$transaction/);
+  assert.match(repository, /TransactionIsolationLevel\.Serializable/);
 });
 
 test('saves only the remaining available image slots for chat uploads', async () => {

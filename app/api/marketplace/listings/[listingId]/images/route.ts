@@ -105,7 +105,14 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+
+  try {
+    formData = await request.formData();
+  } catch {
+    return Response.json({ error: 'invalid_multipart_form_data' }, { status: 400 });
+  }
+
   const file = formData.get('image');
 
   if (!(file instanceof File)) {

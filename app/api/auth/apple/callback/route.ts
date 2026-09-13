@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAppBaseUrl } from '@/lib/app-url';
 import {
   createAppleClientSecret,
@@ -29,6 +31,8 @@ type AppleUserPayload = {
   };
   email?: string;
 };
+
+const maxAppleCallbackRequestBytes = 16 * 1024;
 
 function redirectToHome(request: Request, cookie?: string) {
   const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
@@ -148,7 +152,25 @@ async function persistAppleUserRegistration(
 }
 
 async function handleAppleCallback(request: Request) {
-  const { code, idToken, name, state } = await readCallbackParams(request);
+  const oversizedRequest = rejectOversizedRequest(
+    request,
+    maxAppleCallbackRequestBytes,
+    'Apple sign-in callback request body is too large.',
+  );
+
+  if (oversizedRequest) {
+    return oversizedRequest;
+  }
+
+  let callbackParams: Awaited<ReturnType<typeof readCallbackParams>>;
+
+  try {
+    callbackParams = await readCallbackParams(request);
+  } catch {
+    return new Response('Invalid Apple sign-in callback.', { status: 400 });
+  }
+
+  const { code, idToken, name, state } = callbackParams;
   const storedState = getOauthState(request);
 
   if (!code || !idToken || !state || !storedState || state !== storedState) {
@@ -160,17 +182,24 @@ async function handleAppleCallback(request: Request) {
     '/api/auth/apple/callback',
     getAppBaseUrl(request),
   );
-  const tokenResponse = await fetch('https://appleid.apple.com/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: createAppleClientSecret(),
-      redirect_uri: redirectUri.toString(),
-      grant_type: 'authorization_code',
-    }),
-  });
+  let tokenResponse: Response;
+
+  try {
+    tokenResponse = await fetchWithTimeout('https://appleid.apple.com/auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: createAppleClientSecret(),
+        redirect_uri: redirectUri.toString(),
+        grant_type: 'authorization_code',
+      }),
+    });
+  } catch {
+    return new Response('Apple token exchange failed.', { status: 502 });
+  }
+
   const tokenJson = (await tokenResponse.json().catch(() => null)) as
     | AppleTokenResponse
     | null;

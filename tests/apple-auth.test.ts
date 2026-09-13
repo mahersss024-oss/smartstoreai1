@@ -66,6 +66,24 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(callbackRoute, /appleid\.apple\.com\/auth\/token/);
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
   assert.match(callbackRoute, /getOauthState/);
+  assert.match(callbackRoute, /rejectOversizedRequest/);
+  assert.match(callbackRoute, /fetchWithTimeout/);
+});
+
+test('google auth callback uses bounded external provider calls', () => {
+  const callbackRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'google',
+    'callback',
+    'route.ts',
+  );
+
+  assert.match(callbackRoute, /fetchWithTimeout\('https:\/\/oauth2\.googleapis\.com\/token'/);
+  assert.match(callbackRoute, /fetchWithTimeout\(\s*'https:\/\/www\.googleapis\.com\/oauth2\/v3\/userinfo'/);
+  assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
+  assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
 });
 
 test('home login control offers Google and Apple choices', () => {
