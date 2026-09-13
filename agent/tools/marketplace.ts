@@ -25,7 +25,10 @@ import {
   updateListingForSeller,
   type CreateListingInput,
 } from '@/agent/marketplace/repository';
-import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
+import {
+  marketplaceSearchUnderstandingSchema,
+  searchMarketplaceWithState,
+} from '@/agent/marketplace/search-engine';
 import { compareMarketplaceListings as compareListingsWithEngine } from '@/agent/marketplace/comparison-engine';
 import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
 import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine';
@@ -274,16 +277,18 @@ export function createMarketplaceTools(
   return {
     searchMarketplaceListings: tool({
       description:
-        'Search current published SmartStore AI marketplace listings for a buyer. Use this before saying listings are unavailable. This is read-only and never stores the user search terms.',
+        'Search current published SmartStore AI marketplace listings for a buyer. Understand the buyer request first, pass structured understoodIntent fields when possible, and use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying listings are unavailable. This is read-only and never stores raw user search text as listing data.',
       inputSchema: z.object({
         query: z.string().trim().min(1).max(300).optional(),
+        understoodIntent: marketplaceSearchUnderstandingSchema.optional(),
       }),
-      execute: async ({ query }) => {
+      execute: async ({ query, understoodIntent }) => {
         const searchResult = await searchMarketplaceWithState({
           ownerKey:
             options.searchOwnerKey ??
             (session ? `user:${session.user.id}` : 'anonymous'),
           query,
+          understoodIntent,
         });
 
         return {

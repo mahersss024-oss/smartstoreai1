@@ -12,8 +12,8 @@ test('system prompt knows assistant search can be cleared without changing model
 });
 
 test('system prompt guides signed-in users through platform account help safely', () => {
-  assert.match(systemPrompt, /Sign-in with Google or Apple/);
-  assert.match(systemPrompt, /platform-help questions/);
+  assert.match(systemPrompt, /Google or Apple sign-in/);
+  assert.match(systemPrompt, /platform_help/);
   assert.match(systemPrompt, /\/account/);
   assert.match(systemPrompt, /saved contact phone/);
   assert.match(systemPrompt, /\/conversations/);
@@ -22,8 +22,8 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /\/listing-policy/);
   assert.match(systemPrompt, /\/terms/);
   assert.match(systemPrompt, /\/privacy/);
-  assert.match(systemPrompt, /manual phone numbers and emails remain blocked/);
-  assert.match(systemPrompt, /Do not claim you can navigate the app/);
-  assert.match(systemPrompt, /tell the user what to tap/);
-  assert.match(systemPrompt, /Do not invent account data/);
+  assert.match(systemPrompt, /Manual phone numbers and emails are blocked/);
+  assert.match(systemPrompt, /Do not claim to see hidden UI state, click buttons, navigate pages/);
+  assert.match(systemPrompt, /The assistant only sees and acts through explicit platform capabilities/);
+  assert.match(systemPrompt, /Do not invent listings, sellers, prices/);
 });

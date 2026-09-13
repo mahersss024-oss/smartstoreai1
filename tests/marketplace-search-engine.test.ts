@@ -7,7 +7,10 @@ import {
 } from '@/agent/marketplace/ranking-engine';
 import { buildRetrievalTermGroups } from '@/agent/marketplace/retrieval-engine';
 import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
-import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
+import {
+  getMarketplaceSearchState,
+  resetMarketplaceSearchState,
+} from '@/agent/marketplace/search-state';
 import { parseStructuredSearchIntent } from '@/agent/marketplace/structured-search-intent';
 import {
   createListingDraft,
@@ -288,6 +291,46 @@ test('chat marketplace search finds Nissan Patrol when the buyer writes petrol s
   assert.equal(
     result.listings.some(
       (ranked) => ranked.listing.id === 'listing:p0-nissan-patrol-arabic',
+    ),
+    true,
+  );
+});
+
+test('chat marketplace search uses understood intent instead of raw query words', async () => {
+  const ownerKey = 'test:search-state-understood-intent-no-raw-words';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-nissan-patrol-understood',
+    title: 'Nissan Patrol LE 2025 - Tabuk',
+    price: 230000,
+    year: 2025,
+    mileage: 12000,
+    brand: 'Nissan',
+    model: 'Patrol',
+    city: 'Tabuk',
+    description: 'Clean Nissan Patrol 2025 with full service history',
+  });
+
+  const result = await searchMarketplaceWithState({
+    ownerKey,
+    query:
+      'Please check if SmartStore AI has a published listing card for a Nissan Patrol and do not just search these words.',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Nissan',
+      model: 'Patrol',
+      city: 'Tabuk',
+    },
+  });
+
+  assert.equal(result.searchState.category, 'cars');
+  assert.equal(result.searchState.brand, 'Nissan');
+  assert.equal(result.searchState.model, 'Patrol');
+  assert.deepEqual((await getMarketplaceSearchState(ownerKey))?.terms, []);
+  assert.equal(
+    result.listings.some(
+      (ranked) => ranked.listing.id === 'listing:p0-nissan-patrol-understood',
     ),
     true,
   );
