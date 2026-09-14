@@ -44,7 +44,7 @@ test('publishes the latest matching seller draft when listingId is omitted', asy
   const executeSetListingStatus = tools.setListingStatus.execute as unknown as (
     input: { status: 'published' },
     options: Record<string, never>,
-  ) => Promise<{ status: string; listing: { id: string } }>;
+  ) => Promise<{ status: string; listingUrl?: string; listing: { id: string } }>;
   const result = await executeSetListingStatus(
     { status: 'published' },
     {},
@@ -52,6 +52,16 @@ test('publishes the latest matching seller draft when listingId is omitted', asy
 
   assert.equal(result?.status, 'published');
   assert.equal(result?.listing.id, listing.id);
+  assert.equal(
+    result?.listingUrl,
+    `http://localhost:3000/listings/${encodeURIComponent(listing.id)}`,
+  );
+});
+
+test('marketplace tools do not let assistant chat open buyer seller conversations', () => {
+  const tools = createMarketplaceTools(createTestSession('buyer:no-chat-open'));
+
+  assert.equal('openMarketplaceConversation' in tools, false);
 });
 
 test('adds many follow-up details to the current draft when listingId is omitted', async () => {

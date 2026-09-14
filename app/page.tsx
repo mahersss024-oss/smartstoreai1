@@ -178,6 +178,28 @@ type RetainedListingImage = Pick<
   'type' | 'url' | 'mediaType' | 'filename'
 >;
 
+type HomeAssistantRuntimeState = {
+  messages: UIMessage[];
+  activeListingQuery: string;
+  selectedListingContext: SelectedListingContext | null;
+  retainedListingImages: RetainedListingImage[];
+  shouldResetSearchState: boolean;
+};
+
+let homeAssistantRuntimeState: HomeAssistantRuntimeState | null = null;
+
+function readHomeAssistantRuntimeState() {
+  return homeAssistantRuntimeState;
+}
+
+function writeHomeAssistantRuntimeState(state: HomeAssistantRuntimeState) {
+  homeAssistantRuntimeState = state;
+}
+
+function clearHomeAssistantRuntimeState() {
+  homeAssistantRuntimeState = null;
+}
+
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const chatRateLimitMessage =
   'الضغط مرتفع الآن على مساعد SmartStore AI. انتظر لحظات ثم أعد إرسال الطلب.';
@@ -439,7 +461,7 @@ const featuredListings: ListingCard[] = [];
 
 const starters = [
   'أريد بيع منتج',
-  'أبحث عن سيارة في الرياض',
+  'أبحث عن منتج',
   'افحص صور الإعلان',
 ];
 
@@ -1001,12 +1023,7 @@ function ListingCardView({
             className="h-7 rounded-md bg-blue-600 text-[11px] hover:bg-blue-700"
             onClick={(event) => {
               event.stopPropagation();
-              onAsk(
-                listing.id
-                  ? `أريد التواصل مع البائع بخصوص الإعلان رقم ${listing.id}: ${listing.title}`
-                  : `أريد التواصل بخصوص ${listing.title}`,
-                listing,
-              );
+              onOpen(listing);
             }}
           >
             <MessageCircle className="size-3 sm:size-3.5" />
@@ -1613,6 +1630,27 @@ export default function Page() {
 
   useEffect(() => {
     let cancelled = false;
+    const restoredChatState = readHomeAssistantRuntimeState();
+
+    if (restoredChatState) {
+      retainedListingImagesRef.current = restoredChatState.retainedListingImages;
+      shouldResetSearchStateRef.current = restoredChatState.shouldResetSearchState;
+
+      queueMicrotask(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setMessages(restoredChatState.messages);
+        setActiveListingQuery(restoredChatState.activeListingQuery);
+        setSelectedListingContext(restoredChatState.selectedListingContext);
+        setHasRestoredChat(true);
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     clearStaleStoredChatState();
     retainedListingImagesRef.current = [];
@@ -1647,6 +1685,24 @@ export default function Page() {
     };
   }, [setMessages]);
 
+  useEffect(() => {
+    if (!hasRestoredChat) {
+      return;
+    }
+
+    writeHomeAssistantRuntimeState({
+      messages,
+      activeListingQuery,
+      selectedListingContext,
+      retainedListingImages: retainedListingImagesRef.current,
+      shouldResetSearchState: shouldResetSearchStateRef.current,
+    });
+  }, [
+    activeListingQuery,
+    hasRestoredChat,
+    messages,
+    selectedListingContext,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2028,6 +2084,7 @@ export default function Page() {
 
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
+      clearHomeAssistantRuntimeState();
       setSession({ authenticated: false, user: null });
       setFavoriteListingIds(new Set());
     });
@@ -2059,6 +2116,7 @@ export default function Page() {
     setSelectedListingContext(null);
     retainedListingImagesRef.current = [];
     shouldResetSearchStateRef.current = true;
+    clearHomeAssistantRuntimeState();
     clearStoredChatState();
     void clearRetainedListingImages().catch(() => {});
     void resetAssistantSearchState().catch(() => {});

@@ -12,7 +12,6 @@ import {
 } from '@/agent/marketplace/listing-limits';
 import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
-  createConversationForListing,
   createListingDraft,
   deleteListingImageForSeller,
   getListing,
@@ -32,6 +31,7 @@ import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
 import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine';
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
+import { getPublicListingUrl } from '@/lib/listing-url';
 
 type MarketplaceListingResult = Awaited<
   ReturnType<typeof listMarketplaceListings>
@@ -50,6 +50,7 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
 
   return {
     id: listing.id,
+    listingUrl: getPublicListingUrl(listing.id),
     title: listing.title,
     category: listing.category,
     price: listing.price,
@@ -727,6 +728,10 @@ export function createMarketplaceTools(
 
         return {
           status: listing.status,
+          listingUrl:
+            listing.status === 'published'
+              ? getPublicListingUrl(listing.id)
+              : undefined,
           listing,
         };
       },
@@ -758,21 +763,6 @@ export function createMarketplaceTools(
           'Allowed enhancements: crop, lighting, sharpening, straighten, compression, thumbnails, and blur sensitive info. Forbidden: hide defects, change colors, add accessories, or alter product truth.',
         results: images.map(analyzeImageQuality),
       }),
-    }),
-
-    openMarketplaceConversation: tool({
-      description:
-        'Open an internal buyer-seller conversation for a published listing. Requires sign-in and must not expose phone numbers.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-      }),
-      execute: async ({ listingId }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        return createConversationForListing(listingId, session.user);
-      },
     }),
 
     toggleFavoriteListing: tool({

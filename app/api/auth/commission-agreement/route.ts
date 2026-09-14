@@ -1,9 +1,20 @@
 import { createCommissionAgreementCookie } from '@/lib/auth/session';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 
 const maxCommissionAgreementRequestBytes = 1024;
 
 export async function POST(request: Request) {
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'commission_agreement',
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const oversizedRequestResponse = rejectOversizedRequest(
     request,
     maxCommissionAgreementRequestBytes,

@@ -31,6 +31,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { ListingShareButton } from '@/components/listing-share-button';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { createNormalizedImageFile } from '@/lib/client-image-normalization';
@@ -1516,7 +1517,22 @@ export default function AccountPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-6">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-7">
+                        {listing.status === 'published' && (
+                          <Button asChild size="sm" variant="outline" className="rounded-md">
+                            <Link href={`/listings/${listing.id}`}>
+                              <Store className="size-3.5" />
+                              عرض
+                            </Link>
+                          </Button>
+                        )}
+                        {listing.status === 'published' && (
+                          <ListingShareButton
+                            className="rounded-md"
+                            listingId={listing.id}
+                            title={listing.title}
+                          />
+                        )}
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => startEditingListing(listing)}>
                           <Pencil className="size-3.5" />
                           تعديل

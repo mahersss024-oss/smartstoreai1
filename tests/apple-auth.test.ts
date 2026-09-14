@@ -61,8 +61,12 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   );
 
   assert.match(startRoute, /appleid\.apple\.com\/auth\/authorize/);
+  assert.match(startRoute, /enforceApiRateLimit/);
+  assert.match(startRoute, /auth_apple_start/);
   assert.match(startRoute, /response_mode', 'form_post'/);
   assert.match(startRoute, /createOauthStateCookie/);
+  assert.match(startRoute, /sameSite:\s*'None'/);
+  assert.match(startRoute, /secure:\s*true/);
   assert.match(callbackRoute, /appleid\.apple\.com\/auth\/token/);
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
   assert.match(callbackRoute, /getOauthState/);
@@ -71,6 +75,14 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
 });
 
 test('google auth callback uses bounded external provider calls', () => {
+  const startRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'google',
+    'start',
+    'route.ts',
+  );
   const callbackRoute = readProjectFile(
     'app',
     'api',
@@ -80,6 +92,8 @@ test('google auth callback uses bounded external provider calls', () => {
     'route.ts',
   );
 
+  assert.match(startRoute, /enforceApiRateLimit/);
+  assert.match(startRoute, /auth_google_start/);
   assert.match(callbackRoute, /fetchWithTimeout\('https:\/\/oauth2\.googleapis\.com\/token'/);
   assert.match(callbackRoute, /fetchWithTimeout\(\s*'https:\/\/www\.googleapis\.com\/oauth2\/v3\/userinfo'/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);

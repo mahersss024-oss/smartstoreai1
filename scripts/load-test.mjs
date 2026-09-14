@@ -59,7 +59,11 @@ function pickPath(workerId, iteration) {
   return browsePaths[(workerId + iteration) % browsePaths.length];
 }
 
-async function requestOnce(baseUrl, path, timeoutMs) {
+function createClientIp(workerId) {
+  return `203.0.${Math.floor(workerId / 250) % 250}.${(workerId % 250) + 1}`;
+}
+
+async function requestOnce(baseUrl, path, timeoutMs, workerId) {
   const startedAt = performance.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -70,6 +74,7 @@ async function requestOnce(baseUrl, path, timeoutMs) {
       headers: {
         Accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
         'User-Agent': 'SmartStoreAI-load-check/1.0',
+        'X-Forwarded-For': createClientIp(workerId),
       },
       signal: controller.signal,
     });
@@ -109,6 +114,7 @@ async function runStage(concurrency, options) {
             options.baseUrl,
             pickPath(workerId, iteration),
             options.timeoutMs,
+            workerId,
           ),
         );
         iteration += 1;

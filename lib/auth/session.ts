@@ -259,9 +259,17 @@ export function createOauthState() {
   return randomBytes(24).toString('base64url');
 }
 
-export function createOauthStateCookie(state: string) {
+export function createOauthStateCookie(
+  state: string,
+  options: {
+    sameSite?: 'Lax' | 'Strict' | 'None';
+    secure?: boolean;
+  } = {},
+) {
   return serializeCookie(oauthStateCookieName, encodeURIComponent(state), {
     maxAge: 60 * 10,
+    sameSite: options.sameSite,
+    secure: options.secure,
   });
 }
 

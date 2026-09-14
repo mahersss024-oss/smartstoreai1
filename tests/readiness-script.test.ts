@@ -77,3 +77,44 @@ test('readiness rejects untrusted production public app urls', () => {
     ),
   );
 });
+
+test('readiness reports production rate limiting scope', () => {
+  const memoryOnly = evaluateReadiness(productionEnv);
+
+  assert.ok(
+    memoryOnly.checks.some(
+      (check) =>
+        check.name === 'rate_limit_backend' &&
+        check.status === 'warn' &&
+        /instance-local memory/i.test(check.message),
+    ),
+  );
+
+  const redisBacked = evaluateReadiness({
+    ...productionEnv,
+    UPSTASH_REDIS_REST_URL: 'https://redis.example',
+    UPSTASH_REDIS_REST_TOKEN: 'redis-token',
+  });
+
+  assert.ok(
+    redisBacked.checks.some(
+      (check) =>
+        check.name === 'rate_limit_backend' && check.status === 'pass',
+    ),
+  );
+});
+
+test('readiness fails when redis rate limiting is requested without credentials', () => {
+  const result = evaluateReadiness({
+    ...productionEnv,
+    SMARTSTORE_RATE_LIMIT_BACKEND: 'redis',
+  });
+
+  assert.equal(result.status, 'fail');
+  assert.ok(
+    result.checks.some(
+      (check) =>
+        check.name === 'rate_limit_backend' && check.status === 'fail',
+    ),
+  );
+});

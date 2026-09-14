@@ -6,8 +6,19 @@ import {
   hasCommissionAgreement,
 } from '@/lib/auth/session';
 import { getAppBaseUrl } from '@/lib/app-url';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 
 export async function GET(request: Request) {
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'auth_google_start',
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   if (!hasCommissionAgreement(request)) {
     return NextResponse.redirect(
       new URL('/commission-agreement?provider=google', getAppBaseUrl(request)),

@@ -18,6 +18,7 @@ import {
 import { getListing } from '@/agent/marketplace/repository';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
+import { ListingShareButton } from '@/components/listing-share-button';
 import { ListingContactActions } from './contact-actions';
 import { ListingImageGallery } from './listing-image-gallery';
 import { ListingSafetyActions } from './listing-safety-actions';
@@ -305,6 +306,11 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                 <div className="text-xs text-muted-foreground">السعر المطلوب</div>
                 <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
               </div>
+              <ListingShareButton
+                className="mb-3 h-11 w-full rounded-md"
+                listingId={listing.id}
+                title={listing.title ?? 'إعلان SmartStore AI'}
+              />
               <ListingContactActions listingId={listing.id} />
               <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
             </section>

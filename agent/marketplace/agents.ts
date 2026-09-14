@@ -20,7 +20,7 @@ export const marketplaceAgentBlueprint = {
   comparisonAgent:
     'Compares listings by price, condition, specs, seller signals, and risk before recommending a choice.',
   conversationAgent:
-    'Creates one internal conversation per buyer, seller, and listing, and prevents self-contact.',
+    'Explains buyer-seller conversation rules and directs users to the listing contact button without opening conversations from assistant chat.',
   negotiationAgent:
     'Provides private advisory price and offer guidance only, without sending offers, accepting, rejecting, changing prices, or committing either party.',
   safetyFraudAgent:
@@ -72,6 +72,7 @@ ${renderPlatformCapabilitiesForPrompt()}
 - Use estimateListingPrice when the seller asks for pricing guidance or wants help choosing a fair asking price. Present it as a calculated range with comparable count and confidence, not as a guaranteed price.
 - Use evaluateNegotiationOffer when the user asks whether a buyer offer is fair, too low, or what counteroffer is reasonable for a specific listing. This is private guidance only; never accept, reject, send a response, change price, or commit to a deal.
 - If searchMarketplaceListings returns listings, mention the best matches briefly and tell the user they can open the visible listing cards for full details.
+- If the user asks for a specific found listing and it is not visible in the smart results area, share the listingUrl from the tool or selected listing context as a Markdown link: [فتح الإعلان](listingUrl) in Arabic or [Open listing](listingUrl) in English. Sharing a public listing link is allowed; creating the buyer-seller conversation from chat is not.
 - If compareMarketplaceListings returns alternatives, explain the target listing and the closest comparable options by price, condition, city, details, and engagement. If no alternatives are found, say that no close comparable listings are currently available.
 - Do not say SmartStore AI cannot show marketplace listings before using searchMarketplaceListings.
 - Use createListingDraft as soon as the seller intent and a minimum product signal are clear. Minimum product signal can be a product image, product name, category, or short description. Do not block draft creation just because price, city, condition, title, or long description are missing.
@@ -87,7 +88,7 @@ ${renderPlatformCapabilitiesForPrompt()}
 - If the latest uploaded image compliance context is allow, treat the image review as passed for the current chat turn. If image review is needs_review or unavailable, do not publish.
 - If the user already provided any requested follow-up detail, apply it to the current draft or create the draft from context. Never say that no publish draft exists when the conversation contains enough product context to create one.
 - Use analyzeListingImages when the user asks about image quality or uploads/describes listing images.
-- Use openMarketplaceConversation only when the user clearly wants to contact a seller about a specific published listing.
+- Never open a buyer-seller conversation from assistant chat. When the user wants to contact a seller, provide the public listing link when available and tell the user to open the listing card/details page and press the contact button.
 - Use toggleFavoriteListing when the user clearly wants to save or remove a specific listing from favorites.
 - Use reportMarketplaceListing when the user reports a specific listing as prohibited, fraudulent, misleading, abusive, counterfeit, or wrongly categorized.
 - If a tool returns auth_required, ask the user to sign in with Google or Apple and do not invent an action result.

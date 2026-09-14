@@ -61,6 +61,8 @@ import type { AppLanguage } from '@/app/i18n';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
+import { getAppBaseUrl } from '@/lib/app-url';
+import { getPublicListingUrl } from '@/lib/listing-url';
 import {
   extractAssistantSearchToolResults,
   type AssistantSearchToolResult,
@@ -517,6 +519,10 @@ function summarizeListingForAgent(
 ) {
   return {
     id: listing.id,
+    listingUrl:
+      listing.status === 'published'
+        ? getPublicListingUrl(listing.id, getAppBaseUrl())
+        : null,
     ownership,
     status: listing.status,
     title: listing.title ?? null,
@@ -607,9 +613,9 @@ async function buildMarketplaceInterfaceContext({
   }
 
   return `SmartStore interface context:
-- selectedListing is the listing most recently clicked or targeted in the UI. If the user says "this listing", "this ad", "the selected ad", "تواصل معه", "هذا الإعلان", or similar, use selectedListing.id as the target listing.
+- selectedListing is the listing most recently clicked or targeted in the UI. If the user says "this listing", "this ad", "the selected ad", "تواصل معه", "هذا الإعلان", or similar, use selectedListing.id as the target listing for explanation and links only.
 - sellerListings are listings owned by the signed-in user. Use them when the user asks about "my listings", "my ad", editing, pausing, deleting, marking sold, or adding listing details.
-- For buyer-seller contact, use openMarketplaceConversation only for a published selected listing owned by another seller. If selectedListing.ownership is current_user, explain that the user cannot contact themselves.
+- For buyer-seller contact, do not create or open conversations from assistant chat. If selectedListing.ownership is other_seller, guide the user to open /listings/{selectedListing.id} and press the contact button. If selectedListing.ownership is current_user, explain that the user cannot contact themselves.
 - For seller listing edits, use updateListing only when the target is owned by the signed-in user and the requested change is clear. Ask for confirmation before destructive or price-changing actions.
 ${JSON.stringify(
   {
@@ -644,10 +650,12 @@ async function publishLatestReadyDraftFromConfirmation({
   userRequest,
   language,
   session,
+  request,
 }: {
   userRequest: string;
   language: AppLanguage;
   session: ReturnType<typeof getAuthSession>;
+  request: Request;
 }) {
   if (!isDirectPublishConfirmation(userRequest)) {
     return null;
@@ -688,10 +696,15 @@ async function publishLatestReadyDraftFromConfirmation({
       );
     }
 
+    const listingUrl = getPublicListingUrl(
+      published.id,
+      getAppBaseUrl(request),
+    );
+
     return createTextUIResponse(
       language === 'en'
-        ? `Published successfully.\n\n${published.title ?? 'Listing'}\nPrice: ${formatListingPriceForChat(published.price, language)}\nCity: ${published.city ?? 'Not specified'}`
-        : `تم نشر الإعلان بنجاح.\n\n${published.title ?? 'إعلانك'}\nالسعر: ${formatListingPriceForChat(published.price, language)}\nالمدينة: ${published.city ?? 'غير محددة'}`,
+        ? `Published successfully.\n\n${published.title ?? 'Listing'}\nPrice: ${formatListingPriceForChat(published.price, language)}\nCity: ${published.city ?? 'Not specified'}\n\n[Open listing](${listingUrl})`
+        : `تم نشر الإعلان بنجاح.\n\n${published.title ?? 'إعلانك'}\nالسعر: ${formatListingPriceForChat(published.price, language)}\nالمدينة: ${published.city ?? 'غير محددة'}\n\n[فتح الإعلان](${listingUrl})`,
     );
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
@@ -1256,6 +1269,7 @@ export async function POST(request: Request) {
     userRequest: preliminaryUserRequest,
     language,
     session,
+    request,
   });
 
   if (directPublishResponse) {

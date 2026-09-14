@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAppBaseUrl } from '@/lib/app-url';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAppleClientId, isAppleAuthConfigured } from '@/lib/auth/apple';
 import {
   createOauthState,
@@ -9,6 +10,16 @@ import {
 } from '@/lib/auth/session';
 
 export async function GET(request: Request) {
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'auth_apple_start',
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   if (!hasCommissionAgreement(request)) {
     return NextResponse.redirect(
       new URL('/commission-agreement?provider=apple', getAppBaseUrl(request)),
@@ -37,7 +48,10 @@ export async function GET(request: Request) {
     status: 302,
     headers: {
       Location: authorizationUrl.toString(),
-      'Set-Cookie': createOauthStateCookie(state),
+      'Set-Cookie': createOauthStateCookie(state, {
+        sameSite: 'None',
+        secure: true,
+      }),
     },
   });
 }

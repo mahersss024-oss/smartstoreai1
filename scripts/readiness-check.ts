@@ -331,6 +331,56 @@ function validateImageStorage(
   );
 }
 
+function validateRateLimiting(
+  checks: ReadinessCheck[],
+  env: Env,
+  production: boolean,
+) {
+  const backend = env.SMARTSTORE_RATE_LIMIT_BACKEND?.trim().toLowerCase() ?? '';
+  const hasRedisUrl = present(env, 'UPSTASH_REDIS_REST_URL');
+  const hasRedisToken = present(env, 'UPSTASH_REDIS_REST_TOKEN');
+  const hasRedis = hasRedisUrl && hasRedisToken;
+
+  if (backend && backend !== 'redis') {
+    pushCheck(
+      checks,
+      'rate_limit_backend',
+      'fail',
+      `Unsupported rate limit backend "${backend}".`,
+    );
+    return;
+  }
+
+  if (backend === 'redis' && !hasRedis) {
+    pushCheck(
+      checks,
+      'rate_limit_backend',
+      'fail',
+      'Redis rate limiting is requested but Upstash Redis URL/token are missing.',
+    );
+    return;
+  }
+
+  if (hasRedis) {
+    pushCheck(
+      checks,
+      'rate_limit_backend',
+      'pass',
+      'Shared Redis rate limiting is configured.',
+    );
+    return;
+  }
+
+  pushCheck(
+    checks,
+    'rate_limit_backend',
+    production ? 'warn' : 'pass',
+    production
+      ? 'Rate limiting will use instance-local memory; configure Upstash Redis before scaling to multiple instances.'
+      : 'Instance-local memory rate limiting is acceptable for local development.',
+  );
+}
+
 export function evaluateReadiness(env: Env = process.env) {
   const production = env.NODE_ENV === 'production';
   const checks: ReadinessCheck[] = [];
@@ -347,6 +397,7 @@ export function evaluateReadiness(env: Env = process.env) {
   validateDeepseek(checks, env, production);
   validateAuthProviders(checks, env, production);
   validateImageStorage(checks, env, production);
+  validateRateLimiting(checks, env, production);
 
   const failures = checks.filter((check) => check.status === 'fail').length;
   const warnings = checks.filter((check) => check.status === 'warn').length;

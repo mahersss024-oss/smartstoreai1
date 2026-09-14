@@ -24,6 +24,17 @@ async function addSignedInSession(baseURL: string | undefined, page: Page) {
   ]);
 }
 
+async function navigateByVisibleControl(page: Page, href: string, label: string) {
+  const visibleLink = page.locator(`a[href="${href}"]:visible`).first();
+
+  if ((await visibleLink.count()) > 0) {
+    await visibleLink.click();
+    return;
+  }
+
+  await page.getByRole('button', { name: label }).click();
+}
+
 test('visitor can reach the marketplace and choose an auth provider', async ({
   page,
 }) => {
@@ -69,4 +80,32 @@ test('signed-in customer can open the core journey pages without auth flash or s
       path,
     ).toHaveCount(0);
   }
+});
+
+test('home assistant keeps the current chat while navigating to account and back', async ({
+  page,
+  baseURL,
+}) => {
+  await addSignedInSession(baseURL, page);
+  await page.route('**/api/chat', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'e2e chat provider disabled' }),
+    });
+  });
+
+  const customerMessage = 'اختبار بقاء المحادثة أثناء التنقل';
+
+  await page.goto('/');
+  await page.getByPlaceholder(/اكتب طلبك/).fill(customerMessage);
+  await page.getByRole('button', { name: 'إرسال' }).click();
+  await expect(page.locator('body')).toContainText(customerMessage);
+
+  await navigateByVisibleControl(page, '/account', 'حسابي');
+  await expect(page).toHaveURL(/\/account$/);
+  await navigateByVisibleControl(page, '/', 'الرئيسية');
+  await expect(page).toHaveURL(/\/$/);
+
+  await expect(page.locator('body')).toContainText(customerMessage);
 });

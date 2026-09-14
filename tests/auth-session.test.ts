@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -15,6 +17,10 @@ import {
   parseCommissionAgreement,
 } from '@/lib/auth/session';
 
+function readProjectFile(...segments: string[]) {
+  return readFileSync(join(process.cwd(), ...segments), 'utf8');
+}
+
 test('creates a signed commission agreement cookie for the 1 percent policy', () => {
   const setCookie = createCommissionAgreementCookie();
   const cookieHeader = setCookie.split(';')[0];
@@ -27,6 +33,19 @@ test('creates a signed commission agreement cookie for the 1 percent policy', ()
 
 test('rejects tampered commission agreement cookies', () => {
   assert.equal(parseCommissionAgreement('bad.payload.signature'), null);
+});
+
+test('commission agreement endpoint is rate limited before sign-in', () => {
+  const agreementRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'commission-agreement',
+    'route.ts',
+  );
+
+  assert.match(agreementRoute, /enforceApiRateLimit/);
+  assert.match(agreementRoute, /commission_agreement/);
 });
 
 test('detects admin sessions from configured admin emails', () => {

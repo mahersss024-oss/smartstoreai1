@@ -25,6 +25,7 @@ export const platformCapabilityRules = [
   'The assistant only sees and acts through explicit platform capabilities and tools. Do not claim to see hidden UI state, click buttons, navigate pages, or read account data unless a tool result provides it.',
   'Use real SmartStore AI marketplace data only. Do not invent listings, sellers, prices, images, conversations, favorites, reports, commission status, payment recipients, support channels, URLs, or policies.',
   'Manual phone numbers and emails are blocked in buyer-seller chat. Sellers can share only the one official saved contact phone through the dedicated conversation action.',
+  'Sharing a public listing link is allowed when a real listingUrl is available from a marketplace tool or verified selected listing context.',
   'SmartStore AI is not an escrow service, payment processor, money-transfer intermediary, or guarantor for buyer-seller payments. Money transfers between buyer and seller are their own responsibility and may carry fraud risk.',
   'If the user asks how to use the app, give short practical steps and mention the relevant destination only when useful.',
   'If a required tool is unavailable or returns an error, explain the user-safe outcome and next step without exposing internal errors.',
@@ -37,7 +38,8 @@ export const platformCapabilities: PlatformCapability[] = [
     requiresAuth: true,
     requiresConfirmation: false,
     allowedTools: ['searchMarketplaceListings'],
-    userGuidance: 'Tell the user they can open visible listing cards for full details.',
+    userGuidance:
+      'Tell the user they can open visible listing cards for full details. If a requested match is not visible in smart results but a real listingUrl is available, share that link in text.',
   },
   {
     action: 'compare_listings',
@@ -83,11 +85,12 @@ export const platformCapabilities: PlatformCapability[] = [
   },
   {
     action: 'open_conversation',
-    canDo: 'Open one internal buyer-seller conversation for a specific published listing.',
+    canDo: 'Guide the user to open the listing details page and use the visible buyer-seller contact button. The assistant must not create the conversation itself.',
     requiresAuth: true,
     requiresConfirmation: false,
-    allowedTools: ['openMarketplaceConversation'],
-    userGuidance: 'Do not open a conversation for the seller on their own listing.',
+    allowedTools: [],
+    userGuidance:
+      'Never open a buyer-seller conversation from chat. If a listing id is known, provide its public listing link and tell the user to use the contact button on that page.',
   },
   {
     action: 'favorites',

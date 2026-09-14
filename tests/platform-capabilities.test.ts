@@ -17,6 +17,11 @@ test('platform capabilities define what chat can do and what requires confirmati
   assert.equal(byAction.get('create_listing_draft')?.requiresAuth, true);
   assert.equal(byAction.get('create_listing_draft')?.requiresConfirmation, false);
   assert.equal(byAction.get('publish_or_status_change')?.requiresConfirmation, true);
+  assert.deepEqual(byAction.get('open_conversation')?.allowedTools, []);
+  assert.match(
+    byAction.get('open_conversation')?.userGuidance ?? '',
+    /Never open a buyer-seller conversation from chat/,
+  );
   assert.equal(byAction.get('reports')?.requiresConfirmation, true);
   assert.equal(byAction.get('platform_help')?.allowedTools.length, 0);
 });
@@ -28,6 +33,8 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(renderedCapabilities, /\/account/);
   assert.match(renderedCapabilities, /\/conversations/);
   assert.match(renderedCapabilities, /manual phone numbers and emails are blocked/i);
+  assert.match(renderedCapabilities, /Sharing a public listing link is allowed/);
+  assert.match(renderedCapabilities, /real listingUrl is available/);
   assert.match(renderedCapabilities, /requires_confirmation=yes/);
   assert.match(renderedCapabilities, /searchMarketplaceListings/);
   assert.match(renderedCapabilities, /structured/);
@@ -35,6 +42,10 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(renderedCapabilities, /The assistant only sees and acts through explicit platform capabilities/);
   assert.match(renderedCapabilities, /not an escrow service, payment processor, money-transfer intermediary, or guarantor/);
   assert.match(renderedCapabilities, /fraud risk/);
+  assert.match(renderedCapabilities, /Never open a buyer-seller conversation from chat/);
+  assert.doesNotMatch(renderedCapabilities, /openMarketplaceConversation/);
   assert.match(systemPrompt, /Available platform capabilities/);
   assert.match(marketplaceSystemInstructions, /Available platform capabilities/);
+  assert.match(marketplaceSystemInstructions, /share the listingUrl/);
+  assert.doesNotMatch(marketplaceSystemInstructions, /Use openMarketplaceConversation/);
 });

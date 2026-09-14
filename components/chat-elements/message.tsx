@@ -17,6 +17,7 @@ import type { FileUIPart, UIMessage } from "ai";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  ExternalLinkIcon,
   PaperclipIcon,
   XIcon,
 } from "lucide-react";
@@ -330,10 +331,61 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+function isSmartStoreListingHref(href: unknown) {
+  if (typeof href !== "string") {
+    return false;
+  }
+
+  if (/^\/listings\/[^/?#]+/.test(href)) {
+    return true;
+  }
+
+  try {
+    const url = new URL(href);
+
+    return (
+      (url.hostname === "www.smartstore-ai.com" ||
+        url.hostname === "smartstore-ai.com" ||
+        url.hostname === "localhost" ||
+        url.hostname === "127.0.0.1") &&
+      /^\/listings\/[^/?#]+/.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const messageMarkdownComponents = {
   p: ({ children, ...props }: ComponentPropsWithoutRef<'div'>) => (
     <div {...props}>{children}</div>
   ),
+  a: ({ children, href, ...props }: ComponentPropsWithoutRef<'a'>) => {
+    if (isSmartStoreListingHref(href)) {
+      return (
+        <a
+          className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          href={href}
+          {...props}
+        >
+          <ExternalLinkIcon className="size-4" />
+          فتح الإعلان
+          <span className="sr-only">{children}</span>
+        </a>
+      );
+    }
+
+    return (
+      <a
+        className="font-semibold text-blue-700 underline underline-offset-4 dark:text-blue-300"
+        href={href}
+        rel="noreferrer"
+        target="_blank"
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
 };
 
 export const MessageResponse = memo(
