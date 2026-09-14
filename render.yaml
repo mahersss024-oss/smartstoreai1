@@ -54,8 +54,6 @@ services:
         value: "0"
       - key: SMARTSTORE_IMAGE_STORAGE
         sync: false
-      - key: SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS
-        value: "30000"
       - key: SMARTSTORE_MAX_IMAGES_PER_LISTING
         sync: false
       - key: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME
@@ -90,16 +88,12 @@ services:
         sync: false
       - key: SMARTSTORE_RATE_LIMIT_BACKEND
         sync: false
-      - key: SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS
-        value: "2000"
       - key: SMARTSTORE_VAPID_PUBLIC_KEY
         sync: false
       - key: SMARTSTORE_VAPID_PRIVATE_KEY
         sync: false
       - key: SMARTSTORE_VAPID_SUBJECT
         sync: false
-      - key: SMARTSTORE_PUSH_TIMEOUT_MS
-        value: "10000"
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
