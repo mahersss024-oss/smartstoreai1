@@ -12,6 +12,7 @@
     "test:db:integration": "tsx --test tests/db-integration.test.ts",
     "test:e2e": "playwright test",
     "test:ai-load": "tsx scripts/ai-path-load-test.ts",
+    "demo:seed": "tsx scripts/seed-demo-listings.ts",
     "verify": "pnpm exec tsc --noEmit && pnpm lint && pnpm test && pnpm build && pnpm audit --audit-level moderate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
