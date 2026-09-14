@@ -49,7 +49,7 @@ Run the AI path load test with the real DeepSeek provider enabled, gradually and
 only from staging or another safe environment:
 
 ```bash
-SMARTSTORE_AI_LOAD_PROVIDER=deepseek pnpm test:ai-load -- --levels=10,25,50,100
+AI_LOAD_MODE=real AI_LOAD_LEVELS=10,25,50,100 pnpm test:ai-load
 ```
 
 Minimum pass criteria:
