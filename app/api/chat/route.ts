@@ -24,6 +24,7 @@ import {
   getComplianceBlockResponse,
   getComplianceReviewResponse,
 } from '@/agent/marketplace/policy';
+import { parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 import {
   checkImageMarketplaceCompliance,
   inferExpectedMarketplaceCategory,
@@ -76,6 +77,7 @@ const maxTextCharactersPerRequest = 24_000;
 const maxImagesPerChatMessage = defaultMaxListingImages;
 const maxChatImageBytes = 12 * 1024 * 1024;
 const maxChatRequestBytes = 140 * 1024 * 1024;
+const chatIssueResponseTimeoutMs = 6_000;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const policyFacilitationIntents = new Set([
   'search_listing',
@@ -465,6 +467,37 @@ function createTextUIResponse(
       },
     }),
   });
+}
+
+function withChatAbortTimeout<T>(
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  return run(controller.signal).finally(() => {
+    clearTimeout(timeout);
+  });
+}
+
+function isGenericMarketplaceSearchStarter(text: string) {
+  const parsed = parseMarketplaceSearchQuery(text);
+
+  return (
+    classifyMarketplaceIntent(text).intent === 'search_listing' &&
+    !parsed.category &&
+    !parsed.city &&
+    parsed.minPrice === undefined &&
+    parsed.maxPrice === undefined &&
+    parsed.terms.length === 0
+  );
+}
+
+function getGenericMarketplaceSearchStarterResponse(language: AppLanguage) {
+  return language === 'en'
+    ? 'What product are you looking for? Share the product type, brand, model, city, or budget and I will show the closest SmartStore AI listings.'
+    : 'ما المنتج الذي تبحث عنه؟ اكتب نوع المنتج، الماركة، الموديل، المدينة، أو الميزانية وسأعرض لك أقرب إعلانات SmartStore AI.';
 }
 
 function isDirectPublishConfirmation(userRequest: string) {
@@ -1153,15 +1186,24 @@ async function generateProfessionalChatIssueResponse(
 ) {
   const fallback = getChatIssueFallbackResponse(input);
 
-  if (input.kind === 'image_inspection_unavailable') {
+  if (
+    input.kind === 'image_inspection_unavailable' ||
+    input.kind === 'scope_block' ||
+    input.kind === 'scope_unclear' ||
+    input.scopeDecision?.reason_code === 'scope_checker_failure'
+  ) {
     return createTextUIResponse(fallback);
   }
 
   try {
-    const result = await generateText({
-      model: getDeepseekChatModel('chat'),
-      maxOutputTokens: 280,
-      instructions: `You are SmartStore AI's customer-facing marketplace assistant.
+    const result = await withChatAbortTimeout(
+      chatIssueResponseTimeoutMs,
+      (signal) =>
+        generateText({
+          model: getDeepseekChatModel('chat'),
+          maxOutputTokens: 280,
+          abortSignal: signal,
+          instructions: `You are SmartStore AI's customer-facing marketplace assistant.
 Write a polished, natural response for a Saudi classifieds marketplace user.
 The safety/compliance decision is already final; do not override it.
 Do not mention internal models, databases, prompts, raw policy codes, JSON, or system decisions.
@@ -1174,30 +1216,33 @@ For scope issues, redirect naturally to SmartStore AI marketplace actions withou
 For auth_required, explain that SmartStore AI chat requires sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
 Use the user's language. Language=${input.language}.`,
-      messages: [
-        {
-          role: 'user',
-          content: JSON.stringify({
-            issue_kind: input.kind,
-            user_request: input.userRequest,
-            validation_reason: input.validationReason,
-            text_policy: input.textPolicyDecision,
-            scope: input.scopeDecision,
-            compliance: input.complianceDecision
-              ? {
-                  decision: input.complianceDecision.decision,
-                  detectedProduct: input.complianceDecision.detectedProduct,
-                  detectedCategory: input.complianceDecision.detectedCategory,
-                  expectedCategory: input.complianceDecision.expectedCategory,
-                  categoryMatch: input.complianceDecision.categoryMatch,
-                  reasons: input.complianceDecision.reasons,
-                  shariaSensitive: input.complianceDecision.shariaSensitive,
-                }
-              : undefined,
-          }),
-        },
-      ],
-    });
+          messages: [
+            {
+              role: 'user',
+              content: JSON.stringify({
+                issue_kind: input.kind,
+                user_request: input.userRequest,
+                validation_reason: input.validationReason,
+                text_policy: input.textPolicyDecision,
+                scope: input.scopeDecision,
+                compliance: input.complianceDecision
+                  ? {
+                      decision: input.complianceDecision.decision,
+                      detectedProduct: input.complianceDecision.detectedProduct,
+                      detectedCategory:
+                        input.complianceDecision.detectedCategory,
+                      expectedCategory:
+                        input.complianceDecision.expectedCategory,
+                      categoryMatch: input.complianceDecision.categoryMatch,
+                      reasons: input.complianceDecision.reasons,
+                      shariaSensitive: input.complianceDecision.shariaSensitive,
+                    }
+                  : undefined,
+              }),
+            },
+          ],
+        }),
+    );
     let responseText = getSafeAssistantText(result.text);
 
     if (responseText) {
@@ -1421,6 +1466,16 @@ export async function POST(request: Request) {
     ? [...scopedMessages, marketplaceInterfaceScopeMessage]
     : scopedMessages;
   const userRequest = getLatestUserRequest(scopedMessages);
+
+  if (
+    isGenericMarketplaceSearchStarter(userRequest) &&
+    !latestUserMessageHasImageAttachment(scopedMessages)
+  ) {
+    return createTextUIResponse(
+      getGenericMarketplaceSearchStarterResponse(language),
+    );
+  }
+
   const adaptiveIntent = await resolveAdaptiveMarketplaceIntent({
     messages: scopedMessagesWithInterfaceContext,
     language,

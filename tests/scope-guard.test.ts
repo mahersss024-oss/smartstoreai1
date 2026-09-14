@@ -176,6 +176,20 @@ test('allows direct marketplace camera searches without model scope fallback', a
   assert.equal(decision.reason_code, 'direct_marketplace_request');
 });
 
+test('allows generic Arabic marketplace search starters without model scope fallback', async () => {
+  const decision = await checkInputScope({
+    messages: [
+      {
+        role: 'user',
+        parts: [{ type: 'text', text: 'أبحث عن منتج' }],
+      },
+    ],
+  });
+
+  assert.equal(decision.decision, 'ALLOW');
+  assert.equal(decision.reason_code, 'direct_marketplace_request');
+});
+
 test('rewrites only the latest user message for partial requests', () => {
   const messages = [
     {

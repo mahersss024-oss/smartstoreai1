@@ -163,11 +163,27 @@ const directMarketplaceActionPattern =
 const directMarketplaceProductPattern =
   /(?:سيارة|سيارات|كامري|تويوتا|تايوتا|جوال|آيفون|ايفون|لابتوب|كمبيوتر|عقار|أثاث|اثاث|كرسي|كنب|ساعة|كاميرا|كاميره|كانون|نيكون|سوني|car|cars|toyota|camry|iphone|phone|laptop|computer|camera|canon|nikon|sony|chair|sofa|watch)/i;
 
+const genericMarketplaceObjectPattern = /(?:product|listing|ad|item)/i;
+
+const arabicMarketplaceActionPattern =
+  /(?:\u0627\u0628\u062d\u062b|\u0623\u0628\u062d\u062b|\u0627\u062f\u0648\u0631|\u0623\u062f\u0648\u0631|\u0627\u0631\u064a\u062f|\u0623\u0631\u064a\u062f|\u0627\u0628\u063a\u0649|\u0623\u0628\u063a\u0649|\u0627\u0628\u064a|\u0623\u0628\u064a|\u0628\u064a\u0639|\u0623\u0628\u064a\u0639|\u0627\u0634\u062a\u0631\u064a|\u0634\u0631\u0627\u0621)/i;
+
+const arabicMarketplaceObjectPattern =
+  /(?:\u0645\u0646\u062a\u062c|\u0627\u0639\u0644\u0627\u0646|\u0625\u0639\u0644\u0627\u0646|\u0628\u0637\u0627\u0642\u0629|\u0628\u0637\u0627\u0642\u0627\u062a|\u0633\u064a\u0627\u0631\u0629|\u0633\u064a\u0627\u0631\u0627\u062a|\u062c\u0648\u0627\u0644|\u0627\u064a\u0641\u0648\u0646|\u0622\u064a\u0641\u0648\u0646|\u0644\u0627\u0628\u062a\u0648\u0628|\u0639\u0642\u0627\u0631|\u0623\u062b\u0627\u062b|\u0627\u062b\u0627\u062b|\u0643\u0646\u0628|\u0633\u0627\u0639\u0629|\u0643\u0627\u0645\u064a\u0631\u0627)/i;
+
 function getDirectMarketplaceScopeDecision(latestRequest: string) {
+  const hasMarketplaceAction =
+    directMarketplaceActionPattern.test(latestRequest) ||
+    arabicMarketplaceActionPattern.test(latestRequest);
+  const hasMarketplaceObject =
+    directMarketplaceProductPattern.test(latestRequest) ||
+    genericMarketplaceObjectPattern.test(latestRequest) ||
+    arabicMarketplaceObjectPattern.test(latestRequest);
+
   if (
     !unsafeContinuationPattern.test(latestRequest) &&
-    directMarketplaceActionPattern.test(latestRequest) &&
-    directMarketplaceProductPattern.test(latestRequest)
+    hasMarketplaceAction &&
+    hasMarketplaceObject
   ) {
     return {
       decision: 'ALLOW',

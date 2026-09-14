@@ -168,3 +168,47 @@ test('hides missing AI provider configuration details from chat users', async ()
     }
   }
 });
+
+test('generic marketplace search starter returns immediately without model routing', async () => {
+  const originalApiKey = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
+
+  try {
+    const startedAt = Date.now();
+    const response = await POST(
+      new Request('http://localhost/api/chat', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: createSessionCookie({
+            id: 'google:generic-search-starter-user',
+            email: 'generic-search-starter@example.com',
+          }),
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              id: 'message-1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'أبحث عن منتج' }],
+            },
+          ],
+          locationSettings: { language: 'ar' },
+        }),
+      }),
+    );
+    const text = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+    assert.ok(Date.now() - startedAt < 1_000);
+    assert.match(text, /ما المنتج الذي تبحث عنه/);
+    assert.match(text, /data: \[DONE\]/);
+  } finally {
+    if (originalApiKey === undefined) {
+      delete process.env.DEEPSEEK_API_KEY;
+    } else {
+      process.env.DEEPSEEK_API_KEY = originalApiKey;
+    }
+  }
+});
