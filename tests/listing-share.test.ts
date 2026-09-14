@@ -54,9 +54,12 @@ test('assistant marketplace context can share real listing links without opening
 test('assistant message renderer turns listing links into a clear open listing button', () => {
   const messageComponent = readProjectFile('components', 'chat-elements', 'message.tsx');
 
-  assert.match(messageComponent, /isSmartStoreListingHref/);
+  assert.match(messageComponent, /getSmartStoreListingPath/);
   assert.match(messageComponent, /\/\^\\\/listings\\\/\[\^\/\?#\]\+\//);
   assert.match(messageComponent, /www\.smartstore-ai\.com/);
+  assert.match(messageComponent, /return `\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`/);
+  assert.match(messageComponent, /href=\{listingPath\}/);
+  assert.match(messageComponent, /target="_self"/);
   assert.match(messageComponent, /ExternalLinkIcon/);
   assert.match(messageComponent, /فتح الإعلان/);
 });

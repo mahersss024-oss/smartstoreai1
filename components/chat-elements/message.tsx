@@ -331,27 +331,31 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-function isSmartStoreListingHref(href: unknown) {
+function getSmartStoreListingPath(href: unknown) {
   if (typeof href !== "string") {
-    return false;
+    return null;
   }
 
   if (/^\/listings\/[^/?#]+/.test(href)) {
-    return true;
+    return href;
   }
 
   try {
     const url = new URL(href);
 
-    return (
+    if (
       (url.hostname === "www.smartstore-ai.com" ||
         url.hostname === "smartstore-ai.com" ||
         url.hostname === "localhost" ||
         url.hostname === "127.0.0.1") &&
       /^\/listings\/[^/?#]+/.test(url.pathname)
-    );
+    ) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -360,12 +364,15 @@ const messageMarkdownComponents = {
     <div {...props}>{children}</div>
   ),
   a: ({ children, href, ...props }: ComponentPropsWithoutRef<'a'>) => {
-    if (isSmartStoreListingHref(href)) {
+    const listingPath = getSmartStoreListingPath(href);
+
+    if (listingPath) {
       return (
         <a
-          className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-          href={href}
           {...props}
+          className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          href={listingPath}
+          target="_self"
         >
           <ExternalLinkIcon className="size-4" />
           فتح الإعلان
