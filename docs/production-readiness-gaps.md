@@ -26,6 +26,43 @@ run against real or staging-equivalent infrastructure:
 Do not mark the project as production-ready at the 93-95/100 level until every
 item below has passed and the results are recorded.
 
+## Latest External Verification Log
+
+Date: 2026-09-14.
+
+Completed:
+
+- Pushed production-hardening changes to `main`.
+- Live smoke test passed for:
+  - `/`
+  - `/api/health`
+  - `/api/marketplace/listings?page=1&limit=24`
+  - `/manifest.webmanifest`
+  - `/sw.js`
+- Live `/api/health` returned `status=ok`, `database=ok`, and
+  `store=database`.
+- Real DeepSeek AI load test completed locally through the real provider with
+  `AI_LOAD_MODE=real` and `AI_LOAD_LEVELS=10,25,50,100`.
+
+Real DeepSeek load results:
+
+| Concurrent users | Success | HTTP errors | Empty bodies | Incomplete streams | Queue p95 | Provider fetch p95 | End-to-end p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 10/10 | 0 | 0 | 0 | 11ms | 1389ms | 9591ms |
+| 25 | 25/25 | 0 | 0 | 0 | 5ms | 8308ms | 19229ms |
+| 50 | 50/50 | 0 | 0 | 0 | 9ms | 6945ms | 18730ms |
+| 100 | 100/100 | 0 | 0 | 0 | 13ms | 6356ms | 21422ms |
+
+Finding: the bottleneck during the real DeepSeek run was provider/model latency
+and the number of model phases per chat request, not the local queue. Queue p95
+stayed below 20ms up to 100 concurrent users.
+
+Still pending for 93-95/100:
+
+- Run DB integration against a disposable staging PostgreSQL database.
+- Run iPhone/iPad Safari and installed-PWA manual checks.
+- Enable production-style monitoring and run a 30-60 minute soak test.
+
 ### 1. Real Database Verification
 
 Run the optional integration test against a disposable PostgreSQL database that
