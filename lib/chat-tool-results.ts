@@ -5,6 +5,7 @@ export type AssistantSearchToolName =
 export type AssistantSearchToolOutput = {
   status: 'searched' | 'compared';
   listings: unknown[];
+  [key: string]: unknown;
 };
 
 export type AssistantSearchToolResult = {

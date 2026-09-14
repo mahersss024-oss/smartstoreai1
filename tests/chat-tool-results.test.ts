@@ -102,3 +102,24 @@ test('chat route streams marketplace tool outputs with guarded text responses', 
   assert.match(route, /type: 'tool-input-available'/);
   assert.match(route, /type: 'tool-output-available'/);
 });
+
+test('chat route uses a bounded fast path for direct buyer searches', () => {
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
+    'utf8',
+  );
+
+  assert.match(route, /maybeCreateDirectSearchResponse/);
+  assert.match(route, /adaptiveIntent\.intent === 'search_listing'/);
+  assert.match(route, /adaptiveIntent\.execution === 'search_listings'/);
+  assert.match(route, /useModelUnderstanding: true/);
+  assert.match(route, /direct_search_fast_path/);
+  assert.ok(
+    route.indexOf('const scopeCheckMessages') <
+      route.indexOf("adaptiveIntent.intent === 'search_listing'"),
+  );
+  assert.ok(
+    route.indexOf("adaptiveIntent.intent === 'search_listing'") <
+      route.indexOf('const modelMessages = normalizeModelMessageFileData'),
+  );
+});

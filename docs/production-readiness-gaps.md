@@ -43,19 +43,25 @@ Completed:
   `store=database`.
 - Real DeepSeek AI load test completed locally through the real provider with
   `AI_LOAD_MODE=real` and `AI_LOAD_LEVELS=10,25,50,100`.
+- Direct buyer search requests now use a bounded search fast path after the
+  marketplace intent checks. This keeps the dedicated search-understanding model
+  while avoiding the heavier general chat generation and output-check phases for
+  simple search requests.
 
-Real DeepSeek load results:
+Real DeepSeek load results after the search fast path:
 
-| Concurrent users | Success | HTTP errors | Empty bodies | Incomplete streams | Queue p95 | Provider fetch p95 | End-to-end p95 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 10/10 | 0 | 0 | 0 | 11ms | 1389ms | 9591ms |
-| 25 | 25/25 | 0 | 0 | 0 | 5ms | 8308ms | 19229ms |
-| 50 | 50/50 | 0 | 0 | 0 | 9ms | 6945ms | 18730ms |
-| 100 | 100/100 | 0 | 0 | 0 | 13ms | 6356ms | 21422ms |
+| Concurrent users | Success | HTTP errors | Empty bodies | Incomplete streams | Provider calls | Queue p95 | Provider fetch p95 | End-to-end p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 10/10 | 0 | 0 | 0 | 20 | 16ms | 2577ms | 5250ms |
+| 25 | 25/25 | 0 | 0 | 0 | 50 | 6ms | 1198ms | 2947ms |
+| 50 | 50/50 | 0 | 0 | 0 | 100 | 10ms | 1220ms | 3826ms |
+| 100 | 100/100 | 0 | 0 | 0 | 200 | 15ms | 1173ms | 3065ms |
 
-Finding: the bottleneck during the real DeepSeek run was provider/model latency
-and the number of model phases per chat request, not the local queue. Queue p95
-stayed below 20ms up to 100 concurrent users.
+Before the fast path, the same real DeepSeek search load made about five
+provider calls per chat request and reached roughly 22.6s p95 at 100 concurrent
+users. After the fast path, direct search uses two provider calls per request and
+the 100-concurrent p95 dropped to about 3.1s. Queue p95 stayed below 20ms, so the
+remaining bottleneck is external provider latency rather than local queueing.
 
 Still pending for 93-95/100:
 
