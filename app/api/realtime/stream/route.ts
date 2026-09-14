@@ -1,5 +1,6 @@
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import {
   getRealtimeEventsSince,
   subscribeRealtimeEvents,
@@ -42,6 +43,17 @@ function toSseHeartbeat() {
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'realtime_stream',
+    actorId: session?.user.id,
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const isAdmin = await hasVerifiedAdminAccess(session);
   const context = {
     userId: session?.user.id ?? null,
@@ -77,7 +89,7 @@ export async function GET(request: Request) {
         closed = true;
 
         if (heartbeatId !== null) {
-        clearInterval(heartbeatId);
+          clearInterval(heartbeatId);
           heartbeatId = null;
         }
 

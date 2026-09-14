@@ -16,6 +16,9 @@ const maxDeepseekQueueTimeoutMs = 60_000;
 const defaultDeepseekConcurrency = 100;
 const defaultDeepseekQueueLimit = 2_000;
 const defaultDeepseekQueueTimeoutMs = 60_000;
+const defaultObjectStorageTimeoutMs = 30_000;
+const defaultRateLimitRedisTimeoutMs = 2_000;
+const defaultPushTimeoutMs = 10_000;
 const productionAppHosts = new Set(['www.smartstore-ai.com', 'smartstore-ai.com']);
 
 function present(env: Env, key: string) {
@@ -331,6 +334,42 @@ function validateImageStorage(
   );
 }
 
+function validateOperationalTimeouts(checks: ReadinessCheck[], env: Env) {
+  const objectStorageTimeoutMs =
+    parseInteger(env, 'SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS') ??
+    defaultObjectStorageTimeoutMs;
+  const rateLimitRedisTimeoutMs =
+    parseInteger(env, 'SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS') ??
+    defaultRateLimitRedisTimeoutMs;
+  const pushTimeoutMs =
+    parseInteger(env, 'SMARTSTORE_PUSH_TIMEOUT_MS') ?? defaultPushTimeoutMs;
+
+  pushCheck(
+    checks,
+    'object_storage_timeout',
+    objectStorageTimeoutMs >= 1_000 && objectStorageTimeoutMs <= 60_000
+      ? 'pass'
+      : 'fail',
+    `Object storage timeout is ${objectStorageTimeoutMs}ms.`,
+  );
+
+  pushCheck(
+    checks,
+    'rate_limit_redis_timeout',
+    rateLimitRedisTimeoutMs >= 250 && rateLimitRedisTimeoutMs <= 5_000
+      ? 'pass'
+      : 'fail',
+    `Rate limit Redis timeout is ${rateLimitRedisTimeoutMs}ms.`,
+  );
+
+  pushCheck(
+    checks,
+    'push_timeout',
+    pushTimeoutMs >= 1_000 && pushTimeoutMs <= 30_000 ? 'pass' : 'fail',
+    `Push notification timeout is ${pushTimeoutMs}ms.`,
+  );
+}
+
 function validateRateLimiting(
   checks: ReadinessCheck[],
   env: Env,
@@ -397,6 +436,7 @@ export function evaluateReadiness(env: Env = process.env) {
   validateDeepseek(checks, env, production);
   validateAuthProviders(checks, env, production);
   validateImageStorage(checks, env, production);
+  validateOperationalTimeouts(checks, env);
   validateRateLimiting(checks, env, production);
 
   const failures = checks.filter((check) => check.status === 'fail').length;

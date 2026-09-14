@@ -1,10 +1,22 @@
 import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import { resetIncompleteSellerDrafts } from '@/agent/marketplace/repository';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
 
 export async function POST(request: Request) {
   const session = getAuthSession(request);
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'chat_reset',
+    actorId: session?.user.id,
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const ownerKey = getChatSearchOwnerKey(session, request);
 
   await resetMarketplaceSearchState(ownerKey);

@@ -1,4 +1,7 @@
-import { toggleFavoriteListing } from '@/agent/marketplace/repository';
+import {
+  getListingFavoriteState,
+  toggleFavoriteListing,
+} from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
@@ -8,6 +11,44 @@ type RouteContext = {
     listingId: string;
   }>;
 };
+
+export async function GET(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return Response.json(
+      {
+        error: 'auth_required',
+        message: 'Sign-in is required to inspect favorite status.',
+      },
+      { status: 401 },
+    );
+  }
+
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'favorite_state',
+    actorId: session.user.id,
+    maxRequests: 120,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  const { listingId } = await context.params;
+  const result = await getListingFavoriteState(listingId, session.user);
+
+  if (result.status === 'not_found') {
+    return Response.json({ error: 'listing_not_found' }, { status: 404 });
+  }
+
+  return Response.json({
+    listingId,
+    isFavorite: result.isFavorite,
+    canFavorite: result.canFavorite,
+  });
+}
 
 export async function POST(request: Request, context: RouteContext) {
   const session = getAuthSession(request);

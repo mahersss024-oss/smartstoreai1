@@ -14,6 +14,9 @@ const productionEnv = {
   SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS: '100',
   SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS: '2000',
   SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS: '60000',
+  SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS: '30000',
+  SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS: '2000',
+  SMARTSTORE_PUSH_TIMEOUT_MS: '10000',
   SMARTSTORE_IMAGE_STORAGE: 'cloudinary',
   SMARTSTORE_MARKETPLACE_STORE: 'database',
   CLOUDINARY_CLOUD_NAME: 'smartstore',
@@ -59,6 +62,21 @@ test('readiness rejects unsafe DeepSeek queue configuration', () => {
     result.checks.some(
       (check) =>
         check.name === 'deepseek_concurrency' && check.status === 'fail',
+    ),
+  );
+});
+
+test('readiness rejects unsafe operational timeout configuration', () => {
+  const result = evaluateReadiness({
+    ...productionEnv,
+    SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS: '120000',
+  });
+
+  assert.equal(result.status, 'fail');
+  assert.ok(
+    result.checks.some(
+      (check) =>
+        check.name === 'object_storage_timeout' && check.status === 'fail',
     ),
   );
 });

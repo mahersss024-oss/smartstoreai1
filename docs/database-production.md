@@ -16,6 +16,7 @@ SMARTSTORE_MAX_LISTINGS_PER_SELLER=100
 SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS=100
 SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS=2000
 SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS=60000
+SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
 ```
 
 Keep this value server-side only.
@@ -90,10 +91,13 @@ CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 CLOUDINARY_FOLDER=smartstore/listings
+SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
 SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
 Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
+`SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS` caps Cloudinary/S3 upload and delete
+requests so a stalled image provider cannot hold the request open indefinitely.
 `SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Production can
 lower this value, but the application caps it at `8` to protect storage,
 bandwidth, and listing page work.
@@ -135,6 +139,7 @@ SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID=...
 SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY=...
 SMARTSTORE_OBJECT_STORAGE_REGION=auto
 SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL=https://PUBLIC_BUCKET_OR_CDN_DOMAIN
+SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
 SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
@@ -146,8 +151,11 @@ For multi-instance production deployments, add Upstash Redis REST credentials:
 
 ```env
 SMARTSTORE_RATE_LIMIT_BACKEND=redis
+SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS=2000
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 Without Redis credentials, the app still rate-limits chat requests in memory, which is acceptable for local development and single-instance testing.
+`SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS` keeps Redis failures from delaying
+customer requests for longer than the configured guardrail.

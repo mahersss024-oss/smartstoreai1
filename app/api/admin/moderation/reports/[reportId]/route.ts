@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
@@ -21,6 +22,18 @@ function getReportStatus(action: z.infer<typeof reportActionSchema>['action']) {
   return action === 'review' ? 'reviewed' : 'dismissed';
 }
 
+async function enforceModerationReportMutationRateLimit(
+  request: Request,
+  moderatorId: string,
+) {
+  return enforceApiRateLimit(request, {
+    namespace: 'moderation_report_mutation',
+    actorId: moderatorId,
+    maxRequests: 120,
+    windowMs: 60_000,
+  });
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
@@ -30,6 +43,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceModerationReportMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const oversizedRequestResponse = rejectOversizedRequest(

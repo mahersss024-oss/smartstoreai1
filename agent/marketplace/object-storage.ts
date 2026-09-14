@@ -1,6 +1,8 @@
 import { createHash, createHmac } from 'node:crypto';
 import path from 'node:path';
 
+import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+
 type StoreListingObjectInput = {
   data: Uint8Array;
   mediaType: string;
@@ -36,6 +38,17 @@ function isObjectStorageEnabled() {
   const mode = getObjectStorageMode();
 
   return mode === 'object' || mode === 's3' || mode === 'cloudinary';
+}
+
+function getObjectStorageTimeoutMs() {
+  const rawValue = process.env.SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS?.trim();
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : 30_000;
+
+  if (!Number.isFinite(parsedValue)) {
+    return 30_000;
+  }
+
+  return Math.min(Math.max(parsedValue, 1_000), 60_000);
 }
 
 function getS3ObjectStorageConfig(): S3ObjectStorageConfig {
@@ -236,11 +249,15 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
     mediaType: input.mediaType,
     config,
   });
-  const response = await fetch(request.uploadUrl, {
-    method: 'PUT',
-    headers: request.headers,
-    body,
-  });
+  const response = await fetchWithTimeout(
+    request.uploadUrl,
+    {
+      method: 'PUT',
+      headers: request.headers,
+      body,
+    },
+    getObjectStorageTimeoutMs(),
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -295,7 +312,7 @@ async function storeListingObjectInCloudinary(input: StoreListingObjectInput) {
     createCloudinarySignature(uploadParams, config.apiSecret),
   );
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://api.cloudinary.com/v1_1/${encodeURIComponent(
       config.cloudName,
     )}/image/upload`,
@@ -303,6 +320,7 @@ async function storeListingObjectInCloudinary(input: StoreListingObjectInput) {
       method: 'POST',
       body: formData,
     },
+    getObjectStorageTimeoutMs(),
   );
 
   if (!response.ok) {
@@ -352,7 +370,7 @@ async function deleteListingObjectFromCloudinary(input: DeleteListingObjectInput
     createCloudinarySignature(destroyParams, config.apiSecret),
   );
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://api.cloudinary.com/v1_1/${encodeURIComponent(
       config.cloudName,
     )}/image/destroy`,
@@ -360,6 +378,7 @@ async function deleteListingObjectFromCloudinary(input: DeleteListingObjectInput
       method: 'POST',
       body: formData,
     },
+    getObjectStorageTimeoutMs(),
   );
 
   if (!response.ok) {

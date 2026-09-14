@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { GET } from '@/app/api/realtime/stream/route';
@@ -21,6 +23,21 @@ test('sse stream sets the correct streaming headers', async () => {
   assert.equal(response.headers.get('x-accel-buffering'), 'no');
 
   controller.abort();
+});
+
+test('sse stream is rate limited on connection attempts', () => {
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'realtime', 'stream', 'route.ts'),
+    'utf8',
+  );
+
+  assert.match(route, /enforceApiRateLimit/);
+  assert.match(route, /namespace: 'realtime_stream'/);
+  assert.match(route, /actorId: session\?\.user\.id/);
+  assert.ok(
+    route.indexOf('const rateLimitResponse') <
+      route.indexOf('const isAdmin = await hasVerifiedAdminAccess'),
+  );
 });
 
 test('sse stream emits a ready event then replays visible events', async () => {

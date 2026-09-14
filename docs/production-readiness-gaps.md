@@ -1,9 +1,114 @@
-# Production readiness gaps
+# Production Readiness Gaps
 
 This project now has local verification, browser E2E, readiness checks, optional
 database integration coverage, and runtime metrics for the AI and image upload
 paths. The remaining production-readiness work depends on real infrastructure,
 not only code in the repository.
+
+## Current Score
+
+Current code-level readiness after the latest local audit: **87/100**.
+
+This score is intentionally conservative. Passing lint, TypeScript, unit tests,
+E2E tests, production build, audit, and local AI load tests is strong evidence,
+but it does not prove real production behavior by itself.
+
+To raise the project to the **93-95/100** range, the remaining verification must
+run against real or staging-equivalent infrastructure:
+
+- Real PostgreSQL database through `DATABASE_URL`.
+- Real DeepSeek provider, not the mocked load-test provider.
+- Real iPhone Safari and installed PWA behavior.
+- Production-style monitoring and an extended soak test.
+
+## Target 93-95/100 Gate
+
+Do not mark the project as production-ready at the 93-95/100 level until every
+item below has passed and the results are recorded.
+
+### 1. Real Database Verification
+
+Run the optional integration test against a disposable PostgreSQL database that
+matches production as closely as possible:
+
+```bash
+SMARTSTORE_DB_INTEGRATION=1 SMARTSTORE_MARKETPLACE_STORE=database pnpm test:db:integration
+```
+
+Minimum pass criteria:
+
+- Image concurrency test keeps each listing within the hard image limit.
+- Favorite toggle race test keeps `favoriteCount` equal to the real favorite
+  rows.
+- No failed transactions, duplicate critical records, or orphaned relational
+  data.
+
+### 2. Real DeepSeek Load Verification
+
+Run the AI path load test with the real DeepSeek provider enabled, gradually and
+only from staging or another safe environment:
+
+```bash
+SMARTSTORE_AI_LOAD_PROVIDER=deepseek pnpm test:ai-load -- --levels=10,25,50,100
+```
+
+Minimum pass criteria:
+
+- No lost requests.
+- No empty assistant responses.
+- No incomplete streams.
+- Controlled handling for provider limits such as 429, 5xx, timeouts, or queue
+  overflow.
+- p95 latency remains acceptable for the user experience at the highest tested
+  concurrency.
+- Queue wait, backend time, and provider time are compared so the bottleneck is
+  identified clearly.
+
+### 3. Safari And Installed PWA Verification
+
+Manually verify on physical devices or a trusted real-device cloud:
+
+- iPhone Safari browser.
+- iPhone app installed through Safari Add to Home Screen.
+- iPad Safari and installed PWA.
+- Android Chrome browser.
+- Android installed PWA.
+
+Minimum pass criteria:
+
+- Welcome screen appears only when intended and does not flash during normal
+  navigation.
+- Chat input stays above the keyboard every time the keyboard opens.
+- Closing the keyboard restores the existing layout with no permanent height or
+  bottom-sheet changes.
+- Navigating from chat to account/listing pages and back preserves the intended
+  in-app chat session behavior.
+- Listing links opened from chat stay inside the platform and do not open new
+  external tabs unexpectedly.
+
+### 4. Monitoring And Soak Verification
+
+Enable production-style observability before the final launch decision.
+
+Minimum metrics to watch:
+
+- Request error rate by endpoint.
+- p50/p95/p99 latency for `/api/chat`, image upload, auth callback, listings,
+  conversations, and admin mutations.
+- DeepSeek queue size, queue wait, active provider calls, provider failures, and
+  provider timeouts.
+- Database connection count and slow query symptoms.
+- Memory and CPU.
+- Realtime SSE connection count and reconnect/error behavior.
+
+Minimum soak criteria:
+
+- Run staging for at least 30-60 minutes with repeated realistic journeys.
+- No steady memory growth.
+- No queue growth that fails to drain.
+- No database connection leaks.
+- No spike of failed or incomplete AI responses.
+- `/api/health` remains healthy during and after the run.
 
 ## Required before launch
 
@@ -90,7 +195,7 @@ For optional database integration in CI:
 
 ## Current honest status
 
-Production readiness is high, but not 100 percent proven until staging and
-real-device checks pass. The remaining risk is operational verification:
-provider limits, storage credentials, OAuth credentials, real database behavior,
-mobile Safari/PWA behavior, and monitoring under real traffic.
+Production readiness is high, but not 100 percent proven until the 93-95/100
+gate above passes. The remaining risk is operational verification: provider
+limits, storage credentials, OAuth credentials, real database behavior, mobile
+Safari/PWA behavior, and monitoring under real traffic.

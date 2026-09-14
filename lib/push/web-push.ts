@@ -10,6 +10,7 @@ import {
   getVapidConfig,
   isPushConfigured,
 } from './vapid';
+import { fetchWithTimeout } from '../api/fetch-timeout';
 
 // Minimal Web Push (RFC 8291 aes128gcm) sender built on node:crypto only.
 
@@ -113,6 +114,17 @@ export type SendPushResult =
   | { ok: true }
   | { ok: false; status?: number; reason: string; expired?: boolean };
 
+function getPushTimeoutMs() {
+  const rawValue = process.env.SMARTSTORE_PUSH_TIMEOUT_MS?.trim();
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : 10_000;
+
+  if (!Number.isFinite(parsedValue)) {
+    return 10_000;
+  }
+
+  return Math.min(Math.max(parsedValue, 1_000), 30_000);
+}
+
 export async function sendWebPush(
   subscription: PushSubscriptionRecord,
   message: PushMessage,
@@ -136,16 +148,20 @@ export async function sendWebPush(
     const encrypted = encryptPayload(subscription, payload);
     const body = buildEncryptedRequest(encrypted);
 
-    const response = await fetch(subscription.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Encoding': 'aes128gcm',
-        TTL: '2419200',
-        Authorization: buildAuthorizationHeader(subscription.endpoint, config),
+    const response = await fetchWithTimeout(
+      subscription.endpoint,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Encoding': 'aes128gcm',
+          TTL: '2419200',
+          Authorization: buildAuthorizationHeader(subscription.endpoint, config),
+        },
+        body,
       },
-      body,
-    });
+      getPushTimeoutMs(),
+    );
 
     if (response.ok) {
       return { ok: true };
@@ -169,4 +185,3 @@ export async function sendWebPush(
 }
 
 export { isPushConfigured, getVapidConfig };
-

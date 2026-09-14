@@ -20,9 +20,12 @@ runtime dependency.
 | `SMARTSTORE_VAPID_PUBLIC_KEY` | base64url uncompressed P-256 public point |
 | `SMARTSTORE_VAPID_PRIVATE_KEY` | base64url P-256 private scalar |
 | `SMARTSTORE_VAPID_SUBJECT` | `mailto:` or `https:` contact for VAPID `sub` |
+| `SMARTSTORE_PUSH_TIMEOUT_MS` | optional send timeout, defaults to `10000` |
 
 When these are missing, push stays disabled and `/api/push/subscribe` returns
 `configured: false`. The UI degrades gracefully.
+Push sends are bounded by `SMARTSTORE_PUSH_TIMEOUT_MS` so slow or stalled push
+providers do not hold server work indefinitely.
 
 ## Generating VAPID keys
 

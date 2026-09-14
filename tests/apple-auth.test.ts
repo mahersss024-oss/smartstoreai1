@@ -63,6 +63,8 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(startRoute, /appleid\.apple\.com\/auth\/authorize/);
   assert.match(startRoute, /enforceApiRateLimit/);
   assert.match(startRoute, /auth_apple_start/);
+  assert.match(startRoute, /Apple sign-in is temporarily unavailable/);
+  assert.doesNotMatch(startRoute, /Apple OAuth is not configured/);
   assert.match(startRoute, /response_mode', 'form_post'/);
   assert.match(startRoute, /createOauthStateCookie/);
   assert.match(startRoute, /sameSite:\s*'None'/);
@@ -70,8 +72,18 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(callbackRoute, /appleid\.apple\.com\/auth\/token/);
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
   assert.match(callbackRoute, /getOauthState/);
+  assert.match(callbackRoute, /enforceApiRateLimit/);
+  assert.match(callbackRoute, /auth_apple_callback/);
+  assert.match(callbackRoute, /Apple sign-in is temporarily unavailable/);
   assert.match(callbackRoute, /rejectOversizedRequest/);
   assert.match(callbackRoute, /fetchWithTimeout/);
+});
+
+test('apple identity token verification uses bounded JWKS fetches', () => {
+  const appleAuth = readProjectFile('lib', 'auth', 'apple.ts');
+
+  assert.match(appleAuth, /fetchWithTimeout\(appleKeysUrl/);
+  assert.doesNotMatch(appleAuth, /await fetch\(appleKeysUrl/);
 });
 
 test('google auth callback uses bounded external provider calls', () => {
@@ -94,6 +106,12 @@ test('google auth callback uses bounded external provider calls', () => {
 
   assert.match(startRoute, /enforceApiRateLimit/);
   assert.match(startRoute, /auth_google_start/);
+  assert.match(startRoute, /Google sign-in is temporarily unavailable/);
+  assert.doesNotMatch(startRoute, /GOOGLE_CLIENT_ID is not configured/);
+  assert.match(callbackRoute, /enforceApiRateLimit/);
+  assert.match(callbackRoute, /auth_google_callback/);
+  assert.match(callbackRoute, /Google sign-in is temporarily unavailable/);
+  assert.doesNotMatch(callbackRoute, /Google OAuth is not configured/);
   assert.match(callbackRoute, /fetchWithTimeout\('https:\/\/oauth2\.googleapis\.com\/token'/);
   assert.match(callbackRoute, /fetchWithTimeout\(\s*'https:\/\/www\.googleapis\.com\/oauth2\/v3\/userinfo'/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);

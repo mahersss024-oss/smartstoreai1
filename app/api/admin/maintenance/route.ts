@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
@@ -154,6 +155,17 @@ export async function POST(request: Request) {
 
   if ('response' in admin) {
     return admin.response;
+  }
+
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'admin_maintenance_cleanup',
+    actorId: admin.session.user.id,
+    maxRequests: 12,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   if (!isDestructiveMaintenanceEnabled()) {

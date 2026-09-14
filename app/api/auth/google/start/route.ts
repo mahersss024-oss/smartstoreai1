@@ -28,7 +28,10 @@ export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
 
   if (!clientId) {
-    return new Response('GOOGLE_CLIENT_ID is not configured.', { status: 500 });
+    console.warn('[google_auth] start_unavailable=missing_client_id');
+    return new Response('Google sign-in is temporarily unavailable.', {
+      status: 503,
+    });
   }
 
   const state = createOauthState();

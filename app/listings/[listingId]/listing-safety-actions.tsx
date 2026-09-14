@@ -16,6 +16,11 @@ type SessionPayload = {
   user: { id: string } | null;
 };
 
+type FavoriteStatePayload = {
+  isFavorite?: boolean;
+  canFavorite?: boolean;
+};
+
 export function ListingSafetyActions({
   listingId,
   sellerId,
@@ -46,8 +51,39 @@ export function ListingSafetyActions({
 
         const session = (await response.json()) as SessionPayload;
 
+        if (!session.authenticated || !session.user) {
+          if (isCurrent) {
+            setCanFavorite(true);
+            setIsFavorite(false);
+          }
+          return;
+        }
+
+        if (session.user.id === sellerId) {
+          if (isCurrent) {
+            setCanFavorite(false);
+            setIsFavorite(false);
+          }
+          return;
+        }
+
+        const favoriteResponse = await fetch(
+          `/api/marketplace/listings/${listingId}/favorite`,
+          { cache: 'no-store' },
+        );
+
+        if (!favoriteResponse.ok) {
+          if (isCurrent) {
+            setCanFavorite(true);
+          }
+          return;
+        }
+
+        const favoriteState = (await favoriteResponse.json()) as FavoriteStatePayload;
+
         if (isCurrent) {
-          setCanFavorite(session.user?.id !== sellerId);
+          setCanFavorite(favoriteState.canFavorite !== false);
+          setIsFavorite(Boolean(favoriteState.isFavorite));
         }
       } catch {
         if (isCurrent) {
@@ -61,7 +97,7 @@ export function ListingSafetyActions({
     return () => {
       isCurrent = false;
     };
-  }, [sellerId]);
+  }, [listingId, sellerId]);
 
   const saveFavorite = async () => {
     setIsSaving(true);

@@ -33,3 +33,4 @@ pnpm dev
 
 - [docs/smart-marketplace-foundation.md](docs/smart-marketplace-foundation.md)
 - [docs/database-production.md](docs/database-production.md)
+- [docs/production-readiness-gaps.md](docs/production-readiness-gaps.md)

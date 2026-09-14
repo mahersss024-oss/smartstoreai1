@@ -27,7 +27,10 @@ export async function GET(request: Request) {
   }
 
   if (!isAppleAuthConfigured()) {
-    return new Response('Apple OAuth is not configured.', { status: 500 });
+    console.warn('[apple_auth] start_unavailable=missing_config');
+    return new Response('Apple sign-in is temporarily unavailable.', {
+      status: 503,
+    });
   }
 
   const state = createOauthState();

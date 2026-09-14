@@ -2281,6 +2281,51 @@ export async function listUserFavoritesPage(
   return toPaginatedResponse(favorites.map(toFavoriteRecord), pagination);
 }
 
+export async function getListingFavoriteState(listingId: string, actor: Actor) {
+  const userId = getActorId(actor);
+
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.getListingFavoriteState(listingId, userId);
+  }
+
+  const listing = await getListing(listingId);
+
+  if (!listing || listing.status !== 'published') {
+    return {
+      status: 'not_found' as const,
+      isFavorite: false,
+      canFavorite: false,
+      listing: null,
+    };
+  }
+
+  if (listing.sellerId === userId) {
+    return {
+      status: 'ok' as const,
+      isFavorite: false,
+      canFavorite: false,
+      listing,
+    };
+  }
+
+  const favorite = await prisma.favorite.findUnique({
+    where: {
+      listingId_userId: {
+        listingId,
+        userId,
+      },
+    },
+    select: { id: true },
+  });
+
+  return {
+    status: 'ok' as const,
+    isFavorite: Boolean(favorite),
+    canFavorite: true,
+    listing,
+  };
+}
+
 export async function toggleFavoriteListing(listingId: string, actor: Actor) {
   const userId = getActorId(actor);
 

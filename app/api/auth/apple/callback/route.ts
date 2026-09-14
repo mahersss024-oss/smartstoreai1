@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAppBaseUrl } from '@/lib/app-url';
 import {
   createAppleClientSecret,
   getAppleClientId,
+  isAppleAuthConfigured,
   verifyAppleIdentityToken,
 } from '@/lib/auth/apple';
 import {
@@ -175,6 +177,23 @@ async function handleAppleCallback(request: Request) {
 
   if (!code || !idToken || !state || !storedState || state !== storedState) {
     return new Response('Invalid Apple sign-in state.', { status: 400 });
+  }
+
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'auth_apple_callback',
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  if (!isAppleAuthConfigured()) {
+    console.warn('[apple_auth] callback_unavailable=missing_config');
+    return new Response('Apple sign-in is temporarily unavailable.', {
+      status: 503,
+    });
   }
 
   const clientId = getAppleClientId();

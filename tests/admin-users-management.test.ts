@@ -44,12 +44,71 @@ test('admin users api is server-side admin protected and audited', () => {
   assert.match(listRoute, /hasVerifiedAdminAccess/);
   assert.match(listRoute, /userReportsReceived/);
   assert.match(updateRoute, /hasVerifiedAdminAccess/);
+  assert.match(updateRoute, /enforceApiRateLimit/);
+  assert.match(updateRoute, /admin_user_mutation/);
   assert.match(updateRoute, /cannot_downgrade_self/);
   assert.match(updateRoute, /cannot_delete_self/);
   assert.match(updateRoute, /normalizeContactPhoneNumber/);
   assert.match(updateRoute, /update_user/);
   assert.match(updateRoute, /delete_user/);
   assert.match(updateRoute, /adminAuditLog\.create/);
+});
+
+test('admin listing mutations are server-side protected and rate limited', () => {
+  const listingRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'listings',
+    '[listingId]',
+    'route.ts',
+  );
+
+  assert.match(listingRoute, /hasVerifiedAdminAccess/);
+  assert.match(listingRoute, /enforceApiRateLimit/);
+  assert.match(listingRoute, /admin_listing_mutation/);
+  assert.match(listingRoute, /adminAuditLog\.create/);
+});
+
+test('admin commission, moderation, and maintenance mutations are rate limited', () => {
+  const commissionRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'commissions',
+    '[commissionId]',
+    'route.ts',
+  );
+  const listingModerationRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'moderation',
+    'listings',
+    '[listingId]',
+    'route.ts',
+  );
+  const reportModerationRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'moderation',
+    'reports',
+    '[reportId]',
+    'route.ts',
+  );
+  const maintenanceRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'maintenance',
+    'route.ts',
+  );
+
+  assert.match(commissionRoute, /admin_commission_mutation/);
+  assert.match(listingModerationRoute, /moderation_mutation/);
+  assert.match(reportModerationRoute, /moderation_report_mutation/);
+  assert.match(maintenanceRoute, /admin_maintenance_cleanup/);
 });
 
 test('destructive admin maintenance cleanup is disabled by default in production', async () => {

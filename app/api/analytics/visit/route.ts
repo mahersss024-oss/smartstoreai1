@@ -4,6 +4,7 @@ import {
   recordSiteVisit,
   siteVisitorCookieName,
 } from '@/lib/analytics/site-visits';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getCookieValue } from '@/lib/auth/session';
 
 const visitorMaxAgeSeconds = 60 * 60 * 24 * 365;
@@ -33,6 +34,16 @@ export async function POST(request: Request) {
     getCookieValue(request, siteVisitorCookieName),
   );
   const visitorId = existingVisitorId ?? randomUUID();
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'site_visit',
+    actorId: existingVisitorId ?? undefined,
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
 
   try {
     await recordSiteVisit({ visitorId });

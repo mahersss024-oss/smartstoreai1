@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { noStoreHeaders } from '@/lib/api/no-store';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
@@ -20,6 +21,18 @@ type RouteContext = {
     userId: string;
   }>;
 };
+
+async function enforceAdminMutationRateLimit(
+  request: Request,
+  adminId: string,
+) {
+  return enforceApiRateLimit(request, {
+    namespace: 'admin_user_mutation',
+    actorId: adminId,
+    maxRequests: 40,
+    windowMs: 60_000,
+  });
+}
 
 function mapUpdatedUser(user: {
   id: string;
@@ -81,6 +94,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const oversized = rejectOversizedRequest(
@@ -233,6 +255,15 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const { userId } = await context.params;

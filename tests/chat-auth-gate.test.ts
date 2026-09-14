@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { POST } from '@/app/api/chat/route';
@@ -13,6 +15,10 @@ import {
   listSellerListings,
 } from '@/agent/marketplace/repository';
 import { createSessionCookie } from '@/lib/auth/session';
+
+function readProjectFile(...segments: string[]) {
+  return readFileSync(join(process.cwd(), ...segments), 'utf8');
+}
 
 test('requires sign-in before any chat model interaction', async () => {
   const response = await POST(
@@ -89,6 +95,13 @@ test('chat reset endpoint clears retained assistant search state', async () => {
     (await listSellerListings(userId)).some((listing) => listing.id === draft.id),
     false,
   );
+});
+
+test('chat reset endpoint is rate limited because it mutates search and draft state', () => {
+  const resetRoute = readProjectFile('app', 'api', 'chat', 'reset', 'route.ts');
+
+  assert.match(resetRoute, /enforceApiRateLimit/);
+  assert.match(resetRoute, /chat_reset/);
 });
 
 test('rejects oversized chat bodies before model or auth work', async () => {

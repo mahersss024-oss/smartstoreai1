@@ -31,8 +31,28 @@ test('listing details favorite action fills the heart after saving', () => {
   assert.match(actions, /isFavorite/);
   assert.match(actions, /sellerId: string/);
   assert.match(actions, /canFavorite/);
-  assert.match(actions, /session\.user\?\.id !== sellerId/);
+  assert.match(actions, /session\.user\.id === sellerId/);
+  assert.match(actions, /\/api\/marketplace\/listings\/\$\{listingId\}\/favorite/);
+  assert.match(actions, /setIsFavorite\(Boolean\(favoriteState\.isFavorite\)\)/);
   assert.match(actions, /setIsFavorite\(payload\.status !== 'removed'\)/);
   assert.match(actions, /aria-pressed=\{isFavorite\}/);
   assert.match(actions, /fill-current/);
+});
+
+test('listing favorite api exposes exact favorite state for detail pages', () => {
+  const favoriteRoute = readProjectFile(
+    'app',
+    'api',
+    'marketplace',
+    'listings',
+    '[listingId]',
+    'favorite',
+    'route.ts',
+  );
+
+  assert.match(favoriteRoute, /export async function GET/);
+  assert.match(favoriteRoute, /getListingFavoriteState/);
+  assert.match(favoriteRoute, /favorite_state/);
+  assert.match(favoriteRoute, /isFavorite: result\.isFavorite/);
+  assert.match(favoriteRoute, /canFavorite: result\.canFavorite/);
 });

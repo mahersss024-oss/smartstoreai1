@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { beforeEach } from 'node:test';
 
 import {
   rankMarketplaceListings,
@@ -15,8 +15,13 @@ import { parseStructuredSearchIntent } from '@/agent/marketplace/structured-sear
 import {
   createListingDraft,
   publishListing,
+  resetMarketplaceStoreForTests,
   type ListingRecord,
 } from '@/agent/marketplace/store';
+
+beforeEach(() => {
+  resetMarketplaceStoreForTests();
+});
 
 function publishTestListing(input: {
   id: string;

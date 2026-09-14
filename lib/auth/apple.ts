@@ -6,6 +6,8 @@ import {
 } from 'node:crypto';
 import type { JsonWebKey as CryptoJsonWebKey } from 'node:crypto';
 
+import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+
 const appleIssuer = 'https://appleid.apple.com';
 const appleKeysUrl = 'https://appleid.apple.com/auth/keys';
 const clientSecretMaxAgeSeconds = 60 * 60 * 24 * 180;
@@ -191,7 +193,7 @@ export async function verifyAppleIdentityToken(
     return null;
   }
 
-  const keysResponse = await fetch(appleKeysUrl, { cache: 'no-store' });
+  const keysResponse = await fetchWithTimeout(appleKeysUrl, { cache: 'no-store' });
 
   if (!keysResponse.ok) {
     return null;

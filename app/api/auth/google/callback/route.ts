@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import {
   clearOauthStateCookie,
   commissionAgreementVersion,
@@ -116,8 +117,21 @@ export async function GET(request: Request) {
     return new Response('Invalid Google sign-in state.', { status: 400 });
   }
 
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'auth_google_callback',
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   if (!clientId || !clientSecret) {
-    return new Response('Google OAuth is not configured.', { status: 500 });
+    console.warn('[google_auth] callback_unavailable=missing_config');
+    return new Response('Google sign-in is temporarily unavailable.', {
+      status: 503,
+    });
   }
 
   const redirectUri = new URL('/api/auth/google/callback', getAppBaseUrl(request));

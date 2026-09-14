@@ -1,4 +1,7 @@
+import { fetchWithTimeout } from './api/fetch-timeout';
+
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
+const maxMemoryBuckets = 10_000;
 
 type RateLimitInput = {
   namespace: string;
@@ -18,15 +21,45 @@ function getBucketKey(input: RateLimitInput) {
   return `${input.namespace}:${input.clientId}`;
 }
 
-function checkMemoryRateLimit(input: Required<RateLimitInput>) {
-  const now = Date.now();
-  const bucketKey = getBucketKey(input);
+function getRedisTimeoutMs() {
+  const rawValue = process.env.SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS?.trim();
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : 2_000;
 
+  if (!Number.isFinite(parsedValue)) {
+    return 2_000;
+  }
+
+  return Math.min(Math.max(parsedValue, 250), 5_000);
+}
+
+function pruneExpiredMemoryBuckets(now: number) {
   for (const [bucketClientId, bucket] of memoryBuckets) {
     if (bucket.resetAt <= now) {
       memoryBuckets.delete(bucketClientId);
     }
   }
+}
+
+function enforceMemoryBucketLimit() {
+  if (memoryBuckets.size <= maxMemoryBuckets) {
+    return;
+  }
+
+  const excess = memoryBuckets.size - maxMemoryBuckets;
+  const oldestBuckets = [...memoryBuckets.entries()]
+    .sort(([, left], [, right]) => left.resetAt - right.resetAt)
+    .slice(0, excess);
+
+  for (const [bucketKey] of oldestBuckets) {
+    memoryBuckets.delete(bucketKey);
+  }
+}
+
+function checkMemoryRateLimit(input: Required<RateLimitInput>) {
+  const now = Date.now();
+  const bucketKey = getBucketKey(input);
+
+  pruneExpiredMemoryBuckets(now);
 
   const bucket = memoryBuckets.get(bucketKey);
 
@@ -35,6 +68,7 @@ function checkMemoryRateLimit(input: Required<RateLimitInput>) {
       count: 1,
       resetAt: now + input.windowMs,
     });
+    enforceMemoryBucketLimit();
 
     return null;
   }
@@ -57,17 +91,21 @@ async function checkRedisRateLimit(input: Required<RateLimitInput>) {
   const windowSeconds = Math.ceil(input.windowMs / 1000);
   const windowId = Math.floor(Date.now() / input.windowMs);
   const key = `rate-limit:${input.namespace}:${input.clientId}:${windowId}`;
-  const response = await fetch(`${config.url}/pipeline`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json',
+  const response = await fetchWithTimeout(
+    `${config.url}/pipeline`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, windowSeconds + 5],
+      ]),
     },
-    body: JSON.stringify([
-      ['INCR', key],
-      ['EXPIRE', key, windowSeconds + 5],
-    ]),
-  });
+    getRedisTimeoutMs(),
+  );
 
   if (!response.ok) {
     throw new Error(`Redis rate limit failed with ${response.status}.`);

@@ -100,6 +100,16 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'push_unsubscribe',
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const oversizedRequestResponse = rejectOversizedRequest(
     request,
     maxPushSubscriptionRequestBytes,

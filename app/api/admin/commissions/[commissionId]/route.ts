@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
@@ -19,6 +20,18 @@ type RouteContext = {
   }>;
 };
 
+async function enforceAdminCommissionMutationRateLimit(
+  request: Request,
+  adminId: string,
+) {
+  return enforceApiRateLimit(request, {
+    namespace: 'admin_commission_mutation',
+    actorId: adminId,
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
@@ -28,6 +41,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminCommissionMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const oversizedRequestResponse = rejectOversizedRequest(
@@ -79,6 +101,15 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminCommissionMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const { commissionId } = await context.params;

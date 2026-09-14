@@ -384,6 +384,17 @@ export function createListingDraft(input: CreateListingDraftInput): ListingRecor
   return listing;
 }
 
+export function resetMarketplaceStoreForTests() {
+  listings.clear();
+  conversations.clear();
+  favorites.clear();
+  reports.clear();
+  userReports.clear();
+  userBlocks.clear();
+  commissions.clear();
+  storeLoaded = true;
+}
+
 export function publishListing(listingId: string) {
   loadStore();
 
@@ -954,6 +965,38 @@ export function listUserFavorites(userId: string) {
       ...favorite,
       listing: listings.get(favorite.listingId) ?? null,
     }));
+}
+
+export function getListingFavoriteState(listingId: string, userId: string) {
+  const listing = getListing(listingId);
+
+  if (!listing || listing.status !== 'published') {
+    return {
+      status: 'not_found' as const,
+      isFavorite: false,
+      canFavorite: false,
+      listing: null,
+    };
+  }
+
+  if (listing.sellerId === userId) {
+    return {
+      status: 'ok' as const,
+      isFavorite: false,
+      canFavorite: false,
+      listing,
+    };
+  }
+
+  return {
+    status: 'ok' as const,
+    isFavorite: [...favorites.values()].some(
+      (favorite) =>
+        favorite.listingId === listingId && favorite.userId === userId,
+    ),
+    canFavorite: true,
+    listing,
+  };
 }
 
 export function createConversationForListing(listingId: string, buyerId: string) {

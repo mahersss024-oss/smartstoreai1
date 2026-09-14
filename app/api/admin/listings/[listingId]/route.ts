@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
+import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
@@ -28,6 +29,18 @@ type RouteContext = {
     listingId: string;
   }>;
 };
+
+async function enforceAdminListingMutationRateLimit(
+  request: Request,
+  adminId: string,
+) {
+  return enforceApiRateLimit(request, {
+    namespace: 'admin_listing_mutation',
+    actorId: adminId,
+    maxRequests: 60,
+    windowMs: 60_000,
+  });
+}
 
 function buildSearchText(input: {
   category?: string | null;
@@ -65,6 +78,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminListingMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const oversizedRequestResponse = rejectOversizedRequest(
@@ -241,6 +263,15 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceAdminListingMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const { listingId } = await context.params;
