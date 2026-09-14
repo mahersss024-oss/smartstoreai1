@@ -21,11 +21,13 @@ import {
   PaperclipIcon,
   XIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type {
   ComponentProps,
   ComponentPropsWithoutRef,
   HTMLAttributes,
   ReactElement,
+  ReactNode,
 } from "react";
 import {
   createContext,
@@ -359,6 +361,31 @@ function getSmartStoreListingPath(href: unknown) {
   }
 }
 
+function SmartStoreListingLink({
+  children,
+  href,
+}: {
+  children: ReactNode;
+  href: string;
+}) {
+  const router = useRouter();
+
+  return (
+    <a
+      className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        router.push(href);
+      }}
+    >
+      <ExternalLinkIcon className="size-4" />
+      فتح الإعلان
+      <span className="sr-only">{children}</span>
+    </a>
+  );
+}
+
 const messageMarkdownComponents = {
   p: ({ children, ...props }: ComponentPropsWithoutRef<'div'>) => (
     <div {...props}>{children}</div>
@@ -368,16 +395,9 @@ const messageMarkdownComponents = {
 
     if (listingPath) {
       return (
-        <a
-          {...props}
-          className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-          href={listingPath}
-          target="_self"
-        >
-          <ExternalLinkIcon className="size-4" />
-          فتح الإعلان
-          <span className="sr-only">{children}</span>
-        </a>
+        <SmartStoreListingLink href={listingPath}>
+          {children}
+        </SmartStoreListingLink>
       );
     }
 
