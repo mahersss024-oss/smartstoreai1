@@ -99,18 +99,29 @@ export default function FavoritesPage() {
     setIsLoading(true);
 
     try {
-      const [sessionResponse, favoritesResponse] = await Promise.all([
-        fetch('/api/auth/session', { cache: 'no-store' }),
-        fetch(`/api/marketplace/me/favorites?page=${page}&limit=24`, {
-          cache: 'no-store',
-        }),
-      ]);
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+      });
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
       setSession(nextSession);
 
+      if (!nextSession.authenticated) {
+        setFavorites([]);
+        setFavoritesPagination(null);
+        return;
+      }
+
+      const favoritesResponse = await fetch(
+        `/api/marketplace/me/favorites?page=${page}&limit=24`,
+        {
+          cache: 'no-store',
+        },
+      );
+
       if (!favoritesResponse.ok) {
         setFavorites([]);
+        setFavoritesPagination(null);
         return;
       }
 

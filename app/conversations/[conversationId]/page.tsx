@@ -242,21 +242,24 @@ export default function ConversationPage() {
     }
 
     try {
-      const [sessionResponse, conversationResponse] = await Promise.all([
-        fetch('/api/auth/session', { cache: 'no-store' }),
-        fetch(`/api/marketplace/conversations/${conversationId}`, {
-          cache: 'no-store',
-        }),
-      ]);
-
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+      });
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
       setSession(nextSession);
 
-      if (conversationResponse.status === 401) {
+      if (!nextSession.authenticated) {
         router.push('/api/auth/google/start');
         return;
       }
+
+      const conversationResponse = await fetch(
+        `/api/marketplace/conversations/${conversationId}`,
+        {
+          cache: 'no-store',
+        },
+      );
 
       if (!conversationResponse.ok) {
         setNotice('تعذر العثور على هذه المحادثة أو ليس لديك صلاحية لعرضها.');

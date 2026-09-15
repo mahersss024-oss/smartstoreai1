@@ -135,18 +135,29 @@ export default function ConversationsPage() {
     }
 
     try {
-      const [sessionResponse, conversationsResponse] = await Promise.all([
-        fetch('/api/auth/session', { cache: 'no-store' }),
-        fetch(`/api/marketplace/me/conversations?page=${page}&limit=20`, {
-          cache: 'no-store',
-        }),
-      ]);
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+      });
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
       setSession(nextSession);
 
+      if (!nextSession.authenticated) {
+        setConversations([]);
+        setConversationsPagination(null);
+        return;
+      }
+
+      const conversationsResponse = await fetch(
+        `/api/marketplace/me/conversations?page=${page}&limit=20`,
+        {
+          cache: 'no-store',
+        },
+      );
+
       if (!conversationsResponse.ok) {
         setConversations([]);
+        setConversationsPagination(null);
         return;
       }
 
@@ -184,7 +195,7 @@ export default function ConversationsPage() {
   }, [refreshConversations]);
 
   useSmartstoreRealtime({
-    enabled: true,
+    enabled: session.authenticated,
     fallbackIntervalMs: 4000,
     eventTypes: [
       'message_created',

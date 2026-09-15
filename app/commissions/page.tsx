@@ -145,19 +145,28 @@ export default function CommissionsPage() {
     setNotice('');
 
     try {
-      const [sessionResponse, commissionsResponse, paymentMethodsResponse] =
-        await Promise.all([
-          fetch('/api/auth/session', { cache: 'no-store' }),
-          fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`, {
-            cache: 'no-store',
-          }),
-          fetch('/api/marketplace/commission-payment-methods', {
-            cache: 'no-store',
-          }),
-        ]);
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+      });
       const nextSession =
         (await sessionResponse.json()) as AuthSessionPayload;
       setSession(nextSession);
+
+      if (!nextSession.authenticated) {
+        setPaymentMethods([]);
+        setCommissions([]);
+        setCommissionsPagination(null);
+        return;
+      }
+
+      const [commissionsResponse, paymentMethodsResponse] = await Promise.all([
+        fetch(`/api/marketplace/me/commissions?page=${page}&limit=20`, {
+          cache: 'no-store',
+        }),
+        fetch('/api/marketplace/commission-payment-methods', {
+          cache: 'no-store',
+        }),
+      ]);
 
       if (paymentMethodsResponse.ok) {
         const paymentMethodsPayload = (await paymentMethodsResponse.json()) as {
@@ -170,6 +179,7 @@ export default function CommissionsPage() {
 
       if (!commissionsResponse.ok) {
         setCommissions([]);
+        setCommissionsPagination(null);
         return;
       }
 

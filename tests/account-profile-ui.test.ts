@@ -44,3 +44,23 @@ test('signed-in customer pages hide sign-in controls until session check finishe
     assert.match(page, /: !session\.authenticated \? \(/);
   }
 });
+
+test('signed-in customer pages do not fetch protected account data before session is known', () => {
+  const protectedPages = [
+    ['app', 'conversations', 'page.tsx'],
+    ['app', 'favorites', 'page.tsx'],
+    ['app', 'commissions', 'page.tsx'],
+    ['app', 'conversations', '[conversationId]', 'page.tsx'],
+  ];
+
+  for (const segments of protectedPages) {
+    const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
+
+    assert.match(page, /const sessionResponse = await fetch\('\/api\/auth\/session'/);
+    assert.match(page, /if \(!nextSession\.authenticated\)/);
+    assert.doesNotMatch(
+      page,
+      /Promise\.all\(\[[\s\S]*fetch\('\/api\/auth\/session'[\s\S]*api\/marketplace/,
+    );
+  }
+});
