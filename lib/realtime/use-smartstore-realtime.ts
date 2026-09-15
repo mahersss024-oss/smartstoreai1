@@ -90,8 +90,16 @@ export function useSmartstoreRealtime({
 
   useEffect(() => {
     if (!enabled) {
-      setConnectionState('idle');
-      return;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setConnectionState('idle');
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
     }
 
     let eventSource: EventSource | null = null;

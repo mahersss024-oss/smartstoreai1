@@ -170,7 +170,17 @@ export default function ConversationsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshConversations(1);
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshConversations(1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshConversations]);
 
   useSmartstoreRealtime({

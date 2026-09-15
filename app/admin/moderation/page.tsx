@@ -152,7 +152,17 @@ export default function AdminModerationPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshQueue();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshQueue();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshQueue]);
 
   useSmartstoreRealtime({

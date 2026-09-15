@@ -1,11 +1,11 @@
 export const appConfig = {
-  model: 'deepseek-v4-flash',
+  model: 'deepseek-flash',
   models: {
-    chat: 'deepseek-v4-flash',
-    scope: 'deepseek-v4-flash',
-    search: 'deepseek-v4-flash',
-    moderation: 'deepseek-v4-flash',
-    vision: 'deepseek-v4-flash-vision-exp',
+    chat: 'deepseek-flash',
+    scope: 'deepseek-flash',
+    search: 'deepseek-flash',
+    moderation: 'deepseek-flash',
+    vision: 'deepseek-flash',
   },
   metadata: {
     title: 'SmartStore AI - Smart Marketplace',

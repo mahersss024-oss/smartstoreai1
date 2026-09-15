@@ -16,7 +16,6 @@ import {
   buildAdaptiveIntentSystemMessage,
   resolveAdaptiveMarketplaceIntent,
 } from '@/agent/marketplace/adaptive-intent';
-import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
 import {
   classifyMarketplaceIntent,
   evaluateSaudiMarketplaceCompliance,
@@ -24,7 +23,6 @@ import {
   getComplianceBlockResponse,
   getComplianceReviewResponse,
 } from '@/agent/marketplace/policy';
-import { parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 import {
   checkImageMarketplaceCompliance,
   inferExpectedMarketplaceCategory,
@@ -78,6 +76,8 @@ const maxImagesPerChatMessage = defaultMaxListingImages;
 const maxChatImageBytes = 12 * 1024 * 1024;
 const maxChatRequestBytes = 140 * 1024 * 1024;
 const chatIssueResponseTimeoutMs = 6_000;
+const chatAgentGenerationTimeoutMs = 30_000;
+const chatAgentRetryTimeoutMs = 18_000;
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const policyFacilitationIntents = new Set([
   'search_listing',
@@ -481,25 +481,6 @@ function withChatAbortTimeout<T>(
   });
 }
 
-function isGenericMarketplaceSearchStarter(text: string) {
-  const parsed = parseMarketplaceSearchQuery(text);
-
-  return (
-    classifyMarketplaceIntent(text).intent === 'search_listing' &&
-    !parsed.category &&
-    !parsed.city &&
-    parsed.minPrice === undefined &&
-    parsed.maxPrice === undefined &&
-    parsed.terms.length === 0
-  );
-}
-
-function getGenericMarketplaceSearchStarterResponse(language: AppLanguage) {
-  return language === 'en'
-    ? 'What product are you looking for? Share the product type, brand, model, city, or budget and I will show the closest SmartStore AI listings.'
-    : 'ما المنتج الذي تبحث عنه؟ اكتب نوع المنتج، الماركة، الموديل، المدينة، أو الميزانية وسأعرض لك أقرب إعلانات SmartStore AI.';
-}
-
 function isDirectPublishConfirmation(userRequest: string) {
   const normalized = userRequest
     .trim()
@@ -584,101 +565,6 @@ function summarizeListingForAgent(
       Object.entries(listing.attributes ?? {}).slice(0, 10),
     ),
   };
-}
-
-function summarizeRankedListingForChat(
-  result: Awaited<ReturnType<typeof searchMarketplaceWithState>>['listings'][number],
-) {
-  const listing = result.listing;
-  const primaryImage = listing.images.find((image) => image.status === 'approved');
-
-  return {
-    id: listing.id,
-    listingUrl: getPublicListingUrl(listing.id, getAppBaseUrl()),
-    title: listing.title,
-    category: listing.category,
-    price: listing.price,
-    city: listing.city,
-    condition: listing.condition,
-    description: listing.description,
-    attributes: listing.attributes,
-    image:
-      primaryImage?.thumbnailUrl ??
-      primaryImage?.displayUrl ??
-      primaryImage?.originalUrl,
-    views: listing.views,
-    messageCount: listing.messageCount,
-    favoriteCount: listing.favoriteCount,
-    matchScore: result.scores.finalScore,
-    scores: result.scores,
-    reasons: result.reasons,
-  };
-}
-
-function buildDirectSearchText(
-  result: Awaited<ReturnType<typeof searchMarketplaceWithState>>,
-  language: AppLanguage,
-) {
-  if (result.listings.length > 0) {
-    return language === 'en'
-      ? 'These are the closest SmartStore AI listings to your request. You can add more details and I will narrow the results.'
-      : 'هذه أقرب الإعلانات المناسبة لطلبك في SmartStore AI. أضف أي تفاصيل أخرى وسأضيّق النتائج لك.';
-  }
-
-  if (result.relaxedSuggestion) {
-    return language === 'en'
-      ? 'I did not find an exact match right now, so I showed the nearest available options. Add a brand, model, city, or price range and I will refine them.'
-      : 'لم أجد مطابقة دقيقة الآن، لذلك أظهرت لك أقرب الخيارات المتاحة. أضف الماركة أو الموديل أو المدينة أو نطاق السعر وسأضيّقها لك.';
-  }
-
-  return language === 'en'
-    ? 'I did not find a matching listing right now. Add more details or try a broader product description.'
-    : 'لم أجد إعلانًا مطابقًا الآن. أضف تفاصيل أكثر أو جرّب وصفًا أوسع للمنتج.';
-}
-
-function createDirectSearchToolResult(
-  result: Awaited<ReturnType<typeof searchMarketplaceWithState>>,
-  query: string,
-): AssistantSearchToolResult {
-  return {
-    toolCallId: `direct-search-${Date.now()}`,
-    toolName: 'searchMarketplaceListings',
-    input: {
-      query,
-      mode: 'direct_search_fast_path',
-    },
-    output: {
-      status: result.status,
-      listings: result.listings.map(summarizeRankedListingForChat),
-      candidateCount: result.candidateCount,
-      rankedCount: result.rankedCount,
-      searchState: result.searchState,
-      recommendations: result.recommendations,
-      market: result.market,
-      relaxedSuggestion: result.relaxedSuggestion,
-    },
-  };
-}
-
-async function maybeCreateDirectSearchResponse({
-  userRequest,
-  language,
-  searchOwnerKey,
-}: {
-  userRequest: string;
-  language: AppLanguage;
-  searchOwnerKey: string;
-}) {
-  const result = await searchMarketplaceWithState({
-    ownerKey: searchOwnerKey,
-    query: userRequest,
-    language,
-    useModelUnderstanding: true,
-  });
-
-  return createTextUIResponse(buildDirectSearchText(result, language), {
-    toolResults: [createDirectSearchToolResult(result, userRequest)],
-  });
 }
 
 async function getVerifiedSelectedListingContext({
@@ -1043,7 +929,14 @@ async function generateCheckedAssistantResponse(
       language,
       additionalInstructions,
     });
-    const firstResult = await chatAgent.generate({ messages: promptMessages });
+    const firstResult = await withChatAbortTimeout(
+      chatAgentGenerationTimeoutMs,
+      (signal) =>
+        chatAgent.generate({
+          messages: promptMessages,
+          abortSignal: signal,
+        }),
+    );
     const firstText = getSafeAssistantText(firstResult.text);
     const firstSearchToolResults =
       extractAssistantSearchToolResults(firstResult);
@@ -1077,9 +970,14 @@ async function generateCheckedAssistantResponse(
         .filter(Boolean)
         .join('\n\n'),
     });
-    const retryResult = await retryAgent.generate({
-      messages: promptMessages,
-    });
+    const retryResult = await withChatAbortTimeout(
+      chatAgentRetryTimeoutMs,
+      (signal) =>
+        retryAgent.generate({
+          messages: promptMessages,
+          abortSignal: signal,
+        }),
+    );
     const retryText = getSafeAssistantText(retryResult.text);
     const retrySearchToolResults =
       extractAssistantSearchToolResults(retryResult);
@@ -1467,15 +1365,6 @@ export async function POST(request: Request) {
     : scopedMessages;
   const userRequest = getLatestUserRequest(scopedMessages);
 
-  if (
-    isGenericMarketplaceSearchStarter(userRequest) &&
-    !latestUserMessageHasImageAttachment(scopedMessages)
-  ) {
-    return createTextUIResponse(
-      getGenericMarketplaceSearchStarterResponse(language),
-    );
-  }
-
   const adaptiveIntent = await resolveAdaptiveMarketplaceIntent({
     messages: scopedMessagesWithInterfaceContext,
     language,
@@ -1503,18 +1392,6 @@ export async function POST(request: Request) {
       language,
       userRequest,
       textPolicyDecision: complianceDecision,
-    });
-  }
-
-  if (
-    adaptiveIntent.intent === 'search_listing' &&
-    adaptiveIntent.execution === 'search_listings' &&
-    !latestUserMessageHasImageAttachment(scopedMessages)
-  ) {
-    return maybeCreateDirectSearchResponse({
-      userRequest: adaptiveIntent.searchQuery ?? userRequest,
-      language,
-      searchOwnerKey,
     });
   }
 

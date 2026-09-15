@@ -189,7 +189,17 @@ export default function AdminListingsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void loadListings(1);
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void loadListings(1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadListings, status]);
 
   useSmartstoreRealtime({

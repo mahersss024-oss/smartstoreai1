@@ -13,11 +13,11 @@ services:
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: DEEPSEEK_MODEL
-        value: deepseek-v4-flash
+        value: deepseek-flash
       - key: DEEPSEEK_SEARCH_MODEL
-        value: deepseek-v4-flash
+        value: deepseek-flash
       - key: DEEPSEEK_VISION_MODEL
-        value: deepseek-v4-flash-vision-exp
+        value: deepseek-flash
       - key: SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS
         value: "100"
       - key: SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS

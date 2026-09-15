@@ -171,7 +171,17 @@ export default function AdminUsersPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshUsers(1);
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshUsers(1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshUsers]);
 
   const usersLoadMoreRef = useInfiniteScroll({

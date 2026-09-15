@@ -203,6 +203,10 @@ function clearHomeAssistantRuntimeState() {
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const chatRateLimitMessage =
   'الضغط مرتفع الآن على مساعد SmartStore AI. انتظر لحظات ثم أعد إرسال الطلب.';
+const chatNetworkErrorMessage =
+  'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
+const chatSessionExpiredMessage =
+  'انتهت صلاحية جلسة الدخول. يرجى تسجيل الدخول من جديد ثم إعادة المحاولة.';
 const locationSettings: LocationSettings = {
   country: 'SA',
   currency: 'SAR',
@@ -1073,11 +1077,19 @@ function getChatErrorMessage(error: Error | undefined) {
     error.message === 'Failed to fetch' ||
     error.message === 'NetworkError when attempting to fetch resource.'
   ) {
-    return 'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
+    return chatNetworkErrorMessage;
   }
 
   if (error.message === chatRateLimitMessage) {
     return chatRateLimitMessage;
+  }
+
+  if (error.message === chatNetworkErrorMessage) {
+    return chatNetworkErrorMessage;
+  }
+
+  if (error.message === chatSessionExpiredMessage) {
+    return chatSessionExpiredMessage;
   }
 
   return chatServiceUnavailableMessage;
@@ -1088,7 +1100,14 @@ function createClientIdempotencyKey(scope: string) {
 }
 
 const guardedChatFetch: typeof fetch = async (input, init) => {
-  const response = await fetch(input, init);
+  let response: Response;
+
+  try {
+    response = await fetch(input, init);
+  } catch {
+    throw new Error(chatNetworkErrorMessage);
+  }
+
   const contentType = response.headers.get('content-type') ?? '';
 
   if (!response.ok) {
@@ -1106,6 +1125,10 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
 
     if (response.status === 429) {
       throw new Error(chatRateLimitMessage);
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(chatSessionExpiredMessage);
     }
 
     throw new Error(chatServiceUnavailableMessage);

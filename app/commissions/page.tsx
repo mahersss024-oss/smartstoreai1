@@ -191,7 +191,17 @@ export default function CommissionsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshCommissions();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshCommissions();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshCommissions]);
 
   useSmartstoreRealtime({

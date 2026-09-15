@@ -119,7 +119,17 @@ export default function AdminMaintenancePage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void loadCounts();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void loadCounts();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadCounts]);
 
   const runCleanup = useCallback(async () => {

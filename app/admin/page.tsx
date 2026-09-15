@@ -177,7 +177,17 @@ export default function AdminHomePage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void loadOverview();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void loadOverview();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadOverview]);
 
   useSmartstoreRealtime({

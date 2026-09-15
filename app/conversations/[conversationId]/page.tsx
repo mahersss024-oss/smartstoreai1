@@ -282,7 +282,17 @@ export default function ConversationPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshConversation();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshConversation();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshConversation]);
 
   useEffect(() => {

@@ -132,7 +132,17 @@ export default function FavoritesPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshFavorites();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshFavorites();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshFavorites]);
 
   useSmartstoreRealtime({

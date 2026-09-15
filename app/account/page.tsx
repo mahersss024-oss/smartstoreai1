@@ -433,13 +433,35 @@ export default function AccountPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void refreshSession();
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshSession();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshSession]);
 
   useEffect(() => {
-    if (session.authenticated) {
-      void refreshListings();
+    let cancelled = false;
+
+    if (!session.authenticated) {
+      return;
     }
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void refreshListings();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshListings, session.authenticated]);
 
   useSmartstoreRealtime({

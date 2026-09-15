@@ -84,20 +84,17 @@ test('allows one global DeepSeek model override', () => {
 test('uses profile-specific DeepSeek model overrides first', () => {
   withModelEnvironment(
     {
-      DEEPSEEK_MODEL: 'deepseek-v4-flash',
+      DEEPSEEK_MODEL: 'deepseek-flash',
       DEEPSEEK_SCOPE_MODEL: 'deepseek-v4-pro',
       DEEPSEEK_SEARCH_MODEL: 'deepseek-v4-search',
-      DEEPSEEK_VISION_MODEL: 'deepseek-v4-flash-vision-exp',
+      DEEPSEEK_VISION_MODEL: 'deepseek-flash',
     },
     () => {
-      assert.equal(getDeepseekModelName('chat'), 'deepseek-v4-flash');
+      assert.equal(getDeepseekModelName('chat'), 'deepseek-flash');
       assert.equal(getDeepseekModelName('scope'), 'deepseek-v4-pro');
       assert.equal(getDeepseekModelName('search'), 'deepseek-v4-search');
-      assert.equal(getDeepseekModelName('moderation'), 'deepseek-v4-flash');
-      assert.equal(
-        getDeepseekModelName('vision'),
-        'deepseek-v4-flash-vision-exp',
-      );
+      assert.equal(getDeepseekModelName('moderation'), 'deepseek-flash');
+      assert.equal(getDeepseekModelName('vision'), 'deepseek-flash');
     },
   );
 });
@@ -138,7 +135,7 @@ test('normalizes DeepSeek requests for non-thinking marketplace responses', () =
   const normalized = JSON.parse(
     normalizeDeepseekChatBody(
       JSON.stringify({
-        model: 'deepseek-v4-flash',
+        model: 'deepseek-flash',
         messages: [
           { role: 'developer', content: 'hidden rule' },
           { role: 'user', content: 'مرحبا' },

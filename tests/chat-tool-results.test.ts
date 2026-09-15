@@ -103,23 +103,17 @@ test('chat route streams marketplace tool outputs with guarded text responses', 
   assert.match(route, /type: 'tool-output-available'/);
 });
 
-test('chat route uses a bounded fast path for direct buyer searches', () => {
+test('chat route keeps buyer search responses on the real agent path', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
     'utf8',
   );
 
-  assert.match(route, /maybeCreateDirectSearchResponse/);
-  assert.match(route, /adaptiveIntent\.intent === 'search_listing'/);
-  assert.match(route, /adaptiveIntent\.execution === 'search_listings'/);
-  assert.match(route, /useModelUnderstanding: true/);
-  assert.match(route, /direct_search_fast_path/);
-  assert.ok(
-    route.indexOf('const scopeCheckMessages') <
-      route.indexOf("adaptiveIntent.intent === 'search_listing'"),
-  );
-  assert.ok(
-    route.indexOf("adaptiveIntent.intent === 'search_listing'") <
-      route.indexOf('const modelMessages = normalizeModelMessageFileData'),
-  );
+  assert.doesNotMatch(route, /direct_search_fast_path/);
+  assert.doesNotMatch(route, /maybeCreateDirectSearchResponse/);
+  assert.doesNotMatch(route, /isGenericMarketplaceSearchStarter/);
+  assert.doesNotMatch(route, /getGenericMarketplaceSearchStarterResponse/);
+  assert.match(route, /createChatAgent\(session/);
+  assert.match(route, /chatAgentGenerationTimeoutMs/);
+  assert.match(route, /abortSignal: signal/);
 });
