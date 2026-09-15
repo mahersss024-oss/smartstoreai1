@@ -103,9 +103,11 @@ test('prefers local DeepSeek key over stale machine environment key', () => {
   const previousCwd = process.cwd();
   const tempDirectory = mkdtempSync(join(tmpdir(), 'smartstore-env-'));
   const previousKey = process.env.DEEPSEEK_API_KEY;
+  const previousCi = process.env.CI;
 
   try {
     process.chdir(tempDirectory);
+    delete process.env.CI;
     process.env.DEEPSEEK_API_KEY = 'sk-stale-machine-key';
     writeFileSync('.env.local', 'DEEPSEEK_API_KEY=sk-local-file-key\n');
 
@@ -117,6 +119,12 @@ test('prefers local DeepSeek key over stale machine environment key', () => {
       delete process.env.DEEPSEEK_API_KEY;
     } else {
       process.env.DEEPSEEK_API_KEY = previousKey;
+    }
+
+    if (previousCi === undefined) {
+      delete process.env.CI;
+    } else {
+      process.env.CI = previousCi;
     }
 
     rmSync(tempDirectory, { recursive: true, force: true });
