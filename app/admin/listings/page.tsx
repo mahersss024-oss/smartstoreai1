@@ -20,6 +20,7 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import { useAdminAccess } from '../use-admin-access';
 
 type AdminListing = {
   id: string;
@@ -108,6 +109,11 @@ function createDraft(listing: AdminListing): ListingDraft {
 
 export default function AdminListingsPage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    isAdminAccessAllowed,
+    verifyAdminAccess,
+  } = useAdminAccess('admin');
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ListingDraft>>({});
@@ -132,6 +138,13 @@ export default function AdminListingsPage() {
       setNotice('');
 
       try {
+        if (!(await verifyAdminAccess())) {
+          setListings([]);
+          setPagination(null);
+          setDrafts({});
+          return;
+        }
+
         const params = new URLSearchParams({
           page: String(page),
           limit: '24',
@@ -183,7 +196,7 @@ export default function AdminListingsPage() {
         setIsLoading(false);
       }
     },
-    [router],
+    [router, verifyAdminAccess],
   );
 
   useEffect(() => {
@@ -203,7 +216,7 @@ export default function AdminListingsPage() {
   }, [loadListings, status]);
 
   useSmartstoreRealtime({
-    enabled: true,
+    enabled: isAdminAccessAllowed,
     fallbackIntervalMs: 4000,
     eventTypes: [
       'ad_created',
@@ -349,9 +362,9 @@ export default function AdminListingsPage() {
           </Button>
         </section>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 

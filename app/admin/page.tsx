@@ -22,6 +22,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { useAdminAccess } from './use-admin-access';
 
 type OverviewPayload = {
   totals: {
@@ -140,6 +141,11 @@ function StatusBlock({
 
 export default function AdminHomePage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    isAdminAccessAllowed,
+    verifyAdminAccess,
+  } = useAdminAccess('admin');
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -149,6 +155,11 @@ export default function AdminHomePage() {
     setNotice('');
 
     try {
+      if (!(await verifyAdminAccess())) {
+        setOverview(null);
+        return;
+      }
+
       const response = await fetch('/api/admin/overview', {
         cache: 'no-store',
       });
@@ -172,7 +183,7 @@ export default function AdminHomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -191,7 +202,7 @@ export default function AdminHomePage() {
   }, [loadOverview]);
 
   useSmartstoreRealtime({
-    enabled: true,
+    enabled: isAdminAccessAllowed,
     fallbackIntervalMs: 4000,
     eventTypes: [
       'ad_created',
@@ -280,15 +291,19 @@ export default function AdminHomePage() {
           </div>
         </header>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 
-        {isLoading || !overview ? (
+        {isLoading || (!overview && !adminAccessNotice && !notice) ? (
           <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
             جار تحميل لوحة المالك...
+          </section>
+        ) : !overview ? (
+          <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
+            {adminAccessNotice || notice}
           </section>
         ) : (
           <>

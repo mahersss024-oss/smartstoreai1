@@ -19,6 +19,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { useAdminAccess } from '../use-admin-access';
 
 type ListingRecord = {
   id: string;
@@ -91,6 +92,11 @@ function formatComplianceDecision(decision: ListingRecord['compliance']['decisio
 
 export default function AdminModerationPage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    isAdminAccessAllowed,
+    verifyAdminAccess,
+  } = useAdminAccess('moderator');
   const [queue, setQueue] = useState<ModerationQueue>({
     listings: [],
     reports: [],
@@ -112,6 +118,11 @@ export default function AdminModerationPage() {
     setNotice('');
 
     try {
+      if (!(await verifyAdminAccess())) {
+        setQueue({ listings: [], reports: [] });
+        return;
+      }
+
       const response = await fetch(`/api/admin/moderation?page=${page}&limit=20`, {
         cache: 'no-store',
       });
@@ -147,7 +158,7 @@ export default function AdminModerationPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -166,7 +177,7 @@ export default function AdminModerationPage() {
   }, [refreshQueue]);
 
   useSmartstoreRealtime({
-    enabled: true,
+    enabled: isAdminAccessAllowed,
     fallbackIntervalMs: 4000,
     eventTypes: [
       'moderation_updated',
@@ -268,9 +279,9 @@ export default function AdminModerationPage() {
           </div>
         </header>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 

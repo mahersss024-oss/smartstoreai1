@@ -30,6 +30,54 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /اتفاقية العمولة/);
 });
 
+test('admin pages verify access before protected admin api requests', () => {
+  const pages = [
+    ['app', 'admin', 'page.tsx'],
+    ['app', 'admin', 'users', 'page.tsx'],
+    ['app', 'admin', 'listings', 'page.tsx'],
+    ['app', 'admin', 'commissions', 'page.tsx'],
+    ['app', 'admin', 'moderation', 'page.tsx'],
+    ['app', 'admin', 'maintenance', 'page.tsx'],
+  ];
+
+  for (const pageSegments of pages) {
+    const page = readProjectFile(...pageSegments);
+    const guardIndex = page.indexOf('verifyAdminAccess');
+    const firstAdminApiIndex = page.indexOf('/api/admin/');
+
+    assert.notEqual(
+      guardIndex,
+      -1,
+      `${pageSegments.join('/')} must use the admin access guard`,
+    );
+    assert.notEqual(
+      firstAdminApiIndex,
+      -1,
+      `${pageSegments.join('/')} must call an admin api`,
+    );
+    assert.ok(
+      guardIndex < firstAdminApiIndex,
+      `${pageSegments.join('/')} must verify access before calling admin api`,
+    );
+  }
+});
+
+test('admin realtime subscriptions wait for verified access', () => {
+  const pages = [
+    ['app', 'admin', 'page.tsx'],
+    ['app', 'admin', 'listings', 'page.tsx'],
+    ['app', 'admin', 'commissions', 'page.tsx'],
+    ['app', 'admin', 'moderation', 'page.tsx'],
+  ];
+
+  for (const pageSegments of pages) {
+    const page = readProjectFile(...pageSegments);
+
+    assert.doesNotMatch(page, /enabled:\s*true/);
+    assert.match(page, /enabled:\s*isAdminAccessAllowed/);
+  }
+});
+
 test('admin users api is server-side admin protected and audited', () => {
   const listRoute = readProjectFile('app', 'api', 'admin', 'users', 'route.ts');
   const updateRoute = readProjectFile(

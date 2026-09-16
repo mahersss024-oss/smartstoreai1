@@ -22,6 +22,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
+import { useAdminAccess } from '../use-admin-access';
 
 type AdminUserRecord = {
   id: string;
@@ -87,6 +88,10 @@ function normalizeRole(role: string): UserDraft['role'] {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    verifyAdminAccess,
+  } = useAdminAccess('admin');
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
@@ -109,6 +114,12 @@ export default function AdminUsersPage() {
       setNotice('');
 
       try {
+        if (!(await verifyAdminAccess())) {
+          setUsers([]);
+          setPagination(null);
+          return;
+        }
+
         const params = new URLSearchParams({
           page: String(page),
           limit: '20',
@@ -165,7 +176,7 @@ export default function AdminUsersPage() {
         setIsLoading(false);
       }
     },
-    [query, roleFilter, router],
+    [query, roleFilter, router, verifyAdminAccess],
   );
 
   useEffect(() => {
@@ -348,9 +359,9 @@ export default function AdminUsersPage() {
           </div>
         </header>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 

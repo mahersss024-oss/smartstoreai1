@@ -8,6 +8,7 @@ import { ArrowRight, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import { useAdminAccess } from '../use-admin-access';
 
 type MaintenanceCounts = {
   users: number;
@@ -75,6 +76,10 @@ function formatNumber(value: number) {
 
 export default function AdminMaintenancePage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    verifyAdminAccess,
+  } = useAdminAccess('admin');
   const [counts, setCounts] = useState<MaintenanceCounts | null>(null);
   const [scope, setScope] = useState<CleanupScope>('commissions');
   const [confirmation, setConfirmation] = useState('');
@@ -92,6 +97,11 @@ export default function AdminMaintenancePage() {
     setNotice('');
 
     try {
+      if (!(await verifyAdminAccess())) {
+        setCounts(null);
+        return;
+      }
+
       const response = await fetch('/api/admin/maintenance');
 
       if (response.status === 401) {
@@ -114,7 +124,7 @@ export default function AdminMaintenancePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -180,9 +190,9 @@ export default function AdminMaintenancePage() {
           <ThemeToggle language="ar" />
         </header>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 
@@ -195,9 +205,13 @@ export default function AdminMaintenancePage() {
             </Button>
           </div>
 
-          {isLoading || !counts ? (
+          {isLoading || (!counts && !adminAccessNotice && !notice) ? (
             <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
               جار تحميل الأعداد...
+            </div>
+          ) : !counts ? (
+            <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
+              {adminAccessNotice || notice}
             </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

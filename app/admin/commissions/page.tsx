@@ -16,6 +16,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { useAdminAccess } from '../use-admin-access';
 
 type CommissionRecord = {
   id: string;
@@ -62,6 +63,11 @@ function formatStatus(status: CommissionRecord['status']) {
 
 export default function AdminCommissionsPage() {
   const router = useRouter();
+  const {
+    adminAccessNotice,
+    isAdminAccessAllowed,
+    verifyAdminAccess,
+  } = useAdminAccess('admin');
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [commissionsPagination, setCommissionsPagination] =
     useState<PaginationMeta | null>(null);
@@ -88,6 +94,12 @@ export default function AdminCommissionsPage() {
     setNotice('');
 
     try {
+      if (!(await verifyAdminAccess())) {
+        setCommissions([]);
+        setCommissionsPagination(null);
+        return;
+      }
+
       const response = await fetch(`/api/admin/commissions?page=${page}&limit=20`, {
         cache: 'no-store',
       });
@@ -121,7 +133,7 @@ export default function AdminCommissionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -140,7 +152,7 @@ export default function AdminCommissionsPage() {
   }, [refreshCommissions]);
 
   useSmartstoreRealtime({
-    enabled: true,
+    enabled: isAdminAccessAllowed,
     fallbackIntervalMs: 4000,
     eventTypes: ['commission_updated', 'maintenance_cleanup'],
     onEvent: () => {
@@ -228,9 +240,9 @@ export default function AdminCommissionsPage() {
           <ThemeToggle language="ar" />
         </header>
 
-        {notice && (
+        {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {notice}
+            {adminAccessNotice || notice}
           </div>
         )}
 
