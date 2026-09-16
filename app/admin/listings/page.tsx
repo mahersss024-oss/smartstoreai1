@@ -339,12 +339,14 @@ export default function AdminListingsPage() {
 
         <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card md:grid-cols-[1fr_auto_auto]">
           <Input
+            name="listingSearch"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="ابحث بالعنوان أو البائع أو المدينة"
           />
           <select
             className="h-10 rounded-md border bg-background px-3 text-sm"
+            name="listingStatusFilter"
             value={status}
             onChange={(event) =>
               setStatus(event.target.value as AdminListing['status'] | 'all')
@@ -423,14 +425,15 @@ export default function AdminListingsPage() {
                     )}
 
                     <div className="grid gap-2 lg:grid-cols-4">
-                      <Input value={draft.title} onChange={(event) => updateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
-                      <Input value={draft.category} onChange={(event) => updateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
-                      <Input value={draft.city} onChange={(event) => updateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
-                      <Input value={draft.price} onChange={(event) => updateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
+                      <Input name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => updateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
+                      <Input name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => updateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
+                      <Input name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => updateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
+                      <Input name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => updateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
                     </div>
 
                     <textarea
                       className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
+                      name={`listing-${listing.id}-description`}
                       value={draft.description}
                       onChange={(event) =>
                         updateDraft(listing.id, { description: event.target.value })
@@ -441,6 +444,7 @@ export default function AdminListingsPage() {
                     <div className="grid gap-2 md:grid-cols-3">
                       <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
+                        name={`listing-${listing.id}-condition`}
                         value={draft.condition}
                         onChange={(event) =>
                           updateDraft(listing.id, {
@@ -456,6 +460,7 @@ export default function AdminListingsPage() {
                       </select>
                       <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
+                        name={`listing-${listing.id}-priceMode`}
                         value={draft.priceMode}
                         onChange={(event) =>
                           updateDraft(listing.id, {
@@ -469,6 +474,7 @@ export default function AdminListingsPage() {
                       </select>
                       <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
+                        name={`listing-${listing.id}-status`}
                         value={draft.status}
                         onChange={(event) =>
                           updateDraft(listing.id, {

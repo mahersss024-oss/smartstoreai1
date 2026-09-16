@@ -1169,6 +1169,7 @@ export default function AccountPage() {
                     disabled={isProfilePhoneInputLocked || isSavingProfile}
                     dir="ltr"
                     inputMode="tel"
+                    name="profilePhoneNumber"
                     placeholder="05xxxxxxxx"
                     type="tel"
                     value={profilePhone}
@@ -1362,6 +1363,7 @@ export default function AccountPage() {
                           )}
                           <input
                             className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                            name={`listing-${listing.id}-title`}
                             onChange={(event) =>
                               setEditForm((current) => ({
                                 ...current,
@@ -1373,6 +1375,7 @@ export default function AccountPage() {
                           />
                           <textarea
                             className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500 dark:bg-card"
+                            name={`listing-${listing.id}-description`}
                             onChange={(event) =>
                               setEditForm((current) => ({
                                 ...current,
@@ -1385,6 +1388,7 @@ export default function AccountPage() {
                           <div className="grid gap-2 sm:grid-cols-2">
                             <input
                               className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                              name={`listing-${listing.id}-city`}
                               onChange={(event) =>
                                 setEditForm((current) => ({
                                   ...current,
@@ -1396,6 +1400,7 @@ export default function AccountPage() {
                             />
                             <select
                               className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                              name={`listing-${listing.id}-category`}
                               onChange={(event) =>
                                 setEditForm((current) => ({
                                   ...current,
@@ -1414,6 +1419,7 @@ export default function AccountPage() {
                           <div className="grid gap-2 sm:grid-cols-[9rem_1fr_9rem]">
                             <select
                               className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                              name={`listing-${listing.id}-priceMode`}
                               onChange={(event) =>
                                 setEditForm((current) => ({
                                   ...current,
@@ -1430,6 +1436,7 @@ export default function AccountPage() {
                               className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:opacity-50 dark:bg-card"
                               disabled={editForm.priceMode !== 'number'}
                               inputMode="decimal"
+                              name={`listing-${listing.id}-price`}
                               onChange={(event) =>
                                 setEditForm((current) => ({
                                   ...current,
@@ -1441,6 +1448,7 @@ export default function AccountPage() {
                             />
                             <select
                               className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                              name={`listing-${listing.id}-condition`}
                               onChange={(event) =>
                                 setEditForm((current) => ({
                                   ...current,
@@ -1567,6 +1575,7 @@ export default function AccountPage() {
                               accept="image/*"
                               className="sr-only"
                               disabled={uploadingListingId === listing.id}
+                              name={`listing-${listing.id}-image`}
                               onChange={(event) => {
                                 const file = event.currentTarget.files?.[0] ?? null;
                                 void uploadListingImage(listing, file);

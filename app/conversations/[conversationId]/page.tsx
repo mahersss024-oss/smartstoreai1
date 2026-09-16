@@ -788,6 +788,7 @@ export default function ConversationPage() {
               <Textarea
                 className="min-h-20 resize-none"
                 disabled={conversation?.status !== 'open' || isConversationBlocked}
+                name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}

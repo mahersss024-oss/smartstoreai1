@@ -512,6 +512,7 @@ export default function CommissionsPage() {
                           <Input
                             inputMode="decimal"
                             min="1"
+                            name={`commission-${commission.id}-saleAmount`}
                             onChange={(event) =>
                               setAmounts((current) => ({
                                 ...current,

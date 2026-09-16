@@ -117,6 +117,8 @@ export default function CommissionAgreementPage() {
               <input
                 checked={accepted}
                 className="mt-1 size-4 accent-blue-600"
+                id="platform-agreement-accepted"
+                name="platformAgreementAccepted"
                 onChange={(event) => setAccepted(event.target.checked)}
                 type="checkbox"
               />

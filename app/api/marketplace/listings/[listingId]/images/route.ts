@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { createListingImageDeliveryUrls } from '@/agent/marketplace/listing-image-delivery';
 import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
@@ -297,12 +298,11 @@ export async function POST(request: Request, context: RouteContext) {
     isRelevantToListing:
       formData.get('isRelevantToListing') === 'false' ? false : undefined,
   });
+  const imageUrls = createListingImageDeliveryUrls(imageUrl);
   const image: ListingImage = {
     id: imageId,
     listingId,
-    originalUrl: imageUrl,
-    displayUrl: imageUrl,
-    thumbnailUrl: imageUrl,
+    ...imageUrls,
     isPrimary: false,
     qualityScore: quality.qualityScore,
     status:

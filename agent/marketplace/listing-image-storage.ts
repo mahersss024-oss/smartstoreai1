@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { ModelMessage } from 'ai';
 
 import { analyzeImageQuality } from './image-quality';
+import { createListingImageDeliveryUrls } from './listing-image-delivery';
 import {
   defaultMaxListingImages,
   getMaxListingImagesPerListing,
@@ -186,12 +187,11 @@ export async function saveUploadedListingImagesForSeller({
       mimeType: uploadedImage.mediaType,
       sizeBytes: uploadedImage.data.byteLength,
     });
+    const imageUrls = createListingImageDeliveryUrls(imageUrl);
     const image: ListingImage = {
       id: imageId,
       listingId,
-      originalUrl: imageUrl,
-      displayUrl: imageUrl,
-      thumbnailUrl: imageUrl,
+      ...imageUrls,
       isPrimary: false,
       qualityScore: quality.qualityScore,
       status: quality.listingImageStatus,

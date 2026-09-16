@@ -1,3 +1,4 @@
+import { createListingImageDeliveryUrls } from '@/agent/marketplace/listing-image-delivery';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
@@ -54,7 +55,12 @@ function mapListing(listing: {
     favoriteCount: listing.favoriteCount,
     createdAt: listing.createdAt.toISOString(),
     updatedAt: listing.updatedAt.toISOString(),
-    images: listing.images ?? [],
+    images:
+      listing.images?.map((image) => ({
+        ...image,
+        thumbnailUrl: createListingImageDeliveryUrls(image.thumbnailUrl)
+          .thumbnailUrl,
+      })) ?? [],
   };
 }
 

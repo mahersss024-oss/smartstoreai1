@@ -235,6 +235,7 @@ export default function AdminMaintenancePage() {
 
           <select
             className="h-10 rounded-md border bg-background px-3 text-sm"
+            name="cleanupScope"
             value={scope}
             onChange={(event) => setScope(event.target.value as CleanupScope)}
           >
@@ -251,6 +252,7 @@ export default function AdminMaintenancePage() {
 
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input
+              name="cleanupConfirmation"
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
               placeholder="اكتب: تنظيف"

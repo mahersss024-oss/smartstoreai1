@@ -42,6 +42,7 @@ import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from './listing-image-limits';
+import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
 import { deleteListingObject } from './object-storage';
 
 type DatabaseListingRecord = {
@@ -328,7 +329,7 @@ function toListingRecord(listing: DatabaseListingRecord): memoryStore.ListingRec
     images:
       listing.images?.map(
         (image) =>
-          ({
+          normalizeListingImageDeliveryUrls({
             id: image.id,
             listingId: image.listingId,
             originalUrl: image.originalUrl,

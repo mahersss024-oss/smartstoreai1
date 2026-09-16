@@ -392,6 +392,7 @@ export default function AdminUsersPage() {
               بحث
               <input
                 className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                name="userSearch"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="الاسم، البريد، رقم الجوال، أو معرف المستخدم"
                 type="search"
@@ -402,6 +403,7 @@ export default function AdminUsersPage() {
               الدور
               <select
                 className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                name="userRoleFilter"
                 onChange={(event) => setRoleFilter(event.target.value)}
                 value={roleFilter}
               >
@@ -465,6 +467,7 @@ export default function AdminUsersPage() {
                       الدور
                       <select
                         className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                        name={`user-${user.id}-role`}
                         disabled={isSaving || isDeleting}
                         onChange={(event) =>
                           updateDraft(user.id, {
@@ -486,6 +489,7 @@ export default function AdminUsersPage() {
                           dir="ltr"
                           disabled={isSaving || isDeleting}
                           inputMode="tel"
+                          name={`user-${user.id}-phoneNumber`}
                           onChange={(event) =>
                             updateDraft(user.id, {
                               phoneNumber: event.target.value,
