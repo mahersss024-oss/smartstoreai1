@@ -1,0 +1,6 @@
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "platformAgreementVersion" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "platformAgreementAccepted" TIMESTAMP(3);
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsVersion" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "privacyPolicyVersion" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "listingPolicyVersion" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "commissionPolicyVersion" TEXT;

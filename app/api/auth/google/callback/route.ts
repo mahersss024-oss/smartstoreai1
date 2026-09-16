@@ -4,10 +4,15 @@ import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import {
   clearOauthStateCookie,
+  commissionPolicyVersion,
   commissionAgreementVersion,
   createSessionCookie,
   getConfiguredRoleForEmail,
   getCommissionAgreement,
+  listingPolicyVersion,
+  platformAgreementVersion,
+  privacyPolicyVersion,
+  termsVersion,
   getOauthState,
   type AuthSessionUser,
 } from '@/lib/auth/session';
@@ -64,6 +69,18 @@ async function persistGoogleUserRegistration(
       : undefined,
     commissionAgreementAccepted: commissionAgreement
       ? new Date(commissionAgreement.acceptedAt * 1000)
+      : undefined,
+    platformAgreementVersion: commissionAgreement
+      ? platformAgreementVersion
+      : undefined,
+    platformAgreementAccepted: commissionAgreement
+      ? new Date(commissionAgreement.acceptedAt * 1000)
+      : undefined,
+    termsVersion: commissionAgreement ? termsVersion : undefined,
+    privacyPolicyVersion: commissionAgreement ? privacyPolicyVersion : undefined,
+    listingPolicyVersion: commissionAgreement ? listingPolicyVersion : undefined,
+    commissionPolicyVersion: commissionAgreement
+      ? commissionPolicyVersion
       : undefined,
   };
 

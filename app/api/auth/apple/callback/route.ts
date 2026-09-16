@@ -12,10 +12,15 @@ import {
 } from '@/lib/auth/apple';
 import {
   clearOauthStateCookie,
+  commissionPolicyVersion,
   commissionAgreementVersion,
   createSessionCookie,
   getCommissionAgreement,
   getConfiguredRoleForEmail,
+  listingPolicyVersion,
+  platformAgreementVersion,
+  privacyPolicyVersion,
+  termsVersion,
   getOauthState,
   type AuthSessionUser,
 } from '@/lib/auth/session';
@@ -113,6 +118,18 @@ async function persistAppleUserRegistration(
       : undefined,
     commissionAgreementAccepted: commissionAgreement
       ? new Date(commissionAgreement.acceptedAt * 1000)
+      : undefined,
+    platformAgreementVersion: commissionAgreement
+      ? platformAgreementVersion
+      : undefined,
+    platformAgreementAccepted: commissionAgreement
+      ? new Date(commissionAgreement.acceptedAt * 1000)
+      : undefined,
+    termsVersion: commissionAgreement ? termsVersion : undefined,
+    privacyPolicyVersion: commissionAgreement ? privacyPolicyVersion : undefined,
+    listingPolicyVersion: commissionAgreement ? listingPolicyVersion : undefined,
+    commissionPolicyVersion: commissionAgreement
+      ? commissionPolicyVersion
       : undefined,
   };
   const existingUserByEmail = await prisma.user.findUnique({

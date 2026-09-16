@@ -81,6 +81,12 @@ model User {
   role                        String                  @default("user")
   commissionAgreementVersion  String?
   commissionAgreementAccepted DateTime?
+  platformAgreementVersion    String?
+  platformAgreementAccepted   DateTime?
+  termsVersion                String?
+  privacyPolicyVersion        String?
+  listingPolicyVersion        String?
+  commissionPolicyVersion     String?
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
 

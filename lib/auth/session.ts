@@ -18,12 +18,22 @@ export type AuthSession = {
 const sessionCookieName = 'smartstore_session';
 const oauthStateCookieName = 'smartstore_oauth_state';
 const commissionAgreementCookieName = 'smartstore_commission_agreement';
-export const commissionAgreementVersion = 'commission-1pct-v1';
+export const platformAgreementVersion = 'platform-agreement-2026-09-16-v1';
+export const termsVersion = 'terms-2026-09-16-v1';
+export const privacyPolicyVersion = 'privacy-2026-09-16-v1';
+export const listingPolicyVersion = 'listing-policy-2026-09-16-v1';
+export const commissionPolicyVersion = 'commission-policy-2026-09-16-v1';
+export const commissionAgreementVersion = platformAgreementVersion;
 const sessionMaxAgeSeconds = 60 * 60 * 24 * 14;
 const commissionAgreementMaxAgeSeconds = 60 * 60 * 24 * 365;
 
 export type CommissionAgreement = {
   version: typeof commissionAgreementVersion;
+  platformAgreementVersion: typeof platformAgreementVersion;
+  termsVersion: typeof termsVersion;
+  privacyPolicyVersion: typeof privacyPolicyVersion;
+  listingPolicyVersion: typeof listingPolicyVersion;
+  commissionPolicyVersion: typeof commissionPolicyVersion;
   commissionRatePercent: 1;
   acceptedAt: number;
 };
@@ -166,6 +176,11 @@ export function clearSessionCookie() {
 export function createCommissionAgreementCookie() {
   const agreement: CommissionAgreement = {
     version: commissionAgreementVersion,
+    platformAgreementVersion,
+    termsVersion,
+    privacyPolicyVersion,
+    listingPolicyVersion,
+    commissionPolicyVersion,
     commissionRatePercent: 1,
     acceptedAt: Math.floor(Date.now() / 1000),
   };
@@ -195,6 +210,11 @@ export function parseCommissionAgreement(value: string | undefined | null) {
 
     if (
       parsed.version !== commissionAgreementVersion ||
+      parsed.platformAgreementVersion !== platformAgreementVersion ||
+      parsed.termsVersion !== termsVersion ||
+      parsed.privacyPolicyVersion !== privacyPolicyVersion ||
+      parsed.listingPolicyVersion !== listingPolicyVersion ||
+      parsed.commissionPolicyVersion !== commissionPolicyVersion ||
       parsed.commissionRatePercent !== 1 ||
       typeof parsed.acceptedAt !== 'number'
     ) {

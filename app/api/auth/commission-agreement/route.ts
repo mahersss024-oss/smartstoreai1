@@ -1,4 +1,11 @@
-import { createCommissionAgreementCookie } from '@/lib/auth/session';
+import {
+  commissionPolicyVersion,
+  createCommissionAgreementCookie,
+  listingPolicyVersion,
+  platformAgreementVersion,
+  privacyPolicyVersion,
+  termsVersion,
+} from '@/lib/auth/session';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 
@@ -48,6 +55,11 @@ export async function POST(request: Request) {
     {
       accepted: true,
       commissionRatePercent: 1,
+      platformAgreementVersion,
+      termsVersion,
+      privacyPolicyVersion,
+      listingPolicyVersion,
+      commissionPolicyVersion,
     },
     {
       headers: {
