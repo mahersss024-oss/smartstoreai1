@@ -9,7 +9,8 @@ test('listing details keeps up to eight thumbnails in a four-column grid below t
   );
 
   assert.match(source, /visibleImages = images\.slice\(0, 8\)/);
-  assert.match(source, /className="grid grid-cols-4 gap-1\.5"/);
+  assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
+  assert.doesNotMatch(source, /grid gap-2 p-2 sm:p-3/);
   assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
 });
 
