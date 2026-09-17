@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     healthCheckPath: /api/health
-    buildCommand: corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --frozen-lockfile && pnpm build
-    preDeployCommand: corepack prepare pnpm@10.32.1 --activate && pnpm db:deploy
+    buildCommand: corepack prepare pnpm@10.32.1 --activate && corepack pnpm install --frozen-lockfile && corepack pnpm build
+    preDeployCommand: corepack prepare pnpm@10.32.1 --activate && corepack pnpm db:deploy
     startCommand: node scripts/start.mjs
     envVars:
       - key: NODE_ENV
