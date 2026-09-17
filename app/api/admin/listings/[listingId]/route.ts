@@ -281,6 +281,13 @@ export async function DELETE(request: Request, context: RouteContext) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
+  if (existing.status !== 'deleted') {
+    return Response.json(
+      { error: 'listing_must_be_deleted_first' },
+      { status: 409 },
+    );
+  }
+
   // Permanent delete: cascades to images, conversations, favorites, reports
   // and commissions attached to the listing.
   await prisma.$transaction([
@@ -328,5 +335,5 @@ export async function DELETE(request: Request, context: RouteContext) {
     // Admin delete must not fail due to realtime delivery.
   }
 
-  return Response.json({ status: 'deleted' });
+  return Response.json({ status: 'permanently_deleted' });
 }

@@ -138,12 +138,14 @@ function AdminListingCard({
   onUpdateDraft,
   onSave,
   onDelete,
+  onPermanentDelete,
 }: Readonly<{
   listing: AdminListing;
   draft: ListingDraft;
   onUpdateDraft: (listingId: string, updates: Partial<ListingDraft>) => void;
   onSave: (listingId: string) => void;
   onDelete: (listingId: string) => void;
+  onPermanentDelete: (listingId: string) => void;
 }>) {
   return (
     <article className="grid gap-3 rounded-md border p-3">
@@ -256,10 +258,25 @@ function AdminListingCard({
           <Pause className="size-4" />
           إيقاف
         </Button>
-        <Button variant="outline" className="rounded-md" onClick={() => onDelete(listing.id)}>
-          <Trash2 className="size-4" />
-          حذف
-        </Button>
+        {listing.status === 'deleted' ? (
+          <Button
+            variant="outline"
+            className="rounded-md text-red-600 hover:text-red-700"
+            onClick={() => onPermanentDelete(listing.id)}
+          >
+            <Trash2 className="size-4" />
+            حذف نهائي
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="rounded-md"
+            onClick={() => onDelete(listing.id)}
+          >
+            <Trash2 className="size-4" />
+            حذف
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -467,7 +484,9 @@ function AdminListingsPageContent() {
       }
 
       const response = await fetch(`/api/admin/listings/${listingId}`, {
-        method: 'DELETE',
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'deleted' }),
       });
 
       if (!response.ok) {
@@ -476,6 +495,31 @@ function AdminListingsPageContent() {
       }
 
       setNotice('تم حذف الإعلان.');
+      await loadListings(1);
+    },
+    [loadListings],
+  );
+
+  const permanentlyDeleteListing = useCallback(
+    async (listingId: string) => {
+      if (
+        !window.confirm(
+          'هل تريد حذف هذا الإعلان نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.',
+        )
+      ) {
+        return;
+      }
+
+      const response = await fetch(`/api/admin/listings/${listingId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        setNotice('تعذر حذف الإعلان نهائيًا.');
+        return;
+      }
+
+      setNotice('تم حذف الإعلان نهائيًا.');
       await loadListings(1);
     },
     [loadListings],
@@ -506,6 +550,9 @@ function AdminListingsPageContent() {
             onUpdateDraft={updateDraft}
             onSave={(listingId) => void saveListing(listingId)}
             onDelete={(listingId) => void deleteListing(listingId)}
+            onPermanentDelete={(listingId) =>
+              void permanentlyDeleteListing(listingId)
+            }
           />
         ))}
 

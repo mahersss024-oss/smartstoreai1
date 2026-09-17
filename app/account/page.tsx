@@ -367,7 +367,8 @@ export default function AccountPage() {
       sold: listings.filter((listing) => listing.status === 'مباع').length,
     };
   }, [listings]);
-  const isAdmin = session.user?.role === 'admin';
+  const isAdmin =
+    session.user?.role === 'owner' || session.user?.role === 'admin';
   const hasSavedProfilePhone = Boolean(savedProfilePhone);
   const isProfilePhoneInputLocked =
     hasSavedProfilePhone && !isEditingProfilePhone;

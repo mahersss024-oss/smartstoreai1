@@ -116,6 +116,25 @@ test('admin listing mutations are server-side protected and rate limited', () =>
   assert.match(listingRoute, /enforceApiRateLimit/);
   assert.match(listingRoute, /admin_listing_mutation/);
   assert.match(listingRoute, /adminAuditLog\.create/);
+  assert.match(listingRoute, /listing_must_be_deleted_first/);
+});
+
+test('account page shows the admin dashboard to the owner and appointed admins', () => {
+  const page = readProjectFile('app', 'account', 'page.tsx');
+
+  assert.match(page, /session\.user\?\.role === 'owner'/);
+  assert.match(page, /session\.user\?\.role === 'admin'/);
+  assert.match(page, /لوحة الإدارة/);
+});
+
+test('admin listings offer permanent deletion only for deleted listings', () => {
+  const page = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(page, /listing\.status === 'deleted'/);
+  assert.match(page, /حذف نهائي/);
+  assert.match(page, /لا يمكن التراجع عن هذا الإجراء/);
+  assert.match(page, /body: JSON\.stringify\(\{ status: 'deleted' \}\)/);
+  assert.match(page, /method: 'DELETE'/);
 });
 
 test('admin commission, moderation, and maintenance mutations are rate limited', () => {

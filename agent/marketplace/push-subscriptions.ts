@@ -33,11 +33,13 @@ export type StoredPushSubscription = {
   updatedAt: string;
 };
 
-const filePath = join(
-  process.cwd(),
-  '.data',
-  'push-subscriptions-store.json',
-);
+function resolveDataDirectory() {
+  const configured = process.env.SMARTSTORE_DATA_DIR?.trim();
+
+  return configured ? configured : join(process.cwd(), '.data');
+}
+
+const filePath = join(resolveDataDirectory(), 'push-subscriptions-store.json');
 
 const subscriptions = new Map<string, StoredPushSubscription>();
 let storeLoaded = false;
