@@ -172,6 +172,30 @@ function formatConversationReportReason(reason: string) {
   return labels[reason] ?? reason;
 }
 
+function getUserReportConfirmationMessage(action: UserReportResolution) {
+  const messages: Partial<Record<UserReportResolution, string>> = {
+    close_conversation:
+      'سيتم إغلاق المحادثة ومنع استمرار التواصل بين الطرفين. هل تريد المتابعة؟',
+    restrict: 'سيتم منع التواصل بين الطرفين وإغلاق البلاغ. هل تريد المتابعة؟',
+    warn: 'سيتم تسجيل تحذير على الحساب المبلّغ عنه وإغلاق البلاغ. هل تريد المتابعة؟',
+  };
+
+  return messages[action] ?? '';
+}
+
+function getListingReportConfirmMessage(
+  action: 'dismiss' | 'reject_listing' | 'delete_listing',
+) {
+  const messages: Partial<Record<typeof action, string>> = {
+    delete_listing:
+      'سيتم حذف الإعلان وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟',
+    reject_listing:
+      'سيتم إيقاف الإعلان عن الظهور وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟',
+  };
+
+  return messages[action] ?? '';
+}
+
 export default function AdminModerationPage() {
   const router = useRouter();
   const {
@@ -342,14 +366,7 @@ export default function AdminModerationPage() {
 
   const moderateUserReport = useCallback(
     async (reportId: string, action: UserReportResolution) => {
-      const confirmationMessage =
-        action === 'close_conversation'
-          ? 'سيتم إغلاق المحادثة ومنع استمرار التواصل بين الطرفين. هل تريد المتابعة؟'
-          : action === 'restrict'
-            ? 'سيتم منع التواصل بين الطرفين وإغلاق البلاغ. هل تريد المتابعة؟'
-            : action === 'warn'
-              ? 'سيتم تسجيل تحذير على الحساب المبلّغ عنه وإغلاق البلاغ. هل تريد المتابعة؟'
-              : '';
+      const confirmationMessage = getUserReportConfirmationMessage(action);
 
       if (confirmationMessage && !window.confirm(confirmationMessage)) {
         return;
@@ -388,12 +405,7 @@ export default function AdminModerationPage() {
         return;
       }
 
-      const confirmationMessage =
-        action === 'delete_listing'
-          ? 'سيتم حذف الإعلان وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟'
-          : action === 'reject_listing'
-            ? 'سيتم إيقاف الإعلان عن الظهور وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟'
-            : '';
+      const confirmationMessage = getListingReportConfirmMessage(action);
 
       if (confirmationMessage && !window.confirm(confirmationMessage)) {
         return;
@@ -710,7 +722,7 @@ export default function AdminModerationPage() {
                           <span className="font-semibold">
                             {message.senderId === report.reporterId ? 'المبلّغ' : 'المبلّغ عنه'}:
                           </span>{' '}
-                          <span className="break-words">{message.body}</span>
+                          <span className="wrap-break-word">{message.body}</span>
                         </div>
                       ))}
                     </div>
