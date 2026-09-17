@@ -23,6 +23,7 @@ import {
   publishListing,
   reportConversationUser,
   reportListing,
+  setUserReportModerationStatus,
   setListingModerationStatus,
   setPrimaryListingImageForSeller,
   setReportModerationStatus,
@@ -361,6 +362,159 @@ test('lets conversation participants report and block the other user', () => {
   assert.equal(blockStatus?.blockedByMe, true);
   assert.equal(afterBlock.status, 'conversation_blocked');
   assert.equal(afterBlock.message, null);
+});
+
+test('prevents duplicate open conversation reports from the same reporter', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-dedup',
+    category: 'cars',
+    title: 'سيارة للبلاغ المكرر',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:report-dedup');
+  const first = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-dedup',
+    { reason: 'conversation_report', details: 'أول بلاغ' },
+  );
+  const duplicate = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-dedup',
+    { reason: 'conversation_report', details: 'بلاغ مكرر' },
+  );
+
+  assert.equal(first.status, 'reported');
+  assert.equal(duplicate.status, 'already_reported');
+  assert.equal(duplicate.report?.id, first.report?.id);
+});
+
+test('lets an admin record a warning resolution on a conversation report', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-warn',
+    category: 'cars',
+    title: 'سيارة للتحذير',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:report-warn');
+  const reported = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-warn',
+    { reason: 'conversation_report' },
+  );
+  const warned = setUserReportModerationStatus(
+    reported.report?.id ?? '',
+    'warn',
+  );
+
+  assert.equal(warned.status, 'reviewed');
+  assert.equal(warned.report?.resolution, 'warn');
+});
+
+test('restricting a conversation report blocks contact between the parties', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-restrict',
+    category: 'cars',
+    title: 'سيارة للتقييد',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(
+    listing.id,
+    'buyer:report-restrict',
+  );
+  const reported = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-restrict',
+    { reason: 'conversation_report' },
+  );
+  const restricted = setUserReportModerationStatus(
+    reported.report?.id ?? '',
+    'restrict',
+  );
+  const blockStatus = getConversationBlockStatus(
+    opened.conversation?.id ?? '',
+    'buyer:report-restrict',
+  );
+  const afterMessage = addConversationMessage(
+    opened.conversation?.id ?? '',
+    'seller:report-restrict',
+    'هل ما زلت مهتمًا؟',
+  );
+
+  assert.equal(restricted.status, 'reviewed');
+  assert.equal(restricted.report?.resolution, 'restrict');
+  assert.equal(blockStatus?.blocked, true);
+  assert.equal(blockStatus?.blockedByMe, true);
+  // Restricting closes the conversation, so later replies are still refused.
+  assert.equal(afterMessage.status, 'conversation_closed');
+  assert.equal(afterMessage.message, null);
+});
+
+test('keeps a conversation report open when the admin only reviews it', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-review',
+    category: 'cars',
+    title: 'سيارة للمراجعة',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(listing.id, 'buyer:report-review');
+  const reported = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-review',
+    { reason: 'conversation_report' },
+  );
+  const reviewed = setUserReportModerationStatus(
+    reported.report?.id ?? '',
+    'review',
+  );
+
+  assert.equal(reviewed.status, 'open');
+  assert.equal(reviewed.report?.resolution, 'review');
+});
+
+test('orders open conversation reports ahead of resolved ones in the queue', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-order',
+    category: 'cars',
+    title: 'سيارة للترتيب',
+  });
+  publishListing(listing.id);
+
+  const resolvedConversation = createConversationForListing(
+    listing.id,
+    'buyer:report-order-resolved',
+  );
+  const resolvedReport = reportConversationUser(
+    resolvedConversation.conversation?.id ?? '',
+    'buyer:report-order-resolved',
+    { reason: 'conversation_report' },
+  );
+  setUserReportModerationStatus(resolvedReport.report?.id ?? '', 'dismiss');
+
+  const openConversation = createConversationForListing(
+    listing.id,
+    'buyer:report-order-open',
+  );
+  const openReport = reportConversationUser(
+    openConversation.conversation?.id ?? '',
+    'buyer:report-order-open',
+    { reason: 'conversation_report' },
+  );
+
+  const queue = listModerationQueue();
+  const openIndex = queue.userReports.findIndex(
+    (report) => report.id === openReport.report?.id,
+  );
+  const resolvedIndex = queue.userReports.findIndex(
+    (report) => report.id === resolvedReport.report?.id,
+  );
+
+  assert.notEqual(openIndex, -1);
+  assert.notEqual(resolvedIndex, -1);
+  assert.equal(openIndex < resolvedIndex, true);
 });
 
 test('toggles favorite listings and updates the listing favorite count', () => {

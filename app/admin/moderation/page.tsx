@@ -9,10 +9,13 @@ import {
   BadgeCheck,
   Ban,
   CheckCircle2,
+  ExternalLink,
   Flag,
+  MessageCircle,
   Percent,
   ShieldCheck,
   Trash2,
+  Users,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -48,12 +51,46 @@ type ReportRecord = {
   listing: ListingRecord | null;
 };
 
+type UserReportResolution =
+  | 'review'
+  | 'dismiss'
+  | 'warn'
+  | 'restrict'
+  | 'close_conversation';
+
+type UserReportRecord = {
+  id: string;
+  reporterId: string;
+  targetUserId: string;
+  reason: string;
+  details?: string;
+  status: 'open' | 'reviewed' | 'dismissed';
+  resolution?: UserReportResolution;
+  createdAt: string;
+  reporter?: { id: string; email: string; name: string | null };
+  targetUser?: { id: string; email: string; name: string | null };
+  conversation: {
+    id: string;
+    status: string;
+    listing: { id: string; title: string | null };
+    messages: Array<{
+      id: string;
+      senderId: string;
+      body: string;
+      status: string;
+      createdAt: string;
+    }>;
+  } | null;
+};
+
 type ModerationQueue = {
   listings: ListingRecord[];
   reports: ReportRecord[];
+  userReports: UserReportRecord[];
   pagination?: {
     listings: PaginationMeta;
     reports: PaginationMeta;
+    userReports: PaginationMeta;
   };
 };
 
@@ -90,6 +127,18 @@ function formatComplianceDecision(decision: ListingRecord['compliance']['decisio
   return labels[decision];
 }
 
+function formatUserReportResolution(resolution: UserReportResolution) {
+  const labels: Record<UserReportResolution, string> = {
+    review: 'قيد المراجعة',
+    dismiss: 'بلاغ مرفوض',
+    warn: 'تحذير مسجّل',
+    restrict: 'تواصل مقيّد',
+    close_conversation: 'محادثة مغلقة',
+  };
+
+  return labels[resolution];
+}
+
 export default function AdminModerationPage() {
   const router = useRouter();
   const {
@@ -100,10 +149,12 @@ export default function AdminModerationPage() {
   const [queue, setQueue] = useState<ModerationQueue>({
     listings: [],
     reports: [],
+    userReports: [],
   });
   const [nextPage, setNextPage] = useState(1);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
 
   const openReportsCount = useMemo(
     () => queue.reports.filter((report) => report.status === 'open').length,
@@ -111,7 +162,8 @@ export default function AdminModerationPage() {
   );
   const hasMoreQueue =
     Boolean(queue.pagination?.listings.hasMore) ||
-    Boolean(queue.pagination?.reports.hasMore);
+    Boolean(queue.pagination?.reports.hasMore) ||
+    Boolean(queue.pagination?.userReports.hasMore);
 
   const refreshQueue = useCallback(async (page = 1) => {
     setIsLoading(true);
@@ -119,7 +171,7 @@ export default function AdminModerationPage() {
 
     try {
       if (!(await verifyAdminAccess())) {
-        setQueue({ listings: [], reports: [] });
+        setQueue({ listings: [], reports: [], userReports: [] });
         return;
       }
 
@@ -134,7 +186,7 @@ export default function AdminModerationPage() {
 
       if (response.status === 403) {
         setNotice('هذه الصفحة مخصصة للمسؤول فقط.');
-        setQueue({ listings: [], reports: [] });
+        setQueue({ listings: [], reports: [], userReports: [] });
         return;
       }
 
@@ -152,6 +204,10 @@ export default function AdminModerationPage() {
               ...payload,
               listings: [...currentQueue.listings, ...payload.listings],
               reports: [...currentQueue.reports, ...payload.reports],
+              userReports: [
+                ...currentQueue.userReports,
+                ...(payload.userReports ?? []),
+              ],
             },
       );
       setNextPage(page + 1);
@@ -246,6 +302,98 @@ export default function AdminModerationPage() {
       void refreshQueue(1);
     },
     [refreshQueue],
+  );
+
+  const moderateUserReport = useCallback(
+    async (reportId: string, action: UserReportResolution) => {
+      const confirmationMessage =
+        action === 'close_conversation'
+          ? 'سيتم إغلاق المحادثة ومنع استمرار التواصل بين الطرفين. هل تريد المتابعة؟'
+          : action === 'restrict'
+            ? 'سيتم منع التواصل بين الطرفين وإغلاق البلاغ. هل تريد المتابعة؟'
+            : action === 'warn'
+              ? 'سيتم تسجيل تحذير على الحساب المبلّغ عنه وإغلاق البلاغ. هل تريد المتابعة؟'
+              : '';
+
+      if (confirmationMessage && !window.confirm(confirmationMessage)) {
+        return;
+      }
+
+      setProcessingReportId(reportId);
+      setNotice('');
+      try {
+        const response = await fetch(
+          `/api/admin/moderation/user-reports/${reportId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+          },
+        );
+        if (!response.ok) {
+          setNotice('تعذر معالجة بلاغ المحادثة، وبقي البلاغ مفتوحًا.');
+          return;
+        }
+        void refreshQueue(1);
+      } finally {
+        setProcessingReportId(null);
+      }
+    },
+    [refreshQueue],
+  );
+
+  const resolveReport = useCallback(
+    async (
+      report: ReportRecord,
+      action: 'dismiss' | 'reject_listing' | 'delete_listing',
+    ) => {
+      if (action !== 'dismiss' && !report.listing) {
+        setNotice('الإعلان المرتبط بهذا البلاغ لم يعد متاحًا. يمكنك رفض البلاغ وإغلاقه.');
+        return;
+      }
+
+      const confirmationMessage =
+        action === 'delete_listing'
+          ? 'سيتم حذف الإعلان وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟'
+          : action === 'reject_listing'
+            ? 'سيتم إيقاف الإعلان عن الظهور وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟'
+            : '';
+
+      if (confirmationMessage && !window.confirm(confirmationMessage)) {
+        return;
+      }
+
+      setProcessingReportId(report.id);
+      setNotice('');
+
+      try {
+        if (action !== 'dismiss' && report.listing) {
+          const listingResponse = await fetch(
+            `/api/admin/moderation/listings/${report.listing.id}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: action === 'delete_listing' ? 'delete' : 'reject',
+              }),
+            },
+          );
+
+          if (!listingResponse.ok) {
+            setNotice('تعذر تنفيذ الإجراء على الإعلان، لذلك بقي البلاغ مفتوحًا.');
+            return;
+          }
+        }
+
+        await moderateReport(
+          report.id,
+          action === 'dismiss' ? 'dismiss' : 'review',
+        );
+      } finally {
+        setProcessingReportId(null);
+      }
+    },
+    [moderateReport],
   );
 
   return (
@@ -405,29 +553,179 @@ export default function AdminModerationPage() {
                         </p>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        className="rounded-md"
-                        onClick={() => moderateReport(report.id, 'review')}
-                      >
-                        <BadgeCheck className="size-4" />
-                        تمت المراجعة
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="rounded-md"
-                        onClick={() => moderateReport(report.id, 'dismiss')}
-                      >
-                        <Ban className="size-4" />
-                        تجاهل
-                      </Button>
-                    </div>
+                    {report.status === 'open' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {report.listing && report.listing.status !== 'deleted' && (
+                          <Button asChild variant="outline" className="rounded-md">
+                            <Link href={`/listings/${report.listing.id}`} target="_blank">
+                              <ExternalLink className="size-4" />
+                              فتح الإعلان
+                            </Link>
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          className="rounded-md"
+                          disabled={processingReportId === report.id}
+                          onClick={() => void resolveReport(report, 'dismiss')}
+                        >
+                          <BadgeCheck className="size-4" />
+                          رفض البلاغ
+                        </Button>
+                        {report.listing && report.listing.status !== 'deleted' && (
+                          <Button
+                            variant="outline"
+                            className="rounded-md"
+                            disabled={processingReportId === report.id}
+                            onClick={() => void resolveReport(report, 'reject_listing')}
+                          >
+                            <Ban className="size-4" />
+                            إيقاف الإعلان
+                          </Button>
+                        )}
+                        {report.listing && report.listing.status !== 'deleted' && (
+                          <Button
+                            variant="outline"
+                            className="rounded-md text-red-600 hover:text-red-700"
+                            disabled={processingReportId === report.id}
+                            onClick={() => void resolveReport(report, 'delete_listing')}
+                          >
+                            <Trash2 className="size-4" />
+                            حذف الإعلان
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
             )}
           </section>
+        </section>
+        <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+            <MessageCircle className="size-4 text-blue-600" />
+            بلاغات المحادثات
+          </div>
+          {queue.userReports.length === 0 ? (
+            <div className="grid min-h-32 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+              لا توجد بلاغات محادثات.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {queue.userReports.map((report) => (
+                <article key={report.id} className="grid gap-3 rounded-md border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h2 className="font-bold">
+                        {report.conversation?.listing.title ?? 'محادثة دون إعلان متاح'}
+                      </h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        السبب: {report.reason} · {new Date(report.createdAt).toLocaleString('ar-SA')}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-400/10 dark:text-amber-100">
+                      {report.status}
+                      {report.resolution ? ` · ${formatUserReportResolution(report.resolution)}` : ''}
+                    </span>
+                  </div>
+                  {report.details && (
+                    <p className="rounded-md bg-[#f7f9fc] p-2 text-sm leading-7 text-muted-foreground dark:bg-background">
+                      {report.details}
+                    </p>
+                  )}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-md border p-2 text-xs leading-6">
+                      <div className="font-bold">المبلّغ</div>
+                      <div>{report.reporter?.name ?? 'دون اسم'}</div>
+                      <div className="break-all text-muted-foreground">{report.reporter?.email ?? report.reporterId}</div>
+                      <div className="break-all text-muted-foreground">{report.reporterId}</div>
+                      <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
+                        <Link href={`/admin/users?query=${encodeURIComponent(report.reporterId)}`}>
+                          <Users className="size-3.5" />
+                          عرض حساب المبلّغ
+                        </Link>
+                      </Button>
+                    </div>
+                    <div className="rounded-md border p-2 text-xs leading-6">
+                      <div className="font-bold">المبلّغ عنه</div>
+                      <div>{report.targetUser?.name ?? 'دون اسم'}</div>
+                      <div className="break-all text-muted-foreground">{report.targetUser?.email ?? report.targetUserId}</div>
+                      <div className="break-all text-muted-foreground">{report.targetUserId}</div>
+                      <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
+                        <Link href={`/admin/users?query=${encodeURIComponent(report.targetUserId)}`}>
+                          <Users className="size-3.5" />
+                          عرض الحساب المبلّغ عنه
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                  {report.conversation?.messages.length ? (
+                    <div className="grid gap-1.5 rounded-md border p-2">
+                      <div className="text-xs font-bold">آخر الرسائل المرتبطة بالبلاغ</div>
+                      {report.conversation.messages.map((message) => (
+                        <div key={message.id} className="rounded bg-[#f7f9fc] px-2 py-1.5 text-xs dark:bg-background">
+                          <span className="font-semibold">
+                            {message.senderId === report.reporterId ? 'المبلّغ' : 'المبلّغ عنه'}:
+                          </span>{' '}
+                          <span className="break-words">{message.body}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {report.status === 'open' && (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      <Button
+                        variant="outline"
+                        className="rounded-md"
+                        disabled={processingReportId === report.id}
+                        onClick={() => void moderateUserReport(report.id, 'dismiss')}
+                      >
+                        <BadgeCheck className="size-4" />
+                        رفض البلاغ
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-md"
+                        disabled={processingReportId === report.id}
+                        onClick={() => void moderateUserReport(report.id, 'review')}
+                      >
+                        <ShieldCheck className="size-4" />
+                        توثيق المراجعة
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-md text-amber-700 hover:text-amber-800 dark:text-amber-200"
+                        disabled={processingReportId === report.id}
+                        onClick={() => void moderateUserReport(report.id, 'warn')}
+                      >
+                        <Flag className="size-4" />
+                        تحذير الحساب
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-md text-red-600 hover:text-red-700"
+                        disabled={processingReportId === report.id || !report.conversation}
+                        onClick={() => void moderateUserReport(report.id, 'restrict')}
+                      >
+                        <Ban className="size-4" />
+                        تقييد التواصل
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-md text-red-600 hover:text-red-700"
+                        disabled={processingReportId === report.id || !report.conversation}
+                        onClick={() => void moderateUserReport(report.id, 'close_conversation')}
+                      >
+                        <Ban className="size-4" />
+                        إغلاق ومنع التواصل
+                      </Button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
         <div ref={queueLoadMoreRef} className="h-px" />
         {hasMoreQueue && (

@@ -95,7 +95,15 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return (
+      new URLSearchParams(window.location.search).get('query')?.trim() ?? ''
+    );
+  });
   const [roleFilter, setRoleFilter] = useState('all');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);

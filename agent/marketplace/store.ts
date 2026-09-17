@@ -27,13 +27,15 @@ import type {
   Conversation,
   ConversationBlockStatus,
   ConversationMessage,
-  FavoriteRecord,
+    FavoriteRecord,
   ListingDraft,
   ListingImage,
   ListingStatus,
   ReportRecord,
   UserBlockRecord,
   UserReportRecord,
+  UserReportResolution,
+  UserReportStatus,
 } from './types';
 
 export type CreateListingDraftInput = {
@@ -343,6 +345,21 @@ function ensureCommissionForSoldListing(listing: ListingRecord) {
 
 function seedListings() {
   loadStore();
+}
+
+/**
+ * Higher scores surface first in the moderation queue: open reports outrank
+ * resolved ones, and accounts that accumulate several reports (or reports that
+ * keep several open reports on the same target) rise above single reports.
+ */
+function getUserReportPriority(report: UserReportRecord) {
+  const openReportsOnTarget = [...userReports.values()].filter(
+    (candidate) =>
+      candidate.targetUserId === report.targetUserId &&
+      candidate.status === 'open',
+  ).length;
+
+  return (report.status === 'open' ? 1000 : 0) + openReportsOnTarget;
 }
 
 export function createListingDraft(input: CreateListingDraftInput): ListingRecord {
@@ -863,7 +880,7 @@ export function reportConversationUser(
       report: null,
       conversation: null,
     };
-  }
+    }
 
   const targetUserId = getOtherConversationUser(conversation, reporterId);
 
@@ -872,6 +889,22 @@ export function reportConversationUser(
       status: 'not_found' as const,
       report: null,
       conversation: null,
+    };
+  }
+
+  const existingOpenReport = [...userReports.values()].find(
+    (candidate) =>
+      candidate.reporterId === reporterId &&
+      candidate.targetUserId === targetUserId &&
+      candidate.conversationId === conversationId &&
+      candidate.status === 'open',
+  );
+
+  if (existingOpenReport) {
+    return {
+      status: 'already_reported' as const,
+      report: existingOpenReport,
+      conversation,
     };
   }
 
@@ -1322,11 +1355,80 @@ export function listModerationQueue() {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     reports: [...reports.values()]
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .map((report) => ({
+            .map((report) => ({
         ...report,
         listing: listings.get(report.listingId) ?? null,
       })),
+    userReports: [...userReports.values()]
+      .sort((left, right) => {
+        const priorityDiff =
+          getUserReportPriority(right) - getUserReportPriority(left);
+
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
+
+        return right.createdAt.localeCompare(left.createdAt);
+      })
+      .map((report) => ({
+        ...report,
+        conversation: report.conversationId
+          ? conversations.get(report.conversationId) ?? null
+          : null,
+      })),
   };
+}
+
+export function setUserReportModerationStatus(
+  reportId: string,
+  resolution: UserReportResolution,
+  adminId?: string,
+) {
+  seedListings();
+  const report = userReports.get(reportId);
+
+  if (!report) {
+    return { status: 'not_found' as const, report: null };
+  }
+
+  const status: UserReportStatus =
+    resolution === 'review'
+      ? 'open'
+      : resolution === 'dismiss'
+        ? 'dismissed'
+        : 'reviewed';
+
+  report.status = status;
+  report.resolution = resolution;
+  report.resolvedBy = adminId ?? report.resolvedBy;
+  report.resolvedAt = nowIso();
+  report.updatedAt = nowIso();
+  userReports.set(report.id, report);
+
+  const shouldCloseConversation =
+    resolution === 'close_conversation' || resolution === 'restrict';
+
+  if (shouldCloseConversation && report.conversationId) {
+    const conversation = conversations.get(report.conversationId);
+    if (conversation) {
+      conversation.status = 'closed';
+      conversation.updatedAt = nowIso();
+      conversations.set(conversation.id, conversation);
+    }
+
+    const block: UserBlockRecord = {
+      id: randomUUID(),
+      blockerId: report.reporterId,
+      blockedId: report.targetUserId,
+      conversationId: report.conversationId,
+      reason: 'admin_moderation',
+      createdAt: nowIso(),
+    };
+    userBlocks.set(`${block.blockerId}:${block.blockedId}`, block);
+  }
+
+  persistStore();
+  return { status: report.status, report };
 }
 
 export function setListingModerationStatus(

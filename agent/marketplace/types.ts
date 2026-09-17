@@ -107,6 +107,24 @@ export type ReportRecord = {
   createdAt: string;
 };
 
+export type UserReportStatus = 'open' | 'reviewed' | 'dismissed';
+
+/**
+ * Admin-chosen outcome for a conversation report.
+ * - `review`: keep the report open for a later decision.
+ * - `dismiss`: close the report as unfounded (`dismissed`).
+ * - `warn`: record a warning for the target user and close the report.
+ * - `restrict`: block two-way contact between the parties and close the report.
+ * - `close_conversation`: close the reported conversation, block the parties
+ *   and close the report.
+ */
+export type UserReportResolution =
+  | 'review'
+  | 'dismiss'
+  | 'warn'
+  | 'restrict'
+  | 'close_conversation';
+
 export type UserReportRecord = {
   id: string;
   reporterId: string;
@@ -114,7 +132,10 @@ export type UserReportRecord = {
   conversationId?: string;
   reason: string;
   details?: string;
-  status: 'open' | 'reviewed' | 'dismissed';
+  status: UserReportStatus;
+  resolution?: UserReportResolution;
+  resolvedBy?: string;
+  resolvedAt?: string;
   createdAt: string;
   updatedAt: string;
 };

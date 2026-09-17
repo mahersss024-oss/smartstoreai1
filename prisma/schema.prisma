@@ -69,6 +69,8 @@ enum AdminAuditAction {
   update_commission
   update_user
   delete_user
+  warn_user
+  restrict_conversation
 }
 
 model User {
@@ -304,6 +306,9 @@ model UserReport {
   reason         String       @db.VarChar(120)
   details        String?      @db.VarChar(1000)
   status         ReportStatus @default(open)
+  resolution     String?      @db.VarChar(32)
+  resolvedBy     String?
+  resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -315,6 +320,7 @@ model UserReport {
   @@index([reporterId, createdAt])
   @@index([targetUserId, status])
   @@index([conversationId])
+  @@index([resolvedBy])
 }
 
 model UserBlock {

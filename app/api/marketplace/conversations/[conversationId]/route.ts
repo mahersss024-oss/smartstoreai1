@@ -243,6 +243,19 @@ export async function POST(request: Request, context: RouteContext) {
       : Response.json(responseBody, { status: 422 });
   }
 
+  if (result.status === 'already_reported') {
+    const responseBody = {
+      error: 'already_reported',
+      message: 'You already have an open report on this conversation.',
+      report: result.report,
+      conversation: result.conversation,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
+  }
+
   if (result.status === 'blocked') {
     const responseBody = {
       ...result,

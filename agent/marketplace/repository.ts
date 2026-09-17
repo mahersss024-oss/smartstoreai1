@@ -29,9 +29,11 @@ import type {
   ConversationMessage,
   FavoriteRecord,
   ListingCondition,
-  ListingImage,
+    ListingImage,
   ListingStatus,
   ReportRecord,
+  UserReportResolution,
+  UserReportStatus,
 } from './types';
 import { evaluateConversationMessageSafety } from './message-safety';
 import {
@@ -1780,7 +1782,7 @@ export async function reportConversationUser(
       report: null,
       conversation: null,
     };
-  }
+    }
 
   const targetUserId = getOtherConversationUserId(conversation, reporterId);
 
@@ -1789,6 +1791,33 @@ export async function reportConversationUser(
       status: 'not_found' as const,
       report: null,
       conversation: null,
+    };
+  }
+
+  const existingOpenReport = await prisma.userReport.findFirst({
+    where: {
+      reporterId,
+      targetUserId,
+      conversationId,
+      status: 'open',
+    },
+  });
+
+  if (existingOpenReport) {
+    return {
+      status: 'already_reported' as const,
+      report: {
+        id: existingOpenReport.id,
+        reporterId: existingOpenReport.reporterId,
+        targetUserId: existingOpenReport.targetUserId,
+        conversationId: existingOpenReport.conversationId ?? undefined,
+        reason: existingOpenReport.reason,
+        details: existingOpenReport.details ?? undefined,
+        status: existingOpenReport.status,
+        createdAt: existingOpenReport.createdAt.toISOString(),
+        updatedAt: existingOpenReport.updatedAt.toISOString(),
+      },
+      conversation,
     };
   }
 
@@ -2635,6 +2664,10 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
         queue.reports.slice(pagination.skip, pagination.skip + pagination.take),
         pagination,
       ).items,
+      userReports: toPaginatedResponse(
+        queue.userReports.slice(pagination.skip, pagination.skip + pagination.take),
+        pagination,
+      ).items,
       pagination: {
         listings: toPaginatedResponse(
           queue.listings.slice(
@@ -2647,11 +2680,18 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
           queue.reports.slice(pagination.skip, pagination.skip + pagination.take),
           pagination,
         ).pagination,
+        userReports: toPaginatedResponse(
+          queue.userReports.slice(
+            pagination.skip,
+            pagination.skip + pagination.take,
+          ),
+          pagination,
+        ).pagination,
       },
     };
   }
 
-  const [listings, reports] = await Promise.all([
+  const [listings, reports, userReports] = await Promise.all([
     prisma.listing.findMany({
       where: { status: { in: ['pending', 'rejected'] } },
       include: {
@@ -2677,18 +2717,183 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
       },
       orderBy: { createdAt: 'desc' },
       skip: pagination.skip,
+            take: pagination.take,
+    }),
+    prisma.userReport.findMany({
+      include: {
+        reporter: { select: { id: true, email: true, name: true } },
+        targetUser: { select: { id: true, email: true, name: true } },
+        conversation: {
+          include: {
+            listing: { select: { id: true, title: true } },
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+              select: { id: true, senderId: true, body: true, status: true, createdAt: true },
+            },
+          },
+                },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: pagination.skip,
       take: pagination.take,
     }),
   ]);
   const listingPage = toPaginatedResponse(listings.map(toListingRecord), pagination);
-  const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
+    const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
+  const mappedUserReports = userReports
+    .map((report) => ({
+      id: report.id,
+      reporterId: report.reporterId,
+      targetUserId: report.targetUserId,
+      conversationId: report.conversationId ?? undefined,
+      reason: report.reason,
+      details: report.details ?? undefined,
+      status: report.status as UserReportStatus,
+      resolution: (report.resolution ?? undefined) as
+        | UserReportResolution
+        | undefined,
+      resolvedBy: report.resolvedBy ?? undefined,
+      resolvedAt: report.resolvedAt?.toISOString(),
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString(),
+      reporter: report.reporter,
+      targetUser: report.targetUser,
+      conversation: report.conversation
+        ? {
+            id: report.conversation.id,
+            status: report.conversation.status,
+            listing: report.conversation.listing,
+            messages: [...report.conversation.messages].reverse().map((message) => ({
+              ...message,
+              createdAt: message.createdAt.toISOString(),
+            })),
+          }
+        : null,
+    }))
+    // Open reports surface before resolved ones to keep the queue actionable.
+    .sort((left, right) => {
+      const leftOpen = left.status === 'open' ? 1 : 0;
+      const rightOpen = right.status === 'open' ? 1 : 0;
+
+      if (leftOpen !== rightOpen) {
+        return rightOpen - leftOpen;
+      }
+
+      return right.createdAt.localeCompare(left.createdAt);
+    });
+  const userReportPage = toPaginatedResponse(mappedUserReports, pagination);
 
   return {
     listings: listingPage.items,
     reports: reportPage.items,
+    userReports: userReportPage.items,
     pagination: {
       listings: listingPage.pagination,
       reports: reportPage.pagination,
+      userReports: userReportPage.pagination,
+    },
+  };
+}
+
+export async function setUserReportModerationStatus(
+  reportId: string,
+  resolution: UserReportResolution,
+  admin?: Actor,
+) {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.setUserReportModerationStatus(reportId, resolution, undefined);
+  }
+
+  const status: UserReportStatus =
+    resolution === 'review'
+      ? 'open'
+      : resolution === 'dismiss'
+        ? 'dismissed'
+        : 'reviewed';
+  const shouldCloseConversation =
+    resolution === 'close_conversation' || resolution === 'restrict';
+  const auditAction: AdminAuditAction =
+    resolution === 'review'
+      ? 'review_report'
+      : resolution === 'dismiss'
+        ? 'dismiss_report'
+        : resolution === 'warn'
+          ? 'warn_user'
+          : 'restrict_conversation';
+
+  const adminId = await getAdminAuditActorId(admin);
+  const report = await prisma.$transaction(async (tx) => {
+    const existing = await tx.userReport.findUnique({ where: { id: reportId } });
+    if (!existing) return null;
+
+    if (shouldCloseConversation && existing.conversationId) {
+      await tx.conversation.update({
+        where: { id: existing.conversationId },
+        data: { status: 'closed' },
+      });
+      await tx.userBlock.upsert({
+        where: {
+          blockerId_blockedId: {
+            blockerId: existing.reporterId,
+            blockedId: existing.targetUserId,
+          },
+        },
+        create: {
+          blockerId: existing.reporterId,
+          blockedId: existing.targetUserId,
+          conversationId: existing.conversationId,
+          reason: 'admin_moderation',
+        },
+        update: {
+          conversationId: existing.conversationId,
+          reason: 'admin_moderation',
+        },
+      });
+    }
+
+    const updated = await tx.userReport.update({
+      where: { id: reportId },
+      data: {
+        status,
+        resolution,
+        resolvedBy: adminId ?? undefined,
+        resolvedAt: new Date(),
+      },
+    });
+    await createAdminAuditLog(tx, {
+      adminId,
+      action: auditAction,
+      targetType: 'user_report',
+      targetId: reportId,
+      metadata: { resolution, conversationId: existing.conversationId },
+    });
+    return updated;
+  });
+
+  if (!report) return { status: 'not_found' as const, report: null };
+  safelyPublishRealtimeEvent({
+    type: 'moderation_updated',
+    payload: { entity: 'report', entityId: report.id, status: report.status },
+    visibility: { includeAdmins: true },
+  });
+  return {
+    status: report.status,
+    report: {
+      id: report.id,
+      reporterId: report.reporterId,
+      targetUserId: report.targetUserId,
+      conversationId: report.conversationId ?? undefined,
+      reason: report.reason,
+      details: report.details ?? undefined,
+      status: report.status as UserReportStatus,
+      resolution: (report.resolution ?? undefined) as
+        | UserReportResolution
+        | undefined,
+      resolvedBy: report.resolvedBy ?? undefined,
+      resolvedAt: report.resolvedAt?.toISOString(),
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString(),
     },
   };
 }
