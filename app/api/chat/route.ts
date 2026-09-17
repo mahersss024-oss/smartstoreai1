@@ -24,6 +24,10 @@ import {
   getComplianceReviewResponse,
 } from '@/agent/marketplace/policy';
 import {
+  getAmbiguousRootsNeedingModel,
+  resolveAmbiguousForbiddenRoots,
+} from '@/agent/marketplace/forbidden-terms-model';
+import {
   checkImageMarketplaceCompliance,
   inferExpectedMarketplaceCategory,
   type ImageComplianceDecision,
@@ -117,6 +121,46 @@ function getMissingApiKeys() {
 
 function isPolicyFacilitationIntent(intent: string) {
   return policyFacilitationIntents.has(intent);
+}
+
+/**
+ * Re-evaluates a blocked text policy decision when the only reason it blocked
+ * was one or more ambiguous roots (e.g. "حشيش" with no decisive context).
+ *
+ * The deterministic checker stays the source of truth for every other caller.
+ * This extra step runs ONLY in the chat route and ONLY when the deterministic
+ * result is an ambiguous-only block. It is fail-closed: any model error keeps
+ * the original block decision.
+ */
+async function resolveAmbiguousTextPolicyDecision(
+  userRequest: string,
+  decision: ReturnType<typeof evaluateSaudiMarketplaceCompliance>,
+): Promise<ReturnType<typeof evaluateSaudiMarketplaceCompliance>> {
+  if (decision.decision !== 'block' || !userRequest.trim()) {
+    return decision;
+  }
+
+  const ambiguousRoots = getAmbiguousRootsNeedingModel(userRequest);
+
+  if (ambiguousRoots.length === 0) {
+    return decision;
+  }
+
+  const resolution = await resolveAmbiguousForbiddenRoots(
+    userRequest,
+    ambiguousRoots,
+  );
+
+  if (resolution.prohibited) {
+    return decision;
+  }
+
+  return {
+    decision: 'allow',
+    reasons: [],
+    jurisdiction: 'SA',
+    shariaSensitive: false,
+  };
 }
 
 type ChatRequestBody = {
@@ -1259,11 +1303,13 @@ export async function POST(request: Request) {
       validationReason:
         imageValidationFailure ?? retainedImageValidationFailure ?? undefined,
     });
-  }
+    }
 
   const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
-  const preliminaryComplianceDecision =
-    evaluateSaudiMarketplaceCompliance(preliminaryUserRequest);
+  const preliminaryComplianceDecision = await resolveAmbiguousTextPolicyDecision(
+    preliminaryUserRequest,
+    evaluateSaudiMarketplaceCompliance(preliminaryUserRequest),
+  );
 
   if (preliminaryComplianceDecision.decision === 'block') {
     return generateProfessionalChatIssueResponse({
@@ -1368,10 +1414,13 @@ export async function POST(request: Request) {
   const adaptiveIntent = await resolveAdaptiveMarketplaceIntent({
     messages: scopedMessagesWithInterfaceContext,
     language,
-    session,
+        session,
   });
   const marketplaceIntent = classifyMarketplaceIntent(userRequest);
-  const complianceDecision = evaluateSaudiMarketplaceCompliance(userRequest);
+  const complianceDecision = await resolveAmbiguousTextPolicyDecision(
+    userRequest,
+    evaluateSaudiMarketplaceCompliance(userRequest),
+  );
 
   if (complianceDecision.decision === 'block') {
     return generateProfessionalChatIssueResponse({
