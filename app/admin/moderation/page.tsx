@@ -139,6 +139,39 @@ function formatUserReportResolution(resolution: UserReportResolution) {
   return labels[resolution];
 }
 
+function formatReportStatus(status: ReportRecord['status']) {
+  const labels: Record<ReportRecord['status'], string> = {
+    open: 'مفتوح',
+    reviewed: 'تمت المراجعة',
+    dismissed: 'مرفوض',
+  };
+
+  return labels[status];
+}
+
+function formatListingReportReason(reason: string) {
+  const labels: Record<string, string> = {
+    prohibited_item: 'منتج أو محتوى غير مسموح',
+    fraud: 'احتيال أو نصب',
+    counterfeit: 'منتج مقلّد',
+    wrong_category: 'تصنيف غير صحيح',
+    misleading_images: 'صور مضلّلة',
+    abusive_content: 'محتوى مسيء',
+    other: 'سبب آخر',
+  };
+
+  return labels[reason] ?? reason;
+}
+
+function formatConversationReportReason(reason: string) {
+  const labels: Record<string, string> = {
+    conversation_report: 'بلاغ من المحادثة',
+    conversation_block: 'حجب من المحادثة',
+  };
+
+  return labels[reason] ?? reason;
+}
+
 export default function AdminModerationPage() {
   const router = useRouter();
   const {
@@ -546,11 +579,11 @@ export default function AdminModerationPage() {
                           {report.listing?.title ?? 'إعلان غير متاح'}
                         </h2>
                         <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-400/10 dark:text-amber-100">
-                          {report.status}
+                          {formatReportStatus(report.status)}
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                        السبب: {report.reason}
+                        السبب: {formatListingReportReason(report.reason)}
                       </p>
                       {report.details && (
                         <p className="mt-1 rounded-md bg-[#f7f9fc] p-2 text-sm leading-7 text-muted-foreground dark:bg-background">
@@ -626,11 +659,11 @@ export default function AdminModerationPage() {
                         {report.conversation?.listing.title ?? 'محادثة دون إعلان متاح'}
                       </h2>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        السبب: {report.reason} · {new Date(report.createdAt).toLocaleString('ar-SA')}
+                        السبب: {formatConversationReportReason(report.reason)} · {new Date(report.createdAt).toLocaleString('ar-SA')}
                       </p>
                     </div>
                     <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-400/10 dark:text-amber-100">
-                      {report.status}
+                      {formatReportStatus(report.status)}
                       {report.resolution ? ` · ${formatUserReportResolution(report.resolution)}` : ''}
                     </span>
                   </div>
