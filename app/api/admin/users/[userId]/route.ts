@@ -45,6 +45,7 @@ function mapUpdatedUser(user: {
   phoneNumber: string | null;
   phoneUpdatedAt: Date | null;
   role: string;
+  deletedAt: Date | null;
   commissionAgreementVersion: string | null;
   commissionAgreementAccepted: Date | null;
   createdAt: Date;
@@ -69,6 +70,7 @@ function mapUpdatedUser(user: {
         phoneNumber: user.phoneNumber ?? undefined,
     phoneUpdatedAt: user.phoneUpdatedAt?.toISOString() ?? undefined,
     role: isConfiguredAdminEmail(user.email) ? 'owner' : user.role,
+    deletedAt: user.deletedAt?.toISOString() ?? undefined,
     commissionAgreementVersion: user.commissionAgreementVersion ?? undefined,
     commissionAgreementAccepted:
       user.commissionAgreementAccepted?.toISOString() ?? undefined,
@@ -189,6 +191,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (
+    !isOwner &&
     parsed.data.role !== undefined &&
     existing.role === 'admin' &&
     parsed.data.role !== 'admin'
@@ -261,6 +264,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         phoneNumber: true,
         phoneUpdatedAt: true,
         role: true,
+        deletedAt: true,
         commissionAgreementVersion: true,
         commissionAgreementAccepted: true,
         createdAt: true,

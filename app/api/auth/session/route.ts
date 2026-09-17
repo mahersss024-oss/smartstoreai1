@@ -4,6 +4,7 @@ import {
   shouldVerifyRoleFromDatabase,
 } from '@/lib/auth/authorization';
 import {
+  clearSessionCookie,
   getAuthSession,
   getCommissionAgreement,
   isConfiguredAdminEmail,
@@ -35,8 +36,25 @@ export async function GET(request: Request) {
     try {
       const profile = await prisma.user.findUnique({
         where: { id: user.id },
-        select: { phoneNumber: true, role: true },
+        select: { phoneNumber: true, role: true, deletedAt: true },
       });
+
+      if (!profile || profile.deletedAt) {
+        return Response.json(
+          {
+            authenticated: false,
+            user: null,
+            commissionAgreementAccepted: false,
+            commissionAgreement: null,
+          },
+          {
+            headers: {
+              ...noStoreHeaders,
+              'Set-Cookie': clearSessionCookie(),
+            },
+          },
+        );
+      }
 
       if (profile) {
         user.phoneNumber = profile.phoneNumber ?? undefined;

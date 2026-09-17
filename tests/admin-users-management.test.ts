@@ -297,3 +297,63 @@ test('the users page hides role changes and protects the owner account', () => {
   assert.match(page, /isOwnerAccount/);
   assert.match(page, /حساب مالك المنصة محميّ/);
 });
+
+test('scoped admin roles are enforced consistently by pages and APIs', () => {
+  const dashboard = readProjectFile('app', 'admin', 'page.tsx');
+  const commissionsPage = readProjectFile(
+    'app',
+    'admin',
+    'commissions',
+    'page.tsx',
+  );
+  const commissionsRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'commissions',
+    'route.ts',
+  );
+  const commissionRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'commissions',
+    '[commissionId]',
+    'route.ts',
+  );
+  const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
+  const userRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'users',
+    '[userId]',
+    'route.ts',
+  );
+
+  assert.match(dashboard, /useAdminAccess\('admin'\)/);
+  assert.match(dashboard, /const canManageCommissions = isOwner/);
+  assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
+  assert.match(commissionsRoute, /hasPlatformOwnerAccess/);
+  assert.match(commissionRoute, /hasPlatformOwnerAccess/);
+  assert.match(usersPage, /\.\.\.\(isOwner \? \{ role: draft\.role \} : \{\}\)/);
+  assert.match(userRoute, /!isOwner\s*&&\s*parsed\.data\.role/);
+});
+
+test('soft-deleted accounts remain visible to the owner and lose API access', () => {
+  const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
+  const proxy = readProjectFile('proxy.ts');
+  const sessionRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'session',
+    'route.ts',
+  );
+
+  assert.match(usersPage, /includeDeleted/);
+  assert.match(usersPage, /حساب معطّل/);
+  assert.match(proxy, /select: \{ deletedAt: true \}/);
+  assert.match(proxy, /clearSessionCookie/);
+  assert.match(sessionRoute, /profile\.deletedAt/);
+});

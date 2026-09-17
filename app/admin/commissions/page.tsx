@@ -67,7 +67,7 @@ export default function AdminCommissionsPage() {
     adminAccessNotice,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('admin');
+  } = useAdminAccess('owner');
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [commissionsPagination, setCommissionsPagination] =
     useState<PaginationMeta | null>(null);

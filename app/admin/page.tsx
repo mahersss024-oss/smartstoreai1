@@ -146,7 +146,7 @@ export default function AdminHomePage() {
     adminAccessRole,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('moderator');
+  } = useAdminAccess('admin');
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -230,7 +230,7 @@ export default function AdminHomePage() {
 
   const isOwner = adminAccessRole === 'owner';
   const canManageUsers = adminAccessRole === 'owner' || adminAccessRole === 'admin';
-  const canManageCommissions = canManageUsers;
+  const canManageCommissions = isOwner;
 
   const quickLinks = useMemo(() => {
     const links = [

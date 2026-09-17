@@ -871,7 +871,9 @@ export default function AdminModerationPage() {
         <UserReportsSection
           userReports={queue.userReports}
           processingReportId={processingReportId}
-          canViewAccounts={adminAccessRole === 'admin'}
+          canViewAccounts={
+            adminAccessRole === 'owner' || adminAccessRole === 'admin'
+          }
           onModerate={(reportId, action) => void moderateUserReport(reportId, action)}
         />
         <div ref={queueLoadMoreRef} className="h-px" />

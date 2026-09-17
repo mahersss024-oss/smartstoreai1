@@ -32,6 +32,7 @@ type AdminUserRecord = {
   phoneNumber?: string;
   phoneUpdatedAt?: string;
   role: 'user' | 'moderator' | 'admin' | string;
+  deletedAt?: string;
   commissionAgreementVersion?: string;
   commissionAgreementAccepted?: string;
   createdAt: string;
@@ -130,6 +131,10 @@ export default function AdminUsersPage() {
           role: roleFilter,
         });
 
+        if (isOwner) {
+          params.set('includeDeleted', '1');
+        }
+
         if (query.trim()) {
           params.set('query', query.trim());
         }
@@ -180,7 +185,7 @@ export default function AdminUsersPage() {
         setIsLoading(false);
       }
     },
-    [query, roleFilter, router, verifyAdminAccess],
+    [isOwner, query, roleFilter, router, verifyAdminAccess],
   );
 
   useEffect(() => {
@@ -257,7 +262,7 @@ export default function AdminUsersPage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            role: draft.role,
+            ...(isOwner ? { role: draft.role } : {}),
             phoneNumber: phoneOverride ?? draft.phoneNumber,
           }),
         });
@@ -300,7 +305,7 @@ export default function AdminUsersPage() {
         setSavingUserId(null);
       }
     },
-    [drafts, router],
+    [drafts, isOwner, router],
   );
 
   const deleteUser = useCallback(
@@ -462,6 +467,7 @@ export default function AdminUsersPage() {
               const isSaving = savingUserId === user.id;
               const isDeleting = deletingUserId === user.id;
               const isOwnerAccount = user.role === 'owner';
+              const isSoftDeleted = Boolean(user.deletedAt);
               const canChangeRole = isOwner && !isOwnerAccount;
               const canDelete =
                 !isOwnerAccount &&
@@ -488,7 +494,9 @@ export default function AdminUsersPage() {
                       </div>
                     </div>
                     <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                      {roleLabels[user.role] ?? user.role}
+                      {isSoftDeleted
+                        ? 'حساب معطّل'
+                        : roleLabels[user.role] ?? user.role}
                     </span>
                   </div>
 
