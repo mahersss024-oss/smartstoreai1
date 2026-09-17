@@ -18,7 +18,7 @@ export function ListingImageGallery({
   return (
     <section className="w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
       <div className="grid gap-2">
-        <div className="aspect-[16/9] max-h-[18rem] overflow-hidden bg-slate-100">
+        <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
           <img
             alt={title}
             className="h-full w-full object-cover"

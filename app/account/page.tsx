@@ -1488,15 +1488,15 @@ export default function AccountPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:border-r xl:border-t-0">
+                        <div className="grid min-w-0 gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:border-r xl:border-t-0">
                           <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
-                          <div className="flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-2 xl:overflow-visible xl:pb-0">
+                          <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
                             {listing.images.map((image) => (
                               <div
                                 key={image.id}
-                                className="grid w-20 shrink-0 gap-1 rounded-md border p-1 xl:w-auto"
+                                className="grid w-20 shrink-0 gap-1 rounded-md border p-1"
                               >
                                 <div className="relative aspect-square overflow-hidden rounded bg-slate-100 dark:bg-slate-900">
                                   {image.url ? (
