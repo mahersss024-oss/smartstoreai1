@@ -475,6 +475,38 @@ test('keeps a conversation report open when the admin only reviews it', () => {
   assert.equal(reviewed.report?.resolution, 'review');
 });
 
+test('does not change a conversation report after it is resolved', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:report-final-resolution',
+    category: 'cars',
+    title: 'سيارة لاختبار قرار البلاغ النهائي',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(
+    listing.id,
+    'buyer:report-final-resolution',
+  );
+  const reported = reportConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:report-final-resolution',
+    { reason: 'conversation_report' },
+  );
+  const dismissed = setUserReportModerationStatus(
+    reported.report?.id ?? '',
+    'dismiss',
+  );
+  const secondDecision = setUserReportModerationStatus(
+    reported.report?.id ?? '',
+    'warn',
+  );
+
+  assert.equal(dismissed.status, 'dismissed');
+  assert.equal(secondDecision.status, 'already_resolved');
+  assert.equal(secondDecision.report?.status, 'dismissed');
+  assert.equal(secondDecision.report?.resolution, 'dismiss');
+});
+
 test('orders open conversation reports ahead of resolved ones in the queue', () => {
   const listing = createListingDraft({
     sellerId: 'seller:report-order',

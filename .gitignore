@@ -11,6 +11,8 @@
 # testing
 /coverage
 /screenshots
+/test-results
+/playwright-report
 
 # app build output
 /.next/

@@ -1390,6 +1390,9 @@ export function setUserReportModerationStatus(
   if (!report) {
     return { status: 'not_found' as const, report: null };
   }
+  if (report.status !== 'open') {
+    return { status: 'already_resolved' as const, report };
+  }
 
   const status: UserReportStatus =
     resolution === 'review'
@@ -1401,7 +1404,7 @@ export function setUserReportModerationStatus(
   report.status = status;
   report.resolution = resolution;
   report.resolvedBy = adminId ?? report.resolvedBy;
-  report.resolvedAt = nowIso();
+  report.resolvedAt = resolution === 'review' ? undefined : nowIso();
   report.updatedAt = nowIso();
   userReports.set(report.id, report);
 

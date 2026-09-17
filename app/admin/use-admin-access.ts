@@ -23,9 +23,11 @@ function hasRequiredRole(role: string | undefined, requiredRole: AdminAccessRole
 
 export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
   const [status, setStatus] = useState<AdminAccessStatus>('idle');
+  const [role, setRole] = useState<AdminAccessRole | null>(null);
 
   const verifyAdminAccess = useCallback(async () => {
     setStatus('checking');
+    setRole(null);
 
     try {
       const response = await fetch('/api/auth/session', { cache: 'no-store' });
@@ -50,6 +52,7 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
         return false;
       }
 
+      setRole(session.user?.role as AdminAccessRole);
       setStatus('allowed');
       return true;
     } catch {
@@ -59,6 +62,7 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
   }, [requiredRole]);
 
   return {
+    adminAccessRole: role,
     isAdminAccessAllowed: status === 'allowed',
     isAdminAccessChecking: status === 'checking' || status === 'idle',
     adminAccessNotice:

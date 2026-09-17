@@ -142,6 +142,7 @@ function formatUserReportResolution(resolution: UserReportResolution) {
 export default function AdminModerationPage() {
   const router = useRouter();
   const {
+    adminAccessRole,
     adminAccessNotice,
     isAdminAccessAllowed,
     verifyAdminAccess,
@@ -157,8 +158,10 @@ export default function AdminModerationPage() {
   const [processingReportId, setProcessingReportId] = useState<string | null>(null);
 
   const openReportsCount = useMemo(
-    () => queue.reports.filter((report) => report.status === 'open').length,
-    [queue.reports],
+    () =>
+      queue.reports.filter((report) => report.status === 'open').length +
+      queue.userReports.filter((report) => report.status === 'open').length,
+    [queue.reports, queue.userReports],
   );
   const hasMoreQueue =
     Boolean(queue.pagination?.listings.hasMore) ||
@@ -444,7 +447,9 @@ export default function AdminModerationPage() {
           </div>
           <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
             <div className="text-xs text-muted-foreground">إجمالي البلاغات</div>
-            <div className="mt-1 text-2xl font-bold">{queue.reports.length}</div>
+            <div className="mt-1 text-2xl font-bold">
+              {queue.reports.length + queue.userReports.length}
+            </div>
           </div>
         </section>
 
@@ -640,24 +645,28 @@ export default function AdminModerationPage() {
                       <div>{report.reporter?.name ?? 'دون اسم'}</div>
                       <div className="break-all text-muted-foreground">{report.reporter?.email ?? report.reporterId}</div>
                       <div className="break-all text-muted-foreground">{report.reporterId}</div>
-                      <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
-                        <Link href={`/admin/users?query=${encodeURIComponent(report.reporterId)}`}>
-                          <Users className="size-3.5" />
-                          عرض حساب المبلّغ
-                        </Link>
-                      </Button>
+                      {adminAccessRole === 'admin' && (
+                        <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
+                          <Link href={`/admin/users?query=${encodeURIComponent(report.reporterId)}`}>
+                            <Users className="size-3.5" />
+                            عرض حساب المبلّغ
+                          </Link>
+                        </Button>
+                      )}
                     </div>
                     <div className="rounded-md border p-2 text-xs leading-6">
                       <div className="font-bold">المبلّغ عنه</div>
                       <div>{report.targetUser?.name ?? 'دون اسم'}</div>
                       <div className="break-all text-muted-foreground">{report.targetUser?.email ?? report.targetUserId}</div>
                       <div className="break-all text-muted-foreground">{report.targetUserId}</div>
-                      <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
-                        <Link href={`/admin/users?query=${encodeURIComponent(report.targetUserId)}`}>
-                          <Users className="size-3.5" />
-                          عرض الحساب المبلّغ عنه
-                        </Link>
-                      </Button>
+                      {adminAccessRole === 'admin' && (
+                        <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
+                          <Link href={`/admin/users?query=${encodeURIComponent(report.targetUserId)}`}>
+                            <Users className="size-3.5" />
+                            عرض الحساب المبلّغ عنه
+                          </Link>
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {report.conversation?.messages.length ? (
@@ -700,7 +709,7 @@ export default function AdminModerationPage() {
                         onClick={() => void moderateUserReport(report.id, 'warn')}
                       >
                         <Flag className="size-4" />
-                        تحذير الحساب
+                        تسجيل تحذير إداري
                       </Button>
                       <Button
                         variant="outline"

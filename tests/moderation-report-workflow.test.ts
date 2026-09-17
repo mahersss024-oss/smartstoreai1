@@ -25,11 +25,12 @@ test('admin moderation exposes a complete conversation report workflow', async (
   );
 
   assert.match(source, /بلاغات المحادثات/);
-  assert.match(source, /تحذير الحساب/);
+  assert.match(source, /تسجيل تحذير إداري/);
   assert.match(source, /تقييد التواصل/);
   assert.match(source, /إغلاق ومنع التواصل/);
   assert.match(source, /عرض حساب المبلّغ/);
   assert.match(source, /عرض الحساب المبلّغ عنه/);
+  assert.match(source, /adminAccessRole === 'admin'/);
 
   const route = await readFile(
     new URL(
@@ -44,4 +45,19 @@ test('admin moderation exposes a complete conversation report workflow', async (
   assert.match(route, /'close_conversation'/);
   assert.match(route, /hasVerifiedModeratorAccess/);
   assert.match(route, /enforceApiRateLimit/);
+  assert.match(route, /report_already_resolved/);
+});
+
+test('conversation reports enforce one open report per conversation and reporter', async () => {
+  const migration = await readFile(
+    new URL(
+      '../prisma/migrations/20260917010000_unique_open_conversation_report/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.match(migration, /ROW_NUMBER\(\) OVER/);
+  assert.match(migration, /UserReport_unique_open_conversation_report/);
+  assert.match(migration, /WHERE "status" = 'open' AND "conversationId" IS NOT NULL/);
 });

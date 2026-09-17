@@ -51,5 +51,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (result.status === 'not_found') {
     return Response.json({ error: 'report_not_found' }, { status: 404 });
   }
+  if (result.status === 'already_resolved') {
+    return Response.json({ error: 'report_already_resolved' }, { status: 409 });
+  }
   return Response.json(result);
 }

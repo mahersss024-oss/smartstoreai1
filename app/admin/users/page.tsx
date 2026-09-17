@@ -95,15 +95,8 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
-  const [query, setQuery] = useState(() => {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-
-    return (
-      new URLSearchParams(window.location.search).get('query')?.trim() ?? ''
-    );
-  });
+  const [query, setQuery] = useState('');
+  const [isLinkedQueryReady, setIsLinkedQueryReady] = useState(false);
   const [roleFilter, setRoleFilter] = useState('all');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -194,6 +187,26 @@ export default function AdminUsersPage() {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
+        setQuery(
+          new URLSearchParams(window.location.search).get('query')?.trim() ?? '',
+        );
+        setIsLinkedQueryReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLinkedQueryReady) {
+      return;
+    }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
         void refreshUsers(1);
       }
     });
@@ -201,7 +214,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshUsers]);
+  }, [isLinkedQueryReady, refreshUsers]);
 
   const usersLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(pagination?.hasMore),

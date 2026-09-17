@@ -1823,16 +1823,34 @@ export async function reportConversationUser(
 
   await ensureActorUser(reporter);
 
-  const report = await prisma.userReport.create({
-    data: {
-      reporterId,
-      targetUserId,
-      conversationId,
-      reason: input.reason,
-      details: input.details,
-      status: 'open',
-    },
-  });
+  const report = await prisma.userReport
+    .create({
+      data: {
+        reporterId,
+        targetUserId,
+        conversationId,
+        reason: input.reason,
+        details: input.details,
+        status: 'open',
+      },
+    })
+    .catch(async (error) => {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      ) {
+        throw error;
+      }
+
+      return prisma.userReport.findFirstOrThrow({
+        where: {
+          reporterId,
+          targetUserId,
+          conversationId,
+          status: 'open',
+        },
+      });
+    });
 
   safelyPublishRealtimeEvent({
     type: 'conversation_updated',
@@ -2717,7 +2735,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
       },
       orderBy: { createdAt: 'desc' },
       skip: pagination.skip,
-            take: pagination.take,
+      take: pagination.take,
     }),
     prisma.userReport.findMany({
       include: {
@@ -2732,18 +2750,17 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
               select: { id: true, senderId: true, body: true, status: true, createdAt: true },
             },
           },
-                },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       skip: pagination.skip,
       take: pagination.take,
     }),
   ]);
   const listingPage = toPaginatedResponse(listings.map(toListingRecord), pagination);
-    const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
-  const mappedUserReports = userReports
-    .map((report) => ({
-      id: report.id,
+  const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
+  const mappedUserReports = userReports.map((report) => ({
+    id: report.id,
       reporterId: report.reporterId,
       targetUserId: report.targetUserId,
       conversationId: report.conversationId ?? undefined,
@@ -2770,18 +2787,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
             })),
           }
         : null,
-    }))
-    // Open reports surface before resolved ones to keep the queue actionable.
-    .sort((left, right) => {
-      const leftOpen = left.status === 'open' ? 1 : 0;
-      const rightOpen = right.status === 'open' ? 1 : 0;
-
-      if (leftOpen !== rightOpen) {
-        return rightOpen - leftOpen;
-      }
-
-      return right.createdAt.localeCompare(left.createdAt);
-    });
+    }));
   const userReportPage = toPaginatedResponse(mappedUserReports, pagination);
 
   return {
@@ -2802,7 +2808,11 @@ export async function setUserReportModerationStatus(
   admin?: Actor,
 ) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.setUserReportModerationStatus(reportId, resolution, undefined);
+    return memoryStore.setUserReportModerationStatus(
+      reportId,
+      resolution,
+      admin ? getActorId(admin) : undefined,
+    );
   }
 
   const status: UserReportStatus =
@@ -2826,6 +2836,18 @@ export async function setUserReportModerationStatus(
   const report = await prisma.$transaction(async (tx) => {
     const existing = await tx.userReport.findUnique({ where: { id: reportId } });
     if (!existing) return null;
+    if (existing.status !== 'open') return 'already_resolved' as const;
+
+    const claimed = await tx.userReport.updateMany({
+      where: { id: reportId, status: 'open' },
+      data: {
+        status,
+        resolution,
+        resolvedBy: adminId ?? undefined,
+        resolvedAt: resolution === 'review' ? null : new Date(),
+      },
+    });
+    if (claimed.count === 0) return 'already_resolved' as const;
 
     if (shouldCloseConversation && existing.conversationId) {
       await tx.conversation.update({
@@ -2852,15 +2874,6 @@ export async function setUserReportModerationStatus(
       });
     }
 
-    const updated = await tx.userReport.update({
-      where: { id: reportId },
-      data: {
-        status,
-        resolution,
-        resolvedBy: adminId ?? undefined,
-        resolvedAt: new Date(),
-      },
-    });
     await createAdminAuditLog(tx, {
       adminId,
       action: auditAction,
@@ -2868,10 +2881,13 @@ export async function setUserReportModerationStatus(
       targetId: reportId,
       metadata: { resolution, conversationId: existing.conversationId },
     });
-    return updated;
+    return tx.userReport.findUniqueOrThrow({ where: { id: reportId } });
   });
 
   if (!report) return { status: 'not_found' as const, report: null };
+  if (report === 'already_resolved') {
+    return { status: 'already_resolved' as const, report: null };
+  }
   safelyPublishRealtimeEvent({
     type: 'moderation_updated',
     payload: { entity: 'report', entityId: report.id, status: report.status },
