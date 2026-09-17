@@ -343,7 +343,10 @@ function ListingReportsSection({
                 <div className="grid grid-cols-2 gap-2">
                   {hasActiveListing && report.listing && (
                     <Button asChild variant="outline" className="rounded-md">
-                      <Link href={`/listings/${report.listing.id}`} target="_blank">
+                      <Link
+                        href={`/admin/listings?listingId=${encodeURIComponent(report.listing.id)}`}
+                        target="_blank"
+                      >
                         <ExternalLink className="size-4" />
                         فتح الإعلان
                       </Link>

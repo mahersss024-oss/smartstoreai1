@@ -1,9 +1,9 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   CheckCircle2,
@@ -107,8 +107,10 @@ function createDraft(listing: AdminListing): ListingDraft {
   };
 }
 
-export default function AdminListingsPage() {
+function AdminListingsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusedListingId = searchParams.get('listingId')?.trim() ?? '';
   const {
     adminAccessNotice,
     isAdminAccessAllowed,
@@ -123,6 +125,7 @@ export default function AdminListingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const queryRef = useRef(query);
   const statusRef = useRef(status);
+  const focusedListingIdRef = useRef(focusedListingId);
 
   useEffect(() => {
     queryRef.current = query;
@@ -131,6 +134,10 @@ export default function AdminListingsPage() {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  useEffect(() => {
+    focusedListingIdRef.current = focusedListingId;
+  }, [focusedListingId]);
 
   const loadListings = useCallback(
     async (page = 1) => {
@@ -151,7 +158,9 @@ export default function AdminListingsPage() {
           status: statusRef.current,
         });
 
-        if (queryRef.current.trim()) {
+        if (focusedListingIdRef.current) {
+          params.set('listingId', focusedListingIdRef.current);
+        } else if (queryRef.current.trim()) {
           params.set('query', queryRef.current.trim());
         }
 
@@ -213,7 +222,7 @@ export default function AdminListingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadListings, status]);
+  }, [loadListings, status, focusedListingId]);
 
   useSmartstoreRealtime({
     enabled: isAdminAccessAllowed,
@@ -337,32 +346,47 @@ export default function AdminListingsPage() {
           <ThemeToggle language="ar" />
         </header>
 
-        <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card md:grid-cols-[1fr_auto_auto]">
-          <Input
-            name="listingSearch"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="ابحث بالعنوان أو البائع أو المدينة"
-          />
-          <select
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-            name="listingStatusFilter"
-            value={status}
-            onChange={(event) =>
-              setStatus(event.target.value as AdminListing['status'] | 'all')
-            }
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => void loadListings(1)}>
-            <Search className="size-4" />
-            بحث
-          </Button>
-        </section>
+        {focusedListingId ? (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
+            <div className="flex items-center gap-2 font-semibold">
+              <Store className="size-4" />
+              مراجعة إعلان محدد من البلاغ
+            </div>
+            <Button asChild variant="outline" className="rounded-md">
+              <Link href="/admin/listings">
+                <ArrowRight className="size-4" />
+                عرض كل الإعلانات
+              </Link>
+            </Button>
+          </section>
+        ) : (
+          <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card md:grid-cols-[1fr_auto_auto]">
+            <Input
+              name="listingSearch"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="ابحث بالعنوان أو البائع أو المدينة"
+            />
+            <select
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+              name="listingStatusFilter"
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as AdminListing['status'] | 'all')
+              }
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => void loadListings(1)}>
+              <Search className="size-4" />
+              بحث
+            </Button>
+          </section>
+        )}
 
         {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
@@ -373,7 +397,9 @@ export default function AdminListingsPage() {
         <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-bold">
-              الإعلانات {pagination ? `(${formatNumber(pagination.total)})` : ''}
+              {focusedListingId
+                ? 'الإعلان المرتبط بالبلاغ'
+                : `الإعلانات ${pagination ? `(${formatNumber(pagination.total)})` : ''}`}
             </h2>
             <Button variant="outline" className="rounded-md" onClick={() => void loadListings(1)}>
               <RefreshCw className="size-4" />
@@ -387,7 +413,9 @@ export default function AdminListingsPage() {
             </div>
           ) : listings.length === 0 ? (
             <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
-              لا توجد إعلانات.
+              {focusedListingId
+                ? 'لم يتم العثور على الإعلان المرتبط بهذا البلاغ (قد يكون محذوفًا).'
+                : 'لا توجد إعلانات.'}
             </div>
           ) : (
             <div className="grid gap-3">
@@ -514,11 +542,11 @@ export default function AdminListingsPage() {
                 );
               })}
 
-              {pagination?.hasMore && (
+              {!focusedListingId && pagination?.hasMore && (
                 <div ref={listingsLoadMoreRef} className="h-px" />
               )}
 
-              {pagination?.hasMore && (
+              {!focusedListingId && pagination?.hasMore && (
                 <Button
                   variant="outline"
                   className="mx-auto rounded-md"
@@ -533,5 +561,13 @@ export default function AdminListingsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function AdminListingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminListingsPageContent />
+    </Suspense>
   );
 }

@@ -78,13 +78,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get('query')?.trim();
   const status = url.searchParams.get('status')?.trim();
+  const listingId = url.searchParams.get('listingId')?.trim();
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 24,
     maxLimit: 48,
   });
   const where = {
+    ...(listingId ? { id: listingId } : {}),
     ...(status && status !== 'all' ? { status: status as never } : {}),
-    ...(query
+    ...(query && !listingId
       ? {
           OR: [
             { title: { contains: query, mode: 'insensitive' as const } },
