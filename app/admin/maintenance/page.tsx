@@ -153,19 +153,54 @@ export default function AdminMaintenancePage() {
         body: JSON.stringify({ scope, confirmation }),
       });
 
+      const payload = (await response.json().catch(() => null)) as
+        | { counts?: MaintenanceCounts; error?: string; message?: string }
+        | null;
+
       if (!response.ok) {
-        setNotice('لم يتم التنفيذ. اكتب كلمة التأكيد: تنظيف');
+        if (response.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
+
+        if (payload?.error === 'maintenance_cleanup_disabled') {
+          setNotice(
+            'التنظيف معطّل في بيئة الإنتاج. فعّل المتغير SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP=1 ثم أعد تشغيل الخادم.',
+          );
+          return;
+        }
+
+        if (payload?.error === 'confirmation_required') {
+          setNotice('كلمة التأكيد غير صحيحة. اكتب بالضبط: تنظيف');
+          return;
+        }
+
+        if (payload?.error === 'admin_required') {
+          setNotice('هذه العملية مخصصة للمالك فقط.');
+          return;
+        }
+
+        if (response.status === 429) {
+          setNotice('طلبات كثيرة جدًا. انتظر قليلاً ثم أعد المحاولة.');
+          return;
+        }
+
+        setNotice(
+          payload?.message ??
+            'تعذّر تنفيذ عملية التنظيف. تحقق من كلمة التأكيد وحاول مجددًا.',
+        );
         return;
       }
 
-      const payload = (await response.json()) as { counts: MaintenanceCounts };
-      setCounts(payload.counts);
+      if (payload?.counts) {
+        setCounts(payload.counts);
+      }
       setConfirmation('');
       setNotice('تم تنفيذ عملية التنظيف.');
     } finally {
       setIsRunning(false);
     }
-  }, [confirmation, scope]);
+  }, [confirmation, scope, router]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
