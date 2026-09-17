@@ -481,6 +481,52 @@ function AdminListingsPageContent() {
     [loadListings],
   );
 
+  let listingsContent;
+
+  if (isLoading && listings.length === 0) {
+    listingsContent = (
+      <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
+        جار تحميل الإعلانات...
+      </div>
+    );
+  } else if (listings.length === 0) {
+    listingsContent = (
+      <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+        {getListingsEmptyMessage(focusedListingId)}
+      </div>
+    );
+  } else {
+    listingsContent = (
+      <div className="grid gap-3">
+        {listings.map((listing) => (
+          <AdminListingCard
+            key={listing.id}
+            listing={listing}
+            draft={drafts[listing.id] ?? createDraft(listing)}
+            onUpdateDraft={updateDraft}
+            onSave={(listingId) => void saveListing(listingId)}
+            onDelete={(listingId) => void deleteListing(listingId)}
+          />
+        ))}
+
+        {!focusedListingId && pagination?.hasMore && (
+          <div ref={listingsLoadMoreRef} className="h-px" />
+        )}
+
+        {!focusedListingId && pagination?.hasMore && (
+          <Button
+            variant="outline"
+            className="mx-auto rounded-md"
+            disabled={isLoading}
+            onClick={() => void loadListings(pagination.nextPage ?? 1)}
+          >
+            تحميل المزيد
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
@@ -563,43 +609,7 @@ function AdminListingsPageContent() {
             </Button>
           </div>
 
-          {isLoading && listings.length === 0 ? (
-            <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-              جار تحميل الإعلانات...
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
-              {getListingsEmptyMessage(focusedListingId)}
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {listings.map((listing) => (
-                <AdminListingCard
-                  key={listing.id}
-                  listing={listing}
-                  draft={drafts[listing.id] ?? createDraft(listing)}
-                  onUpdateDraft={updateDraft}
-                  onSave={(listingId) => void saveListing(listingId)}
-                  onDelete={(listingId) => void deleteListing(listingId)}
-                />
-              ))}
-
-              {!focusedListingId && pagination?.hasMore && (
-                <div ref={listingsLoadMoreRef} className="h-px" />
-              )}
-
-              {!focusedListingId && pagination?.hasMore && (
-                <Button
-                  variant="outline"
-                  className="mx-auto rounded-md"
-                  disabled={isLoading}
-                  onClick={() => void loadListings(pagination.nextPage ?? 1)}
-                >
-                  تحميل المزيد
-                </Button>
-              )}
-            </div>
-          )}
+          {listingsContent}
         </section>
       </div>
     </main>
