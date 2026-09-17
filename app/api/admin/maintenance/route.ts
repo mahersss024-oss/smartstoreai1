@@ -17,6 +17,7 @@ const cleanupSchema = z.object({
     'analytics',
     'search_state',
     'marketplace_without_users',
+    'purge_deleted_listings',
   ]),
   confirmation: z.string(),
 });
@@ -94,7 +95,7 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
     };
   }
 
-  if (scope === 'search_state') {
+    if (scope === 'search_state') {
     const [searchStates, idempotencyKeys] = await prisma.$transaction([
       prisma.marketplaceSearchState.deleteMany(),
       prisma.apiIdempotencyKey.deleteMany(),
@@ -104,6 +105,14 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
       searchStates: searchStates.count,
       idempotencyKeys: idempotencyKeys.count,
     };
+  }
+
+  if (scope === 'purge_deleted_listings') {
+    const result = await prisma.listing.deleteMany({
+      where: { status: 'deleted' },
+    });
+
+    return { listings: result.count };
   }
 
   const [listings, searchStates, idempotencyKeys] = await prisma.$transaction([

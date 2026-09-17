@@ -159,6 +159,29 @@ test('admin commission, moderation, and maintenance mutations are rate limited',
   assert.match(maintenanceRoute, /admin_maintenance_cleanup/);
 });
 
+test('admin maintenance exposes a scope that purges only soft-deleted listings', () => {
+  const maintenanceRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'maintenance',
+    'route.ts',
+  );
+
+  assert.match(maintenanceRoute, /purge_deleted_listings/);
+  assert.match(
+    maintenanceRoute,
+    /prisma\.listing\.deleteMany\(\{\s*where:\s*\{\s*status:\s*'deleted'\s*\}/,
+  );
+});
+
+test('admin maintenance page offers the deleted-listings purge option', () => {
+  const page = readProjectFile('app', 'admin', 'maintenance', 'page.tsx');
+
+  assert.match(page, /purge_deleted_listings/);
+  assert.match(page, /حذف نهائي للإعلانات المحذوفة من العملاء/);
+});
+
 test('destructive admin maintenance cleanup is disabled by default in production', async () => {
   const env = process.env as Record<string, string | undefined>;
   const previousNodeEnv = env.NODE_ENV;

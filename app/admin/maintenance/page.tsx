@@ -31,7 +31,8 @@ type CleanupScope =
   | 'reports'
   | 'analytics'
   | 'search_state'
-  | 'marketplace_without_users';
+  | 'marketplace_without_users'
+  | 'purge_deleted_listings';
 
 const cleanupScopes: Array<{
   value: CleanupScope;
@@ -67,6 +68,12 @@ const cleanupScopes: Array<{
     value: 'marketplace_without_users',
     label: 'تنظيف السوق مع إبقاء المستخدمين',
     description: 'يحذف الإعلانات وما يتبعها من صور ومحادثات ومفضلات وبلاغات وعمولات.',
+  },
+  {
+    value: 'purge_deleted_listings',
+    label: 'حذف نهائي للإعلانات المحذوفة من العملاء',
+    description:
+      'يحذف نهائيًا الإعلانات التي حالتها «محذوف» فقط (التي حذفها العملاء)، مع صورها ومحادثاتها ومفضلاتها وبلاغاتها وعمولاتها. لا يمسّ الإعلانات الحيّة.',
   },
 ];
 
