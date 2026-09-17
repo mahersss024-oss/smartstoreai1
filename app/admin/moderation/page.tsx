@@ -101,6 +101,10 @@ type PaginationMeta = {
   nextPage: number | null;
 };
 
+type ListingModerationAction = 'approve' | 'reject' | 'delete';
+
+type ListingReportAction = 'dismiss' | 'reject_listing' | 'delete_listing';
+
 function formatPrice(price: ListingRecord['price']) {
   if (typeof price === 'number') {
     return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
@@ -183,10 +187,8 @@ function getUserReportConfirmationMessage(action: UserReportResolution) {
   return messages[action] ?? '';
 }
 
-function getListingReportConfirmMessage(
-  action: 'dismiss' | 'reject_listing' | 'delete_listing',
-) {
-  const messages: Partial<Record<typeof action, string>> = {
+function getListingReportConfirmMessage(action: ListingReportAction) {
+  const messages: Partial<Record<ListingReportAction, string>> = {
     delete_listing:
       'سيتم حذف الإعلان وإغلاق البلاغ بعد تسجيل القرار. هل تريد المتابعة؟',
     reject_listing:
@@ -200,11 +202,11 @@ function SensitiveListingsSection({
   listings,
   isLoading,
   onModerate,
-}: {
+}: Readonly<{
   listings: ListingRecord[];
   isLoading: boolean;
-  onModerate: (listingId: string, action: 'approve' | 'reject' | 'delete') => void;
-}) {
+  onModerate: (listingId: string, action: ListingModerationAction) => void;
+}>) {
   let content;
 
   if (isLoading && listings.length === 0) {
@@ -290,15 +292,12 @@ function ListingReportsSection({
   isLoading,
   processingReportId,
   onResolve,
-}: {
+}: Readonly<{
   reports: ReportRecord[];
   isLoading: boolean;
   processingReportId: string | null;
-  onResolve: (
-    report: ReportRecord,
-    action: 'dismiss' | 'reject_listing' | 'delete_listing',
-  ) => void;
-}) {
+  onResolve: (report: ReportRecord, action: ListingReportAction) => void;
+}>) {
   let content;
 
   if (isLoading && reports.length === 0) {
@@ -406,12 +405,12 @@ function UserReportsSection({
   processingReportId,
   canViewAccounts,
   onModerate,
-}: {
+}: Readonly<{
   userReports: UserReportRecord[];
   processingReportId: string | null;
   canViewAccounts: boolean;
   onModerate: (reportId: string, action: UserReportResolution) => void;
-}) {
+}>) {
   let content;
 
   if (userReports.length === 0) {
@@ -680,7 +679,7 @@ export default function AdminModerationPage() {
   });
 
   const moderateListing = useCallback(
-    async (listingId: string, action: 'approve' | 'reject' | 'delete') => {
+    async (listingId: string, action: ListingModerationAction) => {
       const response = await fetch(
         `/api/admin/moderation/listings/${listingId}`,
         {
@@ -753,10 +752,7 @@ export default function AdminModerationPage() {
   );
 
   const resolveReport = useCallback(
-    async (
-      report: ReportRecord,
-      action: 'dismiss' | 'reject_listing' | 'delete_listing',
-    ) => {
+    async (report: ReportRecord, action: ListingReportAction) => {
       if (action !== 'dismiss' && !report.listing) {
         setNotice('الإعلان المرتبط بهذا البلاغ لم يعد متاحًا. يمكنك رفض البلاغ وإغلاقه.');
         return;
