@@ -1312,9 +1312,9 @@ export default function AccountPage() {
                     {listings.map((listing) => (
                       <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_13rem]">
                       {listing.image ? (
-                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:row-start-1 md:h-full md:min-h-40" src={listing.image} />
+                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:row-start-1 md:aspect-square md:self-start" src={listing.image} />
                       ) : (
-                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:h-full md:min-h-40">
+                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
                           <div className="grid gap-1">
                             <ImageIcon className="mx-auto size-5" />
                             <span>لا توجد صورة حقيقية</span>

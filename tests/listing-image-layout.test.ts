@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+test('listing details keeps up to eight thumbnails in a four-column grid below the main image', async () => {
+  const source = await readFile(
+    new URL('../app/listings/[listingId]/listing-image-gallery.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(source, /visibleImages = images\.slice\(0, 8\)/);
+  assert.match(source, /className="grid grid-cols-4 gap-1\.5"/);
+  assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
+});
+
+test('account listing primary image does not stretch with the image manager', async () => {
+  const source = await readFile(
+    new URL('../app/account/page.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(
+    source,
+    /md:row-start-1 md:aspect-square md:self-start/,
+  );
+  assert.doesNotMatch(
+    source,
+    /md:row-start-1 md:h-full md:min-h-40/,
+  );
+});
