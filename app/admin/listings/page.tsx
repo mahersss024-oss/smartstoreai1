@@ -89,6 +89,18 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ar-SA').format(value);
 }
 
+function resolveDraftPriceMode(listing: AdminListing): ListingDraft['priceMode'] {
+  if (listing.price === 'bid' || listing.priceMode === 'bid') {
+    return 'bid';
+  }
+
+  if (listing.price === 'negotiable' || listing.priceMode === 'negotiable') {
+    return 'negotiable';
+  }
+
+  return 'fixed';
+}
+
 function createDraft(listing: AdminListing): ListingDraft {
   return {
     title: listing.title ?? '',
@@ -97,14 +109,160 @@ function createDraft(listing: AdminListing): ListingDraft {
     city: listing.city ?? '',
     condition: listing.condition ?? '',
     price: typeof listing.price === 'number' ? String(listing.price) : '',
-    priceMode:
-      listing.price === 'bid' || listing.priceMode === 'bid'
-        ? 'bid'
-        : listing.price === 'negotiable' || listing.priceMode === 'negotiable'
-          ? 'negotiable'
-          : 'fixed',
+    priceMode: resolveDraftPriceMode(listing),
     status: listing.status,
   };
+}
+
+function getListingsSectionTitle(
+  focusedListingId: string,
+  pagination: PaginationMeta | null,
+) {
+  if (focusedListingId) {
+    return 'الإعلان المرتبط بالبلاغ';
+  }
+
+  const totalLabel = pagination ? ` (${formatNumber(pagination.total)})` : '';
+  return `الإعلانات${totalLabel}`;
+}
+
+function getListingsEmptyMessage(focusedListingId: string) {
+  return focusedListingId
+    ? 'لم يتم العثور على الإعلان المرتبط بهذا البلاغ (قد يكون محذوفًا).'
+    : 'لا توجد إعلانات.';
+}
+
+function AdminListingCard({
+  listing,
+  draft,
+  onUpdateDraft,
+  onSave,
+  onDelete,
+}: Readonly<{
+  listing: AdminListing;
+  draft: ListingDraft;
+  onUpdateDraft: (listingId: string, updates: Partial<ListingDraft>) => void;
+  onSave: (listingId: string) => void;
+  onDelete: (listingId: string) => void;
+}>) {
+  return (
+    <article className="grid gap-3 rounded-md border p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold">{listing.title ?? 'إعلان بدون عنوان'}</h3>
+          <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+            <span>{listing.seller?.email ?? listing.sellerId}</span>
+            <span>مشاهدات {formatNumber(listing.views)}</span>
+            <span>رسائل {formatNumber(listing.messageCount)}</span>
+            <span>حفظ {formatNumber(listing.favoriteCount)}</span>
+          </div>
+        </div>
+        <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+          {statusOptions.find((option) => option.value === listing.status)?.label ?? listing.status}
+        </span>
+      </div>
+
+      {listing.images.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto">
+          {listing.images.map((image) => (
+            <img
+              key={image.id}
+              alt=""
+              className="h-16 w-16 rounded-md border object-cover"
+              src={image.thumbnailUrl}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-2 lg:grid-cols-4">
+        <Input name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
+        <Input name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
+        <Input name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => onUpdateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
+        <Input name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
+      </div>
+
+      <textarea
+        className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
+        name={`listing-${listing.id}-description`}
+        value={draft.description}
+        onChange={(event) =>
+          onUpdateDraft(listing.id, { description: event.target.value })
+        }
+        placeholder="الوصف"
+      />
+
+      <div className="grid gap-2 md:grid-cols-3">
+        <select
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          name={`listing-${listing.id}-condition`}
+          value={draft.condition}
+          onChange={(event) =>
+            onUpdateDraft(listing.id, {
+              condition: event.target.value as ListingDraft['condition'],
+            })
+          }
+        >
+          {conditionOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          name={`listing-${listing.id}-priceMode`}
+          value={draft.priceMode}
+          onChange={(event) =>
+            onUpdateDraft(listing.id, {
+              priceMode: event.target.value as ListingDraft['priceMode'],
+            })
+          }
+        >
+          <option value="fixed">سعر محدد</option>
+          <option value="bid">على السوم</option>
+          <option value="negotiable">قابل للتفاوض</option>
+        </select>
+        <select
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          name={`listing-${listing.id}-status`}
+          value={draft.status}
+          onChange={(event) =>
+            onUpdateDraft(listing.id, {
+              status: event.target.value as AdminListing['status'],
+            })
+          }
+        >
+          {statusOptions
+            .filter((option) => option.value !== 'all')
+            .map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+        </select>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-4">
+        <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => onSave(listing.id)}>
+          <Save className="size-4" />
+          حفظ
+        </Button>
+        <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'published' })}>
+          <CheckCircle2 className="size-4" />
+          نشر
+        </Button>
+        <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'paused' })}>
+          <Pause className="size-4" />
+          إيقاف
+        </Button>
+        <Button variant="outline" className="rounded-md" onClick={() => onDelete(listing.id)}>
+          <Trash2 className="size-4" />
+          حذف
+        </Button>
+      </div>
+    </article>
+  );
 }
 
 function AdminListingsPageContent() {
@@ -397,9 +555,7 @@ function AdminListingsPageContent() {
         <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-bold">
-              {focusedListingId
-                ? 'الإعلان المرتبط بالبلاغ'
-                : `الإعلانات ${pagination ? `(${formatNumber(pagination.total)})` : ''}`}
+              {getListingsSectionTitle(focusedListingId, pagination)}
             </h2>
             <Button variant="outline" className="rounded-md" onClick={() => void loadListings(1)}>
               <RefreshCw className="size-4" />
@@ -413,134 +569,20 @@ function AdminListingsPageContent() {
             </div>
           ) : listings.length === 0 ? (
             <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
-              {focusedListingId
-                ? 'لم يتم العثور على الإعلان المرتبط بهذا البلاغ (قد يكون محذوفًا).'
-                : 'لا توجد إعلانات.'}
+              {getListingsEmptyMessage(focusedListingId)}
             </div>
           ) : (
             <div className="grid gap-3">
-              {listings.map((listing) => {
-                const draft = drafts[listing.id] ?? createDraft(listing);
-
-                return (
-                  <article key={listing.id} className="grid gap-3 rounded-md border p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-bold">{listing.title ?? 'إعلان بدون عنوان'}</h3>
-                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                          <span>{listing.seller?.email ?? listing.sellerId}</span>
-                          <span>مشاهدات {formatNumber(listing.views)}</span>
-                          <span>رسائل {formatNumber(listing.messageCount)}</span>
-                          <span>حفظ {formatNumber(listing.favoriteCount)}</span>
-                        </div>
-                      </div>
-                      <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                        {statusOptions.find((option) => option.value === listing.status)?.label ?? listing.status}
-                      </span>
-                    </div>
-
-                    {listing.images.length > 0 && (
-                      <div className="flex gap-2 overflow-x-auto">
-                        {listing.images.map((image) => (
-                          <img
-                            key={image.id}
-                            alt=""
-                            className="h-16 w-16 rounded-md border object-cover"
-                            src={image.thumbnailUrl}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="grid gap-2 lg:grid-cols-4">
-                      <Input name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => updateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
-                      <Input name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => updateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
-                      <Input name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => updateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
-                      <Input name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => updateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
-                    </div>
-
-                    <textarea
-                      className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
-                      name={`listing-${listing.id}-description`}
-                      value={draft.description}
-                      onChange={(event) =>
-                        updateDraft(listing.id, { description: event.target.value })
-                      }
-                      placeholder="الوصف"
-                    />
-
-                    <div className="grid gap-2 md:grid-cols-3">
-                      <select
-                        className="h-10 rounded-md border bg-background px-3 text-sm"
-                        name={`listing-${listing.id}-condition`}
-                        value={draft.condition}
-                        onChange={(event) =>
-                          updateDraft(listing.id, {
-                            condition: event.target.value as ListingDraft['condition'],
-                          })
-                        }
-                      >
-                        {conditionOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className="h-10 rounded-md border bg-background px-3 text-sm"
-                        name={`listing-${listing.id}-priceMode`}
-                        value={draft.priceMode}
-                        onChange={(event) =>
-                          updateDraft(listing.id, {
-                            priceMode: event.target.value as ListingDraft['priceMode'],
-                          })
-                        }
-                      >
-                        <option value="fixed">سعر محدد</option>
-                        <option value="bid">على السوم</option>
-                        <option value="negotiable">قابل للتفاوض</option>
-                      </select>
-                      <select
-                        className="h-10 rounded-md border bg-background px-3 text-sm"
-                        name={`listing-${listing.id}-status`}
-                        value={draft.status}
-                        onChange={(event) =>
-                          updateDraft(listing.id, {
-                            status: event.target.value as AdminListing['status'],
-                          })
-                        }
-                      >
-                        {statusOptions
-                          .filter((option) => option.value !== 'all')
-                          .map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-4">
-                      <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => void saveListing(listing.id)}>
-                        <Save className="size-4" />
-                        حفظ
-                      </Button>
-                      <Button variant="outline" className="rounded-md" onClick={() => updateDraft(listing.id, { status: 'published' })}>
-                        <CheckCircle2 className="size-4" />
-                        نشر
-                      </Button>
-                      <Button variant="outline" className="rounded-md" onClick={() => updateDraft(listing.id, { status: 'paused' })}>
-                        <Pause className="size-4" />
-                        إيقاف
-                      </Button>
-                      <Button variant="outline" className="rounded-md" onClick={() => void deleteListing(listing.id)}>
-                        <Trash2 className="size-4" />
-                        حذف
-                      </Button>
-                    </div>
-                  </article>
-                );
-              })}
+              {listings.map((listing) => (
+                <AdminListingCard
+                  key={listing.id}
+                  listing={listing}
+                  draft={drafts[listing.id] ?? createDraft(listing)}
+                  onUpdateDraft={updateDraft}
+                  onSave={(listingId) => void saveListing(listingId)}
+                  onDelete={(listingId) => void deleteListing(listingId)}
+                />
+              ))}
 
               {!focusedListingId && pagination?.hasMore && (
                 <div ref={listingsLoadMoreRef} className="h-px" />
