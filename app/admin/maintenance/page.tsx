@@ -202,6 +202,33 @@ export default function AdminMaintenancePage() {
     }
   }, [confirmation, scope, router]);
 
+  let countsContent;
+
+  if (isLoading || (!counts && !adminAccessNotice && !notice)) {
+    countsContent = (
+      <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
+        جار تحميل الأعداد...
+      </div>
+    );
+  } else if (!counts) {
+    countsContent = (
+      <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
+        {adminAccessNotice || notice}
+      </div>
+    );
+  } else {
+    countsContent = (
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {Object.entries(counts).map(([key, value]) => (
+          <div key={key} className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">{key}</div>
+            <div className="mt-1 text-xl font-bold">{formatNumber(value)}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
@@ -240,24 +267,7 @@ export default function AdminMaintenancePage() {
             </Button>
           </div>
 
-          {isLoading || (!counts && !adminAccessNotice && !notice) ? (
-            <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
-              جار تحميل الأعداد...
-            </div>
-          ) : !counts ? (
-            <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
-              {adminAccessNotice || notice}
-            </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(counts).map(([key, value]) => (
-                <div key={key} className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">{key}</div>
-                  <div className="mt-1 text-xl font-bold">{formatNumber(value)}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {countsContent}
         </section>
 
         <section className="grid gap-4 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
