@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  hasPlatformOwnerAccess,
   hasVerifiedAdminAccess,
   hasVerifiedModeratorAccess,
+  isPlatformOwner,
 } from '@/lib/auth/authorization';
 import { GET as getSession } from '@/app/api/auth/session/route';
 import {
@@ -159,6 +161,124 @@ test('configured admin emails keep verified admin access', async () => {
       }),
       true,
     );
+  } finally {
+    if (originalStore === undefined) {
+      delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    } else {
+      process.env.SMARTSTORE_MARKETPLACE_STORE = originalStore;
+    }
+
+    if (originalAdminEmails === undefined) {
+      delete process.env.SMARTSTORE_ADMIN_EMAILS;
+    } else {
+      process.env.SMARTSTORE_ADMIN_EMAILS = originalAdminEmails;
+    }
+  }
+});
+
+test('only the configured owner email is treated as the platform owner', () => {
+  const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;
+  process.env.SMARTSTORE_ADMIN_EMAILS = 'owner@example.com';
+
+  try {
+    assert.equal(
+      isPlatformOwner({
+        user: { id: 'google:owner', email: 'OWNER@example.com' },
+        issuedAt: 1,
+        expiresAt: 2,
+      }),
+      true,
+    );
+    assert.equal(
+      isPlatformOwner({
+        user: {
+          id: 'google:appointed-admin',
+          email: 'appointed@example.com',
+          role: 'admin',
+        },
+        issuedAt: 1,
+        expiresAt: 2,
+      }),
+      false,
+    );
+    assert.equal(isPlatformOwner(null), false);
+  } finally {
+    if (originalAdminEmails === undefined) {
+      delete process.env.SMARTSTORE_ADMIN_EMAILS;
+    } else {
+      process.env.SMARTSTORE_ADMIN_EMAILS = originalAdminEmails;
+    }
+  }
+});
+
+test('appointed admins and moderators never pass the platform owner gate', async () => {
+  const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  process.env.SMARTSTORE_ADMIN_EMAILS = 'owner@example.com';
+
+  try {
+    const appointedAdmin = {
+      user: {
+        id: 'google:appointed-admin',
+        email: 'appointed@example.com',
+        role: 'admin',
+      },
+      issuedAt: 1,
+      expiresAt: Math.floor(Date.now() / 1000) + 60,
+    };
+    const moderator = {
+      user: {
+        id: 'google:moderator',
+        email: 'moderator@example.com',
+        role: 'moderator',
+      },
+      issuedAt: 1,
+      expiresAt: Math.floor(Date.now() / 1000) + 60,
+    };
+    const owner = {
+      user: { id: 'google:owner', email: 'owner@example.com' },
+      issuedAt: 1,
+      expiresAt: Math.floor(Date.now() / 1000) + 60,
+    };
+
+    assert.equal(await hasPlatformOwnerAccess(appointedAdmin), false);
+    assert.equal(await hasPlatformOwnerAccess(moderator), false);
+    assert.equal(await hasPlatformOwnerAccess(owner), true);
+  } finally {
+    if (originalStore === undefined) {
+      delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    } else {
+      process.env.SMARTSTORE_MARKETPLACE_STORE = originalStore;
+    }
+
+    if (originalAdminEmails === undefined) {
+      delete process.env.SMARTSTORE_ADMIN_EMAILS;
+    } else {
+      process.env.SMARTSTORE_ADMIN_EMAILS = originalAdminEmails;
+    }
+  }
+});
+
+test('session api exposes the owner role for the configured owner email', async () => {
+  const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
+  process.env.SMARTSTORE_ADMIN_EMAILS = 'owner@example.com';
+
+  try {
+    const cookie = createSessionCookie({
+      id: 'google:owner',
+      email: 'owner@example.com',
+    });
+    const response = await getSession(
+      new Request('https://smartstore.test/api/auth/session', {
+        headers: { cookie },
+      }),
+    );
+    const body = await response.json();
+
+    assert.equal(body.user.role, 'owner');
   } finally {
     if (originalStore === undefined) {
       delete process.env.SMARTSTORE_MARKETPLACE_STORE;

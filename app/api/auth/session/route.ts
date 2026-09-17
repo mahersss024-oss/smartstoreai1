@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       if (profile) {
         user.phoneNumber = profile.phoneNumber ?? undefined;
         user.role = isConfiguredAdminEmail(session.user.email)
-          ? 'admin'
+          ? 'owner'
           : profile.role;
       }
     } catch (error) {

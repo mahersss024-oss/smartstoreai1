@@ -274,25 +274,24 @@ export async function DELETE(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-  const { listingId } = await context.params;
+      const { listingId } = await context.params;
   const existing = await prisma.listing.findUnique({ where: { id: listingId } });
 
   if (!existing) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
+  // Permanent delete: cascades to images, conversations, favorites, reports
+  // and commissions attached to the listing.
   await prisma.$transaction([
-    prisma.listing.update({
-      where: { id: listingId },
-      data: { status: 'deleted' },
-    }),
+    prisma.listing.delete({ where: { id: listingId } }),
     prisma.adminAuditLog.create({
       data: {
         adminId: session.user.id,
         action: 'delete_listing',
         targetType: 'listing',
         targetId: listingId,
-        metadata: { operation: 'admin_listing_delete' },
+        metadata: { operation: 'admin_listing_delete', mode: 'permanent' },
       },
     }),
   ]);

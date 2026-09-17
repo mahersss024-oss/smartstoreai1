@@ -3,9 +3,12 @@ import { z } from 'zod';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import {
+  hasVerifiedAdminAccess,
+  isPlatformOwner,
+} from '@/lib/auth/authorization';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
-import { getAuthSession } from '@/lib/auth/session';
+import { getAuthSession, isConfiguredAdminEmail } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -63,9 +66,9 @@ function mapUpdatedUser(user: {
     email: user.email,
     name: user.name ?? undefined,
     picture: user.picture ?? undefined,
-    phoneNumber: user.phoneNumber ?? undefined,
+        phoneNumber: user.phoneNumber ?? undefined,
     phoneUpdatedAt: user.phoneUpdatedAt?.toISOString() ?? undefined,
-    role: user.role,
+    role: isConfiguredAdminEmail(user.email) ? 'owner' : user.role,
     commissionAgreementVersion: user.commissionAgreementVersion ?? undefined,
     commissionAgreementAccepted:
       user.commissionAgreementAccepted?.toISOString() ?? undefined,
@@ -149,6 +152,28 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+    const isOwner = isPlatformOwner(session);
+
+  if (parsed.data.role !== undefined && !isOwner) {
+    return Response.json(
+      {
+        error: 'owner_required',
+        message: 'Only the platform owner can change user roles.',
+      },
+      { status: 403, headers: noStoreHeaders },
+    );
+  }
+
+  if (isConfiguredAdminEmail(existing.email)) {
+    return Response.json(
+      {
+        error: 'owner_account_protected',
+        message: 'The platform owner account cannot be modified.',
+      },
+      { status: 409, headers: noStoreHeaders },
+    );
+  }
+
   if (
     existing.id === session.user.id &&
     parsed.data.role !== undefined &&
@@ -158,6 +183,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       {
         error: 'cannot_downgrade_self',
         message: 'The active admin cannot remove their own admin role.',
+      },
+      { status: 409, headers: noStoreHeaders },
+    );
+  }
+
+  if (
+    parsed.data.role !== undefined &&
+    existing.role === 'admin' &&
+    parsed.data.role !== 'admin'
+  ) {
+    return Response.json(
+      {
+        error: 'cannot_demote_admin',
+        message: 'Appointed admins cannot be demoted by another admin.',
       },
       { status: 409, headers: noStoreHeaders },
     );
@@ -266,7 +305,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-  const { userId } = await context.params;
+    const { userId } = await context.params;
 
   if (userId === session.user.id) {
     return Response.json(
@@ -285,6 +324,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       email: true,
       role: true,
       phoneNumber: true,
+      deletedAt: true,
     },
   });
 
@@ -295,6 +335,30 @@ export async function DELETE(request: Request, context: RouteContext) {
     );
   }
 
+  if (isConfiguredAdminEmail(existing.email)) {
+    return Response.json(
+      {
+        error: 'owner_account_protected',
+        message: 'The platform owner account cannot be deleted.',
+      },
+      { status: 409, headers: noStoreHeaders },
+    );
+  }
+
+  // Appointed admins may not delete other appointed admins.
+  if (!isPlatformOwner(session) && existing.role === 'admin') {
+    return Response.json(
+      {
+        error: 'cannot_delete_admin',
+        message: 'Appointed admins cannot delete other admins.',
+      },
+      { status: 409, headers: noStoreHeaders },
+    );
+  }
+
+  const isOwner = isPlatformOwner(session);
+  const deleteMode = isOwner ? 'permanent' : 'soft';
+
   await prisma.$transaction(async (tx) => {
     await tx.adminAuditLog.create({
       data: {
@@ -304,6 +368,7 @@ export async function DELETE(request: Request, context: RouteContext) {
         targetId: existing.id,
         metadata: {
           operation: 'admin_user_delete',
+          mode: deleteMode,
           email: existing.email,
           role: existing.role,
           hadPhoneNumber: Boolean(existing.phoneNumber),
@@ -311,14 +376,23 @@ export async function DELETE(request: Request, context: RouteContext) {
       },
     });
 
-    await tx.user.delete({
+    if (deleteMode === 'permanent') {
+      await tx.user.delete({
+        where: { id: existing.id },
+      });
+      return;
+    }
+
+    await tx.user.update({
       where: { id: existing.id },
+      data: { deletedAt: existing.deletedAt ?? new Date() },
     });
   });
 
   return Response.json(
     {
-      status: 'deleted',
+      status: deleteMode === 'permanent' ? 'deleted' : 'soft_deleted',
+      mode: deleteMode,
       userId: existing.id,
     },
     { headers: noStoreHeaders },

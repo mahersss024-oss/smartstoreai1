@@ -1,8 +1,11 @@
 import type { Prisma } from '@prisma/client';
 
 import { noStoreHeaders } from '@/lib/api/no-store';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
-import { getAuthSession } from '@/lib/auth/session';
+import {
+  hasVerifiedAdminAccess,
+  isPlatformOwner,
+} from '@/lib/auth/authorization';
+import { getAuthSession, isConfiguredAdminEmail } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import {
   createPaginationMeta,
@@ -44,7 +47,7 @@ function mapUser(user: {
     picture: user.picture ?? undefined,
     phoneNumber: user.phoneNumber ?? undefined,
     phoneUpdatedAt: user.phoneUpdatedAt?.toISOString() ?? undefined,
-    role: user.role,
+    role: isConfiguredAdminEmail(user.email) ? 'owner' : user.role,
     commissionAgreementVersion: user.commissionAgreementVersion ?? undefined,
     commissionAgreementAccepted:
       user.commissionAgreementAccepted?.toISOString() ?? undefined,
@@ -78,11 +81,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get('query')?.trim();
   const role = url.searchParams.get('role')?.trim();
+  const includeSoftDeleted =
+    url.searchParams.get('includeDeleted') === '1' && isPlatformOwner(session);
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 20,
     maxLimit: 50,
   });
   const where: Prisma.UserWhereInput = {
+    ...(includeSoftDeleted ? {} : { deletedAt: null }),
     ...(role && role !== 'all' && userRoles.has(role) ? { role } : {}),
     ...(query
       ? {

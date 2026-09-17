@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 
-type AdminAccessRole = 'admin' | 'moderator';
+type AdminAccessRole = 'owner' | 'admin' | 'moderator';
 
 type AuthSessionPayload = {
   authenticated: boolean;
@@ -15,10 +15,15 @@ type AdminAccessStatus = 'idle' | 'checking' | 'allowed' | 'forbidden' | 'error'
 
 function hasRequiredRole(role: string | undefined, requiredRole: AdminAccessRole) {
   if (requiredRole === 'moderator') {
-    return role === 'admin' || role === 'moderator';
+    return role === 'owner' || role === 'admin' || role === 'moderator';
   }
 
-  return role === 'admin';
+  if (requiredRole === 'admin') {
+    return role === 'owner' || role === 'admin';
+  }
+
+  // requiredRole === 'owner'
+  return role === 'owner';
 }
 
 export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
@@ -69,8 +74,10 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
       status === 'error'
         ? 'تعذر التحقق من صلاحيات الإدارة الآن. حاول مرة أخرى.'
         : status === 'forbidden'
-          ? 'هذه الصفحة مخصصة للإدارة فقط.'
-        : '',
+          ? requiredRole === 'owner'
+            ? 'هذه الصفحة مخصصة لمالك المنصة فقط.'
+            : 'هذه الصفحة مخصصة للإدارة فقط.'
+          : '',
     verifyAdminAccess,
   };
 }

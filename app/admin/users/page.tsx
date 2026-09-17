@@ -65,6 +65,7 @@ const roleLabels: Record<string, string> = {
   user: 'عميل',
   moderator: 'مشرف',
   admin: 'مدير',
+  owner: 'مالك المنصة',
 };
 
 function formatNumber(value: number) {
@@ -90,8 +91,10 @@ export default function AdminUsersPage() {
   const router = useRouter();
   const {
     adminAccessNotice,
+    adminAccessRole,
     verifyAdminAccess,
   } = useAdminAccess('admin');
+  const isOwner = adminAccessRole === 'owner';
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
@@ -458,6 +461,12 @@ export default function AdminUsersPage() {
               };
               const isSaving = savingUserId === user.id;
               const isDeleting = deletingUserId === user.id;
+              const isOwnerAccount = user.role === 'owner';
+              const canChangeRole = isOwner && !isOwnerAccount;
+              const canDelete =
+                !isOwnerAccount &&
+                (isOwner || user.role !== 'admin');
+              const isBusy = isSaving || isDeleting;
 
               return (
                 <article key={user.id} className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
@@ -489,18 +498,25 @@ export default function AdminUsersPage() {
                       <select
                         className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                         name={`user-${user.id}-role`}
-                        disabled={isSaving || isDeleting}
+                        disabled={isBusy || !canChangeRole}
                         onChange={(event) =>
                           updateDraft(user.id, {
                             role: normalizeRole(event.target.value),
                           })
                         }
-                        value={draft.role}
+                        value={isOwnerAccount ? 'admin' : draft.role}
                       >
                         <option value="user">عميل</option>
                         <option value="moderator">مشرف</option>
                         <option value="admin">مدير</option>
                       </select>
+                      {!canChangeRole && (
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          {isOwnerAccount
+                            ? 'حساب مالك المنصة محميّ من التعديل.'
+                            : 'تغيير الأدوار متاح لمالك المنصة فقط.'}
+                        </span>
+                      )}
                     </label>
                     <label className="grid gap-1 text-sm font-semibold md:col-span-2">
                       رقم التواصل الرسمي
@@ -508,7 +524,7 @@ export default function AdminUsersPage() {
                         <input
                           className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                           dir="ltr"
-                          disabled={isSaving || isDeleting}
+                          disabled={isBusy || isOwnerAccount}
                           inputMode="tel"
                           name={`user-${user.id}-phoneNumber`}
                           onChange={(event) =>
@@ -522,7 +538,7 @@ export default function AdminUsersPage() {
                         />
                         <Button
                           className="rounded-md"
-                          disabled={isSaving || isDeleting || !draft.phoneNumber}
+                          disabled={isBusy || isOwnerAccount || !draft.phoneNumber}
                           onClick={() => void saveUser(user.id, '')}
                           type="button"
                           variant="outline"
@@ -573,19 +589,21 @@ export default function AdminUsersPage() {
                       <ShieldCheck className="size-4 text-blue-600" />
                       أي تعديل إداري يتم تسجيله في سجل الإدارة.
                     </div>
-                    <Button
-                      className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
-                      disabled={isSaving || isDeleting}
-                      onClick={() => void deleteUser(user)}
-                      type="button"
-                      variant="outline"
-                    >
-                      <Trash2 className="size-4" />
-                      {isDeleting ? 'جار الحذف...' : 'حذف المستخدم'}
-                    </Button>
+                    {canDelete && (
+                      <Button
+                        className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                        disabled={isBusy}
+                        onClick={() => void deleteUser(user)}
+                        type="button"
+                        variant="outline"
+                      >
+                        <Trash2 className="size-4" />
+                        {isDeleting ? 'جار الحذف...' : 'حذف المستخدم'}
+                      </Button>
+                    )}
                     <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      disabled={isSaving || isDeleting}
+                      disabled={isBusy || isOwnerAccount}
                       onClick={() => void saveUser(user.id)}
                       type="button"
                     >

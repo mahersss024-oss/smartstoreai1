@@ -86,7 +86,7 @@ export default function AdminMaintenancePage() {
   const {
     adminAccessNotice,
     verifyAdminAccess,
-  } = useAdminAccess('admin');
+  } = useAdminAccess('owner');
   const [counts, setCounts] = useState<MaintenanceCounts | null>(null);
   const [scope, setScope] = useState<CleanupScope>('commissions');
   const [confirmation, setConfirmation] = useState('');

@@ -84,9 +84,13 @@ async function persistGoogleUserRegistration(
       : undefined,
   };
 
-  const existingUserByEmail = await prisma.user.findUnique({
+    const existingUserByEmail = await prisma.user.findUnique({
     where: { email: user.email },
   });
+
+  if (existingUserByEmail?.deletedAt) {
+    throw new Error('ACCOUNT_SOFT_DELETED');
+  }
 
   if (existingUserByEmail && existingUserByEmail.id !== user.id) {
     const updatedUser = await prisma.user.update({
@@ -216,9 +220,17 @@ export async function GET(request: Request) {
   };
   let registeredUser = user;
 
-  try {
+    try {
     registeredUser = await persistGoogleUserRegistration(request, user);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'UnknownError';
+
+    if (errorMessage === 'ACCOUNT_SOFT_DELETED') {
+      return new Response('This account has been deactivated.', {
+        status: 403,
+      });
+    }
+
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.error(`[google_auth] registration_failed=${errorName}`);
 

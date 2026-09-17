@@ -182,63 +182,118 @@ test('admin maintenance page offers the deleted-listings purge option', () => {
   assert.match(page, /حذف نهائي للإعلانات المحذوفة من العملاء/);
 });
 
-test('destructive admin maintenance cleanup is disabled by default in production', async () => {
+function withMaintenanceEnv(
+  overrides: Record<string, string | undefined>,
+  run: () => Promise<void>,
+) {
   const env = process.env as Record<string, string | undefined>;
-  const previousNodeEnv = env.NODE_ENV;
-  const previousStore = env.SMARTSTORE_MARKETPLACE_STORE;
-  const previousCleanupFlag = env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
-  const previousAuthSecret = env.AUTH_SECRET;
-  env.NODE_ENV = 'production';
-  env.SMARTSTORE_MARKETPLACE_STORE = 'file';
-  env.AUTH_SECRET = 'test-admin-maintenance-secret';
-  delete env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
+  const previous = new Map<string, string | undefined>();
 
-  try {
-    const response = await runMaintenanceCleanup(
-      new Request('https://smartstore.test/api/admin/maintenance', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          cookie: createSessionCookie({
-            id: 'google:maintenance-admin',
-            email: 'maintenance-admin@example.com',
-            role: 'admin',
-          }),
-        },
-        body: JSON.stringify({
-          scope: 'marketplace_without_users',
-          confirmation: 'confirm',
-        }),
-      }),
-    );
-    assert.ok(response);
-    const body = (await response.json()) as { error?: string };
+  for (const key of Object.keys(overrides)) {
+    previous.set(key, env[key]);
 
-    assert.equal(response.status, 403);
-    assert.equal(body.error, 'maintenance_cleanup_disabled');
-  } finally {
-    if (previousNodeEnv === undefined) {
-      delete env.NODE_ENV;
+    if (overrides[key] === undefined) {
+      delete env[key];
     } else {
-      env.NODE_ENV = previousNodeEnv;
-    }
-
-    if (previousStore === undefined) {
-      delete env.SMARTSTORE_MARKETPLACE_STORE;
-    } else {
-      env.SMARTSTORE_MARKETPLACE_STORE = previousStore;
-    }
-
-    if (previousCleanupFlag === undefined) {
-      delete env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP;
-    } else {
-      env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP = previousCleanupFlag;
-    }
-
-    if (previousAuthSecret === undefined) {
-      delete env.AUTH_SECRET;
-    } else {
-      env.AUTH_SECRET = previousAuthSecret;
+      env[key] = overrides[key];
     }
   }
+
+  return run().finally(() => {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete env[key];
+      } else {
+        env[key] = value;
+      }
+    }
+  });
+}
+
+function maintenanceCleanupRequest(email: string, role = 'admin') {
+  return new Request('https://smartstore.test/api/admin/maintenance', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: createSessionCookie({
+        id: `google:${email}`,
+        email,
+        role,
+      }),
+    },
+    body: JSON.stringify({
+      scope: 'marketplace_without_users',
+      confirmation: 'confirm',
+    }),
+  });
+}
+
+test('destructive admin maintenance cleanup is disabled by default in production', async () => {
+  await withMaintenanceEnv(
+    {
+      NODE_ENV: 'production',
+      SMARTSTORE_MARKETPLACE_STORE: 'file',
+      AUTH_SECRET: 'test-admin-maintenance-secret',
+      SMARTSTORE_ADMIN_EMAILS: 'owner@example.com',
+      SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP: undefined,
+    },
+    async () => {
+      const response = await runMaintenanceCleanup(
+        maintenanceCleanupRequest('owner@example.com'),
+      );
+      assert.ok(response);
+      const body = (await response.json()) as { error?: string };
+
+      assert.equal(response.status, 403);
+      assert.equal(body.error, 'maintenance_cleanup_disabled');
+    },
+  );
+});
+
+test('maintenance cleanup is restricted to the platform owner', async () => {
+  await withMaintenanceEnv(
+    {
+      NODE_ENV: 'production',
+      SMARTSTORE_MARKETPLACE_STORE: 'file',
+      AUTH_SECRET: 'test-admin-maintenance-secret',
+      SMARTSTORE_ADMIN_EMAILS: 'owner@example.com',
+      SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP: '1',
+    },
+    async () => {
+      const response = await runMaintenanceCleanup(
+        maintenanceCleanupRequest('appointed-admin@example.com'),
+      );
+      assert.ok(response);
+      const body = (await response.json()) as { error?: string };
+
+      assert.equal(response.status, 403);
+      assert.equal(body.error, 'owner_required');
+    },
+  );
+});
+
+test('the owner account cannot be demoted or deleted by appointed admins', () => {
+  const updateRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'users',
+    '[userId]',
+    'route.ts',
+  );
+
+  assert.match(updateRoute, /owner_account_protected/);
+  assert.match(updateRoute, /owner_required/);
+  assert.match(updateRoute, /cannot_delete_admin/);
+  assert.match(updateRoute, /soft_deleted/);
+  assert.match(updateRoute, /deletedAt/);
+});
+
+test('the users page hides role changes and protects the owner account', () => {
+  const page = readProjectFile('app', 'admin', 'users', 'page.tsx');
+
+  assert.match(page, /adminAccessRole === 'owner'/);
+  assert.match(page, /canChangeRole/);
+  assert.match(page, /isOwnerAccount/);
+  assert.match(page, /حساب مالك المنصة محميّ/);
 });

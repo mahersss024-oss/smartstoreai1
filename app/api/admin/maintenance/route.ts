@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { hasPlatformOwnerAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
@@ -135,8 +135,10 @@ async function requireAdmin(request: Request) {
     return { response: Response.json({ error: 'auth_required' }, { status: 401 }) };
   }
 
-  if (!(await hasVerifiedAdminAccess(session))) {
-    return { response: Response.json({ error: 'admin_required' }, { status: 403 }) };
+    if (!(await hasPlatformOwnerAccess(session))) {
+    return {
+      response: Response.json({ error: 'owner_required' }, { status: 403 }),
+    };
   }
 
   return { session };

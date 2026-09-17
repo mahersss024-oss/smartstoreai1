@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     adminActions,
     visits,
   ] = await Promise.all([
-    prisma.user.count(),
+    prisma.user.count({ where: { deletedAt: null } }),
     prisma.listing.count(),
     prisma.listingImage.count(),
     prisma.conversation.count(),

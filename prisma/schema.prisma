@@ -88,9 +88,10 @@ model User {
   termsVersion                String?
   privacyPolicyVersion        String?
   listingPolicyVersion        String?
-  commissionPolicyVersion     String?
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
+    commissionPolicyVersion   String?
+  deletedAt                 DateTime?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
 
   listings                    Listing[]               @relation("SellerListings")
   buyerConversations          Conversation[]          @relation("BuyerConversations")

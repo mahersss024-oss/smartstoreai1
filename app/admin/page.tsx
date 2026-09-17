@@ -143,9 +143,10 @@ export default function AdminHomePage() {
   const router = useRouter();
   const {
     adminAccessNotice,
+    adminAccessRole,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('admin');
+  } = useAdminAccess('moderator');
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -170,12 +171,12 @@ export default function AdminHomePage() {
       }
 
       if (response.status === 403) {
-        setNotice('هذه الصفحة مخصصة للمالك فقط.');
+        setNotice('هذه الصفحة مخصصة للإدارة فقط.');
         return;
       }
 
       if (!response.ok) {
-        setNotice('تعذر تحميل لوحة المالك.');
+        setNotice('تعذر تحميل لوحة الإدارة.');
         return;
       }
 
@@ -227,41 +228,51 @@ export default function AdminHomePage() {
     },
   });
 
-  const quickLinks = useMemo(
-    () => [
-      {
-        href: '/admin/users',
-        icon: <Users className="size-4" />,
-        label: 'إدارة المستخدمين',
-        text: 'عرض العملاء، بيانات التواصل الرسمية، الأدوار، ونشاط الحسابات.',
-      },
+  const isOwner = adminAccessRole === 'owner';
+  const canManageUsers = adminAccessRole === 'owner' || adminAccessRole === 'admin';
+  const canManageCommissions = canManageUsers;
+
+  const quickLinks = useMemo(() => {
+    const links = [
       {
         href: '/admin/listings',
         icon: <Megaphone className="size-4" />,
         label: 'إدارة الإعلانات',
         text: 'تعديل، إيقاف، نشر، بيع، أو حذف الإعلانات.',
+        visible: true,
       },
       {
         href: '/admin/moderation',
         icon: <ShieldCheck className="size-4" />,
         label: 'المراجعة والبلاغات',
         text: 'اعتماد الإعلانات الحساسة ومراجعة البلاغات.',
+        visible: true,
+      },
+      {
+        href: '/admin/users',
+        icon: <Users className="size-4" />,
+        label: 'إدارة المستخدمين',
+        text: 'عرض العملاء، بيانات التواصل الرسمية، الأدوار، ونشاط الحسابات.',
+        visible: canManageUsers,
       },
       {
         href: '/admin/commissions',
         icon: <Percent className="size-4" />,
         label: 'إدارة العمولات',
         text: 'تحديث حالة العمولة أو حذف سجل عمولة.',
+        visible: canManageCommissions,
       },
       {
         href: '/admin/maintenance',
         icon: <Trash2 className="size-4" />,
         label: 'الصيانة والتنظيف',
         text: 'تنظيف بيانات التجربة بعد معاينة الأعداد.',
+        visible: isOwner,
       },
-    ],
-    [],
-  );
+    ];
+
+    return links.filter((link) => link.visible);
+  }, [canManageCommissions, canManageUsers, isOwner]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
