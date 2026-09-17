@@ -53,6 +53,22 @@ type OverviewPayload = {
   };
 };
 
+type ModeratorOverviewPayload = {
+  totals: {
+    listings: number;
+    images: number;
+    reports: number;
+    openReports: number;
+    openListingReports: number;
+    openUserReports: number;
+  };
+  statuses: {
+    listings: Record<string, number>;
+    images: Record<string, number>;
+    reports: Record<string, number>;
+  };
+};
+
 const statusLabels: Record<string, string> = {
   approved: 'معتمدة',
   deleted: 'محذوفة',
@@ -146,8 +162,10 @@ export default function AdminHomePage() {
     adminAccessRole,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('admin');
+  } = useAdminAccess('moderator');
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
+  const [moderatorOverview, setModeratorOverview] =
+    useState<ModeratorOverviewPayload | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -158,9 +176,15 @@ export default function AdminHomePage() {
     try {
       if (!(await verifyAdminAccess())) {
         setOverview(null);
+        setModeratorOverview(null);
         return;
       }
+    } catch {
+      setIsLoading(false);
+      return;
+    }
 
+    try {
       const response = await fetch('/api/admin/overview', {
         cache: 'no-store',
       });
@@ -171,7 +195,26 @@ export default function AdminHomePage() {
       }
 
       if (response.status === 403) {
-        setNotice('هذه الصفحة مخصصة للإدارة فقط.');
+        // Appointed moderators cannot read the full admin overview; fall back
+        // to the scoped moderator overview they are allowed to see.
+        const moderatorResponse = await fetch('/api/moderator/overview', {
+          cache: 'no-store',
+        });
+
+        if (moderatorResponse.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
+
+        if (moderatorResponse.ok) {
+          setOverview(null);
+          setModeratorOverview(
+            (await moderatorResponse.json()) as ModeratorOverviewPayload,
+          );
+          return;
+        }
+
+        setNotice('هذه الصفحة مخصصة للفريق الإداري فقط.');
         return;
       }
 
@@ -180,6 +223,7 @@ export default function AdminHomePage() {
         return;
       }
 
+      setModeratorOverview(null);
       setOverview((await response.json()) as OverviewPayload);
     } finally {
       setIsLoading(false);
@@ -229,6 +273,7 @@ export default function AdminHomePage() {
   });
 
   const isOwner = adminAccessRole === 'owner';
+  const isModeratorOnly = adminAccessRole === 'moderator';
   const canManageUsers = adminAccessRole === 'owner' || adminAccessRole === 'admin';
   const canManageCommissions = isOwner;
 
@@ -288,9 +333,13 @@ export default function AdminHomePage() {
               <Store className="size-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">لوحة المالك</h1>
+              <h1 className="truncate text-base font-bold">
+                {isModeratorOnly ? 'لوحة المشرف' : 'لوحة المالك'}
+              </h1>
               <p className="truncate text-xs text-muted-foreground">
-                إحصائيات وصلاحيات إدارة SmartStore AI
+                {isModeratorOnly
+                  ? 'مراجعة الإعلانات والبلاغات حسب صلاحياتك'
+                  : 'إحصائيات وصلاحيات إدارة SmartStore AI'}
               </p>
             </div>
           </div>
@@ -308,10 +357,48 @@ export default function AdminHomePage() {
           </div>
         )}
 
-        {isLoading || (!overview && !adminAccessNotice && !notice) ? (
+        {isLoading ||
+        (!overview && !moderatorOverview && !adminAccessNotice && !notice) ? (
           <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
-            جار تحميل لوحة المالك...
+            {isModeratorOnly ? 'جار تحميل لوحة المشرف...' : 'جار تحميل لوحة المالك...'}
           </section>
+        ) : moderatorOverview ? (
+          <>
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard icon={<Flag className="size-4" />} label="البلاغات المفتوحة" value={formatNumber(moderatorOverview.totals.openReports)} />
+              <StatCard icon={<Flag className="size-4" />} label="بلاغات الإعلانات المفتوحة" value={formatNumber(moderatorOverview.totals.openListingReports)} />
+              <StatCard icon={<MessageCircle className="size-4" />} label="بلاغات المحادثات المفتوحة" value={formatNumber(moderatorOverview.totals.openUserReports)} />
+              <StatCard icon={<Megaphone className="size-4" />} label="قيد المراجعة (إعلانات)" value={formatNumber((moderatorOverview.statuses.listings.pending ?? 0) + (moderatorOverview.statuses.listings.rejected ?? 0))} />
+            </section>
+
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <StatCard icon={<Megaphone className="size-4" />} label="كل الإعلانات" value={formatNumber(moderatorOverview.totals.listings)} />
+              <StatCard icon={<ImageIcon className="size-4" />} label="صور الإعلانات" value={formatNumber(moderatorOverview.totals.images)} />
+              <StatCard icon={<Flag className="size-4" />} label="إجمالي البلاغات" value={formatNumber(moderatorOverview.totals.reports)} />
+            </section>
+
+            <section className="grid gap-3 lg:grid-cols-4">
+              {quickLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="grid gap-2 rounded-md border bg-white p-4 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10"
+                >
+                  <div className="flex items-center gap-2 text-sm font-bold">
+                    {link.icon}
+                    {link.label}
+                  </div>
+                  <p className="text-xs leading-6 text-muted-foreground">{link.text}</p>
+                </Link>
+              ))}
+            </section>
+
+            <section className="grid gap-3 lg:grid-cols-3">
+              <StatusBlock title="حالات الإعلانات" statuses={moderatorOverview.statuses.listings} />
+              <StatusBlock title="حالات الصور" statuses={moderatorOverview.statuses.images} />
+              <StatusBlock title="حالات البلاغات" statuses={moderatorOverview.statuses.reports} />
+            </section>
+          </>
         ) : !overview ? (
           <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
             {adminAccessNotice || notice}

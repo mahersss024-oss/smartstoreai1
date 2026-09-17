@@ -350,7 +350,7 @@ test('scoped admin roles are enforced consistently by pages and APIs', () => {
     'route.ts',
   );
 
-  assert.match(dashboard, /useAdminAccess\('admin'\)/);
+  assert.match(dashboard, /useAdminAccess\('moderator'\)/);
   assert.match(dashboard, /const canManageCommissions = isOwner/);
   assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
   assert.match(commissionsRoute, /hasPlatformOwnerAccess/);
@@ -375,4 +375,30 @@ test('soft-deleted accounts remain visible to the owner and lose API access', ()
   assert.match(proxy, /select: \{ deletedAt: true \}/);
   assert.match(proxy, /clearSessionCookie/);
   assert.match(sessionRoute, /profile\.deletedAt/);
+});
+
+test('admin dashboard admits moderators and renders a scoped moderator view', () => {
+  const dashboard = readProjectFile('app', 'admin', 'page.tsx');
+
+  assert.match(dashboard, /useAdminAccess\('moderator'\)/);
+  assert.match(dashboard, /isModeratorOnly/);
+  assert.match(dashboard, /لوحة المشرف/);
+  assert.match(dashboard, /\/api\/moderator\/overview/);
+});
+
+test('moderator overview api is server-side moderator protected and scoped', () => {
+  const route = readProjectFile(
+    'app',
+    'api',
+    'moderator',
+    'overview',
+    'route.ts',
+  );
+
+  assert.match(route, /hasVerifiedModeratorAccess/);
+  assert.match(route, /openReports/);
+  assert.match(route, /openUserReports/);
+  // Must never expose owner/admin-only data such as commissions or users.
+  assert.doesNotMatch(route, /commission/i);
+  assert.doesNotMatch(route, /prisma\.user\b/);
 });
