@@ -1186,6 +1186,7 @@ export default function Page() {
   const assistantDragStartYRef = useRef<number | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
+  const chatInputContainerRef = useRef<HTMLDivElement | null>(null);
   const listingsRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
@@ -1283,20 +1284,58 @@ export default function Page() {
 
   const handleChatInputFocus = useCallback(() => {
     const visualViewport = window.visualViewport;
-    const viewportHeight = Math.max(
-      window.innerHeight,
-      visualViewport
-        ? visualViewport.height + visualViewport.offsetTop
-        : window.innerHeight,
-    );
+    const currentViewportBottom = visualViewport
+      ? visualViewport.height + visualViewport.offsetTop
+      : window.innerHeight;
 
+    // Capture the largest known viewport height *before* the keyboard opens so
+    // the offset calculation has a stable reference that is never polluted by
+    // the shrunken `window.innerHeight` that Android Chrome reports once the
+    // keyboard is visible.
     keyboardBaselineViewportHeightRef.current = Math.max(
       keyboardBaselineViewportHeightRef.current ?? 0,
-      viewportHeight,
+      currentViewportBottom,
+      window.innerHeight,
     );
     setIsChatInputFocused(true);
     expandAssistant();
   }, [expandAssistant]);
+
+  const handleChatInputPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      // When the assistant is collapsed, tapping anywhere on the input
+      // container should open the sheet and move focus into the textarea so the
+      // mobile keyboard opens reliably, even when the tap lands on the padding
+      // around the textarea rather than on the field itself.
+      if (isAssistantExpanded) {
+        return;
+      }
+
+      event.stopPropagation();
+      handleChatInputFocus();
+
+      const target = event.target;
+
+      if (
+        target instanceof Element &&
+        target.closest('textarea, input, button, a, [role="button"]')
+      ) {
+        return;
+      }
+
+      const textarea = chatInputContainerRef.current?.querySelector('textarea');
+
+      if (textarea instanceof HTMLTextAreaElement) {
+        // Defer focus until after the expanded sheet has been committed to the
+        // DOM so the browser does not scroll the freshly revealed textarea out
+        // of view while the keyboard animates open.
+        window.requestAnimationFrame(() => {
+          textarea.focus({ preventScroll: true });
+        });
+      }
+    },
+    [handleChatInputFocus, isAssistantExpanded],
+  );
 
   const handleChatInputBlur = useCallback(
     (event: ReactFocusEvent<HTMLDivElement>) => {
@@ -1341,19 +1380,39 @@ export default function Page() {
         return;
       }
 
+      // The keyboard is only considered open while a text-entry element keeps
+      // focus. This prevents the offset from lingering after the keyboard is
+      // dismissed on devices that do not fire a reliable resize event.
+      const activeElement = document.activeElement;
+      const isTextEntryFocused =
+        activeElement instanceof Element &&
+        Boolean(
+          activeElement.closest(
+            'textarea, input:not([type="checkbox"]):not([type="radio"]), [contenteditable="true"]',
+          ),
+        );
+
+      if (!isTextEntryFocused) {
+        setKeyboardOffset(0);
+        return;
+      }
+
+      // On Android Chrome the visible viewport shrinks when the keyboard opens,
+      // but `offsetTop` stays at 0, so `height + offsetTop` marks the keyboard
+      // upper boundary. The baseline is captured once (before the keyboard
+      // opens) and kept stable here so `window.innerHeight`, which also shrinks
+      // on Android, never corrupts the offset.
       const viewportBottom = visualViewport.height + visualViewport.offsetTop;
-      const baselineViewportHeight = Math.max(
-        keyboardBaselineViewportHeightRef.current ?? 0,
-        window.innerHeight,
-        viewportBottom,
-      );
-      keyboardBaselineViewportHeightRef.current = baselineViewportHeight;
+      const baselineViewportHeight =
+        keyboardBaselineViewportHeightRef.current ??
+        Math.max(window.innerHeight, viewportBottom);
+
       const nextKeyboardOffset = Math.max(
         0,
         Math.round(baselineViewportHeight - viewportBottom),
       );
 
-      setKeyboardOffset(nextKeyboardOffset > 80 ? nextKeyboardOffset : 0);
+      setKeyboardOffset(nextKeyboardOffset > 60 ? nextKeyboardOffset : 0);
     };
 
     syncKeyboardOffset();
@@ -2473,15 +2532,11 @@ export default function Page() {
               </div>
 
               <div
+                ref={chatInputContainerRef}
                 className="shrink-0 border-t p-3"
                 onBlur={handleChatInputBlur}
                 onFocus={handleChatInputFocus}
-                onPointerDown={(event) => {
-                  if (!isAssistantExpanded) {
-                    event.stopPropagation();
-                    handleChatInputFocus();
-                  }
-                }}
+                onPointerDown={handleChatInputPointerDown}
               >
                 <PromptInput
                   accept="image/*"
