@@ -67,7 +67,10 @@ const themeStyle: CSSProperties = {
 // shown only when the head script explicitly marks this load as a welcome launch.
 // This avoids any independent dark cover appearing during normal navigation.
 const welcomeCriticalStyle = `
-html, body { background-color: #08111d; }
+html { background-color: #e8edf3; }
+html.dark { background-color: #0a111c; }
+body { background-color: var(--theme-light-background, #e8edf3); }
+html.dark body { background-color: var(--theme-dark-background, #0a111c); }
 html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
 #smartstore-welcome {
   position: fixed;
