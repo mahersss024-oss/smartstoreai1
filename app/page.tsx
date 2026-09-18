@@ -29,7 +29,6 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
-  MoreHorizontal,
   Plus,
   SendHorizontal,
   ShieldCheck,
@@ -2379,7 +2378,7 @@ export default function Page() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
-                      <MoreHorizontal className="size-4" />
+                      <Plus className="size-4" />
                     </Button>
                   </div>
                 </div>
