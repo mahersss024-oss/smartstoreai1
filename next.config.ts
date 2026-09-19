@@ -4,6 +4,11 @@ import { getSecurityHeaders } from "./lib/security/headers";
 
 const nextConfig: NextConfig = {
   agentRules: false,
+  // Pin the Turbopack workspace root to this project directory so Next.js does
+  // not infer it from an unrelated lockfile located outside the Git repository.
+  turbopack: {
+    root: __dirname,
+  },
   async headers() {
     return [
       {
