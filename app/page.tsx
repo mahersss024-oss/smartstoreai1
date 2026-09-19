@@ -1531,6 +1531,12 @@ export default function Page() {
     setAssistantState('expanded');
   }, []);
 
+  const resetChatKeyboardState = useCallback(() => {
+    setIsChatInputFocused(false);
+    setKeyboardOffset(0);
+    keyboardBaselineViewportHeightRef.current = null;
+  }, []);
+
   const handleChatInputFocus = useCallback(() => {
     const visualViewport = window.visualViewport;
     const currentViewportBottom = visualViewport
@@ -1723,6 +1729,7 @@ export default function Page() {
       String(window.scrollY),
     );
 
+    resetChatKeyboardState();
     setHasAssistantBubbleAttention(false);
     setIsMobileChatViewOpen(true);
     expandAssistant();
@@ -1731,29 +1738,27 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.set('chat', '1');
     window.history.pushState({ smartstoreMobileChat: true }, '', url);
-  }, [expandAssistant]);
+  }, [expandAssistant, resetChatKeyboardState]);
 
   const closeMobileChatView = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    setIsChatInputFocused(false);
-    setKeyboardOffset(0);
+    resetChatKeyboardState();
 
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     window.history.replaceState(null, '', url);
     restoreMarketplaceScroll();
-  }, [restoreMarketplaceScroll]);
+  }, [resetChatKeyboardState, restoreMarketplaceScroll]);
 
   const closeAssistantForNavigation = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    setIsChatInputFocused(false);
-    setKeyboardOffset(0);
+    resetChatKeyboardState();
     collapseAssistant();
 
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     window.history.replaceState(null, '', url);
-  }, [collapseAssistant]);
+  }, [collapseAssistant, resetChatKeyboardState]);
 
   useEffect(() => {
     const syncMobileChatViewFromUrl = () => {
@@ -1761,6 +1766,7 @@ export default function Page() {
         new URL(window.location.href).searchParams.get('chat') === '1';
 
       setIsMobileChatViewOpen(shouldOpen);
+      resetChatKeyboardState();
 
       if (shouldOpen) {
         expandAssistant();
@@ -1776,7 +1782,7 @@ export default function Page() {
     return () => {
       window.removeEventListener('popstate', syncMobileChatViewFromUrl);
     };
-  }, [expandAssistant, restoreMarketplaceScroll]);
+  }, [expandAssistant, resetChatKeyboardState, restoreMarketplaceScroll]);
 
   useEffect(() => {
     window.addEventListener(

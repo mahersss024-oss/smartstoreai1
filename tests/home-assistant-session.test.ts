@@ -36,18 +36,31 @@ test('primary mobile navigation closes the visible assistant chat view only', ()
   const homePage = readProjectFile('app', 'page.tsx');
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
   const closeNavigationMatch = homePage.match(
-    /const closeAssistantForNavigation = useCallback\([\s\S]*?\n  \}, \[collapseAssistant\]\);/,
+    /const closeAssistantForNavigation = useCallback\([\s\S]*?\n  \}, \[collapseAssistant, resetChatKeyboardState\]\);/,
   );
   const closeNavigationHandler = closeNavigationMatch?.[0] ?? '';
 
   assert.match(homePage, /smartstore:close-assistant-view/);
   assert.match(homePage, /closeAssistantForNavigation/);
   assert.match(closeNavigationHandler, /setIsMobileChatViewOpen\(false\)/);
+  assert.match(closeNavigationHandler, /resetChatKeyboardState\(\)/);
   assert.match(closeNavigationHandler, /url\.searchParams\.delete\('chat'\)/);
   assert.doesNotMatch(closeNavigationHandler, /clearHomeAssistantRuntimeState/);
   assert.match(mobileNavigation, /closeAssistantViewForPrimaryNavigation/);
   assert.match(mobileNavigation, /href !== '\/' && href !== '\/account'/);
   assert.match(mobileNavigation, /smartstore:close-assistant-view/);
+});
+
+test('mobile chat view resets keyboard tracking when opened or closed', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /const resetChatKeyboardState = useCallback/);
+  assert.match(homePage, /setIsChatInputFocused\(false\)/);
+  assert.match(homePage, /setKeyboardOffset\(0\)/);
+  assert.match(homePage, /keyboardBaselineViewportHeightRef\.current = null/);
+  assert.match(homePage, /const openMobileChatView = useCallback\([\s\S]*resetChatKeyboardState\(\)/);
+  assert.match(homePage, /const closeMobileChatView = useCallback\([\s\S]*resetChatKeyboardState\(\)/);
+  assert.match(homePage, /syncMobileChatViewFromUrl[\s\S]*resetChatKeyboardState\(\)/);
 });
 
 test('home assistant starter search is generic instead of a fixed car city example', () => {
