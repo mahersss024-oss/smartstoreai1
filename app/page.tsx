@@ -215,7 +215,14 @@ const currentChatStorageKey = 'smartstore-current-chat-v1';
 const retainedListingImagesDatabaseName = 'smartstore-listing-images-v1';
 const retainedListingImagesStoreName = 'listing-images';
 const retainedListingImagesRecordKey = 'latest';
+const assistantBubblePositionStorageKey = 'smartstore-ai-bubble-position-v1';
+const assistantMarketplaceScrollStorageKey =
+  'smartstore-marketplace-scroll-y-v1';
 const assistantDragThreshold = 60;
+const assistantBubbleSize = 64;
+const assistantBubbleMargin = 14;
+const assistantBubbleBottomReserve = 92;
+const assistantBubbleDragThreshold = 8;
 const chatMaxAttachments = 8;
 const chatInputGroupStyle: CSSProperties = {
   display: 'grid',
@@ -241,8 +248,83 @@ const chatAttachmentControlsStyle: CSSProperties = {
 
 type PendingChatAttachment = FileUIPart & { id: string };
 
+type AssistantBubblePosition = {
+  x: number;
+  y: number;
+};
+
+type AssistantBubbleDragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  originX: number;
+  originY: number;
+  hasDragged: boolean;
+};
+
 function getAttachmentLabel(file: PendingChatAttachment) {
   return file.filename || (file.mediaType?.startsWith('image/') ? 'صورة مرفقة' : 'ملف مرفق');
+}
+
+function getAssistantBubbleBounds() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const minX = assistantBubbleMargin;
+  const maxX = Math.max(minX, width - assistantBubbleSize - assistantBubbleMargin);
+  const minY = assistantBubbleMargin;
+  const maxY = Math.max(
+    minY,
+    height - assistantBubbleSize - assistantBubbleBottomReserve,
+  );
+
+  return { minX, maxX, minY, maxY };
+}
+
+function clampAssistantBubblePosition(position: AssistantBubblePosition) {
+  const bounds = getAssistantBubbleBounds();
+
+  return {
+    x: Math.min(bounds.maxX, Math.max(bounds.minX, position.x)),
+    y: Math.min(bounds.maxY, Math.max(bounds.minY, position.y)),
+  };
+}
+
+function getDefaultAssistantBubblePosition() {
+  return clampAssistantBubblePosition({
+    x: window.innerWidth - assistantBubbleSize - assistantBubbleMargin,
+    y: window.innerHeight - assistantBubbleSize - assistantBubbleBottomReserve,
+  });
+}
+
+function readAssistantBubblePosition() {
+  try {
+    const rawPosition = localStorage.getItem(assistantBubblePositionStorageKey);
+
+    if (!rawPosition) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawPosition) as Partial<AssistantBubblePosition>;
+
+    if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') {
+      return null;
+    }
+
+    return clampAssistantBubblePosition({ x: parsed.x, y: parsed.y });
+  } catch {
+    return null;
+  }
+}
+
+function writeAssistantBubblePosition(position: AssistantBubblePosition) {
+  try {
+    localStorage.setItem(
+      assistantBubblePositionStorageKey,
+      JSON.stringify(position),
+    );
+  } catch {
+    // Position persistence is an enhancement only.
+  }
 }
 
 function ChatAttachmentPreviewStrip({ maxFiles }: { maxFiles: number }) {
@@ -1178,12 +1260,20 @@ export default function Page() {
   const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const [assistantState, setAssistantState] =
     useState<AssistantState>('collapsed');
+  const [isMobileChatViewOpen, setIsMobileChatViewOpen] = useState(false);
   const [isCompactViewport, setIsCompactViewport] = useState(true);
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [assistantBubblePosition, setAssistantBubblePosition] =
+    useState<AssistantBubblePosition | null>(null);
+  const [hasAssistantBubbleAttention, setHasAssistantBubbleAttention] =
+    useState(false);
   const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
+  const assistantBubbleDragRef = useRef<AssistantBubbleDragState | null>(null);
+  const assistantBubbleRef = useRef<HTMLButtonElement | null>(null);
+  const lastAssistantBubbleMessageIdRef = useRef<string | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const chatInputContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1196,6 +1286,12 @@ export default function Page() {
   const filteredMessages = useMemo(
     () => messages.filter((message) => message.role !== 'system'),
     [messages],
+  );
+  const latestAssistantMessageId = useMemo(
+    () =>
+      filteredMessages.findLast((message) => message.role === 'assistant')?.id ??
+      null,
+    [filteredMessages],
   );
   const isLoading = status === 'streaming' || status === 'submitted';
   const chatErrorMessage = getChatErrorMessage(error);
@@ -1250,7 +1346,7 @@ export default function Page() {
 
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
-        if (!isCompactViewport) {
+    if (!isCompactViewport || isMobileChatViewOpen) {
       return undefined;
     }
 
@@ -1275,6 +1371,7 @@ export default function Page() {
     isAssistantExpanded,
     isChatInputFocused,
     isCompactViewport,
+    isMobileChatViewOpen,
     keyboardOffset,
   ]);
 
@@ -1458,6 +1555,227 @@ export default function Page() {
       window.removeEventListener('resize', syncViewportMode);
     };
   }, [collapseAssistant, expandAssistant]);
+
+  const restoreMarketplaceScroll = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      const rawScroll = sessionStorage.getItem(
+        assistantMarketplaceScrollStorageKey,
+      );
+      const scrollY = rawScroll ? Number.parseInt(rawScroll, 10) : 0;
+
+      if (Number.isFinite(scrollY) && scrollY > 0) {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      }
+    });
+  }, []);
+
+  const openMobileChatView = useCallback(() => {
+    sessionStorage.setItem(
+      assistantMarketplaceScrollStorageKey,
+      String(window.scrollY),
+    );
+
+    setHasAssistantBubbleAttention(false);
+    setIsMobileChatViewOpen(true);
+    expandAssistant();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('chat', '1');
+    window.history.pushState({ smartstoreMobileChat: true }, '', url);
+  }, [expandAssistant]);
+
+  const closeMobileChatView = useCallback(() => {
+    setIsMobileChatViewOpen(false);
+    setIsChatInputFocused(false);
+    setKeyboardOffset(0);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chat');
+    window.history.replaceState(null, '', url);
+    restoreMarketplaceScroll();
+  }, [restoreMarketplaceScroll]);
+
+  useEffect(() => {
+    const syncMobileChatViewFromUrl = () => {
+      const shouldOpen =
+        new URL(window.location.href).searchParams.get('chat') === '1';
+
+      setIsMobileChatViewOpen(shouldOpen);
+
+      if (shouldOpen) {
+        expandAssistant();
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      } else {
+        restoreMarketplaceScroll();
+      }
+    };
+
+    syncMobileChatViewFromUrl();
+    window.addEventListener('popstate', syncMobileChatViewFromUrl);
+
+    return () => {
+      window.removeEventListener('popstate', syncMobileChatViewFromUrl);
+    };
+  }, [expandAssistant, restoreMarketplaceScroll]);
+
+  useEffect(() => {
+    if (!isCompactViewport || isMobileChatViewOpen) {
+      return;
+    }
+
+    const syncBubblePosition = () => {
+      setAssistantBubblePosition((current) => {
+        const nextPosition = current
+          ? clampAssistantBubblePosition(current)
+          : readAssistantBubblePosition() ?? getDefaultAssistantBubblePosition();
+
+        writeAssistantBubblePosition(nextPosition);
+        return nextPosition;
+      });
+    };
+
+    syncBubblePosition();
+    window.addEventListener('resize', syncBubblePosition);
+    window.visualViewport?.addEventListener('resize', syncBubblePosition);
+
+    return () => {
+      window.removeEventListener('resize', syncBubblePosition);
+      window.visualViewport?.removeEventListener('resize', syncBubblePosition);
+    };
+  }, [isCompactViewport, isMobileChatViewOpen]);
+
+  useEffect(() => {
+    if (!latestAssistantMessageId) {
+      return;
+    }
+
+    if (lastAssistantBubbleMessageIdRef.current === null) {
+      lastAssistantBubbleMessageIdRef.current = latestAssistantMessageId;
+      return;
+    }
+
+    if (lastAssistantBubbleMessageIdRef.current === latestAssistantMessageId) {
+      return;
+    }
+
+    lastAssistantBubbleMessageIdRef.current = latestAssistantMessageId;
+
+    if (!isCompactViewport || isMobileChatViewOpen || isLoading) {
+      return;
+    }
+
+    const startAttentionTimer = window.setTimeout(() => {
+      setHasAssistantBubbleAttention(true);
+    }, 0);
+    const stopAttentionTimer = window.setTimeout(() => {
+      setHasAssistantBubbleAttention(false);
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(startAttentionTimer);
+      window.clearTimeout(stopAttentionTimer);
+    };
+  }, [
+    isCompactViewport,
+    isLoading,
+    isMobileChatViewOpen,
+    latestAssistantMessageId,
+  ]);
+
+  const handleAssistantBubblePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!assistantBubblePosition) {
+        return;
+      }
+
+      assistantBubbleRef.current?.setPointerCapture(event.pointerId);
+      assistantBubbleDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: assistantBubblePosition.x,
+        originY: assistantBubblePosition.y,
+        hasDragged: false,
+      };
+    },
+    [assistantBubblePosition],
+  );
+
+  const handleAssistantBubblePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const dragState = assistantBubbleDragRef.current;
+
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+      const hasPassedThreshold =
+        Math.hypot(deltaX, deltaY) > assistantBubbleDragThreshold;
+
+      if (!dragState.hasDragged && !hasPassedThreshold) {
+        return;
+      }
+
+      dragState.hasDragged = true;
+      event.preventDefault();
+
+      setAssistantBubblePosition(
+        clampAssistantBubblePosition({
+          x: dragState.originX + deltaX,
+          y: dragState.originY + deltaY,
+        }),
+      );
+    },
+    [],
+  );
+
+  const handleAssistantBubblePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const dragState = assistantBubbleDragRef.current;
+
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      assistantBubbleDragRef.current = null;
+      assistantBubbleRef.current?.releasePointerCapture(event.pointerId);
+
+      if (!dragState.hasDragged) {
+        openMobileChatView();
+        return;
+      }
+
+      setAssistantBubblePosition((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const bounds = getAssistantBubbleBounds();
+        const snappedPosition = clampAssistantBubblePosition({
+          ...current,
+          x:
+            current.x + assistantBubbleSize / 2 < window.innerWidth / 2
+              ? bounds.minX
+              : bounds.maxX,
+        });
+
+        writeAssistantBubblePosition(snappedPosition);
+        return snappedPosition;
+      });
+    },
+    [openMobileChatView],
+  );
+
+  const handleAssistantBubblePointerCancel = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      assistantBubbleDragRef.current = null;
+      assistantBubbleRef.current?.releasePointerCapture(event.pointerId);
+    },
+    [],
+  );
 
   const handleAssistantDragStart = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -2212,10 +2530,41 @@ export default function Page() {
     setActiveListingQuery('');
   }, []);
 
+  const isCompactChatView = isCompactViewport && isMobileChatViewOpen;
+  const shouldRenderAssistantPanel = !isCompactViewport || isCompactChatView;
+  const isAssistantContentVisible =
+    !isCompactViewport || isAssistantExpanded || isCompactChatView;
+  const shouldRenderAssistantBubble =
+    isCompactViewport && !isMobileChatViewOpen && assistantBubblePosition;
+  const assistantBubbleState = isLoading
+    ? 'active'
+    : hasAssistantBubbleAttention
+      ? 'attention'
+      : 'idle';
+
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden" dir="rtl">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0">
-        <section className="flex min-h-0 flex-col rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card lg:overflow-hidden">
+    <main
+      className={cn(
+        'min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden',
+        isCompactChatView && 'h-dvh overflow-hidden',
+      )}
+      dir="rtl"
+    >
+      <div
+        className={cn(
+          'mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0',
+          isCompactChatView && 'h-dvh min-h-0 max-w-none gap-0 px-0 py-0 sm:px-0',
+        )}
+      >
+        <section
+          className={cn(
+            'flex min-h-0 flex-col bg-white dark:bg-card',
+            isCompactChatView
+              ? 'h-full rounded-none border-0 shadow-none'
+              : 'rounded-md border shadow-2xl shadow-slate-950/10 lg:overflow-hidden',
+          )}
+        >
+          {!isCompactChatView && (
           <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
@@ -2274,13 +2623,22 @@ export default function Page() {
               )}
             </div>
           </header>
+          )}
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden">
+          <div
+            className={cn(
+              'grid min-h-0 flex-1',
+              isCompactChatView
+                ? 'grid-cols-1 overflow-hidden'
+                : 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden',
+            )}
+          >
+            {!isCompactChatView && (
             <section
               className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
-                isAssistantExpanded
-                  ? 'pb-[calc(70dvh+6rem)] sm:pb-[calc(70dvh+6rem)]'
-                  : 'pb-[calc(14rem+env(safe-area-inset-bottom))] sm:pb-[calc(14rem+env(safe-area-inset-bottom))]'
+                isCompactViewport
+                  ? 'pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))]'
+                  : ''
               }`}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
@@ -2415,25 +2773,56 @@ export default function Page() {
               )}
 
             </section>
+            )}
 
+            {shouldRenderAssistantPanel && (
             <section
-              className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex h-72 translate-y-0 transform-gpu flex-col overflow-hidden rounded-t-[24px] border bg-white shadow-2xl shadow-slate-950/20 transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card lg:static lg:h-auto lg:max-h-none lg:min-h-0 lg:rounded-none lg:border-0 lg:shadow-none"
+              className={cn(
+                'z-40 flex min-h-0 translate-y-0 transform-gpu flex-col overflow-hidden bg-white transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card',
+                isCompactChatView
+                  ? 'h-full rounded-none border-0 shadow-none'
+                  : 'fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] h-72 rounded-t-[24px] border shadow-2xl shadow-slate-950/20 lg:static lg:h-auto lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none',
+              )}
               style={assistantPanelStyle}
             >
               <header
-                className="shrink-0 touch-none border-b px-4 py-3"
-                onPointerDown={handleAssistantDragStart}
-                onPointerUp={handleAssistantDragEnd}
-                onTouchEnd={handleAssistantTouchEnd}
-                onTouchStart={handleAssistantTouchStart}
+                className={cn(
+                  'shrink-0 border-b px-4 py-3',
+                  !isCompactChatView && 'touch-none',
+                )}
+                onPointerDown={
+                  isCompactChatView ? undefined : handleAssistantDragStart
+                }
+                onPointerUp={
+                  isCompactChatView ? undefined : handleAssistantDragEnd
+                }
+                onTouchEnd={
+                  isCompactChatView ? undefined : handleAssistantTouchEnd
+                }
+                onTouchStart={
+                  isCompactChatView ? undefined : handleAssistantTouchStart
+                }
               >
-                <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
+                {!isCompactChatView && (
+                  <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-600 lg:hidden" />
+                )}
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {isCompactChatView && (
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="rounded-md"
+                        aria-label="العودة للإعلانات"
+                        onClick={closeMobileChatView}
+                      >
+                        <ChevronRight className="size-4" />
+                      </Button>
+                    )}
                     <div className="grid size-8 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
-                      <Bot className="size-4" />
+                      <img alt="" className="size-7 rounded-full object-cover" src="/smartstore-mark.png" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h2 className="text-sm font-bold">مساعد SmartStore AI</h2>
                       <p className="text-[11px] text-muted-foreground">
                         {session.authenticated ? session.user?.email : 'التسجيل للعمليات فقط'}
@@ -2449,7 +2838,7 @@ export default function Page() {
               </header>
 
               <div className={`flex min-h-0 flex-1 overflow-hidden transition-opacity duration-150 lg:pointer-events-auto lg:opacity-100 ${
-                isAssistantExpanded
+                isAssistantContentVisible
                   ? 'pointer-events-auto opacity-100'
                   : 'pointer-events-none opacity-0'
               }`}>
@@ -2569,10 +2958,33 @@ export default function Page() {
                 </PromptInput>
               </div>
             </section>
+            )}
           </div>
         </section>
 
       </div>
+      {shouldRenderAssistantBubble && (
+        <button
+          ref={assistantBubbleRef}
+          type="button"
+          aria-label="فتح مساعد SmartStore AI"
+          className="smartstore-ai-bubble"
+          data-state={assistantBubbleState}
+          style={{
+            transform: `translate3d(${assistantBubblePosition.x}px, ${assistantBubblePosition.y}px, 0)`,
+          }}
+          onPointerCancel={handleAssistantBubblePointerCancel}
+          onPointerDown={handleAssistantBubblePointerDown}
+          onPointerMove={handleAssistantBubblePointerMove}
+          onPointerUp={handleAssistantBubblePointerUp}
+        >
+          <span className="smartstore-ai-bubble__halo" aria-hidden="true" />
+          <span className="smartstore-ai-bubble__core" aria-hidden="true">
+            <img alt="" src="/smartstore-mark.png" />
+          </span>
+          <span className="smartstore-ai-bubble__glint" aria-hidden="true" />
+        </button>
+      )}
     </main>
   );
 }
