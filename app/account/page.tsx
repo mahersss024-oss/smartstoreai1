@@ -1497,11 +1497,11 @@ export default function AccountPage() {
                           <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
-                          <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+                          <div className="grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2">
                             {listing.images.map((image) => (
                               <div
                                 key={image.id}
-                                className="grid w-20 shrink-0 gap-1 rounded-md border p-1"
+                                className="grid min-w-0 gap-1 rounded-md border p-1"
                               >
                                 <div className="relative aspect-square overflow-hidden rounded bg-slate-100 dark:bg-slate-900">
                                   {image.url ? (

@@ -30,6 +30,7 @@ test('account listing primary image does not stretch with the image manager', as
     source,
     /md:row-start-1 md:h-full md:min-h-40/,
   );
-  assert.match(source, /flex max-w-full gap-2 overflow-x-auto pb-1/);
+  assert.match(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2/);
+  assert.doesNotMatch(source, /overflow-x-auto/);
   assert.doesNotMatch(source, /xl:grid xl:grid-cols-2 xl:overflow-visible/);
 });

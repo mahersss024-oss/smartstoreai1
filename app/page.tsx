@@ -2336,7 +2336,13 @@ export default function Page() {
 
       const intent = inferClientIntent(prompt);
       setClientIntent(intent);
-      expandAssistant();
+
+      if (isCompactViewport && !isMobileChatViewOpen) {
+        openMobileChatView();
+      } else {
+        expandAssistant();
+      }
+
       const resetSearchState =
         shouldResetSearchStateRef.current || filteredMessages.length === 0;
       shouldResetSearchStateRef.current = false;
@@ -2375,6 +2381,9 @@ export default function Page() {
       selectedListingContext,
       sendMessage,
       expandAssistant,
+      isCompactViewport,
+      isMobileChatViewOpen,
+      openMobileChatView,
       filteredMessages.length,
     ],
   );
