@@ -1530,21 +1530,29 @@ export default function Page() {
     keyboardOffset,
   ]);
   const compactChatViewStyle = useMemo<CSSProperties | undefined>(() => {
-    if (
-      !isCompactViewport ||
-      !isMobileChatViewOpen ||
-      !isChatInputFocused ||
-      !visualViewportFrame
-    ) {
+    if (!isCompactViewport || !isMobileChatViewOpen) {
       return undefined;
     }
 
+    if (!isChatInputFocused || !visualViewportFrame) {
+      return {
+        blockSize: 'auto',
+        bottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
+        insetInline: '0.5rem',
+        minHeight: '0',
+        position: 'fixed',
+        top: 'calc(env(safe-area-inset-top) + 0.5rem)',
+      };
+    }
+
+    const focusedPanelHeight = Math.max(0, visualViewportFrame.height - 8);
+
     return {
-      insetInline: 0,
+      insetInline: '0.5rem',
       position: 'fixed',
-      top: `${visualViewportFrame.offsetTop}px`,
-      height: `${visualViewportFrame.height}px`,
-      maxHeight: `${visualViewportFrame.height}px`,
+      top: `${visualViewportFrame.offsetTop + 8}px`,
+      height: `${focusedPanelHeight}px`,
+      maxHeight: `${focusedPanelHeight}px`,
       minHeight: '0',
     };
   }, [
@@ -2827,7 +2835,7 @@ export default function Page() {
           className={cn(
             'flex min-h-0 flex-col bg-white dark:bg-card',
             isCompactChatView
-              ? 'h-full rounded-none border-0 shadow-none'
+              ? 'h-full rounded-none border-0 bg-transparent shadow-none dark:bg-transparent'
               : 'rounded-md border shadow-2xl shadow-slate-950/10 lg:overflow-hidden',
           )}
         >
@@ -3049,7 +3057,7 @@ export default function Page() {
                 'z-40 flex min-h-0 translate-y-0 transform-gpu flex-col overflow-hidden bg-white transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card',
                 isCompactChatView && isChatInputFocused && 'transition-none',
                 isCompactChatView
-                  ? 'h-full rounded-none border-0 shadow-none'
+                  ? 'h-auto rounded-[1.15rem] border border-white/80 shadow-2xl shadow-slate-950/10 dark:border-white/10 dark:shadow-black/30'
                   : 'fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] h-72 rounded-t-[24px] border shadow-2xl shadow-slate-950/20 lg:static lg:h-auto lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none',
               )}
               style={isCompactChatView ? compactChatViewStyle : assistantPanelStyle}
