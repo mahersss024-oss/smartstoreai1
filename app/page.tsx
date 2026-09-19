@@ -1009,7 +1009,7 @@ function getListingHrefFromMarkdownLink(label: string, href: string) {
     const isListingPath = /^\/listings\/[^/]+/.test(url.pathname);
 
     if (isListingPath && (isListingActionLabel || url.pathname.startsWith('/listings/'))) {
-      return href;
+      return `${url.pathname}${url.search}${url.hash}`;
     }
   } catch {
     return null;
@@ -1020,7 +1020,7 @@ function getListingHrefFromMarkdownLink(label: string, href: string) {
 
 function ListingChatLinkCard({ href }: { href: string }) {
   return (
-    <a
+    <Link
       className="my-2 grid gap-2 rounded-md border border-blue-200 bg-blue-50/80 p-3 text-right text-blue-950 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-50 dark:hover:border-blue-300/40"
       href={href}
     >
@@ -1042,7 +1042,7 @@ function ListingChatLinkCard({ href }: { href: string }) {
         فتح الإعلان
         <ChevronLeft className="size-3.5" />
       </span>
-    </a>
+    </Link>
   );
 }
 
