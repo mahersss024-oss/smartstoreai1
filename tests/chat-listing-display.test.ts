@@ -89,3 +89,35 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(globalCss, /smart-assistant-result-card-in/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);
 });
+
+test('prevents page-level horizontal panning on all viewports', () => {
+  const globalCss = readProjectFile('app', 'globals.css');
+
+  assert.match(globalCss, /html \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
+  assert.match(globalCss, /body \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
+  assert.match(globalCss, /body > main \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
+  assert.match(globalCss, /overscroll-behavior-x: none;/);
+});
+
+test('keeps intentional touch controls and image strips interactive', () => {
+  const globalCss = readProjectFile('app', 'globals.css');
+  const homePage = readProjectFile('app', 'page.tsx');
+  const adminListingsPage = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+  const listingGallery = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'listing-image-gallery.tsx',
+  );
+  const htmlRule = globalCss.match(/\n\s*html \{[^}]*\}/)?.[0] ?? '';
+  const bodyRule = globalCss.match(/\n\s*body \{[^}]*\}/)?.[0] ?? '';
+
+  assert.doesNotMatch(htmlRule, /touch-action:/);
+  assert.doesNotMatch(bodyRule, /touch-action:/);
+  assert.match(globalCss, /\.smartstore-ai-bubble \{[\s\S]*touch-action: none;/);
+  assert.match(homePage, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(homePage, /releasePointerCapture\(event\.pointerId\)/);
+  assert.match(adminListingsPage, /overflow-x-auto/);
+  assert.match(listingGallery, /grid-cols-4/);
+  assert.match(listingGallery, /onClick=\{\(\) => setSelectedImage\(image\)\}/);
+});

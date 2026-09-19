@@ -174,16 +174,28 @@
   }
   body {
     @apply bg-background text-foreground;
+    max-width: 100%;
     overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior-x: none;
+    width: 100%;
   }
 
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
+    max-width: 100%;
     overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior-x: none;
     text-size-adjust: 100%;
+    width: 100%;
+  }
+
+  body > main {
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* Prevent iOS Safari from zooming when focusing form controls. */
