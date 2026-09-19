@@ -61,7 +61,11 @@ test('assistant message renderer turns listing links into a listing card inside 
   assert.match(homePage, /return `\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`/);
   assert.match(homePage, /function ListingChatLinkCard/);
   assert.match(homePage, /<Link[\s\S]*href=\{href\}/);
+  assert.match(homePage, /listing\?: ListingCard/);
+  assert.match(homePage, /listing\?\.image/);
+  assert.match(homePage, /chatListingCardsById/);
+  assert.match(homePage, /getListingIdFromHref\(listingHref\)/);
   assert.match(homePage, /عرض بطاقة الإعلان/);
-  assert.match(homePage, /return renderTextMessagePart\(part\.text, index\)/);
+  assert.match(homePage, /return renderTextMessagePart\(part\.text, index, listingsById\)/);
   assert.match(homePage, /فتح الإعلان/);
 });

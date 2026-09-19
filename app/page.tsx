@@ -1018,7 +1018,24 @@ function getListingHrefFromMarkdownLink(label: string, href: string) {
   return null;
 }
 
-function ListingChatLinkCard({ href }: { href: string }) {
+function getListingIdFromHref(href: string) {
+  try {
+    const url = new URL(href, 'https://smartstore-ai.local');
+    const match = url.pathname.match(/^\/listings\/([^/]+)/);
+
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function ListingChatLinkCard({
+  href,
+  listing,
+}: {
+  href: string;
+  listing?: ListingCard;
+}) {
   return (
     <Link
       className="my-2 grid gap-2 rounded-md border border-blue-200 bg-blue-50/80 p-3 text-right text-blue-950 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-50 dark:hover:border-blue-300/40"
@@ -1034,8 +1051,12 @@ function ListingChatLinkCard({ href }: { href: string }) {
             افتح تفاصيل الإعلان والصور وخيارات التواصل من صفحة الإعلان.
           </div>
         </div>
-        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-600 text-white shadow-sm shadow-blue-950/10">
-          <Store className="size-4" />
+        <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-600 text-white shadow-sm shadow-blue-950/10">
+          {listing?.image ? (
+            <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
+          ) : (
+            <Store className="size-5" />
+          )}
         </div>
       </div>
       <span className="inline-flex h-8 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-700">
@@ -1046,7 +1067,11 @@ function ListingChatLinkCard({ href }: { href: string }) {
   );
 }
 
-function renderTextMessagePart(text: string, index: number): ReactElement[] {
+function renderTextMessagePart(
+  text: string,
+  index: number,
+  listingsById: ReadonlyMap<string, ListingCard>,
+): ReactElement[] {
   const markdownLinkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   const renderedParts: ReactElement[] = [];
   let lastIndex = 0;
@@ -1073,6 +1098,10 @@ function renderTextMessagePart(text: string, index: number): ReactElement[] {
       <ListingChatLinkCard
         key={`listing-link-${index}-${renderedParts.length}`}
         href={listingHref}
+        listing={
+          listingsById.get(getListingIdFromHref(listingHref) ?? '') ??
+          undefined
+        }
       />,
     );
     lastIndex = match.index + rawLink.length;
@@ -1092,14 +1121,17 @@ function renderTextMessagePart(text: string, index: number): ReactElement[] {
     : [<MessageResponse key={`text-${index}`}>{text}</MessageResponse>];
 }
 
-function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
+function renderMessageParts(
+  parts: UIMessage['parts'],
+  listingsById: ReadonlyMap<string, ListingCard>,
+): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
       if (part.text.includes(authRequiredMarker)) {
         return [<SignInCard key={`auth-${index}`} text={part.text} />];
       }
 
-      return renderTextMessagePart(part.text, index);
+      return renderTextMessagePart(part.text, index, listingsById);
     }
 
     if (part.type === 'file') {
@@ -1434,6 +1466,27 @@ export default function Page() {
       searchToolListings: hasActiveAssistantSearch ? assistantResultListings : [],
     });
   }, [assistantResultListings, hasActiveAssistantSearch, marketplaceListings]);
+  const chatListingCardsById = useMemo(() => {
+    const cardsById = new Map<string, ListingCard>();
+
+    [
+      ...marketplaceListings,
+      ...searchToolListings,
+      ...assistantResultListings,
+      ...exploreMarketplaceListings,
+    ].forEach((listing) => {
+      if (listing.id) {
+        cardsById.set(listing.id, listing);
+      }
+    });
+
+    return cardsById;
+  }, [
+    assistantResultListings,
+    exploreMarketplaceListings,
+    marketplaceListings,
+    searchToolListings,
+  ]);
   const canLoadMoreListings = getCanLoadMoreExploreListings({
     hasMore: listingPagination.hasMore,
     displayedCount: marketplaceListings.length,
@@ -3032,10 +3085,14 @@ export default function Page() {
                           <Message key={`${message.id}-${messageIndex}`} from={message.role}>
                             {message.role === 'assistant' ? (
                               <AssistantMessageFrame>
-                                <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                                <MessageContent>
+                                  {renderMessageParts(message.parts, chatListingCardsById)}
+                                </MessageContent>
                               </AssistantMessageFrame>
                             ) : (
-                              <MessageContent>{renderMessageParts(message.parts)}</MessageContent>
+                              <MessageContent>
+                                {renderMessageParts(message.parts, chatListingCardsById)}
+                              </MessageContent>
                             )}
                           </Message>
                         ))}
