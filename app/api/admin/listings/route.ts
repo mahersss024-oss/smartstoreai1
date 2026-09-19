@@ -1,5 +1,5 @@
 import { createListingImageDeliveryUrls } from '@/agent/marketplace/listing-image-delivery';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!(await hasVerifiedAdminAccess(session))) {
+  if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

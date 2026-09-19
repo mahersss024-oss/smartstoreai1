@@ -135,6 +135,7 @@ function getListingsEmptyMessage(focusedListingId: string) {
 function AdminListingCard({
   listing,
   draft,
+  canManageListings,
   onUpdateDraft,
   onSave,
   onDelete,
@@ -142,6 +143,7 @@ function AdminListingCard({
 }: Readonly<{
   listing: AdminListing;
   draft: ListingDraft;
+  canManageListings: boolean;
   onUpdateDraft: (listingId: string, updates: Partial<ListingDraft>) => void;
   onSave: (listingId: string) => void;
   onDelete: (listingId: string) => void;
@@ -178,14 +180,15 @@ function AdminListingCard({
       )}
 
       <div className="grid gap-2 lg:grid-cols-4">
-        <Input name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
-        <Input name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
-        <Input name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => onUpdateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
-        <Input name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
+        <Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
+        <Input disabled={!canManageListings} name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
+        <Input disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => onUpdateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
+        <Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
       </div>
 
       <textarea
         className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
+        disabled={!canManageListings}
         name={`listing-${listing.id}-description`}
         value={draft.description}
         onChange={(event) =>
@@ -197,6 +200,7 @@ function AdminListingCard({
       <div className="grid gap-2 md:grid-cols-3">
         <select
           className="h-10 rounded-md border bg-background px-3 text-sm"
+          disabled={!canManageListings}
           name={`listing-${listing.id}-condition`}
           value={draft.condition}
           onChange={(event) =>
@@ -213,6 +217,7 @@ function AdminListingCard({
         </select>
         <select
           className="h-10 rounded-md border bg-background px-3 text-sm"
+          disabled={!canManageListings}
           name={`listing-${listing.id}-priceMode`}
           value={draft.priceMode}
           onChange={(event) =>
@@ -227,6 +232,7 @@ function AdminListingCard({
         </select>
         <select
           className="h-10 rounded-md border bg-background px-3 text-sm"
+          disabled={!canManageListings}
           name={`listing-${listing.id}-status`}
           value={draft.status}
           onChange={(event) =>
@@ -245,6 +251,7 @@ function AdminListingCard({
         </select>
       </div>
 
+      {canManageListings && (
       <div className="grid gap-2 sm:grid-cols-4">
         <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => onSave(listing.id)}>
           <Save className="size-4" />
@@ -278,6 +285,7 @@ function AdminListingCard({
           </Button>
         )}
       </div>
+      )}
     </article>
   );
 }
@@ -287,10 +295,11 @@ function AdminListingsPageContent() {
   const searchParams = useSearchParams();
   const focusedListingId = searchParams.get('listingId')?.trim() ?? '';
   const {
+    adminAccessRole,
     adminAccessNotice,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('admin');
+  } = useAdminAccess('moderator');
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ListingDraft>>({});
@@ -349,7 +358,7 @@ function AdminListingsPageContent() {
         }
 
         if (response.status === 403) {
-          setNotice('هذه الصفحة مخصصة للمالك فقط.');
+          setNotice('هذه الصفحة مخصصة للفريق الإداري فقط.');
           return;
         }
 
@@ -428,6 +437,8 @@ function AdminListingsPageContent() {
       void loadListings(pagination?.nextPage ?? 1);
     },
   });
+  const canManageListings =
+    adminAccessRole === 'owner' || adminAccessRole === 'admin';
 
   const updateDraft = useCallback(
     (listingId: string, updates: Partial<ListingDraft>) => {
@@ -547,6 +558,7 @@ function AdminListingsPageContent() {
             key={listing.id}
             listing={listing}
             draft={drafts[listing.id] ?? createDraft(listing)}
+            canManageListings={canManageListings}
             onUpdateDraft={updateDraft}
             onSave={(listingId) => void saveListing(listingId)}
             onDelete={(listingId) => void deleteListing(listingId)}

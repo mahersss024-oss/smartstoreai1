@@ -119,6 +119,17 @@ test('admin listing mutations are server-side protected and rate limited', () =>
   assert.match(listingRoute, /listing_must_be_deleted_first/);
 });
 
+test('moderators can view admin listings without listing mutation controls', () => {
+  const listRoute = readProjectFile('app', 'api', 'admin', 'listings', 'route.ts');
+  const page = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(listRoute, /hasVerifiedModeratorAccess/);
+  assert.match(page, /useAdminAccess\('moderator'\)/);
+  assert.match(page, /const canManageListings/);
+  assert.match(page, /disabled=\{!canManageListings\}/);
+  assert.match(page, /\{canManageListings && \(/);
+});
+
 test('account page shows the admin dashboard to the owner and appointed admins', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 
