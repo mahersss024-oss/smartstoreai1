@@ -48,7 +48,6 @@ import {
   Loader2Icon,
   MicIcon,
   PaperclipIcon,
-  PlusIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
@@ -1070,7 +1069,7 @@ export const PromptInputActionMenuTrigger = ({
 }: PromptInputActionMenuTriggerProps) => (
   <DropdownMenuTrigger asChild>
     <PromptInputButton className={className} {...props}>
-      {children ?? <PlusIcon className="size-4" />}
+      {children ?? <ImageIcon className="size-4" />}
     </PromptInputButton>
   </DropdownMenuTrigger>
 );

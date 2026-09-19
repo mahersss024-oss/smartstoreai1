@@ -29,7 +29,6 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
-  Plus,
   SendHorizontal,
   ShieldCheck,
   Sparkles,
@@ -513,7 +512,7 @@ function ChatAttachmentControls() {
         type="button"
         variant="ghost"
       >
-        <Plus className="size-5" />
+        <ImageIcon className="size-5" />
       </Button>
     </div>
   );
@@ -2652,7 +2651,7 @@ export default function Page() {
                   <h2 className="mt-1 text-xl font-bold">إعلانات SmartStore AI</h2>
                 </div>
                 <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
-                  <Plus className="size-4" />
+                  <Store className="size-4" />
                   إعلان جديد
                 </Button>
               </div>
@@ -2830,8 +2829,14 @@ export default function Page() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-sm" className="rounded-md" onClick={startNewChat} aria-label="محادثة جديدة">
-                      <Plus className="size-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                      onClick={startNewChat}
+                      aria-label="مسح المحادثة وبدء محادثة جديدة"
+                    >
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 </div>
