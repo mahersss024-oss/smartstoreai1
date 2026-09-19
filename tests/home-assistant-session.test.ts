@@ -63,6 +63,19 @@ test('mobile chat view resets keyboard tracking when opened or closed', () => {
   assert.match(homePage, /syncMobileChatViewFromUrl[\s\S]*resetChatKeyboardState\(\)/);
 });
 
+test('mobile bottom navigation is hidden while assistant chat view is open', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+  const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
+
+  assert.match(homePage, /smartstore:assistant-chat-view-change/);
+  assert.doesNotMatch(mobileNavigation, /useSearchParams/);
+  assert.match(mobileNavigation, /const \[isAssistantChatViewOpen, setIsAssistantChatViewOpen\]/);
+  assert.match(mobileNavigation, /window\.location\.href/);
+  assert.match(mobileNavigation, /searchParams\.get\('chat'\) === '1'/);
+  assert.match(mobileNavigation, /smartstore:assistant-chat-view-change/);
+  assert.match(mobileNavigation, /isAssistantChatViewOpen[\s\S]*return null/);
+});
+
 test('home assistant starter search is generic instead of a fixed car city example', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

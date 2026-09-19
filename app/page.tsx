@@ -1738,6 +1738,7 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.set('chat', '1');
     window.history.pushState({ smartstoreMobileChat: true }, '', url);
+    window.dispatchEvent(new Event('smartstore:assistant-chat-view-change'));
   }, [expandAssistant, resetChatKeyboardState]);
 
   const closeMobileChatView = useCallback(() => {
@@ -1747,6 +1748,7 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     window.history.replaceState(null, '', url);
+    window.dispatchEvent(new Event('smartstore:assistant-chat-view-change'));
     restoreMarketplaceScroll();
   }, [resetChatKeyboardState, restoreMarketplaceScroll]);
 
@@ -1758,6 +1760,7 @@ export default function Page() {
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     window.history.replaceState(null, '', url);
+    window.dispatchEvent(new Event('smartstore:assistant-chat-view-change'));
   }, [collapseAssistant, resetChatKeyboardState]);
 
   useEffect(() => {

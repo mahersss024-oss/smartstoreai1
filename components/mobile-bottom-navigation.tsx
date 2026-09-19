@@ -46,6 +46,7 @@ export function MobileBottomNavigation() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isAssistantChatViewOpen, setIsAssistantChatViewOpen] = useState(false);
 
   useEffect(() => {
     ['/', '/account', '/terms'].forEach((href) => {
@@ -99,7 +100,35 @@ export function MobileBottomNavigation() {
     };
   }, [pathname]);
 
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api')) {
+  useEffect(() => {
+    const syncAssistantChatView = () => {
+      setIsAssistantChatViewOpen(
+        pathname === '/' &&
+          new URL(window.location.href).searchParams.get('chat') === '1',
+      );
+    };
+
+    syncAssistantChatView();
+    window.addEventListener('popstate', syncAssistantChatView);
+    window.addEventListener(
+      'smartstore:assistant-chat-view-change',
+      syncAssistantChatView,
+    );
+
+    return () => {
+      window.removeEventListener('popstate', syncAssistantChatView);
+      window.removeEventListener(
+        'smartstore:assistant-chat-view-change',
+        syncAssistantChatView,
+      );
+    };
+  }, [pathname]);
+
+  if (
+    isAssistantChatViewOpen ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/api')
+  ) {
     return null;
   }
 
