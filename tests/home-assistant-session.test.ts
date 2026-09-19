@@ -63,6 +63,23 @@ test('mobile chat view resets keyboard tracking when opened or closed', () => {
   assert.match(homePage, /syncMobileChatViewFromUrl[\s\S]*resetChatKeyboardState\(\)/);
 });
 
+test('mobile chat view keeps input attached to the keyboard while focused', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /const compactChatViewStyle = useMemo/);
+  assert.match(homePage, /!isCompactViewport \|\| !isMobileChatViewOpen \|\| !hasKeyboardOffset/);
+  assert.match(homePage, /height: `calc\(100dvh - \$\{keyboardOffset\}px\)`/);
+  assert.match(homePage, /style=\{isCompactChatView \? compactChatViewStyle : assistantPanelStyle\}/);
+});
+
+test('mobile chat submit dismisses the keyboard before sending', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /if \(isCompactViewport\) \{/);
+  assert.match(homePage, /activeElement\.blur\(\)/);
+  assert.match(homePage, /resetChatKeyboardState\(\)/);
+});
+
 test('mobile bottom navigation is hidden while assistant chat view is open', () => {
   const homePage = readProjectFile('app', 'page.tsx');
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');

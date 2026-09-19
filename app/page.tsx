@@ -1522,6 +1522,24 @@ export default function Page() {
     isMobileChatViewOpen,
     keyboardOffset,
   ]);
+  const compactChatViewStyle = useMemo<CSSProperties | undefined>(() => {
+    const hasKeyboardOffset = isChatInputFocused && keyboardOffset > 0;
+
+    if (!isCompactViewport || !isMobileChatViewOpen || !hasKeyboardOffset) {
+      return undefined;
+    }
+
+    return {
+      height: `calc(100dvh - ${keyboardOffset}px)`,
+      maxHeight: `calc(100dvh - ${keyboardOffset}px)`,
+      minHeight: '0',
+    };
+  }, [
+    isChatInputFocused,
+    isCompactViewport,
+    isMobileChatViewOpen,
+    keyboardOffset,
+  ]);
 
   const collapseAssistant = useCallback(() => {
     setAssistantState('collapsed');
@@ -2437,6 +2455,16 @@ export default function Page() {
         return;
       }
 
+      if (isCompactViewport) {
+        const activeElement = document.activeElement;
+
+        if (activeElement instanceof HTMLElement) {
+          activeElement.blur();
+        }
+
+        resetChatKeyboardState();
+      }
+
       expandAssistant();
 
       const text = hasText && 'text' in message ? message.text : '';
@@ -2500,6 +2528,8 @@ export default function Page() {
       sendMessage,
       expandAssistant,
       filteredMessages.length,
+      isCompactViewport,
+      resetChatKeyboardState,
     ],
   );
 
@@ -2974,7 +3004,7 @@ export default function Page() {
                   ? 'h-full rounded-none border-0 shadow-none'
                   : 'fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] h-72 rounded-t-[24px] border shadow-2xl shadow-slate-950/20 lg:static lg:h-auto lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none',
               )}
-              style={assistantPanelStyle}
+              style={isCompactChatView ? compactChatViewStyle : assistantPanelStyle}
             >
               <header
                 className={cn(
