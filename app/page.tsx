@@ -262,6 +262,11 @@ type AssistantBubbleDragState = {
   hasDragged: boolean;
 };
 
+type VisualViewportFrame = {
+  height: number;
+  offsetTop: number;
+};
+
 function getAttachmentLabel(file: PendingChatAttachment) {
   return file.filename || (file.mediaType?.startsWith('image/') ? 'صورة مرفقة' : 'ملف مرفق');
 }
@@ -1391,6 +1396,8 @@ export default function Page() {
   const [isCompactViewport, setIsCompactViewport] = useState(true);
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [visualViewportFrame, setVisualViewportFrame] =
+    useState<VisualViewportFrame | null>(null);
   const [assistantBubblePosition, setAssistantBubblePosition] =
     useState<AssistantBubblePosition | null>(null);
   const [hasAssistantBubbleAttention, setHasAssistantBubbleAttention] =
@@ -1523,22 +1530,28 @@ export default function Page() {
     keyboardOffset,
   ]);
   const compactChatViewStyle = useMemo<CSSProperties | undefined>(() => {
-    const hasKeyboardOffset = isChatInputFocused && keyboardOffset > 0;
-
-    if (!isCompactViewport || !isMobileChatViewOpen || !hasKeyboardOffset) {
+    if (
+      !isCompactViewport ||
+      !isMobileChatViewOpen ||
+      !isChatInputFocused ||
+      !visualViewportFrame
+    ) {
       return undefined;
     }
 
     return {
-      height: `calc(100dvh - ${keyboardOffset}px)`,
-      maxHeight: `calc(100dvh - ${keyboardOffset}px)`,
+      insetInline: 0,
+      position: 'fixed',
+      top: `${visualViewportFrame.offsetTop}px`,
+      height: `${visualViewportFrame.height}px`,
+      maxHeight: `${visualViewportFrame.height}px`,
       minHeight: '0',
     };
   }, [
     isChatInputFocused,
     isCompactViewport,
     isMobileChatViewOpen,
-    keyboardOffset,
+    visualViewportFrame,
   ]);
 
   const collapseAssistant = useCallback(() => {
@@ -1552,6 +1565,7 @@ export default function Page() {
   const resetChatKeyboardState = useCallback(() => {
     setIsChatInputFocused(false);
     setKeyboardOffset(0);
+    setVisualViewportFrame(null);
     keyboardBaselineViewportHeightRef.current = null;
   }, []);
 
@@ -1700,6 +1714,38 @@ export default function Page() {
       window.removeEventListener('resize', syncKeyboardOffset);
     };
   }, [isChatInputFocused, isCompactViewport]);
+
+  useEffect(() => {
+    if (!isCompactViewport || !isMobileChatViewOpen || !isChatInputFocused) {
+      return;
+    }
+
+    const syncVisualViewportFrame = () => {
+      const visualViewport = window.visualViewport;
+
+      setVisualViewportFrame({
+        height: Math.round(visualViewport?.height ?? window.innerHeight),
+        offsetTop: Math.round(visualViewport?.offsetTop ?? 0),
+      });
+    };
+
+    syncVisualViewportFrame();
+    window.visualViewport?.addEventListener('resize', syncVisualViewportFrame);
+    window.visualViewport?.addEventListener('scroll', syncVisualViewportFrame);
+    window.addEventListener('resize', syncVisualViewportFrame);
+
+    return () => {
+      window.visualViewport?.removeEventListener(
+        'resize',
+        syncVisualViewportFrame,
+      );
+      window.visualViewport?.removeEventListener(
+        'scroll',
+        syncVisualViewportFrame,
+      );
+      window.removeEventListener('resize', syncVisualViewportFrame);
+    };
+  }, [isChatInputFocused, isCompactViewport, isMobileChatViewOpen]);
 
   useEffect(() => {
     const syncViewportMode = () => {
@@ -2998,6 +3044,7 @@ export default function Page() {
 
             {shouldRenderAssistantPanel && (
             <section
+              data-testid="assistant-panel"
               className={cn(
                 'z-40 flex min-h-0 translate-y-0 transform-gpu flex-col overflow-hidden bg-white transition-[bottom,height,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-card',
                 isCompactChatView
@@ -3158,6 +3205,7 @@ export default function Page() {
 
               <div
                 ref={chatInputContainerRef}
+                data-testid="assistant-chat-input-container"
                 className="shrink-0 border-t p-3"
                 onBlur={handleChatInputBlur}
                 onFocus={handleChatInputFocus}
