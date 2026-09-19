@@ -1250,7 +1250,7 @@ export default function Page() {
 
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!isCompactViewport) {
+        if (!isCompactViewport) {
       return undefined;
     }
 
@@ -1260,8 +1260,12 @@ export default function Page() {
       : '68dvh';
 
     return {
+      // عند فتح الكيبورد على iPhone لا نضيف env(safe-area-inset-bottom)، لأن
+      // visualViewport يستبعد منطقة الـ safe-area أصلاً عند حساب إزاحة
+      // الكيبورد، وإضافتها هنا تُنتج فراغًا بين الحاوية والكيبورد بمقدار
+      // شريط الـ Home. أما عند إغلاق الكيبورد فنعتمد عليها لتفادي شريط الـ Home.
       bottom: hasKeyboardOffset
-        ? `calc(${keyboardOffset}px + env(safe-area-inset-bottom))`
+        ? `${keyboardOffset}px`
         : 'calc(4.5rem + env(safe-area-inset-bottom))',
       height: isAssistantExpanded ? expandedHeight : '12.75rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
@@ -1397,19 +1401,20 @@ export default function Page() {
         return;
       }
 
-      // On Android Chrome the visible viewport shrinks when the keyboard opens,
-      // but `offsetTop` stays at 0, so `height + offsetTop` marks the keyboard
-      // upper boundary. The baseline is captured once (before the keyboard
-      // opens) and kept stable here so `window.innerHeight`, which also shrinks
-      // on Android, never corrupts the offset.
-      const viewportBottom = visualViewport.height + visualViewport.offsetTop;
+            // On iOS Safari/PWA the keyboard shrinks `visualViewport.height` but the
+      // baseline captured before focus still reflects the full layout viewport,
+      // so `baseline - height` yields the real keyboard height. We compare
+      // heights directly (without `offsetTop`) because iOS shifts `offsetTop`
+      // when the page scrolls under the keyboard, which would otherwise add a
+      // spurious gap. On Android `offsetTop` stays 0, so the same formula holds.
+      const viewportHeight = visualViewport.height;
       const baselineViewportHeight =
         keyboardBaselineViewportHeightRef.current ??
-        Math.max(window.innerHeight, viewportBottom);
+        Math.max(window.innerHeight, viewportHeight);
 
       const nextKeyboardOffset = Math.max(
         0,
-        Math.round(baselineViewportHeight - viewportBottom),
+        Math.round(baselineViewportHeight - viewportHeight),
       );
 
       setKeyboardOffset(nextKeyboardOffset > 60 ? nextKeyboardOffset : 0);
