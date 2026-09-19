@@ -32,6 +32,24 @@ test('home assistant keeps chat only across in-app navigation', () => {
   assert.doesNotMatch(homePage, /sessionStorage\.setItem\(\s*currentChatStorageKey/);
 });
 
+test('primary mobile navigation closes the visible assistant chat view only', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+  const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
+  const closeNavigationMatch = homePage.match(
+    /const closeAssistantForNavigation = useCallback\([\s\S]*?\n  \}, \[collapseAssistant\]\);/,
+  );
+  const closeNavigationHandler = closeNavigationMatch?.[0] ?? '';
+
+  assert.match(homePage, /smartstore:close-assistant-view/);
+  assert.match(homePage, /closeAssistantForNavigation/);
+  assert.match(closeNavigationHandler, /setIsMobileChatViewOpen\(false\)/);
+  assert.match(closeNavigationHandler, /url\.searchParams\.delete\('chat'\)/);
+  assert.doesNotMatch(closeNavigationHandler, /clearHomeAssistantRuntimeState/);
+  assert.match(mobileNavigation, /closeAssistantViewForPrimaryNavigation/);
+  assert.match(mobileNavigation, /href !== '\/' && href !== '\/account'/);
+  assert.match(mobileNavigation, /smartstore:close-assistant-view/);
+});
+
 test('home assistant starter search is generic instead of a fixed car city example', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

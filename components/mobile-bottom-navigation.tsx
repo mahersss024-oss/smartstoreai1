@@ -31,6 +31,14 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function closeAssistantViewForPrimaryNavigation(href: string) {
+  if (href !== '/' && href !== '/account') {
+    return;
+  }
+
+  window.dispatchEvent(new Event('smartstore:close-assistant-view'));
+}
+
 export function MobileBottomNavigation() {
   const pathname = usePathname();
   const router = useRouter();
@@ -127,6 +135,7 @@ export function MobileBottomNavigation() {
   const indicatorIndex = activeIndex >= 0 ? activeIndex : 1;
 
   function navigate(href: string) {
+    closeAssistantViewForPrimaryNavigation(href);
     setPendingHref(href);
     setIsMoreOpen(false);
     startTransition(() => {

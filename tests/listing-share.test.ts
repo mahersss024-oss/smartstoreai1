@@ -51,17 +51,15 @@ test('assistant marketplace context can share real listing links without opening
   assert.match(chatRoute, /do not create or open conversations from assistant chat/);
 });
 
-test('assistant message renderer turns listing links into a clear open listing button', () => {
-  const messageComponent = readProjectFile('components', 'chat-elements', 'message.tsx');
+test('assistant message renderer turns listing links into a listing card inside chat', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
 
-  assert.match(messageComponent, /getSmartStoreListingPath/);
-  assert.match(messageComponent, /\/\^\\\/listings\\\/\[\^\/\?#\]\+\//);
-  assert.match(messageComponent, /www\.smartstore-ai\.com/);
-  assert.match(messageComponent, /return `\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`/);
-  assert.match(messageComponent, /function SmartStoreListingLink/);
-  assert.match(messageComponent, /useRouter/);
-  assert.match(messageComponent, /event\.preventDefault\(\)/);
-  assert.match(messageComponent, /router\.push\(href\)/);
-  assert.match(messageComponent, /ExternalLinkIcon/);
-  assert.match(messageComponent, /فتح الإعلان/);
+  assert.match(homePage, /function getListingHrefFromMarkdownLink/);
+  assert.match(homePage, /normalizedLabel === 'فتح الإعلان'/);
+  assert.match(homePage, /normalizedLabel === 'open listing'/);
+  assert.match(homePage, /\^\\\/listings\\\/\[\^\/\]\+/);
+  assert.match(homePage, /function ListingChatLinkCard/);
+  assert.match(homePage, /عرض بطاقة الإعلان/);
+  assert.match(homePage, /return renderTextMessagePart\(part\.text, index\)/);
+  assert.match(homePage, /فتح الإعلان/);
 });

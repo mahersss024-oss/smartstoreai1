@@ -4,6 +4,7 @@
 import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
+  type ReactElement,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
@@ -996,6 +997,101 @@ function AuthProviderMenu() {
   );
 }
 
+function getListingHrefFromMarkdownLink(label: string, href: string) {
+  const normalizedLabel = label.trim().toLowerCase();
+  const isListingActionLabel =
+    normalizedLabel === 'فتح الإعلان' ||
+    normalizedLabel === 'فتح الاعلان' ||
+    normalizedLabel === 'open listing';
+
+  try {
+    const url = new URL(href, 'https://smartstore-ai.local');
+    const isListingPath = /^\/listings\/[^/]+/.test(url.pathname);
+
+    if (isListingPath && (isListingActionLabel || url.pathname.startsWith('/listings/'))) {
+      return href;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function ListingChatLinkCard({ href }: { href: string }) {
+  return (
+    <a
+      className="my-2 grid gap-2 rounded-md border border-blue-200 bg-blue-50/80 p-3 text-right text-blue-950 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-50 dark:hover:border-blue-300/40"
+      href={href}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-blue-700 dark:text-blue-200">
+            إعلان من SmartStore AI
+          </div>
+          <div className="mt-1 text-sm font-bold">عرض بطاقة الإعلان</div>
+          <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
+            افتح تفاصيل الإعلان والصور وخيارات التواصل من صفحة الإعلان.
+          </div>
+        </div>
+        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-blue-600 text-white shadow-sm shadow-blue-950/10">
+          <Store className="size-4" />
+        </div>
+      </div>
+      <span className="inline-flex h-8 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-700">
+        فتح الإعلان
+        <ChevronLeft className="size-3.5" />
+      </span>
+    </a>
+  );
+}
+
+function renderTextMessagePart(text: string, index: number): ReactElement[] {
+  const markdownLinkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const renderedParts: ReactElement[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = markdownLinkPattern.exec(text)) !== null) {
+    const [rawLink, label, href] = match;
+    const listingHref = getListingHrefFromMarkdownLink(label, href);
+
+    if (!listingHref) {
+      continue;
+    }
+
+    const precedingText = text.slice(lastIndex, match.index).trim();
+    if (precedingText) {
+      renderedParts.push(
+        <MessageResponse key={`text-${index}-${renderedParts.length}`}>
+          {precedingText}
+        </MessageResponse>,
+      );
+    }
+
+    renderedParts.push(
+      <ListingChatLinkCard
+        key={`listing-link-${index}-${renderedParts.length}`}
+        href={listingHref}
+      />,
+    );
+    lastIndex = match.index + rawLink.length;
+  }
+
+  const trailingText = text.slice(lastIndex).trim();
+  if (trailingText) {
+    renderedParts.push(
+      <MessageResponse key={`text-${index}-${renderedParts.length}`}>
+        {trailingText}
+      </MessageResponse>,
+    );
+  }
+
+  return renderedParts.length > 0
+    ? renderedParts
+    : [<MessageResponse key={`text-${index}`}>{text}</MessageResponse>];
+}
+
 function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
@@ -1003,7 +1099,7 @@ function renderMessageParts(parts: UIMessage['parts']): ReactNode[] {
         return [<SignInCard key={`auth-${index}`} text={part.text} />];
       }
 
-      return [<MessageResponse key={`text-${index}`}>{part.text}</MessageResponse>];
+      return renderTextMessagePart(part.text, index);
     }
 
     if (part.type === 'file') {
@@ -1595,6 +1691,17 @@ export default function Page() {
     restoreMarketplaceScroll();
   }, [restoreMarketplaceScroll]);
 
+  const closeAssistantForNavigation = useCallback(() => {
+    setIsMobileChatViewOpen(false);
+    setIsChatInputFocused(false);
+    setKeyboardOffset(0);
+    collapseAssistant();
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chat');
+    window.history.replaceState(null, '', url);
+  }, [collapseAssistant]);
+
   useEffect(() => {
     const syncMobileChatViewFromUrl = () => {
       const shouldOpen =
@@ -1617,6 +1724,20 @@ export default function Page() {
       window.removeEventListener('popstate', syncMobileChatViewFromUrl);
     };
   }, [expandAssistant, restoreMarketplaceScroll]);
+
+  useEffect(() => {
+    window.addEventListener(
+      'smartstore:close-assistant-view',
+      closeAssistantForNavigation,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'smartstore:close-assistant-view',
+        closeAssistantForNavigation,
+      );
+    };
+  }, [closeAssistantForNavigation]);
 
   useEffect(() => {
     if (!isCompactViewport || isMobileChatViewOpen) {
@@ -2616,7 +2737,7 @@ export default function Page() {
               {session.authenticated ? (
                 <>
                   <Button asChild variant="outline" size="sm" className="hidden rounded-md sm:inline-flex">
-                    <Link href="/account">
+                    <Link href="/account" onClick={closeAssistantForNavigation}>
                       <User className="size-4" />
                       حسابي
                     </Link>
