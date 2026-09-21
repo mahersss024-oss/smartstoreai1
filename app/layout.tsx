@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: appConfig.metadata.title,
   description: appConfig.metadata.description,
   applicationName: "سوق حمد",
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.webmanifest?v=souq-hamad-20260921",
   appleWebApp: {
     capable: true,
     title: "سوق حمد",
@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico?v=souq-hamad", sizes: "any" },
-      { url: "/icon.png?v=souq-hamad", type: "image/png" },
-      { url: "/hamad-market-logo.jpeg?v=souq-hamad", type: "image/jpeg" },
+      { url: "/favicon.ico?v=souq-hamad-20260921", sizes: "any" },
+      { url: "/icon.png?v=souq-hamad-20260921", type: "image/png" },
+      { url: "/hamad-market-logo.jpeg?v=souq-hamad-20260921", type: "image/jpeg" },
     ],
-    apple: "/apple-icon.png?v=souq-hamad",
+    apple: "/apple-icon.png?v=souq-hamad-20260921",
   },
 };
 

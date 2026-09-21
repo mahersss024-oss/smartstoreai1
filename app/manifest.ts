@@ -2,6 +2,8 @@ import type { MetadataRoute } from 'next';
 
 import { appConfig } from './app-config';
 
+const pwaAssetVersion = 'souq-hamad-20260921';
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: appConfig.metadata.title,
@@ -18,13 +20,13 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ['shopping', 'business'],
     icons: [
       {
-        src: '/icon.png',
+        src: `/icon.png?v=${pwaAssetVersion}`,
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/apple-icon.png',
+        src: `/apple-icon.png?v=${pwaAssetVersion}`,
         sizes: '180x180',
         type: 'image/png',
         purpose: 'maskable',
@@ -32,4 +34,3 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   };
 }
-
