@@ -560,7 +560,7 @@ export async function resolveAdaptiveMarketplaceIntent({
         model: getDeepseekChatModel('scope'),
         maxOutputTokens: 420,
         abortSignal: signal,
-        system: `You are the SmartStore AI adaptive intent router.
+        system: `You are the سوق حمد adaptive intent router.
 Return JSON only. Do not answer the user.
 Understand Arabic, Saudi dialect, misspellings, short follow-ups, and incomplete phrases using conversation context.
 Your job is to infer what the user wants and the next execution step inside a Saudi classifieds marketplace.

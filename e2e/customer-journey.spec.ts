@@ -41,7 +41,7 @@ test('visitor can reach the marketplace and choose an auth provider', async ({
   const response = await page.goto('/');
 
   expect(response?.status()).toBeLessThan(500);
-  await expect(page.locator('body')).toContainText(/SmartStore AI/i);
+  await expect(page.locator('body')).toContainText(/سوق حمد/i);
 
   const login = page.getByTestId('auth-provider-trigger');
   await login.click();
@@ -74,7 +74,7 @@ test('signed-in customer can open the core journey pages without auth flash or s
     await expect(page.locator('body'), path).not.toContainText(
       /Application error|Internal Server Error|Unhandled Runtime Error/i,
     );
-    await expect(page.locator('body'), path).toContainText(/SmartStore AI/i);
+    await expect(page.locator('body'), path).toContainText(/سوق حمد/i);
     await expect(
       page.getByRole('button', { name: /Google|Apple/i }),
       path,

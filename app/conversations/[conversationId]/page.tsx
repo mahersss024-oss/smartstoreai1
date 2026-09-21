@@ -640,10 +640,10 @@ export default function ConversationPage() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/smartstore-mark.png" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">محادثة SmartStore AI</h1>
+              <h1 className="truncate text-base font-bold">محادثة سوق حمد</h1>
               <p className="truncate text-xs text-muted-foreground">
                 تواصل داخلي آمن بين البائع والمشتري
               </p>
@@ -802,7 +802,7 @@ export default function ConversationPage() {
                 <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                   <ShieldCheck className="size-4 shrink-0 text-blue-600" />
                   <span className="leading-5">
-                    التواصل داخل SmartStore AI. تحويل الأموال بين البائع والمشتري مسؤولية الطرفين والمنصة لا تضمنه.
+                    التواصل داخل سوق حمد. تحويل الأموال بين البائع والمشتري مسؤولية الطرفين والمنصة لا تضمنه.
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

@@ -56,10 +56,10 @@ test('seller buyer conversation hides blocked messages and uses official contact
   assert.doesNotMatch(source, /محجوبة/);
 });
 
-test('seller buyer conversation does not imply SmartStore AI guarantees payment transfers', () => {
+test('seller buyer conversation does not imply سوق حمد guarantees payment transfers', () => {
   const source = readConversationPage();
 
   assert.match(source, /تحويل الأموال بين البائع والمشتري مسؤولية الطرفين/);
   assert.match(source, /المنصة لا تضمنه/);
-  assert.doesNotMatch(source, /التواصل والدفع داخل SmartStore AI/);
+  assert.doesNotMatch(source, /التواصل والدفع داخل سوق حمد/);
 });

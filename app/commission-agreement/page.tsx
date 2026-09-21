@@ -60,12 +60,12 @@ export default function CommissionAgreementPage() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/smartstore-mark.png" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">إقرار التسجيل</h1>
               <p className="truncate text-xs text-muted-foreground">
-                SmartStore AI سوق ذكي للتسويق للمنتجات
+                سوق حمد سوق ذكي للتسويق للمنتجات
               </p>
             </div>
           </div>
@@ -92,10 +92,10 @@ export default function CommissionAgreementPage() {
                 قبل التسجيل
               </div>
               <h2 className="text-2xl font-bold leading-9">
-                إقرار استخدام SmartStore AI
+                إقرار استخدام سوق حمد
               </h2>
               <p className="mt-3 text-sm leading-8 text-muted-foreground">
-                أقر بأنني اطلعت على شروط الاستخدام وسياسة الخصوصية وسياسة الإعلانات وسياسة العمولة، وأوافق عليها. كما أقر بأنني إذا أتممت عملية بيع منتج عن طريق SmartStore AI، فإنني أوافق على دفع عمولة مقدارها 1% من قيمة المنتج. لا تمنع هذه الخطوة التصفح أو السؤال، لكنها مطلوبة قبل إنشاء حساب وتنفيذ العمليات المرتبطة بالحساب.
+                أقر بأنني اطلعت على شروط الاستخدام وسياسة الخصوصية وسياسة الإعلانات وسياسة العمولة، وأوافق عليها. كما أقر بأنني إذا أتممت عملية بيع منتج عن طريق سوق حمد، فإنني أوافق على دفع عمولة مقدارها 1% من قيمة المنتج. لا تمنع هذه الخطوة التصفح أو السؤال، لكنها مطلوبة قبل إنشاء حساب وتنفيذ العمليات المرتبطة بالحساب.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
                 <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms">

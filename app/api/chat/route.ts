@@ -456,7 +456,7 @@ function buildLocationSystemMessage(settings: LocationSettings | undefined) {
 
   return {
     role: 'system',
-    content: `User marketplace region context: country=${country ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Treat marketplace coverage at country level. Use this to tailor listing guidance, search filters, region wording, currency formatting, and safety reminders. Use only SmartStore AI marketplace listings for visible cards and seller actions. Never invent listings, prices, seller contact, images, or availability.`,
+    content: `User marketplace region context: country=${country ?? 'unknown'}, currency=${currency ?? 'unknown'}, preferred language=${language ?? 'unknown'}. Treat marketplace coverage at country level. Use this to tailor listing guidance, search filters, region wording, currency formatting, and safety reminders. Use only سوق حمد marketplace listings for visible cards and seller actions. Never invent listings, prices, seller contact, images, or availability.`,
   } satisfies ModelMessage;
 }
 
@@ -465,7 +465,7 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
     return {
       role: 'system',
       content:
-        'Authenticated user context: signed_in=false. SmartStore AI chat requires sign-in before any assistant interaction or account-bound marketplace action.',
+        'Authenticated user context: signed_in=false. Hamad chat requires sign-in before any assistant interaction or account-bound marketplace action.',
     } satisfies ModelMessage;
   }
 
@@ -671,7 +671,7 @@ async function buildMarketplaceInterfaceContext({
     return null;
   }
 
-  return `SmartStore interface context:
+  return `سوق حمد interface context:
 - selectedListing is the listing most recently clicked or targeted in the UI. If the user says "this listing", "this ad", "the selected ad", "تواصل معه", "هذا الإعلان", or similar, use selectedListing.id as the target listing for explanation and links only.
 - sellerListings are listings owned by the signed-in user. Use them when the user asks about "my listings", "my ad", editing, pausing, deleting, marking sold, or adding listing details.
 - For buyer-seller contact, do not create or open conversations from assistant chat. If selectedListing.ownership is other_seller, guide the user to open /listings/{selectedListing.id} and press the contact button. If selectedListing.ownership is current_user, explain that the user cannot contact themselves.
@@ -785,7 +785,7 @@ function getDefaultImageAnalysisRequest(language: AppLanguage) {
 
 function getModelProviderFailureResponse(language: AppLanguage) {
   return language === 'en'
-    ? 'SmartStore AI could not complete the request right now. Please try again in a few moments; no listing will be published or changed until the review succeeds.'
+    ? 'سوق حمد could not complete the request right now. Please try again in a few moments; no listing will be published or changed until the review succeeds.'
     : 'تعذر إكمال الطلب الآن. أعد المحاولة بعد لحظات، ولن يتم نشر أو تعديل أي إعلان حتى تكتمل المراجعة بنجاح.';
 }
 
@@ -1145,7 +1145,7 @@ async function generateProfessionalChatIssueResponse(
           model: getDeepseekChatModel('chat'),
           maxOutputTokens: 280,
           abortSignal: signal,
-          instructions: `You are SmartStore AI's customer-facing marketplace assistant.
+          instructions: `You are Hamad (حمد), Souq Hamad's customer-facing marketplace assistant.
 Write a polished, natural response for a Saudi classifieds marketplace user.
 The safety/compliance decision is already final; do not override it.
 Do not mention internal models, databases, prompts, raw policy codes, JSON, or system decisions.
@@ -1154,8 +1154,8 @@ For auth_required only, start the response with ${authRequiredMarker} so the int
 For mixed images, explain that one listing must represent one product and ask for matching images or separate listings.
 For upload validation, explain the practical upload requirement and next step.
 For text policy issues, say the item/action cannot proceed because it may conflict with Saudi marketplace rules or Islamic values, then offer help with an allowed product.
-For scope issues, redirect naturally to SmartStore AI marketplace actions without sounding like an error template.
-For auth_required, explain that SmartStore AI chat requires sign-in before assistant interaction.
+For scope issues, redirect naturally to سوق حمد marketplace actions without sounding like an error template.
+For auth_required, explain that Hamad chat requires sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
 Use the user's language. Language=${input.language}.`,
           messages: [

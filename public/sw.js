@@ -1,4 +1,4 @@
-// SmartStore AI service worker.
+// سوق حمد service worker.
 // Kept intentionally minimal: precache the app shell and fall back safely.
 
 const CACHE_NAME = 'smartstore-shell-v2';

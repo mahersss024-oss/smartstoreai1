@@ -1,6 +1,6 @@
-# SmartStore AI Database Production
+# سوق حمد Database Production
 
-SmartStore AI is standardized on PostgreSQL with Prisma.
+سوق حمد is standardized on PostgreSQL with Prisma.
 
 ## Recommended Providers
 
@@ -109,15 +109,15 @@ SNB, and STC Pay. Add only the methods you want to display; any empty method is
 hidden automatically.
 
 ```env
-SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME=سوق حمد
 SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER=...
 SMARTSTORE_COMMISSION_ALRAJHI_IBAN=SA...
 
-SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME=سوق حمد
 SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER=...
 SMARTSTORE_COMMISSION_SNB_IBAN=SA...
 
-SMARTSTORE_COMMISSION_STC_PAY_NAME=SmartStore AI
+SMARTSTORE_COMMISSION_STC_PAY_NAME=سوق حمد
 SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT=...
 ```
 

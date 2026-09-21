@@ -22,7 +22,7 @@ const paymentMethodDefinitions: PaymentMethodDefinition[] = [
   {
     id: 'alrajhi',
     name: 'مصرف الراجحي',
-    subtitle: 'تحويل بنكي لحساب عمولات SmartStore AI',
+    subtitle: 'تحويل بنكي لحساب عمولات سوق حمد',
     logoLabel: 'الراجحي',
     fields: [
       { label: 'اسم المستفيد', envKey: 'SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME' },
@@ -33,7 +33,7 @@ const paymentMethodDefinitions: PaymentMethodDefinition[] = [
   {
     id: 'snb',
     name: 'البنك الأهلي السعودي',
-    subtitle: 'تحويل بنكي لحساب عمولات SmartStore AI',
+    subtitle: 'تحويل بنكي لحساب عمولات سوق حمد',
     logoLabel: 'الأهلي',
     fields: [
       { label: 'اسم المستفيد', envKey: 'SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME' },
@@ -44,7 +44,7 @@ const paymentMethodDefinitions: PaymentMethodDefinition[] = [
   {
     id: 'stc-pay',
     name: 'STC Pay',
-    subtitle: 'تحويل محفظة سريع لعمولات SmartStore AI',
+    subtitle: 'تحويل محفظة سريع لعمولات سوق حمد',
     logoLabel: 'stc pay',
     fields: [
       { label: 'اسم المستفيد', envKey: 'SMARTSTORE_COMMISSION_STC_PAY_NAME' },

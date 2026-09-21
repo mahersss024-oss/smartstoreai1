@@ -41,7 +41,7 @@ function authRequired() {
   return {
     status: 'auth_required' as const,
     message:
-      'Sign-in with Google or Apple is required before using SmartStore AI chat or account-bound marketplace actions.',
+      'Sign-in with Google or Apple is required before using Hamad chat or account-bound marketplace actions.',
   };
 }
 
@@ -278,7 +278,7 @@ export function createMarketplaceTools(
   return {
     searchMarketplaceListings: tool({
       description:
-        'Search current published SmartStore AI marketplace listings for a buyer. Understand the buyer request first, pass structured understoodIntent fields when possible, set searchMode="new_search" for a fresh broad product/category request, and set searchMode="refine" only when the buyer clearly narrows existing results. Use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying listings are unavailable. This is read-only and never stores raw user search text as listing data.',
+        'Search current published سوق حمد marketplace listings for a buyer. Understand the buyer request first, pass structured understoodIntent fields when possible, set searchMode="new_search" for a fresh broad product/category request, and set searchMode="refine" only when the buyer clearly narrows existing results. Use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying listings are unavailable. This is read-only and never stores raw user search text as listing data.',
       inputSchema: z.object({
         query: z.string().trim().min(1).max(300).optional(),
         understoodIntent: marketplaceSearchUnderstandingSchema.optional(),
@@ -312,7 +312,7 @@ export function createMarketplaceTools(
 
     compareMarketplaceListings: tool({
       description:
-        'Compare one specific published listing against similar SmartStore AI marketplace listings. Use this when the user asks to compare a selected listing, especially if a listingId is provided. Return the target listing and comparable alternatives from real marketplace data only.',
+        'Compare one specific published listing against similar سوق حمد marketplace listings. Use this when the user asks to compare a selected listing, especially if a listingId is provided. Return the target listing and comparable alternatives from real marketplace data only.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         query: z.string().trim().min(1).max(300).optional(),
@@ -357,14 +357,14 @@ export function createMarketplaceTools(
           listings: comparison.alternatives.map(getComparisonListingSummary),
           marketSummary: comparison.marketSummary,
           comparisonBasis:
-            'Comparison scores and labels are computed from real SmartStore AI listing data. Explain these values; do not invent market averages or unavailable alternatives.',
+            'Comparison scores and labels are computed from real سوق حمد listing data. Explain these values; do not invent market averages or unavailable alternatives.',
         };
       },
     }),
 
     estimateListingPrice: tool({
       description:
-        'Estimate an honest seller price range using real comparable SmartStore AI listings. Return a range, comparable count, confidence, and adjustments. Never present this as a guaranteed market price.',
+        'Estimate an honest seller price range using real comparable سوق حمد listings. Return a range, comparable count, confidence, and adjustments. Never present this as a guaranteed market price.',
       inputSchema: listingDetailsInputSchema,
       execute: async (input) => {
         const listingInput = normalizeListingDetailsInput(
@@ -387,7 +387,7 @@ export function createMarketplaceTools(
 
     evaluateNegotiationOffer: tool({
       description:
-        'Evaluate a buyer offer for a specific published listing using asking price and comparable SmartStore AI listings. This gives private advisory guidance only and never sends messages, accepts, rejects, changes prices, or commits to a deal.',
+        'Evaluate a buyer offer for a specific published listing using asking price and comparable سوق حمد listings. This gives private advisory guidance only and never sends messages, accepts, rejects, changes prices, or commits to a deal.',
       inputSchema: z.object({
         listingId: z.string().min(1),
         buyerOffer: z.number().nonnegative(),

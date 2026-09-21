@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { WifiOff } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'لا يوجد اتصال | SmartStore AI',
-  description: 'SmartStore AI يحتاج اتصالًا بالإنترنت لعرض الإعلانات والمحادثات.',
+  title: 'لا يوجد اتصال | سوق حمد',
+  description: 'سوق حمد يحتاج اتصالًا بالإنترنت لعرض الإعلانات والمحادثات.',
 };
 
 export default function OfflinePage() {
@@ -19,7 +19,7 @@ export default function OfflinePage() {
         </div>
         <h1 className="text-xl font-bold">لا يوجد اتصال بالإنترنت</h1>
         <p className="text-sm leading-7 text-muted-foreground">
-          تعذّر الوصول إلى سوق SmartStore AI. تحقّق من اتصالك بالشبكة ثم أعد
+          تعذّر الوصول إلى سوق حمد. تحقّق من اتصالك بالشبكة ثم أعد
           المحاولة. لن تُفقد أي بيانات محفوظة أثناء انقطاع الاتصال.
         </p>
         <Link

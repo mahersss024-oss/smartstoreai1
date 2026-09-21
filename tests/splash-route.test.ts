@@ -14,7 +14,7 @@ test('splash route returns an svg image for a known size', async () => {
   assert.match(body, /<svg/);
   assert.match(body, /width="1170"/);
   assert.match(body, /height="2532"/);
-  assert.match(body, /SmartStore AI/);
+  assert.match(body, /سوق حمد/);
 });
 
 test('splash route falls back to a default size for unknown values', async () => {

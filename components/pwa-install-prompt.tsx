@@ -100,7 +100,7 @@ export function PwaInstallPrompt() {
         <Download className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">ثبّت تطبيق SmartStore AI</p>
+        <p className="text-sm font-bold">ثبّت تطبيق سوق حمد</p>
         <p className="truncate text-xs text-muted-foreground">
           وصول أسرع للسوق من الشاشة الرئيسية.
         </p>

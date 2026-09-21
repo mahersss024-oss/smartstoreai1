@@ -16,11 +16,11 @@ const themeCookieName = "theme";
 export const metadata: Metadata = {
   title: appConfig.metadata.title,
   description: appConfig.metadata.description,
-  applicationName: "SmartStore AI",
+  applicationName: "سوق حمد",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "SmartStore AI",
+    title: "سوق حمد",
     statusBarStyle: "default",
   },
   formatDetection: {

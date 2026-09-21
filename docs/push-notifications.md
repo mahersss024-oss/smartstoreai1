@@ -1,6 +1,6 @@
 # Push Notifications
 
-SmartStore AI supports Web Push (RFC 8030/8188/8291) with VAPID (RFC 8292).
+سوق حمد supports Web Push (RFC 8030/8188/8291) with VAPID (RFC 8292).
 The implementation is self-contained on `node:crypto` and adds no third-party
 runtime dependency.
 

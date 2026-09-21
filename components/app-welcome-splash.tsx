@@ -14,7 +14,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
-const LOGO_SRC = '/smartstore-welcome-logo.png';
+const LOGO_SRC = '/hamad-assistant-bubble.png';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is
@@ -90,10 +90,10 @@ export function AppWelcomeSplash() {
         <div className="app-welcome__logo">
           {/* eslint-disable-next-line @next/next/no-img-element -- static brand
               asset already shipped in /public; next/image adds no value here. */}
-          <img src={LOGO_SRC} alt="SmartStore AI" width={256} height={256} />
+          <img src={LOGO_SRC} alt="سوق حمد" width={256} height={256} />
         </div>
 
-        <h1 className="app-welcome__title">SmartStore AI</h1>
+        <h1 className="app-welcome__title">سوق حمد</h1>
         <p className="app-welcome__tagline">سوقك الذكي… بأسلوب المحادثة</p>
 
         <div className="app-welcome__loader" aria-hidden="true">

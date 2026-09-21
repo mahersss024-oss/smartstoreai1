@@ -1,4 +1,4 @@
-// Bridge between the SmartStore AI web app and native WebView wrappers
+// Bridge between the سوق حمد web app and native WebView wrappers
 // (iOS WKWebView / Android WebView). The web app talks to the native shell via
 // window.ReactNativeWebView.postMessage (RN) and a generic
 // window.SmartStoreNative.postMessage (custom shells). Incoming native

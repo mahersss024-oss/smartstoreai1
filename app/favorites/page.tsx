@@ -203,7 +203,7 @@ export default function FavoritesPage() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/smartstore-mark.png" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">المفضلة</h1>

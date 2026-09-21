@@ -196,11 +196,11 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="SmartStore AI" className="size-10 object-cover" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/smartstore-mark.png" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">تفاصيل الإعلان</h1>
-              <p className="truncate text-xs text-muted-foreground">SmartStore AI</p>
+              <p className="truncate text-xs text-muted-foreground">سوق حمد</p>
             </div>
           </div>
           <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
@@ -309,7 +309,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               <ListingShareButton
                 className="mb-3 h-11 w-full rounded-md"
                 listingId={listing.id}
-                title={listing.title ?? 'إعلان SmartStore AI'}
+                title={listing.title ?? 'إعلان سوق حمد'}
               />
               <ListingContactActions listingId={listing.id} />
               <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />

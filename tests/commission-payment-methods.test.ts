@@ -9,7 +9,7 @@ test('hides commission payment methods without configured recipient details', ()
 
 test('returns configured commission payment methods only', () => {
   const methods = getCommissionPaymentMethods({
-    SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME: 'SmartStore AI',
+    SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME: 'سوق حمد',
     SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER: '1234567890',
     SMARTSTORE_COMMISSION_SNB_IBAN: 'SA0000000000000000000000',
     SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT: '0500000000',
@@ -26,11 +26,11 @@ test('returns configured commission payment methods only', () => {
 
 test('trims commission payment values before returning them', () => {
   const methods = getCommissionPaymentMethods({
-    SMARTSTORE_COMMISSION_STC_PAY_NAME: '  SmartStore AI  ',
+    SMARTSTORE_COMMISSION_STC_PAY_NAME: '  سوق حمد  ',
   });
 
-  assert.equal(methods[0]?.fields[0]?.value, 'SmartStore AI');
-  assert.equal(methods[0]?.fields[0]?.copyValue, 'SmartStore AI');
+  assert.equal(methods[0]?.fields[0]?.value, 'سوق حمد');
+  assert.equal(methods[0]?.fields[0]?.copyValue, 'سوق حمد');
 });
 
 test('labels STC Pay account field as account number', () => {

@@ -5,7 +5,7 @@ import { appConfig } from './app-config';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: appConfig.metadata.title,
-    short_name: 'SmartStore AI',
+    short_name: 'سوق حمد',
     description: appConfig.metadata.description,
     start_url: '/',
     scope: '/',

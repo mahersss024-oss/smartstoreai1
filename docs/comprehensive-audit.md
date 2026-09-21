@@ -1,4 +1,4 @@
-# SmartStore AI Comprehensive Audit (Phases 1-75)
+# سوق حمد Comprehensive Audit (Phases 1-75)
 
 Internal audit checklist mapping the required workstreams onto phases 1-75.
 Status values: COMPLETED | PARTIAL | NOT STARTED | BLOCKED.

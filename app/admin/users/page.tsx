@@ -486,7 +486,7 @@ export default function AdminUsersPage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <h2 className="truncate text-sm font-bold">{user.name ?? 'مستخدم SmartStore AI'}</h2>
+                        <h2 className="truncate text-sm font-bold">{user.name ?? 'مستخدم سوق حمد'}</h2>
                         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                         <p className="mt-1 truncate text-[11px] text-muted-foreground" dir="ltr">
                           {user.id}

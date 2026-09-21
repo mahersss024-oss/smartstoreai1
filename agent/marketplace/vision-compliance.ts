@@ -638,7 +638,7 @@ async function generateImageComplianceText(imageMessage: ModelMessage) {
   throw lastError;
 }
 
-export const imageComplianceSystemPrompt = `You are the SmartStore AI visual compliance checker for a Saudi marketplace.
+export const imageComplianceSystemPrompt = `You are the سوق حمد visual compliance checker for a Saudi marketplace.
 Return JSON only. Do not answer the user.
 
 Classify every attached marketplace product image before the chat assistant responds.

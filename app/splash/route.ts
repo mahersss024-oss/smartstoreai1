@@ -40,7 +40,7 @@ function buildSplashSvg(width: number, height: number, dark: boolean) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="100%" height="100%" fill="${background}"/>
   <rect x="${markX}" y="${markY}" width="${markSize}" height="${markSize}" rx="${Math.round(markSize * 0.24)}" fill="${accent}"/>
-  <text x="50%" y="${markY + markSize + titleSize * 1.6}" font-family="Arial, Helvetica, sans-serif" font-size="${titleSize}" font-weight="700" fill="${foreground}" text-anchor="middle">SmartStore AI</text>
+  <text x="50%" y="${markY + markSize + titleSize * 1.6}" font-family="Arial, Helvetica, sans-serif" font-size="${titleSize}" font-weight="700" fill="${foreground}" text-anchor="middle">سوق حمد</text>
 </svg>`;
 }
 

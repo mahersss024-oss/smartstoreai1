@@ -226,7 +226,7 @@ test('rewrites only the latest user message for partial requests', () => {
 test('returns localized safe responses without internal decision details', () => {
   assert.equal(
     getSafeScopeResponse('BLOCK', 'ar'),
-    'أنا هنا لمساعدتك في سوق SmartStore AI: البحث عن الإعلانات، إنشاء إعلان، إدارة منتجاتك، المحادثة الداخلية، البلاغات، والإرشاد للمنتجات المسموحة.',
+    'أنا هنا لمساعدتك في سوق حمد: البحث عن الإعلانات، إنشاء إعلان، إدارة منتجاتك، المحادثة الداخلية، البلاغات، والإرشاد للمنتجات المسموحة.',
   );
   assert.equal(
     getSafeScopeResponse('UNCLEAR', 'en'),

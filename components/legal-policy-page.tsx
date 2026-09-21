@@ -38,7 +38,7 @@ export function LegalPolicyPage({
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
               <Image
-                alt="SmartStore AI"
+                alt="سوق حمد"
                 className="size-10 object-cover"
                 height={40}
                 src="/smartstore-mark.png"
@@ -109,7 +109,7 @@ export function LegalPolicyPage({
         </div>
 
         <section className="rounded-md border border-amber-500/30 bg-amber-50 p-4 text-sm leading-7 text-amber-950 dark:bg-amber-400/10 dark:text-amber-100">
-          هذه الصفحات توضح قواعد تشغيل SmartStore AI للمستخدمين. يمكن تحديثها عند تطوير الخدمة أو تغير المتطلبات النظامية.
+          هذه الصفحات توضح قواعد تشغيل سوق حمد للمستخدمين. يمكن تحديثها عند تطوير الخدمة أو تغير المتطلبات النظامية.
         </section>
 
         <section className="rounded-md border bg-white p-4 text-sm leading-7 shadow-sm dark:bg-card">

@@ -201,7 +201,7 @@ function clearHomeAssistantRuntimeState() {
 
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const chatRateLimitMessage =
-  'الضغط مرتفع الآن على مساعد SmartStore AI. انتظر لحظات ثم أعد إرسال الطلب.';
+  'الضغط مرتفع الآن على حمد. انتظر لحظات ثم أعد إرسال الطلب.';
 const chatNetworkErrorMessage =
   'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
 const chatSessionExpiredMessage =
@@ -1049,7 +1049,7 @@ function ListingChatLinkCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-semibold text-blue-700 dark:text-blue-200">
-            إعلان من SmartStore AI
+            إعلان من سوق حمد
           </div>
           <div className="mt-1 text-sm font-bold">عرض بطاقة الإعلان</div>
           <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
@@ -2843,10 +2843,10 @@ export default function Page() {
           <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-                <img alt="SmartStore AI" className="size-8 object-cover" src="/smartstore-mark.png" />
+                <img alt="سوق حمد" className="size-8 object-cover" src="/smartstore-mark.png" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xs font-bold sm:text-sm">SmartStore AI</h1>
+                <h1 className="truncate text-xs font-bold sm:text-sm">سوق حمد</h1>
                 <p className="max-w-[8rem] truncate text-[10px] text-muted-foreground sm:max-w-none sm:text-[11px]">سوق ذكي للتسويق للمنتجات</p>
               </div>
             </div>
@@ -2854,7 +2854,7 @@ export default function Page() {
             <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
               <Sparkles className="size-4 text-blue-600" />
               <button className="flex h-full min-w-0 flex-1 items-center truncate text-start text-xs" type="button" onClick={() => sendStarter('أبحث عن منتج بمساعدة الذكاء الاصطناعي')}>
-                اسأل مساعد SmartStore AI عن المنتج الذي تبحث عنه
+                اسأل حمد عن المنتج الذي تبحث عنه
               </button>
             </div>
 
@@ -2924,7 +2924,7 @@ export default function Page() {
                     <Store className="size-4" />
                     واجهة الإعلانات
                   </div>
-                  <h2 className="mt-1 text-xl font-bold">إعلانات SmartStore AI</h2>
+                  <h2 className="mt-1 text-xl font-bold">إعلانات سوق حمد</h2>
                 </div>
                 <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
@@ -2941,7 +2941,7 @@ export default function Page() {
                         بحث نشط
                       </div>
                       <p className="mt-1 truncate text-sm font-semibold">
-                        نتائج ذكية من مساعد SmartStore AI
+                        نتائج ذكية من حمد
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -3097,10 +3097,10 @@ export default function Page() {
                       </Button>
                     )}
                     <div className="grid size-8 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
-                      <img alt="" className="size-7 rounded-full object-cover" src="/smartstore-mark.png" />
+                      <img alt="" className="size-7 rounded-full object-cover" src="/hamad-assistant-bubble.png" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="text-sm font-bold">مساعد SmartStore AI</h2>
+                      <h2 className="text-sm font-bold">حمد</h2>
                       <p className="text-[11px] text-muted-foreground">
                         {session.authenticated ? session.user?.email : 'التسجيل للعمليات فقط'}
                       </p>
@@ -3255,7 +3255,7 @@ export default function Page() {
         <button
           ref={assistantBubbleRef}
           type="button"
-          aria-label="فتح مساعد SmartStore AI"
+          aria-label="فتح حمد"
           className="smartstore-ai-bubble"
           data-state={assistantBubbleState}
           style={{
@@ -3268,7 +3268,7 @@ export default function Page() {
         >
           <span className="smartstore-ai-bubble__halo" aria-hidden="true" />
           <span className="smartstore-ai-bubble__core" aria-hidden="true">
-            <img alt="" src="/smartstore-mark.png" />
+            <img alt="" src="/hamad-assistant-bubble.png" />
           </span>
           <span className="smartstore-ai-bubble__glint" aria-hidden="true" />
         </button>

@@ -184,12 +184,12 @@ export async function resolveMarketplaceSearchUnderstanding({
         model: getDeepseekChatModel('search'),
         maxOutputTokens: 480,
         abortSignal: signal,
-        system: `You are the SmartStore AI search-understanding model.
+        system: `You are the سوق حمد search-understanding model.
 Return JSON only. Do not answer the user.
 Your only job is to understand a buyer's marketplace search request and convert it into structured search intent.
 Understand Arabic, Saudi dialect, Arabizi, English brands/models, misspellings, short follow-ups, and mixed Arabic-English wording.
 Do not copy the full user sentence into search terms.
-Do not treat words like search, find, want, need, show me, listing, marketplace, SmartStore AI, ابحث, اريد, ابي, دور, اعلان, سوق, or منتج as product data.
+Do not treat words like search, find, want, need, show me, listing, marketplace, سوق حمد, ابحث, اريد, ابي, دور, اعلان, سوق, or منتج as product data.
 Use structured fields whenever possible: category, brand, model, city, minPrice, maxPrice, yearMin, yearMax, condition, mileageMin, mileageMax, color, requiredFeatures, excludedFeatures, excludedColors, rankingPreferences, sortPreference, locationPreference.
 Set searchMode="new_search" when the buyer starts a fresh search or asks broadly for a product/category such as "ابي سيارة". Set searchMode="refine" only when the buyer is clearly narrowing the existing results, such as adding budget, city, mileage, color, or "show cheaper".
 Use descriptiveTerms only for concrete product descriptors that are not already represented by structured fields.

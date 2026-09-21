@@ -39,7 +39,7 @@ export function ListingShareButton({
   }
 
   async function shareListing() {
-    const shareTitle = title?.trim() || 'SmartStore AI';
+    const shareTitle = title?.trim() || 'سوق حمد';
 
     if (isInsideNativeApp() && postToNative({ type: 'share', url: listingUrl, title: shareTitle })) {
       setStatus('shared');

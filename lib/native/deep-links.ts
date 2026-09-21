@@ -1,6 +1,6 @@
 import { appUrl } from '@/lib/app-url';
 
-// Maps between public HTTP URLs and the SmartStore AI custom scheme used by
+// Maps between public HTTP URLs and the سوق حمد custom scheme used by
 // native shells (smartstore://). Also exposes a helper to detect in-app
 // browser limitations so we can route to the native app or the system browser.
 

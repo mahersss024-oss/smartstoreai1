@@ -1,4 +1,4 @@
-# SmartStore AI Marketplace Foundation
+# سوق حمد Marketplace Foundation
 
 This project is a chat-first Saudi smart marketplace inspired by classifieds apps.
 
@@ -9,7 +9,7 @@ This project is a chat-first Saudi smart marketplace inspired by classifieds app
 - The AI chat is a side panel that stays available while the user browses.
 - Users can ask questions, browse, search, and learn how the system works without signing in.
 - Google sign-in is required only for account-bound actions.
-- Before Google sign-in, the user must accept a commission acknowledgment: if a product is sold through the site, SmartStore AI is owed 1% of the product value.
+- Before Google sign-in, the user must accept a commission acknowledgment: if a product is sold through the site, سوق حمد is owed 1% of the product value.
 - Listing creation and editing happen through natural conversation, not manual forms.
 - The AI infers category, extracts listing details, asks short follow-up questions, requests images, and shows a preview before publishing.
 - Buyer and seller communication happens through internal app conversations, not phone numbers.
@@ -191,7 +191,7 @@ This writes marketplace state to `.data/marketplace-store.json` and uploaded lis
 
 ## Progressive Web App
 
-SmartStore AI ships as an installable mobile web app.
+سوق حمد ships as an installable mobile web app.
 
 - `app/manifest.ts` serves `/manifest.webmanifest` with `standalone` display, RTL/Arabic metadata, and 180x180 + 512x512 icons (including a maskable icon).
 - `app/layout.tsx` exports a Next.js `Viewport` with `viewport-fit=cover`, mobile theme colors, and `appleWebApp` metadata so iOS and Android can install the app to the home screen.

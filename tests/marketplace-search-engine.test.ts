@@ -406,7 +406,7 @@ test('chat marketplace search uses understood intent instead of raw query words'
   const result = await searchMarketplaceWithState({
     ownerKey,
     query:
-      'Please check if SmartStore AI has a published listing card for a Nissan Patrol and do not just search these words.',
+      'Please check if سوق حمد has a published listing card for a Nissan Patrol and do not just search these words.',
     understoodIntent: {
       category: 'cars',
       brand: 'Nissan',

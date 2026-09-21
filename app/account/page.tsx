@@ -1024,10 +1024,10 @@ export default function AccountPage() {
               <ArrowRight className="size-4" />
             </Link>
             <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm sm:size-10">
-              <img alt="SmartStore AI" className="size-9 object-cover sm:size-10" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/smartstore-mark.png" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold sm:text-base">حسابي في SmartStore AI</h1>
+              <h1 className="truncate text-sm font-bold sm:text-base">حسابي في سوق حمد</h1>
               <p className="truncate text-[11px] text-muted-foreground sm:text-xs">بيانات العميل وإعلاناته الخاصة</p>
             </div>
           </div>
@@ -1095,7 +1095,7 @@ export default function AccountPage() {
                 )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="truncate text-xl font-bold">{session.user?.name ?? 'عميل SmartStore'}</h2>
+                    <h2 className="truncate text-xl font-bold">{session.user?.name ?? 'عميل سوق حمد'}</h2>
                     <BadgeCheck className="size-5 shrink-0 text-blue-600" />
                     {isAdmin && (
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">

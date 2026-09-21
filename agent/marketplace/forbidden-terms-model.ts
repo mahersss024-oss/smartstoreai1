@@ -91,7 +91,7 @@ export async function resolveAmbiguousForbiddenRoots(
         model: getDeepseekChatModel('moderation'),
         maxOutputTokens: 200,
         abortSignal: signal,
-        instructions: `You are the SmartStore AI forbidden-terms resolver for the Saudi marketplace.
+        instructions: `You are the سوق حمد forbidden-terms resolver for the Saudi marketplace.
 Return JSON only. Do not answer the user.
 A marketplace listing text contains a word that is spelled the same for a prohibited product and an allowed one (for example "حشيش" can mean the drug marijuana or animal fodder).
 Decide whether, in THIS text, the word refers to a prohibited product or an allowed one.

@@ -339,7 +339,7 @@ export default function AdminHomePage() {
               <p className="truncate text-xs text-muted-foreground">
                 {isModeratorOnly
                   ? 'مراجعة الإعلانات والبلاغات حسب صلاحياتك'
-                  : 'إحصائيات وصلاحيات إدارة SmartStore AI'}
+                  : 'إحصائيات وصلاحيات إدارة سوق حمد'}
               </p>
             </div>
           </div>

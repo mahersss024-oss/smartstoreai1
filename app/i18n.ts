@@ -25,7 +25,7 @@ export const appCopy = {
       'اكتب طلبك طبيعيًا: ابحث عن منتج، اعرض منتج للبيع، ارفع صور إعلان، أو اسأل عن محادثات البيع والشراء.',
     inputPlaceholder: 'اكتب طلبك أو أرفق صور المنتج...',
     fallbackChatTitle: 'محادثة جديدة',
-    imageAlt: 'شعار SmartStore AI',
+    imageAlt: 'شعار سوق حمد',
     themeToDark: 'الوضع الداكن',
     themeToLight: 'الوضع الفاتح',
     privacyPolicy: 'سياسة الخصوصية',
@@ -50,7 +50,7 @@ export const appCopy = {
     status: {
       marketplace: [
         { title: 'جاري فهم الطلب', detail: 'أحدد هل العميل يريد بحثًا أو إعلانًا أو محادثة' },
-        { title: 'جاري مراجعة السوق', detail: 'أبحث داخل إعلانات SmartStore AI المناسبة' },
+        { title: 'جاري مراجعة السوق', detail: 'أبحث داخل إعلانات سوق حمد المناسبة' },
         { title: 'جاري التحقق', detail: 'أراجع السياسة والتصنيف قبل الرد' },
         { title: 'لحظة واحدة', detail: 'أجهز لك ردًا مناسبًا للعملية' },
       ],
@@ -97,7 +97,7 @@ export const appCopy = {
       'Ask naturally: search for a listing, sell an item, upload listing images, or ask about buyer-seller chat.',
     inputPlaceholder: 'Type your request or attach product images...',
     fallbackChatTitle: 'New chat',
-    imageAlt: 'SmartStore AI logo',
+    imageAlt: 'سوق حمد logo',
     themeToDark: 'Switch to dark mode',
     themeToLight: 'Switch to light mode',
     privacyPolicy: 'Privacy policy',
@@ -122,7 +122,7 @@ export const appCopy = {
     status: {
       marketplace: [
         { title: 'Understanding request', detail: 'Detecting whether this is search, selling, or messaging' },
-        { title: 'Checking marketplace', detail: 'Looking through matching SmartStore AI listings' },
+        { title: 'Checking marketplace', detail: 'Looking through matching سوق حمد listings' },
         { title: 'Verifying policy', detail: 'Reviewing category and marketplace safety before replying' },
         { title: 'One moment', detail: 'Preparing the right next step' },
       ],

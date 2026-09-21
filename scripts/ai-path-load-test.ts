@@ -94,7 +94,7 @@ async function getDeepseekProviderModule() {
 }
 
 function getMockContent(body: string) {
-  if (body.includes('SmartStore AI adaptive intent router')) {
+  if (body.includes('سوق حمد adaptive intent router')) {
     return JSON.stringify({
       intent: 'search_listing',
       execution: 'search_listings',
@@ -107,7 +107,7 @@ function getMockContent(body: string) {
     });
   }
 
-  if (body.includes('SmartStore AI output Scope Checker')) {
+  if (body.includes('سوق حمد output Scope Checker')) {
     return JSON.stringify({
       decision: 'ALLOW',
       confidence: 0.99,
@@ -115,7 +115,7 @@ function getMockContent(body: string) {
     });
   }
 
-  if (body.includes('SmartStore AI input Scope Checker')) {
+  if (body.includes('سوق حمد input Scope Checker')) {
     return JSON.stringify({
       decision: 'ALLOW',
       confidence: 0.99,
@@ -123,7 +123,7 @@ function getMockContent(body: string) {
     });
   }
 
-  return 'وجدت لك نتائج مناسبة داخل SmartStore AI. يمكنك تضييق البحث بالسعر أو الموديل أو المدينة.';
+  return 'وجدت لك نتائج مناسبة داخل سوق حمد. يمكنك تضييق البحث بالسعر أو الموديل أو المدينة.';
 }
 
 function installMockProvider() {
