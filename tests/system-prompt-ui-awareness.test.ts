@@ -11,6 +11,12 @@ test('system prompt knows assistant search can be cleared without changing model
   assert.doesNotMatch(systemPrompt, /always mention this UI control/i);
 });
 
+test('system prompt identifies the assistant as Hamad for identity questions', () => {
+  assert.match(systemPrompt, /You are Hamad/);
+  assert.match(systemPrompt, /أنا حمد، مساعدك في سوق حمد/);
+  assert.match(systemPrompt, /create listings and search marketplace listings/);
+});
+
 test('system prompt guides signed-in users through platform account help safely', () => {
   assert.match(systemPrompt, /Google or Apple sign-in/);
   assert.match(systemPrompt, /platform_help/);

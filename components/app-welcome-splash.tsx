@@ -91,6 +91,14 @@ export function AppWelcomeSplash() {
       style={{ '--app-welcome-bg': `url(${WELCOME_BACKGROUND_SRC})` } as CSSProperties}
     >
       <div className="app-welcome__backdrop" aria-hidden="true" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset
+          used as a decorative splash layer. */}
+      <img
+        className="app-welcome__brand"
+        src={WELCOME_BACKGROUND_SRC}
+        alt=""
+        aria-hidden="true"
+      />
       <div className="app-welcome__content">
         <p className="app-welcome__tagline">سوقك الذكي للبيع والشراء</p>
 

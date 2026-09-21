@@ -2845,10 +2845,6 @@ export default function Page() {
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
                 <img alt="سوق حمد" className="size-8 object-cover" src="/hamad-market-logo.jpeg" />
               </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-xs font-bold sm:text-sm">سوق حمد</h1>
-                <p className="max-w-[8rem] truncate text-[10px] text-muted-foreground sm:max-w-none sm:text-[11px]">سوق ذكي للتسويق للمنتجات</p>
-              </div>
             </div>
 
             <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
@@ -2924,7 +2920,6 @@ export default function Page() {
                     <Store className="size-4" />
                     واجهة الإعلانات
                   </div>
-                  <h2 className="mt-1 text-xl font-bold">إعلانات سوق حمد</h2>
                 </div>
                 <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
@@ -3098,12 +3093,6 @@ export default function Page() {
                     )}
                     <div className="grid size-8 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
                       <img alt="" className="size-7 rounded-full object-cover" src="/hamad-assistant-bubble.png" />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-sm font-bold">حمد</h2>
-                      <p className="text-[11px] text-muted-foreground">
-                        {session.authenticated ? session.user?.email : 'التسجيل للعمليات فقط'}
-                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

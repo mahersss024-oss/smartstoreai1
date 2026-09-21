@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png" },
-      { url: "/hamad-market-logo.jpeg", type: "image/jpeg" },
+      { url: "/favicon.ico?v=souq-hamad", sizes: "any" },
+      { url: "/icon.png?v=souq-hamad", type: "image/png" },
+      { url: "/hamad-market-logo.jpeg?v=souq-hamad", type: "image/jpeg" },
     ],
-    apple: "/apple-icon.png",
+    apple: "/apple-icon.png?v=souq-hamad",
   },
 };
 
@@ -80,9 +80,7 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background:
-    var(--app-welcome-bg) center / cover no-repeat,
-    linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
+  background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -92,8 +90,41 @@ html[data-app-display='standalone'] #smartstore-welcome {
   animation-duration: 1700ms;
   animation-name: app-welcome-standalone-lifecycle;
 }
+#smartstore-welcome::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--app-welcome-bg);
+  background-repeat: no-repeat;
+}
+#smartstore-welcome::before {
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  filter: blur(18px) saturate(1.1);
+  opacity: 0.5;
+  transform: scale(1.12);
+}
+#smartstore-welcome .app-welcome__brand {
+  position: absolute;
+  z-index: 2;
+  top: 36%;
+  left: 50%;
+  width: min(132vw, 760px);
+  max-width: none;
+  height: auto;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  -webkit-user-drag: none;
+  display: block;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+}
 #smartstore-welcome .app-welcome__content {
   position: relative;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
