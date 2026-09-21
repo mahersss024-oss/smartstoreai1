@@ -97,13 +97,17 @@ test('welcome logo asset exists in public assets', () => {
   );
 });
 
-test('welcome component uses the icon-only welcome logo', () => {
+test('welcome component uses the market logo as the full-screen background', () => {
   const component = readFileSync(
     join(process.cwd(), 'components', 'app-welcome-splash.tsx'),
     'utf8',
   );
 
   assert.match(component, /\/hamad-market-logo\.jpeg/);
+  assert.match(component, /--app-welcome-bg/);
+  assert.match(component, /سوقك الذكي للبيع والشراء/);
+  assert.doesNotMatch(component, /app-welcome__logo/);
+  assert.doesNotMatch(component, /app-welcome__title/);
   assert.doesNotMatch(component, /\/smartstore-logo\.png/);
 });
 

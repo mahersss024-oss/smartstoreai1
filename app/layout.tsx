@@ -80,7 +80,9 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
+  background:
+    var(--app-welcome-bg) center / cover no-repeat,
+    linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -95,21 +97,12 @@ html[data-app-display='standalone'] #smartstore-welcome {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.15rem;
-  padding: 0 1.5rem;
-  text-align: center;
-}
-#smartstore-welcome .app-welcome__logo {
-  width: clamp(108px, 27vmin, 172px);
-  height: clamp(108px, 27vmin, 172px);
-  border-radius: 24%;
-  overflow: hidden;
-}
-#smartstore-welcome .app-welcome__logo img {
+  justify-content: flex-end;
+  gap: 0.8rem;
   width: 100%;
-  height: 100%;
-  border-radius: 24%;
-  display: block;
+  min-height: 100%;
+  padding: 0 1.5rem calc(env(safe-area-inset-bottom) + 4.5rem);
+  text-align: center;
 }
 @keyframes app-welcome-lifecycle {
   0%, 82% { opacity: 1; }

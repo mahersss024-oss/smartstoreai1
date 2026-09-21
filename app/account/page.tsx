@@ -1027,7 +1027,7 @@ export default function AccountPage() {
               <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold sm:text-base">حسابي في سوق حمد</h1>
+              <h1 className="truncate text-sm font-bold sm:text-base">حسابي</h1>
               <p className="truncate text-[11px] text-muted-foreground sm:text-xs">بيانات العميل وإعلاناته الخاصة</p>
             </div>
           </div>

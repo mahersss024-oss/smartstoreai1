@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useRef } from 'react';
 
 import {
   APP_DISPLAY_MODE_ATTR,
@@ -14,7 +14,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
-const LOGO_SRC = '/hamad-market-logo.jpeg';
+const WELCOME_BACKGROUND_SRC = '/hamad-market-logo.jpeg';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is
@@ -84,17 +84,15 @@ export function AppWelcomeSplash() {
   }, []);
 
   return (
-    <div id={WELCOME_ID} className="app-welcome" role="presentation">
+    <div
+      id={WELCOME_ID}
+      className="app-welcome"
+      role="presentation"
+      style={{ '--app-welcome-bg': `url(${WELCOME_BACKGROUND_SRC})` } as CSSProperties}
+    >
       <div className="app-welcome__backdrop" aria-hidden="true" />
       <div className="app-welcome__content">
-        <div className="app-welcome__logo">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static brand
-              asset already shipped in /public; next/image adds no value here. */}
-          <img src={LOGO_SRC} alt="سوق حمد" width={256} height={256} />
-        </div>
-
-        <h1 className="app-welcome__title">سوق حمد</h1>
-        <p className="app-welcome__tagline">سوقك الذكي… بأسلوب المحادثة</p>
+        <p className="app-welcome__tagline">سوقك الذكي للبيع والشراء</p>
 
         <div className="app-welcome__loader" aria-hidden="true">
           <span />
