@@ -2845,6 +2845,9 @@ export default function Page() {
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
                 <img alt="سوق حمد" className="size-8 object-cover" src="/hamad-market-logo.jpeg" />
               </div>
+              <p className="min-w-0 truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300 sm:text-xs">
+                سوقك الذكي للبيع والشراء
+              </p>
             </div>
 
             <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
