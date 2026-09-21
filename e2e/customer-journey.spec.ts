@@ -35,13 +35,44 @@ async function navigateByVisibleControl(page: Page, href: string, label: string)
   await page.getByRole('button', { name: label }).click();
 }
 
+async function openAssistantChatIfNeeded(page: Page) {
+  const input = page.getByPlaceholder(/اكتب طلبك/);
+
+  try {
+    await expect(input).toBeVisible({ timeout: 5_000 });
+    return input;
+  } catch {
+    // On compact mobile layouts the chat starts behind the floating Hamad button.
+  }
+
+  await page.getByRole('button', { name: /فتح حمد/ }).click({ timeout: 5_000 });
+  await expect(input).toBeVisible();
+  return input;
+}
+
+async function closeAssistantChatIfOpen(page: Page) {
+  const backToListings = page.getByRole('button', { name: /العودة للإعلانات/ });
+
+  if (await backToListings.isVisible().catch(() => false)) {
+    await backToListings.click();
+  }
+}
+
+const corePageText: Record<string, RegExp> = {
+  '/': /واجهة الإعلانات/i,
+  '/account': /حسابي/i,
+  '/conversations': /محادثات/i,
+  '/favorites': /إعلانات محفوظة|المفضلة/i,
+  '/commissions': /العمولة|عمولاتي/i,
+};
+
 test('visitor can reach the marketplace and choose an auth provider', async ({
   page,
 }) => {
   const response = await page.goto('/');
 
   expect(response?.status()).toBeLessThan(500);
-  await expect(page.locator('body')).toContainText(/سوق حمد/i);
+  await expect(page.locator('body')).toContainText(corePageText['/']);
 
   const login = page.getByTestId('auth-provider-trigger');
   await login.click();
@@ -74,7 +105,7 @@ test('signed-in customer can open the core journey pages without auth flash or s
     await expect(page.locator('body'), path).not.toContainText(
       /Application error|Internal Server Error|Unhandled Runtime Error/i,
     );
-    await expect(page.locator('body'), path).toContainText(/سوق حمد/i);
+    await expect(page.locator('body'), path).toContainText(corePageText[path]);
     await expect(
       page.getByRole('button', { name: /Google|Apple/i }),
       path,
@@ -98,14 +129,16 @@ test('home assistant keeps the current chat while navigating to account and back
   const customerMessage = 'اختبار بقاء المحادثة أثناء التنقل';
 
   await page.goto('/');
-  await page.getByPlaceholder(/اكتب طلبك/).fill(customerMessage);
+  await (await openAssistantChatIfNeeded(page)).fill(customerMessage);
   await page.getByRole('button', { name: 'إرسال' }).click();
   await expect(page.locator('body')).toContainText(customerMessage);
 
+  await closeAssistantChatIfOpen(page);
   await navigateByVisibleControl(page, '/account', 'حسابي');
   await expect(page).toHaveURL(/\/account$/);
   await navigateByVisibleControl(page, '/', 'الرئيسية');
   await expect(page).toHaveURL(/\/$/);
 
+  await openAssistantChatIfNeeded(page);
   await expect(page.locator('body')).toContainText(customerMessage);
 });
