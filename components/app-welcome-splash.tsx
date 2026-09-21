@@ -14,7 +14,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
-const LOGO_SRC = '/hamad-assistant-bubble.png';
+const LOGO_SRC = '/hamad-market-logo.jpeg';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is

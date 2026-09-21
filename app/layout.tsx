@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
       { url: "/icon.png", type: "image/png" },
-      { url: "/smartstore-mark.png", type: "image/png" },
+      { url: "/hamad-market-logo.jpeg", type: "image/jpeg" },
     ],
     apple: "/apple-icon.png",
   },

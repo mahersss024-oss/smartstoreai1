@@ -640,7 +640,7 @@ export default function ConversationPage() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <img alt="سوق حمد" className="size-10 object-cover" src="/smartstore-mark.png" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">محادثة سوق حمد</h1>

@@ -92,7 +92,7 @@ test('welcome overlay uses a stable id and sane timings', () => {
 
 test('welcome logo asset exists in public assets', () => {
   assert.equal(
-    existsSync(join(process.cwd(), 'public', 'smartstore-welcome-logo.png')),
+    existsSync(join(process.cwd(), 'public', 'hamad-market-logo.jpeg')),
     true,
   );
 });
@@ -103,7 +103,7 @@ test('welcome component uses the icon-only welcome logo', () => {
     'utf8',
   );
 
-  assert.match(component, /\/smartstore-welcome-logo\.png/);
+  assert.match(component, /\/hamad-market-logo\.jpeg/);
   assert.doesNotMatch(component, /\/smartstore-logo\.png/);
 });
 

@@ -2843,7 +2843,7 @@ export default function Page() {
           <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-                <img alt="سوق حمد" className="size-8 object-cover" src="/smartstore-mark.png" />
+                <img alt="سوق حمد" className="size-8 object-cover" src="/hamad-market-logo.jpeg" />
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-xs font-bold sm:text-sm">سوق حمد</h1>
