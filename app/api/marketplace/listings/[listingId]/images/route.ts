@@ -261,7 +261,13 @@ export async function POST(request: Request, context: RouteContext) {
     });
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[listing_image_storage] failure=${errorName}`);
+    const errorMessage =
+      error instanceof Error
+        ? error.message.replace(/\s+/g, ' ').slice(0, 240)
+        : 'Unknown image storage error';
+    console.warn(
+      `[listing_image_storage] failure=${errorName} message="${errorMessage}"`,
+    );
 
     const responseBody = {
       error: 'image_storage_unavailable',
