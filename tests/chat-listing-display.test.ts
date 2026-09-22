@@ -111,6 +111,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /formData\.append\('image', await createUploadableImageFile\(image\)\)/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
+  assert.match(homePage, /relative aspect-square self-start bg-slate-100/);
   assert.match(globalCss, /smart-assistant-results-panel-in/);
   assert.match(globalCss, /smart-assistant-result-card-in/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);

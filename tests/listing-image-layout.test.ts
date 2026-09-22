@@ -9,7 +9,11 @@ test('listing details keeps up to eight thumbnails in a four-column grid below t
   );
 
   assert.match(source, /visibleImages = images\.slice\(0, 8\)/);
+  assert.match(source, /shouldShowThumbnails = visibleImages\.length > 1/);
+  assert.match(source, /\{shouldShowThumbnails && \(/);
   assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
+  assert.match(source, /className="h-full w-full object-contain"/);
+  assert.match(source, /dark:bg-slate-950/);
   assert.match(source, /aspect-\[16\/9\] w-full overflow-hidden/);
   assert.doesNotMatch(source, /max-h-\[18rem\]/);
   assert.doesNotMatch(source, /grid gap-2 p-2 sm:p-3/);
@@ -31,6 +35,7 @@ test('account listing primary image does not stretch with the image manager', as
     /md:row-start-1 md:h-full md:min-h-40/,
   );
   assert.match(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2/);
+  assert.match(source, /className="h-full w-full object-contain"/);
   assert.doesNotMatch(source, /overflow-x-auto/);
   assert.doesNotMatch(source, /xl:grid xl:grid-cols-2 xl:overflow-visible/);
 });

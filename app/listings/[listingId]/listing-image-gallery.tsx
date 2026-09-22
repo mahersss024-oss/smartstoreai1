@@ -14,17 +14,19 @@ export function ListingImageGallery({
 }: ListingImageGalleryProps) {
   const [selectedImage, setSelectedImage] = useState(images[0] ?? '');
   const visibleImages = images.slice(0, 8);
+  const shouldShowThumbnails = visibleImages.length > 1;
 
   return (
     <section className="w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
       <div className="grid gap-2">
-        <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
+        <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
           <img
             alt={title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             src={selectedImage}
           />
         </div>
+        {shouldShowThumbnails && (
         <div className="grid grid-cols-4 gap-1.5 px-2 pb-2 sm:px-3 sm:pb-3">
           {visibleImages.map((image, index) => {
             const isSelected = image === selectedImage;
@@ -47,6 +49,7 @@ export function ListingImageGallery({
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );

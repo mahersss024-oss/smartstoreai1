@@ -1507,7 +1507,7 @@ export default function AccountPage() {
                                   {image.url ? (
                                     <img
                                       alt=""
-                                      className="h-full w-full object-cover"
+                                      className="h-full w-full object-contain"
                                       src={image.url}
                                     />
                                   ) : (

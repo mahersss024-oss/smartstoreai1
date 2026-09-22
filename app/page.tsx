@@ -1430,7 +1430,7 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative min-h-20 bg-slate-100 sm:min-h-24">
+        <div className="relative aspect-square self-start bg-slate-100">
           {listing.image ? (
             <img
               alt={listing.title}
