@@ -93,6 +93,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /submitManualListing/);
   assert.match(homePage, /fetch\('\/api\/marketplace\/listings'/);
   assert.match(homePage, /manual-listing-image-upload/);
+  assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
+  assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
+  assert.match(homePage, /formData\.append\('image', await createNormalizedImageFile\(image\)\)/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
   assert.match(globalCss, /smart-assistant-results-panel-in/);

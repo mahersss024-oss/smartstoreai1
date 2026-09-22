@@ -1647,7 +1647,17 @@ function getChatErrorMessage(error: Error | undefined) {
 }
 
 function createClientIdempotencyKey(scope: string) {
-  return `${scope}:${crypto.randomUUID()}`;
+  if (typeof crypto.randomUUID === 'function') {
+    return `${scope}:${crypto.randomUUID()}`;
+  }
+
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const fallbackId = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+
+  return `${scope}:${fallbackId}`;
 }
 
 const guardedChatFetch: typeof fetch = async (input, init) => {
@@ -3166,27 +3176,31 @@ export default function Page() {
       let uploadedImages = 0;
 
       for (const image of manualListingImages.slice(0, 8)) {
-        const formData = new FormData();
-        formData.append('image', await createNormalizedImageFile(image));
+        try {
+          const formData = new FormData();
+          formData.append('image', await createNormalizedImageFile(image));
 
-        const uploadResponse = await fetch(
-          `/api/marketplace/listings/${createdListing.id}/images`,
-          {
-            method: 'POST',
-            headers: {
-              'Idempotency-Key': createClientIdempotencyKey(
-                'manual-listing-image-upload',
-              ),
+          const uploadResponse = await fetch(
+            `/api/marketplace/listings/${createdListing.id}/images`,
+            {
+              method: 'POST',
+              headers: {
+                'Idempotency-Key': createClientIdempotencyKey(
+                  'manual-listing-image-upload',
+                ),
+              },
+              body: formData,
             },
-            body: formData,
-          },
-        );
+          );
 
-        if (!uploadResponse.ok) {
+          if (!uploadResponse.ok) {
+            break;
+          }
+
+          uploadedImages += 1;
+        } catch {
           break;
         }
-
-        uploadedImages += 1;
       }
 
       setManualListingForm(defaultManualListingForm);
