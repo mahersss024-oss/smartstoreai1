@@ -34,7 +34,7 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
-import { createNormalizedImageFile } from '@/lib/client-image-normalization';
+import { createUploadableImageFile } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -883,7 +883,7 @@ export default function AccountPage() {
       setUploadingListingId(listing.id);
 
       try {
-        const uploadFile = await createNormalizedImageFile(file);
+        const uploadFile = await createUploadableImageFile(file);
         const formData = new FormData();
         formData.append('image', uploadFile);
 

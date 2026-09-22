@@ -67,7 +67,7 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
-import { createNormalizedImageFile } from '@/lib/client-image-normalization';
+import { createUploadableImageFile } from '@/lib/client-image-normalization';
 import {
   getAssistantResultListings,
   getCanLoadMoreExploreListings,
@@ -3218,7 +3218,7 @@ export default function Page() {
       for (const image of manualListingImages.slice(0, 8)) {
         try {
           const formData = new FormData();
-          formData.append('image', await createNormalizedImageFile(image));
+          formData.append('image', await createUploadableImageFile(image));
 
           const uploadResponse = await fetch(
             `/api/marketplace/listings/${createdListing.id}/images`,
@@ -3573,6 +3573,24 @@ export default function Page() {
                   </Button>
                 </div>
               </div>
+
+              {!isManualListingVisible && manualListingNotice && (
+                <div
+                  className={cn(
+                    'mb-4 rounded-md border px-3 py-2 text-right text-xs leading-5 shadow-sm',
+                    manualListingNotice.tone === 'danger' &&
+                      'border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200',
+                    manualListingNotice.tone === 'warning' &&
+                      'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100',
+                    manualListingNotice.tone === 'success' &&
+                      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100',
+                    manualListingNotice.tone === 'info' &&
+                      'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
+                  )}
+                >
+                  {manualListingNotice.message}
+                </div>
+              )}
 
               {isManualListingVisible && (
                 <form

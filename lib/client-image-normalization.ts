@@ -1,6 +1,12 @@
 const normalizedImageMimeType = "image/jpeg";
 const normalizedImageQuality = 0.88;
 const normalizedImageMaxDimension = 1800;
+const uploadSafeImageMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 const imageFileNamePattern =
   /\.(avif|bmp|gif|heic|heif|jfif|jpe?g|png|svg|tiff?|webp)$/i;
 
@@ -150,4 +156,16 @@ export async function createNormalizedImageFile(file: File) {
     type: normalizedImageMimeType,
     lastModified: Date.now(),
   });
+}
+
+export async function createUploadableImageFile(file: File) {
+  try {
+    return await createNormalizedImageFile(file);
+  } catch (error) {
+    if (uploadSafeImageMimeTypes.has(file.type.toLowerCase())) {
+      return file;
+    }
+
+    throw error;
+  }
 }
