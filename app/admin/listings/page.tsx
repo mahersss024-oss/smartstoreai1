@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   CheckCircle2,
+  ImageIcon,
   Pause,
   RefreshCw,
   Save,
@@ -169,12 +170,20 @@ function AdminListingCard({
       {listing.images.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
           {listing.images.map((image) => (
-            <img
-              key={image.id}
-              alt=""
-              className="h-16 w-16 rounded-md border bg-slate-100 object-contain dark:bg-slate-900"
-              src={image.thumbnailUrl}
-            />
+            <div key={image.id} className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900">
+              <img
+                alt=""
+                className="h-full w-full object-contain"
+                onError={(event) => {
+                  event.currentTarget.hidden = true;
+                  event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                }}
+                src={image.thumbnailUrl}
+              />
+              <span hidden>
+                <ImageIcon className="size-5 text-slate-400" />
+              </span>
+            </div>
           ))}
         </div>
       )}

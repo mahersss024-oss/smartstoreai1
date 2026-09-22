@@ -169,6 +169,21 @@ const categoryMatchers: Array<{
     patterns: [/(?:اثاث|أثاث|كنب|كرسي|طاولة|furniture|chair|table|sofa)/i],
     stopWords: ['اثاث', 'أثاث', 'furniture'],
   },
+  {
+    category: 'women_supplies',
+    patterns: [/(?:مستلزمات نسائية|نسائي|نسائية|حريمي|عباية|عبايات|طرحة|حجاب|women supplies|women|female|ladies|abaya|hijab)/i],
+    stopWords: ['مستلزمات', 'نسائية', 'نسائي', 'حريمي', 'women', 'female', 'ladies'],
+  },
+  {
+    category: 'men_supplies',
+    patterns: [/(?:مستلزمات رجالية|رجالي|رجالية|شماغ|غترة|عقال|men supplies|men|male|mens|shemagh|ghutra)/i],
+    stopWords: ['مستلزمات', 'رجالية', 'رجالي', 'men', 'male', 'mens'],
+  },
+  {
+    category: 'fashion',
+    patterns: [/(?:ملابس|ثوب|حذاء|فستان|شنطة|fashion|clothes|shoes|dress|bag)/i],
+    stopWords: ['ملابس', 'ثوب', 'حذاء', 'فستان', 'شنطة', 'fashion', 'clothes', 'shoes'],
+  },
 ];
 
 const cityMatchers: Array<{ city: string; patterns: RegExp[]; stopWords: string[] }> = [

@@ -144,6 +144,14 @@ test('infers expected marketplace categories from user text', async () => {
     inferExpectedMarketplaceCategory('اريد كاميرا تصوير من نوع كانون'),
     'cameras',
   );
+  assert.equal(
+    inferExpectedMarketplaceCategory('women supplies abaya'),
+    'women_supplies',
+  );
+  assert.equal(
+    inferExpectedMarketplaceCategory('men supplies shemagh'),
+    'men_supplies',
+  );
 });
 
 test('creates a vision compliance message from the latest user image', () => {

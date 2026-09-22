@@ -223,6 +223,14 @@ const categoryRules: Array<{
     patterns: [/(?:أثاث|اثاث|كنب|كرسي|طاولة|سرير|دولاب|furniture|chair|table|sofa|bed|wardrobe)/i],
   },
   {
+    category: 'women_supplies',
+    patterns: [/(?:مستلزمات نسائية|نسائي|نسائية|حريمي|عباية|عبايات|طرحة|طرح|حجاب|women supplies|women|female|ladies|abaya|hijab)/i],
+  },
+  {
+    category: 'men_supplies',
+    patterns: [/(?:مستلزمات رجالية|رجالي|رجالية|ثوب رجالي|شماغ|غترة|عقال|men supplies|men|male|mens|thobe|shemagh|ghutra)/i],
+  },
+  {
     category: 'fashion',
     patterns: [/(?:ملابس|ثوب|شماغ|حذاء|فستان|شنطة|fashion|clothes|shoes|dress|bag)/i],
   },

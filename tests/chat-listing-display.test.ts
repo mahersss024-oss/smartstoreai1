@@ -86,6 +86,11 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /smart-assistant-result-card/);
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
+  assert.match(homePage, /label: 'أزياء ومستلزمات'/);
+  assert.match(homePage, /'مستلزمات نسائية'/);
+  assert.match(homePage, /'مستلزمات رجالية'/);
+  assert.match(homePage, /women_supplies: 'مستلزمات نسائية'/);
+  assert.match(homePage, /men_supplies: 'مستلزمات رجالية'/);
   assert.match(homePage, /saudiMarketplaceCities/);
   assert.match(homePage, /marketplaceSearchInput/);
   assert.match(homePage, /marketplaceSearchQuery/);

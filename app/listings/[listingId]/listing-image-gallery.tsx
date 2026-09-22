@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from 'react';
+import { ImageIcon } from 'lucide-react';
 
 type ListingImageGalleryProps = {
   images: string[];
@@ -15,6 +16,10 @@ export function ListingImageGallery({
   const [selectedImage, setSelectedImage] = useState(images[0] ?? '');
   const visibleImages = images.slice(0, 8);
   const shouldShowThumbnails = visibleImages.length > 1;
+  const showImageFallback = (image: HTMLImageElement) => {
+    image.hidden = true;
+    image.nextElementSibling?.removeAttribute('hidden');
+  };
 
   return (
     <section className="w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
@@ -23,8 +28,12 @@ export function ListingImageGallery({
           <img
             alt={title}
             className="h-full w-full object-contain"
+            onError={(event) => showImageFallback(event.currentTarget)}
             src={selectedImage}
           />
+          <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+            <ImageIcon className="size-8" />
+          </div>
         </div>
         {shouldShowThumbnails && (
         <div className="grid grid-cols-4 gap-1.5 px-2 pb-2 sm:px-3 sm:pb-3">
@@ -44,7 +53,15 @@ export function ListingImageGallery({
                 onClick={() => setSelectedImage(image)}
                 type="button"
               >
-                <img alt="" className="h-full w-full object-cover" src={image} />
+                <img
+                  alt=""
+                  className="h-full w-full object-contain"
+                  onError={(event) => showImageFallback(event.currentTarget)}
+                  src={image}
+                />
+                <span hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                  <ImageIcon className="size-4" />
+                </span>
               </button>
             );
           })}

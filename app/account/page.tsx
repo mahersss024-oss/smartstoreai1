@@ -143,6 +143,8 @@ const listingCategoryOptions = [
   'real_estate',
   'furniture',
   'fashion',
+  'women_supplies',
+  'men_supplies',
   'home_garden',
   'sports',
   'gaming_hobbies',
@@ -205,6 +207,8 @@ function formatCategory(category: string) {
     gaming_hobbies: 'الألعاب والهوايات',
     books_education: 'الكتب والتعليم',
     kids: 'مستلزمات الأطفال',
+    women_supplies: 'مستلزمات نسائية',
+    men_supplies: 'مستلزمات رجالية',
     tools_equipment: 'معدات وأدوات',
     watches_accessories: 'ساعات وإكسسوارات',
     beauty: 'العناية والتجميل',
@@ -1317,7 +1321,23 @@ export default function AccountPage() {
                     {listings.map((listing) => (
                       <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
                       {listing.image ? (
-                        <img alt={listing.title} className="aspect-[16/10] w-full bg-slate-100 object-contain dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start" src={listing.image} />
+                        <div className="aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
+                          <img
+                            alt={listing.title}
+                            className="h-full w-full object-contain"
+                            onError={(event) => {
+                              event.currentTarget.hidden = true;
+                              event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                            }}
+                            src={listing.image}
+                          />
+                          <div hidden className="grid h-full w-full place-items-center text-center text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            <div className="grid gap-1">
+                              <ImageIcon className="mx-auto size-5" />
+                              <span>لا توجد صورة حقيقية</span>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
                           <div className="grid gap-1">
@@ -1505,11 +1525,20 @@ export default function AccountPage() {
                               >
                                 <div className="relative aspect-square overflow-hidden rounded bg-slate-100 dark:bg-slate-900">
                                   {image.url ? (
-                                    <img
-                                      alt=""
-                                      className="h-full w-full object-contain"
-                                      src={image.url}
-                                    />
+                                    <>
+                                      <img
+                                        alt=""
+                                        className="h-full w-full object-contain"
+                                        onError={(event) => {
+                                          event.currentTarget.hidden = true;
+                                          event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                                        }}
+                                        src={image.url}
+                                      />
+                                      <div hidden className="grid h-full place-items-center">
+                                        <ImageIcon className="size-5 text-slate-400" />
+                                      </div>
+                                    </>
                                   ) : (
                                     <div className="grid h-full place-items-center">
                                       <ImageIcon className="size-5 text-slate-400" />

@@ -59,6 +59,14 @@ test('extracts camera category and brand from Arabic buyer search', () => {
   assert.equal(parsed.termGroups.at(-1)?.includes('canon'), true);
 });
 
+test('extracts gender supplies categories without falling back to generic fashion', () => {
+  const womenParsed = parseMarketplaceSearchQuery('women supplies abaya');
+  const menParsed = parseMarketplaceSearchQuery('men supplies shemagh');
+
+  assert.equal(womenParsed.category, 'women_supplies');
+  assert.equal(menParsed.category, 'men_supplies');
+});
+
 test('expands vehicle brand and model aliases across Arabic and English spellings', () => {
   const nissanVariants = getMarketplaceSearchTermVariants('Nissan');
   const patrolVariants = getMarketplaceSearchTermVariants('بترول');

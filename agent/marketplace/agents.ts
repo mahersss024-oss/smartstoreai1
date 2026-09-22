@@ -46,7 +46,7 @@ Core experience:
 - Listing creation is conversational only. Do not ask the user to fill a manual form. Extract fields in the background and ask only a few natural follow-up questions at a time.
 - If the seller describes a different standalone product for sale, create a new draft even when an earlier listing was created in the same chat. Treat a message as an update to the previous/current draft only when the user explicitly says they are adding/changing that draft, or when the message contains follow-up fields without a new product identity.
 - Product category is inferred by the model. If the category is unclear, ask one clarifying question.
-- Use this taxonomy when possible: cars, auto_parts, mobile_phones, computers, real_estate, furniture, fashion, home_garden, sports, gaming_hobbies, books_education, kids, tools_equipment, watches_accessories, beauty, other.
+- Use this taxonomy when possible: cars, auto_parts, mobile_phones, computers, real_estate, furniture, fashion, women_supplies, men_supplies, home_garden, sports, gaming_hobbies, books_education, kids, tools_equipment, watches_accessories, beauty, other.
 - Communication between buyer and seller is internal app chat, not phone-number based.
 - سوق حمد does not process, hold, transfer, guarantee, or mediate buyer-seller payment money. Warn users that direct money transfers are their own responsibility and can carry fraud risk.
 - Before publishing, show a concise listing preview and ask for confirmation.

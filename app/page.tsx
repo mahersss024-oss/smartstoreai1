@@ -759,6 +759,8 @@ function formatCategory(category: string) {
     gaming_hobbies: 'الألعاب والهوايات',
     books_education: 'الكتب والتعليم',
     kids: 'مستلزمات الأطفال',
+    women_supplies: 'مستلزمات نسائية',
+    men_supplies: 'مستلزمات رجالية',
     tools_equipment: 'معدات وأدوات',
     watches_accessories: 'ساعات وإكسسوارات',
     beauty: 'العناية والتجميل',
@@ -787,7 +789,14 @@ const marketplaceCategoryGroups = [
   },
   {
     label: 'أزياء ومستلزمات',
-    categories: ['الموضة', 'ساعات وإكسسوارات', 'العناية والتجميل', 'مستلزمات الأطفال'],
+    categories: [
+      'الموضة',
+      'مستلزمات نسائية',
+      'مستلزمات رجالية',
+      'ساعات وإكسسوارات',
+      'العناية والتجميل',
+      'مستلزمات الأطفال',
+    ],
   },
   {
     label: 'رياضة وهوايات وتعليم',
@@ -811,6 +820,8 @@ const manualListingCategoryOptions = [
   'real_estate',
   'furniture',
   'fashion',
+  'women_supplies',
+  'men_supplies',
   'kids',
   'home_garden',
   'sports',
@@ -1298,7 +1309,20 @@ function ListingChatLinkCard({
         </div>
         <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-slate-900 dark:text-blue-200">
           {listing?.image ? (
-            <img alt={listing.title} className="h-full w-full object-contain" src={listing.image} />
+            <>
+              <img
+                alt={listing.title}
+                className="h-full w-full object-contain"
+                onError={(event) => {
+                  event.currentTarget.hidden = true;
+                  event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                }}
+                src={listing.image}
+              />
+              <span hidden>
+                <Store className="size-5" />
+              </span>
+            </>
           ) : (
             <Store className="size-5" />
           )}
@@ -1408,6 +1432,11 @@ function ListingCardView({
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
 }) {
+  const showImageFallback = (image: HTMLImageElement) => {
+    image.hidden = true;
+    image.nextElementSibling?.removeAttribute('hidden');
+  };
+
   if (variant === 'horizontal') {
     return (
       <article
@@ -1428,11 +1457,20 @@ function ListingCardView({
       >
         <div className="relative aspect-square self-start bg-slate-100 dark:bg-slate-900">
           {listing.image ? (
-            <img
-              alt={listing.title}
-              className="h-full w-full object-contain"
-              src={listing.image}
-            />
+            <>
+              <img
+                alt={listing.title}
+                className="h-full w-full object-contain"
+                onError={(event) => showImageFallback(event.currentTarget)}
+                src={listing.image}
+              />
+              <div hidden className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <div className="grid gap-1">
+                  <ImageIcon className="mx-auto size-5" />
+                  <span>لا توجد صورة حقيقية</span>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
               <div className="grid gap-1">
@@ -1522,7 +1560,20 @@ function ListingCardView({
     >
       <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-900">
         {listing.image ? (
-          <img alt={listing.title} className="h-full w-full object-contain" src={listing.image} />
+          <>
+            <img
+              alt={listing.title}
+              className="h-full w-full object-contain"
+              onError={(event) => showImageFallback(event.currentTarget)}
+              src={listing.image}
+            />
+            <div hidden className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <div className="grid gap-1">
+                <ImageIcon className="mx-auto size-5" />
+                <span>لا توجد صورة حقيقية</span>
+              </div>
+            </div>
+          </>
         ) : (
           <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
             <div className="grid gap-1">
@@ -4234,7 +4285,20 @@ export default function Page() {
                                 onClick={() => sendStarter(`اعرض لي تفاصيل ${listing.title}`)}
                               >
                                 {listing.image ? (
-                                  <img alt={listing.title} className="aspect-square rounded-md bg-slate-100 object-contain dark:bg-slate-900" src={listing.image} />
+                                  <span className="relative block aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
+                                    <img
+                                      alt={listing.title}
+                                      className="h-full w-full object-contain"
+                                      onError={(event) => {
+                                        event.currentTarget.hidden = true;
+                                        event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                                      }}
+                                      src={listing.image}
+                                    />
+                                    <span hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                                      <ImageIcon className="size-4" />
+                                    </span>
+                                  </span>
                                 ) : (
                                   <div className="grid aspect-square place-items-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                                     <ImageIcon className="size-4" />

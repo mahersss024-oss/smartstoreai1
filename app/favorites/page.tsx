@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Heart, MapPin, Store, User } from 'lucide-react';
+import { ArrowRight, Heart, ImageIcon, MapPin, Store, User } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
@@ -289,11 +289,20 @@ export default function FavoritesPage() {
                     className="overflow-hidden rounded-md border transition hover:border-blue-400 hover:shadow-md"
                     href={`/listings/${favorite.listingId}`}
                   >
-                    <img
-                      alt={favorite.listing?.title ?? 'صورة الإعلان'}
-                      className="aspect-[4/3] w-full bg-slate-100 object-contain dark:bg-slate-900"
-                      src={getListingImage(favorite.listing)}
-                    />
+                    <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-slate-900">
+                      <img
+                        alt={favorite.listing?.title ?? 'صورة الإعلان'}
+                        className="h-full w-full object-contain"
+                        onError={(event) => {
+                          event.currentTarget.hidden = true;
+                          event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                        }}
+                        src={getListingImage(favorite.listing)}
+                      />
+                      <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                        <ImageIcon className="size-6" />
+                      </div>
+                    </div>
                     <div className="grid gap-2 p-3">
                       <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
                         <Store className="size-4" />
