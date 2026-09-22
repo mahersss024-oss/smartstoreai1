@@ -87,6 +87,12 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
   assert.match(homePage, /saudiMarketplaceCities/);
+  assert.match(homePage, /marketplaceSearchInput/);
+  assert.match(homePage, /marketplaceSearchQuery/);
+  assert.match(homePage, /params\.set\('q', effectiveQuery\.trim\(\)\)/);
+  assert.match(homePage, /placeholder="ابحث في كل السوق"/);
+  assert.match(homePage, /DropdownMenuRadioGroup/);
+  assert.match(homePage, /DropdownMenuRadioItem value="all"/);
   assert.match(homePage, /selectedMarketSubcategory/);
   assert.match(homePage, /manuallyFilteredMarketplaceListings/);
   assert.match(homePage, /isManualListingVisible/);

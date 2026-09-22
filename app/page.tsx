@@ -30,6 +30,7 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
+  Search,
   SendHorizontal,
   ShieldCheck,
   SlidersHorizontal,
@@ -81,6 +82,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
@@ -1731,6 +1734,8 @@ export default function Page() {
   const [selectedMarketSubcategory, setSelectedMarketSubcategory] =
     useState('all');
   const [selectedMarketCity, setSelectedMarketCity] = useState('all');
+  const [marketplaceSearchInput, setMarketplaceSearchInput] = useState('');
+  const [marketplaceSearchQuery, setMarketplaceSearchQuery] = useState('');
   const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
   const [isManualListingOpen, setIsManualListingOpen] = useState(false);
   const [manualListingForm, setManualListingForm] =
@@ -1854,6 +1859,7 @@ export default function Page() {
     selectedMarketCity !== 'all' && saudiMarketplaceCities.includes(selectedMarketCity)
       ? selectedMarketCity
       : 'all';
+  const hasMarketplaceSearchQuery = marketplaceSearchQuery.trim().length > 0;
   const manuallyFilteredMarketplaceListings = useMemo(() => {
     return marketplaceListings.filter((listing) => {
       const matchesCategory =
@@ -2544,8 +2550,10 @@ export default function Page() {
       setIsLoadingListings(true);
     }
 
-    if (query?.trim()) {
-      params.set('q', query.trim());
+    const effectiveQuery = query ?? marketplaceSearchQuery;
+
+    if (effectiveQuery.trim()) {
+      params.set('q', effectiveQuery.trim());
     }
 
     params.set('page', String(page));
@@ -2610,7 +2618,7 @@ export default function Page() {
           setIsLoadingListings(false);
         }
       });
-  }, []);
+  }, [marketplaceSearchQuery]);
 
   const refreshFavoriteListingIds = useCallback(() => {
     return fetch('/api/marketplace/me/favorites?page=1&limit=48', {
@@ -2826,6 +2834,16 @@ export default function Page() {
       mounted = false;
     };
   }, [refreshFavoriteListingIds]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setMarketplaceSearchQuery(marketplaceSearchInput.trim());
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [marketplaceSearchInput]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -3816,21 +3834,70 @@ export default function Page() {
                 )}
 
                 <div className="grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                    <MapPin className="size-4 shrink-0 text-blue-600" />
-                    <select
+                  <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm sm:col-span-3">
+                    <Search className="size-4 shrink-0 text-blue-600" />
+                    <input
                       className="min-w-0 flex-1 bg-transparent text-right outline-none"
-                      value={activeMarketCity}
-                      onChange={(event) => setSelectedMarketCity(event.target.value)}
-                    >
-                      <option value="all">كل المناطق</option>
-                      {saudiMarketplaceCities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="ابحث في كل السوق"
+                      type="search"
+                      value={marketplaceSearchInput}
+                      onChange={(event) =>
+                        setMarketplaceSearchInput(event.target.value)
+                      }
+                    />
+                    {marketplaceSearchInput && (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        className="size-7 shrink-0 rounded-full"
+                        aria-label="مسح البحث"
+                        onClick={() => {
+                          setMarketplaceSearchInput('');
+                          setMarketplaceSearchQuery('');
+                        }}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    )}
                   </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 justify-between rounded-md bg-background px-3 text-right font-normal"
+                      >
+                        <MapPin className="size-4 shrink-0 text-blue-600" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {activeMarketCity === 'all'
+                            ? 'كل المناطق'
+                            : activeMarketCity}
+                        </span>
+                        <ChevronLeft className="size-4 shrink-0 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="max-h-80 w-[min(20rem,calc(100vw-2rem))] overflow-y-auto text-right"
+                    >
+                      <DropdownMenuLabel>المناطق</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup
+                        value={activeMarketCity}
+                        onValueChange={setSelectedMarketCity}
+                      >
+                        <DropdownMenuRadioItem value="all">
+                          كل المناطق
+                        </DropdownMenuRadioItem>
+                        {saudiMarketplaceCities.map((city) => (
+                          <DropdownMenuRadioItem key={city} value={city}>
+                            {city}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     type="button"
                     variant="outline"
@@ -3950,7 +4017,11 @@ export default function Page() {
               <div className="mb-3 flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2 text-base font-bold">
                   <Sparkles className="size-4 text-blue-600" />
-                  {hasActiveAssistantSearch ? 'استكشف أيضًا' : 'الإعلانات المقترحة'}
+                  {hasActiveAssistantSearch
+                    ? 'استكشف أيضًا'
+                    : hasMarketplaceSearchQuery
+                      ? 'نتائج البحث'
+                      : 'الإعلانات المقترحة'}
                 </div>
               </div>
 

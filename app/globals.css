@@ -205,6 +205,17 @@
     font-size: max(16px, 1em);
   }
 
+  select {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    color-scheme: light dark;
+  }
+
+  select option {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
   button:not(:disabled),
   a[href],
   summary,
