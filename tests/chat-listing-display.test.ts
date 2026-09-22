@@ -98,6 +98,11 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /isManualListingVisible/);
   assert.match(homePage, /submitManualListing/);
   assert.match(homePage, /fetch\('\/api\/marketplace\/listings'/);
+  assert.match(homePage, /manualListingForm\.priceMode === 'negotiable'/);
+  assert.match(homePage, /saleTerms: 'negotiable'/);
+  assert.match(homePage, /disabled=\{manualListingForm\.priceMode === 'bid'\}/);
+  assert.match(homePage, /تم حفظ الإعلان في حسابي كمسودة/);
+  assert.match(homePage, /نشره من صفحة حسابي/);
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);

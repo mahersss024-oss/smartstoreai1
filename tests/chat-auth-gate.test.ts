@@ -61,7 +61,13 @@ test('chat reset endpoint clears retained assistant search state', async () => {
     terms: [],
     rawQuery: 'old retained search',
   });
-  const draft = await createListingDraft(
+  const incompleteDraft = await createListingDraft(
+    { id: userId, email: 'chat-reset@example.com' },
+    {
+      category: 'cars',
+    },
+  );
+  const completeDraft = await createListingDraft(
     { id: userId, email: 'chat-reset@example.com' },
     {
       category: 'cars',
@@ -71,9 +77,18 @@ test('chat reset endpoint clears retained assistant search state', async () => {
   );
 
   assert.ok(await getMarketplaceSearchState(ownerKey));
-  assert.equal(draft.status, 'draft');
+  assert.equal(incompleteDraft.status, 'draft');
+  assert.equal(completeDraft.status, 'draft');
   assert.equal(
-    (await listSellerListings(userId)).some((listing) => listing.id === draft.id),
+    (await listSellerListings(userId)).some(
+      (listing) => listing.id === incompleteDraft.id,
+    ),
+    true,
+  );
+  assert.equal(
+    (await listSellerListings(userId)).some(
+      (listing) => listing.id === completeDraft.id,
+    ),
     true,
   );
 
@@ -92,8 +107,16 @@ test('chat reset endpoint clears retained assistant search state', async () => {
   assert.equal(response.status, 200);
   assert.equal(await getMarketplaceSearchState(ownerKey), null);
   assert.equal(
-    (await listSellerListings(userId)).some((listing) => listing.id === draft.id),
+    (await listSellerListings(userId)).some(
+      (listing) => listing.id === incompleteDraft.id,
+    ),
     false,
+  );
+  assert.equal(
+    (await listSellerListings(userId)).some(
+      (listing) => listing.id === completeDraft.id,
+    ),
+    true,
   );
 });
 

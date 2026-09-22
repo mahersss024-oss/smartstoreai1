@@ -3131,6 +3131,7 @@ export default function Page() {
       city: string;
       category: string;
       condition: ManualListingForm['condition'];
+      attributes?: Record<string, unknown>;
     } = {
       title,
       description,
@@ -3151,6 +3152,27 @@ export default function Page() {
       }
 
       payload.price = numericPrice;
+    } else if (manualListingForm.priceMode === 'negotiable') {
+      const trimmedPrice = manualListingForm.price.trim();
+
+      if (trimmedPrice) {
+        const numericPrice = Number(trimmedPrice);
+
+        if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+          setManualListingNotice({
+            tone: 'warning',
+            message: 'أدخل سعرًا مبدئيًا صحيحًا أو اتركه فارغًا عند اختيار قابل للتفاوض.',
+          });
+          return;
+        }
+
+        payload.price = numericPrice;
+        payload.attributes = {
+          saleTerms: 'negotiable',
+        };
+      } else {
+        payload.price = 'negotiable';
+      }
     } else {
       payload.price = manualListingForm.priceMode;
     }
@@ -3230,8 +3252,8 @@ export default function Page() {
             : 'success',
         message:
           manualListingImages.length > 0 && uploadedImages < manualListingImages.length
-            ? 'تم حفظ الإعلان، لكن لم يتم رفع كل الصور. يمكنك إكمال الصور من حسابي.'
-            : 'تم حفظ الإعلان اليدوي كمسودة داخل حسابك.',
+            ? 'تم حفظ الإعلان في حسابي كمسودة، لكن لم تُرفع كل الصور. يمكنك إكمال الصور ثم نشر الإعلان من صفحة حسابي.'
+            : 'تم حفظ الإعلان في حسابي كمسودة. يمكنك مراجعته وإضافة الصور ثم نشره من صفحة حسابي.',
       });
       setIsManualListingOpen(false);
       setIsManualListingFallbackDismissed(true);
@@ -3697,8 +3719,13 @@ export default function Page() {
                       السعر
                       <input
                         className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500 disabled:opacity-60"
-                        disabled={manualListingForm.priceMode !== 'number'}
+                        disabled={manualListingForm.priceMode === 'bid'}
                         inputMode="numeric"
+                        placeholder={
+                          manualListingForm.priceMode === 'negotiable'
+                            ? 'سعر مبدئي اختياري'
+                            : undefined
+                        }
                         value={manualListingForm.price}
                         onChange={(event) =>
                           setManualListingForm((form) => ({

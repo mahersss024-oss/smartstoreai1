@@ -744,6 +744,12 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
       where: {
         sellerId,
         status: 'draft',
+        title: null,
+        description: null,
+        city: null,
+        images: {
+          none: {},
+        },
       },
       include: {
         images: true,

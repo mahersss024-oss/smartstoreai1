@@ -772,7 +772,18 @@ export function resetIncompleteSellerDrafts(sellerId: string) {
   const deletedDrafts: ListingRecord[] = [];
 
   for (const listing of listings.values()) {
-    if (listing.sellerId !== sellerId || listing.status !== 'draft') {
+    const hasListingDetails = Boolean(
+      listing.title?.trim() ||
+        listing.description?.trim() ||
+        listing.city?.trim() ||
+        listing.images.length > 0,
+    );
+
+    if (
+      listing.sellerId !== sellerId ||
+      listing.status !== 'draft' ||
+      hasListingDetails
+    ) {
       continue;
     }
 
