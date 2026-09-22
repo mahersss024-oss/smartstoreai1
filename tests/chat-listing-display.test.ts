@@ -89,6 +89,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /saudiMarketplaceCities/);
   assert.match(homePage, /selectedMarketSubcategory/);
   assert.match(homePage, /manuallyFilteredMarketplaceListings/);
+  assert.match(homePage, /isManualListingVisible/);
+  assert.match(homePage, /submitManualListing/);
+  assert.match(homePage, /fetch\('\/api\/marketplace\/listings'/);
+  assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
   assert.match(globalCss, /smart-assistant-results-panel-in/);

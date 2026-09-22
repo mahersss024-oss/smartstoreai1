@@ -66,6 +66,7 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
+import { createNormalizedImageFile } from '@/lib/client-image-normalization';
 import {
   getAssistantResultListings,
   getCanLoadMoreExploreListings,
@@ -766,47 +767,93 @@ function formatCategory(category: string) {
 
 const marketplaceCategoryGroups = [
   {
-    label: 'إلكترونيات',
-    categories: [
-      'الجوالات',
-      'الأجهزة',
-      'الألعاب والهوايات',
-      'ساعات وإكسسوارات',
-    ],
+    label: 'الأجهزة',
+    categories: ['الجوالات', 'الأجهزة'],
   },
   {
-    label: 'سيارات ومركبات',
+    label: 'السيارات',
     categories: ['السيارات', 'قطع الغيار'],
   },
   {
-    label: 'عقارات',
+    label: 'العقار',
     categories: ['العقارات'],
   },
   {
-    label: 'المنزل والأثاث',
+    label: 'الأثاث والمنزل',
     categories: ['الأثاث', 'المنزل والحديقة'],
   },
   {
-    label: 'الموضة والجمال',
+    label: 'الشخصية والجمال',
     categories: ['الموضة', 'ساعات وإكسسوارات', 'العناية والتجميل'],
   },
   {
-    label: 'رياضة وتعليم',
-    categories: ['الرياضة', 'الكتب والتعليم'],
+    label: 'الرياضة والهوايات',
+    categories: ['الرياضة', 'الألعاب والهوايات', 'الكتب والتعليم'],
   },
   {
     label: 'الأطفال',
     categories: ['مستلزمات الأطفال'],
   },
   {
-    label: 'معدات وخدمات',
+    label: 'معدات وأدوات',
     categories: ['معدات وأدوات'],
   },
   {
-    label: 'أخرى',
+    label: 'الخدمات العامة',
     categories: ['أخرى'],
   },
 ] satisfies Array<{ label: string; categories: string[] }>;
+
+const manualListingCategoryOptions = [
+  'cars',
+  'auto_parts',
+  'mobile_phones',
+  'computers',
+  'real_estate',
+  'furniture',
+  'fashion',
+  'home_garden',
+  'sports',
+  'gaming_hobbies',
+  'books_education',
+  'kids',
+  'tools_equipment',
+  'watches_accessories',
+  'beauty',
+  'other',
+] satisfies string[];
+
+const manualListingConditionOptions = [
+  { value: 'new', label: 'جديد' },
+  { value: 'like_new', label: 'شبه جديد' },
+  { value: 'used', label: 'مستعمل' },
+  { value: 'damaged', label: 'يحتاج إصلاح' },
+] as const;
+
+type ManualListingForm = {
+  title: string;
+  description: string;
+  priceMode: 'number' | 'bid' | 'negotiable';
+  price: string;
+  city: string;
+  category: string;
+  condition: 'new' | 'used' | 'like_new' | 'damaged';
+};
+
+type ManualListingNotice = {
+  tone: 'success' | 'warning' | 'danger' | 'info';
+  message: string;
+};
+
+const defaultManualListingForm: ManualListingForm = {
+  title: '',
+  description: '',
+  priceMode: 'number',
+  price: '',
+  city: '',
+  category: 'other',
+  condition: 'used',
+};
 
 const saudiMarketplaceCities = [
   'الرياض',
@@ -1686,6 +1733,16 @@ export default function Page() {
     useState('all');
   const [selectedMarketCity, setSelectedMarketCity] = useState('all');
   const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
+  const [isManualListingOpen, setIsManualListingOpen] = useState(false);
+  const [manualListingForm, setManualListingForm] =
+    useState<ManualListingForm>(defaultManualListingForm);
+  const [manualListingImages, setManualListingImages] = useState<File[]>([]);
+  const [manualListingNotice, setManualListingNotice] =
+    useState<ManualListingNotice | null>(null);
+  const [isSubmittingManualListing, setIsSubmittingManualListing] =
+    useState(false);
+  const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
+    useState(false);
   const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -1723,7 +1780,8 @@ export default function Page() {
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const shouldResetSearchStateRef = useRef(true);
-  const [, setClientIntent] = useState<ClientIntentState>(defaultClientIntent);
+  const [clientIntent, setClientIntent] =
+    useState<ClientIntentState>(defaultClientIntent);
 
   const filteredMessages = useMemo(
     () => messages.filter((message) => message.role !== 'system'),
@@ -2893,6 +2951,9 @@ export default function Page() {
 
       const intent = inferClientIntent(text, Boolean(files));
       setClientIntent(intent);
+      if (intent.kind === 'create_listing') {
+        setIsManualListingFallbackDismissed(false);
+      }
 
       if (currentListingImages.length) {
         retainedListingImagesRef.current = currentListingImages;
@@ -2969,6 +3030,9 @@ export default function Page() {
 
       const intent = inferClientIntent(prompt);
       setClientIntent(intent);
+      if (intent.kind === 'create_listing') {
+        setIsManualListingFallbackDismissed(false);
+      }
 
       if (isCompactViewport && !isMobileChatViewOpen) {
         openMobileChatView();
@@ -3020,6 +3084,153 @@ export default function Page() {
       filteredMessages.length,
     ],
   );
+
+  const submitManualListing = useCallback(async () => {
+    if (isSubmittingManualListing) {
+      return;
+    }
+
+    if (!session.authenticated) {
+      router.push('/api/auth/google/start');
+      return;
+    }
+
+    const title = manualListingForm.title.trim();
+    const description = manualListingForm.description.trim();
+    const city = manualListingForm.city.trim();
+
+    if (!title || !description || !city) {
+      setManualListingNotice({
+        tone: 'warning',
+        message: 'أكمل العنوان والوصف والمدينة قبل حفظ الإعلان اليدوي.',
+      });
+      return;
+    }
+
+    const payload: {
+      title: string;
+      description: string;
+      price?: number | 'bid' | 'negotiable';
+      city: string;
+      category: string;
+      condition: ManualListingForm['condition'];
+    } = {
+      title,
+      description,
+      city,
+      category: manualListingForm.category,
+      condition: manualListingForm.condition,
+    };
+
+    if (manualListingForm.priceMode === 'number') {
+      const numericPrice = Number(manualListingForm.price);
+
+      if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+        setManualListingNotice({
+          tone: 'warning',
+          message: 'أدخل سعرًا صحيحًا أو اختر على السوم/قابل للتفاوض.',
+        });
+        return;
+      }
+
+      payload.price = numericPrice;
+    } else {
+      payload.price = manualListingForm.priceMode;
+    }
+
+    setIsSubmittingManualListing(true);
+    setManualListingNotice(null);
+
+    try {
+      const response = await fetch('/api/marketplace/listings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': createClientIdempotencyKey('manual-listing-create'),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      const responsePayload = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+        listing?: ApiListingRecord;
+      } | null;
+
+      if (!response.ok || !responsePayload?.listing) {
+        setManualListingNotice({
+          tone: responsePayload?.error === 'listing_blocked' ? 'danger' : 'warning',
+          message:
+            responsePayload?.message ??
+            responsePayload?.error ??
+            'تعذر حفظ الإعلان اليدوي الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      const createdListing = responsePayload.listing;
+      let uploadedImages = 0;
+
+      for (const image of manualListingImages.slice(0, 8)) {
+        const formData = new FormData();
+        formData.append('image', await createNormalizedImageFile(image));
+
+        const uploadResponse = await fetch(
+          `/api/marketplace/listings/${createdListing.id}/images`,
+          {
+            method: 'POST',
+            headers: {
+              'Idempotency-Key': createClientIdempotencyKey(
+                'manual-listing-image-upload',
+              ),
+            },
+            body: formData,
+          },
+        );
+
+        if (!uploadResponse.ok) {
+          break;
+        }
+
+        uploadedImages += 1;
+      }
+
+      setManualListingForm(defaultManualListingForm);
+      setManualListingImages([]);
+      setManualListingNotice({
+        tone:
+          manualListingImages.length > 0 && uploadedImages < manualListingImages.length
+            ? 'warning'
+            : 'success',
+        message:
+          manualListingImages.length > 0 && uploadedImages < manualListingImages.length
+            ? 'تم حفظ الإعلان، لكن لم يتم رفع كل الصور. يمكنك إكمال الصور من حسابي.'
+            : 'تم حفظ الإعلان اليدوي كمسودة داخل حسابك.',
+      });
+      setIsManualListingOpen(false);
+      setIsManualListingFallbackDismissed(true);
+      void refreshMarketplaceListings();
+    } catch {
+      setManualListingNotice({
+        tone: 'danger',
+        message: 'تعذر حفظ الإعلان اليدوي الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
+      });
+    } finally {
+      setIsSubmittingManualListing(false);
+    }
+  }, [
+    isSubmittingManualListing,
+    manualListingForm,
+    manualListingImages,
+    refreshMarketplaceListings,
+    router,
+    session.authenticated,
+  ]);
 
   const openListing = useCallback(
     (listing: ListingCard) => {
@@ -3182,6 +3393,11 @@ export default function Page() {
     : hasAssistantBubbleAttention
       ? 'attention'
       : 'idle';
+  const shouldShowManualListingFallback =
+    Boolean(error) && clientIntent.kind === 'create_listing';
+  const isManualListingVisible =
+    isManualListingOpen ||
+    (shouldShowManualListingFallback && !isManualListingFallbackDismissed);
 
   return (
     <main
@@ -3290,11 +3506,244 @@ export default function Page() {
                     واجهة الإعلانات
                   </div>
                 </div>
-                <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
                   إعلان جديد
-                </Button>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-md"
+                    onClick={() => {
+                      setIsManualListingOpen((value) => !value);
+                      setIsManualListingFallbackDismissed(false);
+                      setManualListingNotice({
+                        tone: 'info',
+                        message:
+                          'الوضع اليدوي يستخدم نفس نظام الإعلانات الحالي عند عدم توفر حمد.',
+                      });
+                    }}
+                  >
+                    <Store className="size-4" />
+                    إضافة يدوية
+                  </Button>
+                </div>
               </div>
+
+              {isManualListingVisible && (
+                <form
+                  className="mb-4 grid gap-3 rounded-md border border-blue-200 bg-white/95 p-3 text-right shadow-sm dark:border-blue-400/20 dark:bg-card"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitManualListing();
+                  }}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300">
+                        <Store className="size-4" />
+                        إضافة إعلان يدوي
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        يستخدم هذا النموذج نفس نظام الإعلانات الحالي كخيار احتياطي عند عدم توفر حمد.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="self-end rounded-full sm:self-auto"
+                      aria-label="إغلاق الإضافة اليدوية"
+                      onClick={() => {
+                        setIsManualListingOpen(false);
+                        setIsManualListingFallbackDismissed(true);
+                      }}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+
+                  {manualListingNotice && (
+                    <div
+                      className={cn(
+                        'rounded-md border px-3 py-2 text-xs leading-5',
+                        manualListingNotice.tone === 'danger' &&
+                          'border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200',
+                        manualListingNotice.tone === 'warning' &&
+                          'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100',
+                        manualListingNotice.tone === 'success' &&
+                          'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100',
+                        manualListingNotice.tone === 'info' &&
+                          'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
+                      )}
+                    >
+                      {manualListingNotice.message}
+                    </div>
+                  )}
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-semibold">
+                      عنوان الإعلان
+                      <input
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                        maxLength={140}
+                        value={manualListingForm.title}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            title: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold">
+                      المدينة
+                      <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                        value={manualListingForm.city}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            city: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">اختر المدينة</option>
+                        {saudiMarketplaceCities.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold">
+                      التصنيف
+                      <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                        value={manualListingForm.category}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            category: event.target.value,
+                          }))
+                        }
+                      >
+                        {manualListingCategoryOptions.map((category) => (
+                          <option key={category} value={category}>
+                            {formatCategory(category)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold">
+                      حالة المنتج
+                      <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                        value={manualListingForm.condition}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            condition: event.target.value as ManualListingForm['condition'],
+                          }))
+                        }
+                      >
+                        {manualListingConditionOptions.map((condition) => (
+                          <option key={condition.value} value={condition.value}>
+                            {condition.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold">
+                      طريقة السعر
+                      <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                        value={manualListingForm.priceMode}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            priceMode: event.target.value as ManualListingForm['priceMode'],
+                          }))
+                        }
+                      >
+                        <option value="number">سعر محدد</option>
+                        <option value="bid">على السوم</option>
+                        <option value="negotiable">قابل للتفاوض</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold">
+                      السعر
+                      <input
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500 disabled:opacity-60"
+                        disabled={manualListingForm.priceMode !== 'number'}
+                        inputMode="numeric"
+                        value={manualListingForm.price}
+                        onChange={(event) =>
+                          setManualListingForm((form) => ({
+                            ...form,
+                            price: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <label className="grid gap-1 text-xs font-semibold">
+                    الوصف
+                    <textarea
+                      className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
+                      maxLength={4000}
+                      value={manualListingForm.description}
+                      onChange={(event) =>
+                        setManualListingForm((form) => ({
+                          ...form,
+                          description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs font-semibold">
+                    الصور
+                    <input
+                      accept="image/*"
+                      className="rounded-md border bg-background px-3 py-2 text-sm"
+                      multiple
+                      type="file"
+                      onChange={(event) => {
+                        setManualListingImages(
+                          Array.from(event.target.files ?? []).slice(0, 8),
+                        );
+                      }}
+                    />
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      يمكنك رفع حتى 8 صور، ويمكن إكمال إدارة الصور من حسابي.
+                    </span>
+                  </label>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-md"
+                      onClick={() => {
+                        setIsManualListingOpen(false);
+                        setIsManualListingFallbackDismissed(true);
+                      }}
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="rounded-md bg-blue-600 hover:bg-blue-700"
+                      disabled={isSubmittingManualListing}
+                    >
+                      {isSubmittingManualListing ? 'جاري الحفظ...' : 'حفظ الإعلان'}
+                    </Button>
+                  </div>
+                </form>
+              )}
 
               <div className="mb-4 grid gap-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
