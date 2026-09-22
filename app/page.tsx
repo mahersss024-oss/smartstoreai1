@@ -1480,18 +1480,7 @@ function ListingCardView({
               {listing.status ?? 'موثق'}
             </span>
           </div>
-          <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-2">
-            <Button
-              size="sm"
-              className="h-8 rounded-md bg-blue-600 text-xs hover:bg-blue-700"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen(listing);
-              }}
-            >
-              <MessageCircle className="size-3.5" />
-              تواصل
-            </Button>
+          <div className="flex justify-end border-t pt-2">
             <Button
               size="icon-sm"
               variant="outline"
@@ -3951,7 +3940,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid max-w-3xl gap-3">
                 {exploreMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
