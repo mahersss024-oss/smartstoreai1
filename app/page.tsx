@@ -3521,12 +3521,12 @@ export default function Page() {
                       setManualListingNotice({
                         tone: 'info',
                         message:
-                          'الوضع اليدوي يستخدم نفس نظام الإعلانات الحالي عند عدم توفر حمد.',
+                          'أدخل بيانات الإعلان مباشرة، وسيتم حفظه بنفس نظام المراجعة المعتمد في سوق حمد.',
                       });
                     }}
                   >
                     <Store className="size-4" />
-                    إضافة يدوية
+                    إدخال إعلان
                   </Button>
                 </div>
               </div>
@@ -3543,10 +3543,10 @@ export default function Page() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300">
                         <Store className="size-4" />
-                        إضافة إعلان يدوي
+                        نموذج الإعلان
                       </div>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        يستخدم هذا النموذج نفس نظام الإعلانات الحالي كخيار احتياطي عند عدم توفر حمد.
+                        أضف تفاصيل منتجك مباشرة، وسيتم حفظ الإعلان ومراجعته بنفس آلية سوق حمد.
                       </p>
                     </div>
                     <Button
