@@ -3588,7 +3588,20 @@ export default function Page() {
                       'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
                   )}
                 >
-                  {manualListingNotice.message}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>{manualListingNotice.message}</span>
+                    {(manualListingNotice.tone === 'success' ||
+                      manualListingNotice.tone === 'warning') && (
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-md"
+                      >
+                        <Link href="/account">الذهاب إلى حسابي للنشر</Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 

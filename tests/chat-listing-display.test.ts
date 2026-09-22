@@ -104,6 +104,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /تم حفظ الإعلان في حسابي كمسودة/);
   assert.match(homePage, /نشره من صفحة حسابي/);
   assert.match(homePage, /!isManualListingVisible && manualListingNotice/);
+  assert.match(homePage, /الذهاب إلى حسابي للنشر/);
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
