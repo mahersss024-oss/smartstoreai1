@@ -85,6 +85,11 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /smart-assistant-results-panel/);
   assert.match(homePage, /smart-assistant-result-card/);
   assert.match(homePage, /animationDelay/);
+  assert.match(homePage, /marketplaceCategoryOptions/);
+  assert.match(homePage, /marketplaceCityOptions/);
+  assert.match(homePage, /manuallyFilteredMarketplaceListings/);
+  assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
+  assert.match(homePage, /variant="horizontal"/);
   assert.match(globalCss, /smart-assistant-results-panel-in/);
   assert.match(globalCss, /smart-assistant-result-card-in/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);

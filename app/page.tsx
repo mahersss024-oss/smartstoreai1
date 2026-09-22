@@ -32,6 +32,7 @@ import {
   MessageCircle,
   SendHorizontal,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Square,
   Store,
@@ -1156,6 +1157,7 @@ function ListingCardView({
   onFavorite,
   onOpen,
   style,
+  variant = 'grid',
 }: {
   listing: ListingCard;
   isFavorite: boolean;
@@ -1165,7 +1167,122 @@ function ListingCardView({
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
   style?: CSSProperties;
+  variant?: 'grid' | 'horizontal';
 }) {
+  if (variant === 'horizontal') {
+    return (
+      <article
+        className={cn(
+          'group grid w-full min-w-0 cursor-pointer grid-cols-[7.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[10rem_minmax(0,1fr)]',
+          className,
+        )}
+        onClick={() => onOpen(listing)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onOpen(listing);
+          }
+        }}
+        role="button"
+        style={style}
+        tabIndex={0}
+      >
+        <div className="relative min-h-32 bg-slate-100 sm:min-h-36">
+          {listing.image ? (
+            <img
+              alt={listing.title}
+              className="h-full w-full object-cover"
+              src={listing.image}
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <div className="grid gap-1">
+                <ImageIcon className="mx-auto size-5" />
+                <span>لا توجد صورة حقيقية</span>
+              </div>
+            </div>
+          )}
+          {!isOwnListing && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className={cn(
+                'absolute left-2 top-2 size-8 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white',
+                isFavorite
+                  ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
+                  : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
+              )}
+              aria-label="حفظ الإعلان"
+              aria-pressed={isFavorite}
+              onClick={(event) => {
+                event.stopPropagation();
+                onFavorite(listing);
+              }}
+            >
+              <Heart className={cn('size-4', isFavorite && 'fill-current')} />
+            </Button>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5 p-3">
+          <h3 className="line-clamp-2 text-sm font-bold leading-6">
+            {listing.title}
+          </h3>
+          <div className="text-base font-bold text-emerald-600 dark:text-emerald-300">
+            {listing.price}
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <MapPin className="size-3.5" />
+            <span className="truncate">{listing.city}</span>
+          </div>
+          {listing.description && (
+            <p className="line-clamp-2 text-[11px] leading-5 text-muted-foreground">
+              {listing.description}
+            </p>
+          )}
+          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <BadgeCheck className="size-3" />
+              {listing.status ?? 'موثق'}
+            </span>
+            <span className="truncate text-[10px] text-muted-foreground">
+              {listing.stats}
+            </span>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-2">
+            <Button
+              size="sm"
+              className="h-8 rounded-md bg-blue-600 text-xs hover:bg-blue-700"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(listing);
+              }}
+            >
+              <MessageCircle className="size-3.5" />
+              تواصل
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              className="size-8 rounded-md"
+              aria-label="مقارنة الإعلان"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAsk(
+                  listing.id
+                    ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
+                    : `قارن لي إعلان ${listing.title} بالسوق`,
+                  listing,
+                );
+              }}
+            >
+              <Sparkles className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article
       className={cn(
@@ -1378,6 +1495,9 @@ export default function Page() {
   });
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
+  const [selectedMarketCategory, setSelectedMarketCategory] = useState('all');
+  const [selectedMarketCity, setSelectedMarketCity] = useState('all');
+  const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
   const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -1467,12 +1587,61 @@ export default function Page() {
       searchToolListings,
     });
   }, [searchToolListings]);
+  const marketplaceCategoryOptions = useMemo(() => {
+    const categories = new Set<string>();
+
+    marketplaceListings.forEach((listing) => {
+      if (listing.category) {
+        categories.add(listing.category);
+      }
+    });
+
+    return Array.from(categories);
+  }, [marketplaceListings]);
+  const marketplaceCityOptions = useMemo(() => {
+    const cities = new Set<string>();
+
+    marketplaceListings.forEach((listing) => {
+      if (listing.city) {
+        cities.add(listing.city);
+      }
+    });
+
+    return Array.from(cities);
+  }, [marketplaceListings]);
+  const activeMarketCategory =
+    selectedMarketCategory !== 'all' &&
+    marketplaceCategoryOptions.includes(selectedMarketCategory)
+      ? selectedMarketCategory
+      : 'all';
+  const activeMarketCity =
+    selectedMarketCity !== 'all' && marketplaceCityOptions.includes(selectedMarketCity)
+      ? selectedMarketCity
+      : 'all';
+  const manuallyFilteredMarketplaceListings = useMemo(() => {
+    return marketplaceListings.filter((listing) => {
+      const matchesCategory =
+        activeMarketCategory === 'all' || listing.category === activeMarketCategory;
+      const matchesCity =
+        activeMarketCity === 'all' || listing.city === activeMarketCity;
+
+      return matchesCategory && matchesCity;
+    });
+  }, [activeMarketCategory, activeMarketCity, marketplaceListings]);
+  const hasManualMarketFilters =
+    activeMarketCategory !== 'all' || activeMarketCity !== 'all';
+  const activeMarketFilterCount =
+    Number(activeMarketCategory !== 'all') + Number(activeMarketCity !== 'all');
   const exploreMarketplaceListings = useMemo(() => {
     return getExploreListings({
-      marketplaceListings,
+      marketplaceListings: manuallyFilteredMarketplaceListings,
       searchToolListings: hasActiveAssistantSearch ? assistantResultListings : [],
     });
-  }, [assistantResultListings, hasActiveAssistantSearch, marketplaceListings]);
+  }, [
+    assistantResultListings,
+    hasActiveAssistantSearch,
+    manuallyFilteredMarketplaceListings,
+  ]);
   const chatListingCardsById = useMemo(() => {
     const cardsById = new Map<string, ListingCard>();
 
@@ -2930,6 +3099,101 @@ export default function Page() {
                 </Button>
               </div>
 
+              <div className="mb-4 grid gap-3">
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeMarketCategory === 'all' ? 'default' : 'outline'}
+                    className="h-9 shrink-0 rounded-full px-4"
+                    onClick={() => setSelectedMarketCategory('all')}
+                  >
+                    الكل
+                  </Button>
+                  {marketplaceCategoryOptions.map((category) => (
+                    <Button
+                      key={category}
+                      type="button"
+                      size="sm"
+                      variant={
+                        activeMarketCategory === category ? 'default' : 'outline'
+                      }
+                      className="h-9 shrink-0 rounded-full px-4"
+                      onClick={() => setSelectedMarketCategory(category)}
+                    >
+                      {category}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                    <MapPin className="size-4 shrink-0 text-blue-600" />
+                    <select
+                      className="min-w-0 flex-1 bg-transparent text-right outline-none"
+                      value={activeMarketCity}
+                      onChange={(event) => setSelectedMarketCity(event.target.value)}
+                    >
+                      <option value="all">كل المناطق</option>
+                      {marketplaceCityOptions.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-md"
+                    disabled
+                    title="القريب يحتاج إذن الموقع الجغرافي"
+                  >
+                    <MapPin className="size-4" />
+                    القريب
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isMarketFilterOpen ? 'default' : 'outline'}
+                    className="h-10 rounded-md"
+                    onClick={() => setIsMarketFilterOpen((value) => !value)}
+                  >
+                    <SlidersHorizontal className="size-4" />
+                    فلترة
+                    {activeMarketFilterCount > 0 && (
+                      <span className="grid size-5 place-items-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-400/20 dark:text-blue-100">
+                        {activeMarketFilterCount}
+                      </span>
+                    )}
+                  </Button>
+                </div>
+
+                {isMarketFilterOpen && (
+                  <div className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50/70 p-3 text-right text-xs text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {hasManualMarketFilters
+                        ? 'تم تطبيق فلترة محلية على الإعلانات المعروضة فقط.'
+                        : 'اختر تصنيفًا أو منطقة لتصفية الإعلانات المعروضة.'}
+                    </span>
+                    {hasManualMarketFilters && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 rounded-md px-2 text-blue-700 hover:text-blue-800 dark:text-blue-100"
+                        onClick={() => {
+                          setSelectedMarketCategory('all');
+                          setSelectedMarketCity('all');
+                        }}
+                      >
+                        <X className="size-3.5" />
+                        مسح الفلاتر
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {hasActiveAssistantSearch && (
                 <div className="smart-assistant-results-panel mb-5 grid gap-3">
                   <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm dark:border-blue-400/20 dark:bg-card">
@@ -3000,7 +3264,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
+              <div className="grid gap-3">
                 {exploreMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
@@ -3014,6 +3278,7 @@ export default function Page() {
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
+                    variant="horizontal"
                   />
                 ))}
               </div>
