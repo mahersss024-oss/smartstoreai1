@@ -1427,7 +1427,7 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative min-h-24 bg-slate-100 sm:min-h-28">
+        <div className="relative min-h-20 bg-slate-100 sm:min-h-24">
           {listing.image ? (
             <img
               alt={listing.title}
@@ -1463,28 +1463,28 @@ function ListingCardView({
             </Button>
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-1 p-2 sm:p-2.5">
-          <h3 className="line-clamp-1 text-[13px] font-bold leading-5 sm:text-sm">
+        <div className="flex min-w-0 flex-col gap-0.5 p-1.5 sm:p-2">
+          <h3 className="line-clamp-1 text-[12px] font-bold leading-5 sm:text-[13px]">
             {listing.title}
           </h3>
-          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-300">
+          <div className="text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300">
             {listing.price}
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="size-3.5" />
+          <div className="flex items-center gap-1 text-[10px] leading-4 text-muted-foreground">
+            <MapPin className="size-3" />
             <span className="truncate">{listing.city}</span>
           </div>
-          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-              <BadgeCheck className="size-3" />
+          <div className="mt-auto flex items-center justify-between gap-2">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold leading-4 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <BadgeCheck className="size-2.5" />
               {listing.status ?? 'موثق'}
             </span>
           </div>
-          <div className="flex justify-end border-t pt-1.5">
+          <div className="flex justify-end border-t pt-1">
             <Button
               size="icon-sm"
               variant="outline"
-              className="size-7 rounded-md"
+              className="size-6 rounded-md"
               aria-label="مقارنة الإعلان"
               onClick={(event) => {
                 event.stopPropagation();
