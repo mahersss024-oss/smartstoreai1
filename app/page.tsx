@@ -764,6 +764,199 @@ function formatCategory(category: string) {
   return labels[category] ?? category;
 }
 
+const marketplaceCategoryGroups = [
+  {
+    label: 'إلكترونيات',
+    categories: [
+      'الجوالات',
+      'الأجهزة',
+      'الألعاب والهوايات',
+      'ساعات وإكسسوارات',
+    ],
+  },
+  {
+    label: 'سيارات ومركبات',
+    categories: ['السيارات', 'قطع الغيار'],
+  },
+  {
+    label: 'عقارات',
+    categories: ['العقارات'],
+  },
+  {
+    label: 'المنزل والأثاث',
+    categories: ['الأثاث', 'المنزل والحديقة'],
+  },
+  {
+    label: 'الموضة والجمال',
+    categories: ['الموضة', 'ساعات وإكسسوارات', 'العناية والتجميل'],
+  },
+  {
+    label: 'رياضة وتعليم',
+    categories: ['الرياضة', 'الكتب والتعليم'],
+  },
+  {
+    label: 'الأطفال',
+    categories: ['مستلزمات الأطفال'],
+  },
+  {
+    label: 'معدات وخدمات',
+    categories: ['معدات وأدوات'],
+  },
+  {
+    label: 'أخرى',
+    categories: ['أخرى'],
+  },
+] satisfies Array<{ label: string; categories: string[] }>;
+
+const saudiMarketplaceCities = [
+  'الرياض',
+  'الدرعية',
+  'الخرج',
+  'الدوادمي',
+  'المجمعة',
+  'القويعية',
+  'الأفلاج',
+  'وادي الدواسر',
+  'الزلفي',
+  'شقراء',
+  'حوطة بني تميم',
+  'عفيف',
+  'السليل',
+  'ضرما',
+  'المزاحمية',
+  'رماح',
+  'ثادق',
+  'حريملاء',
+  'الحريق',
+  'الغاط',
+  'مكة المكرمة',
+  'جدة',
+  'الطائف',
+  'القنفذة',
+  'الليث',
+  'رابغ',
+  'الجموم',
+  'خليص',
+  'الكامل',
+  'الخرمة',
+  'رنية',
+  'تربة',
+  'المويه',
+  'ميسان',
+  'أضم',
+  'العرضيات',
+  'بحرة',
+  'المدينة المنورة',
+  'ينبع',
+  'العلا',
+  'المهد',
+  'الحناكية',
+  'بدر',
+  'خيبر',
+  'العيص',
+  'وادي الفرع',
+  'الدمام',
+  'الخبر',
+  'الظهران',
+  'الأحساء',
+  'القطيف',
+  'الجبيل',
+  'حفر الباطن',
+  'الخفجي',
+  'رأس تنورة',
+  'بقيق',
+  'النعيرية',
+  'قرية العليا',
+  'العديد',
+  'بريدة',
+  'عنيزة',
+  'الرس',
+  'المذنب',
+  'البكيرية',
+  'البدائع',
+  'الأسياح',
+  'النبهانية',
+  'عيون الجواء',
+  'رياض الخبراء',
+  'الشماسية',
+  'عقلة الصقور',
+  'ضرية',
+  'أبها',
+  'خميس مشيط',
+  'بيشة',
+  'النماص',
+  'محايل عسير',
+  'ظهران الجنوب',
+  'تثليث',
+  'سراة عبيدة',
+  'رجال ألمع',
+  'بلقرن',
+  'أحد رفيدة',
+  'المجاردة',
+  'البرك',
+  'بارق',
+  'تنومة',
+  'طريب',
+  'حائل',
+  'بقعاء',
+  'الغزالة',
+  'الشنان',
+  'الحائط',
+  'السليمي',
+  'الشملي',
+  'موقق',
+  'سميراء',
+  'تبوك',
+  'الوجه',
+  'ضباء',
+  'تيماء',
+  'أملج',
+  'حقل',
+  'البدع',
+  'جازان',
+  'صبيا',
+  'أبو عريش',
+  'صامطة',
+  'بيش',
+  'الدرب',
+  'الحرث',
+  'ضمد',
+  'الريث',
+  'فرسان',
+  'الدائر',
+  'العارضة',
+  'أحد المسارحة',
+  'العيدابي',
+  'فيفاء',
+  'الطوال',
+  'هروب',
+  'نجران',
+  'شرورة',
+  'حبونا',
+  'بدر الجنوب',
+  'يدمة',
+  'ثار',
+  'خباش',
+  'الباحة',
+  'بلجرشي',
+  'المندق',
+  'المخواة',
+  'قلوة',
+  'العقيق',
+  'القرى',
+  'غامد الزناد',
+  'الحجرة',
+  'بني حسن',
+  'سكاكا',
+  'القريات',
+  'دومة الجندل',
+  'طبرجل',
+  'عرعر',
+  'رفحاء',
+  'طريف',
+  'العويقيلة',
+] satisfies string[];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -1173,7 +1366,7 @@ function ListingCardView({
     return (
       <article
         className={cn(
-          'group grid w-full min-w-0 cursor-pointer grid-cols-[7.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[10rem_minmax(0,1fr)]',
+          'group grid w-full min-w-0 cursor-pointer grid-cols-[6.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[8.5rem_minmax(0,1fr)]',
           className,
         )}
         onClick={() => onOpen(listing)}
@@ -1187,7 +1380,7 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative min-h-32 bg-slate-100 sm:min-h-36">
+        <div className="relative min-h-28 bg-slate-100 sm:min-h-32">
           {listing.image ? (
             <img
               alt={listing.title}
@@ -1223,8 +1416,8 @@ function ListingCardView({
             </Button>
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-1.5 p-3">
-          <h3 className="line-clamp-2 text-sm font-bold leading-6">
+        <div className="flex min-w-0 flex-col gap-1.5 p-2.5 sm:p-3">
+          <h3 className="line-clamp-1 text-sm font-bold leading-6">
             {listing.title}
           </h3>
           <div className="text-base font-bold text-emerald-600 dark:text-emerald-300">
@@ -1234,18 +1427,10 @@ function ListingCardView({
             <MapPin className="size-3.5" />
             <span className="truncate">{listing.city}</span>
           </div>
-          {listing.description && (
-            <p className="line-clamp-2 text-[11px] leading-5 text-muted-foreground">
-              {listing.description}
-            </p>
-          )}
           <div className="mt-auto flex items-center justify-between gap-2 pt-1">
             <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
               <BadgeCheck className="size-3" />
               {listing.status ?? 'موثق'}
-            </span>
-            <span className="truncate text-[10px] text-muted-foreground">
-              {listing.stats}
             </span>
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-2">
@@ -1495,7 +1680,10 @@ export default function Page() {
   });
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
-  const [selectedMarketCategory, setSelectedMarketCategory] = useState('all');
+  const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
+    useState('all');
+  const [selectedMarketSubcategory, setSelectedMarketSubcategory] =
+    useState('all');
   const [selectedMarketCity, setSelectedMarketCity] = useState('all');
   const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
   const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
@@ -1587,51 +1775,60 @@ export default function Page() {
       searchToolListings,
     });
   }, [searchToolListings]);
-  const marketplaceCategoryOptions = useMemo(() => {
-    const categories = new Set<string>();
-
-    marketplaceListings.forEach((listing) => {
-      if (listing.category) {
-        categories.add(listing.category);
-      }
-    });
-
-    return Array.from(categories);
-  }, [marketplaceListings]);
-  const marketplaceCityOptions = useMemo(() => {
-    const cities = new Set<string>();
-
-    marketplaceListings.forEach((listing) => {
-      if (listing.city) {
-        cities.add(listing.city);
-      }
-    });
-
-    return Array.from(cities);
-  }, [marketplaceListings]);
-  const activeMarketCategory =
-    selectedMarketCategory !== 'all' &&
-    marketplaceCategoryOptions.includes(selectedMarketCategory)
-      ? selectedMarketCategory
+  const activeMarketCategoryGroup =
+    selectedMarketCategoryGroup !== 'all' &&
+    marketplaceCategoryGroups.some(
+      (group) => group.label === selectedMarketCategoryGroup,
+    )
+      ? selectedMarketCategoryGroup
+      : 'all';
+  const activeMarketCategoryGroupConfig =
+    activeMarketCategoryGroup === 'all'
+      ? null
+      : marketplaceCategoryGroups.find(
+          (group) => group.label === activeMarketCategoryGroup,
+        ) ?? null;
+  const activeMarketSubcategory =
+    selectedMarketSubcategory !== 'all' &&
+    activeMarketCategoryGroupConfig?.categories.includes(selectedMarketSubcategory)
+      ? selectedMarketSubcategory
       : 'all';
   const activeMarketCity =
-    selectedMarketCity !== 'all' && marketplaceCityOptions.includes(selectedMarketCity)
+    selectedMarketCity !== 'all' && saudiMarketplaceCities.includes(selectedMarketCity)
       ? selectedMarketCity
       : 'all';
   const manuallyFilteredMarketplaceListings = useMemo(() => {
     return marketplaceListings.filter((listing) => {
       const matchesCategory =
-        activeMarketCategory === 'all' || listing.category === activeMarketCategory;
+        activeMarketCategoryGroup === 'all' ||
+        (activeMarketSubcategory !== 'all'
+          ? listing.category === activeMarketSubcategory
+          : Boolean(
+              listing.category &&
+                activeMarketCategoryGroupConfig?.categories.includes(
+                  listing.category,
+                ),
+            ));
       const matchesCity =
         activeMarketCity === 'all' || listing.city === activeMarketCity;
 
       return matchesCategory && matchesCity;
     });
-  }, [activeMarketCategory, activeMarketCity, marketplaceListings]);
+  }, [
+    activeMarketCategoryGroup,
+    activeMarketCategoryGroupConfig,
+    activeMarketCity,
+    activeMarketSubcategory,
+    marketplaceListings,
+  ]);
   const hasManualMarketFilters =
-    activeMarketCategory !== 'all' || activeMarketCity !== 'all';
+    activeMarketCategoryGroup !== 'all' ||
+    activeMarketSubcategory !== 'all' ||
+    activeMarketCity !== 'all';
   const activeMarketFilterCount =
-    Number(activeMarketCategory !== 'all') + Number(activeMarketCity !== 'all');
+    Number(activeMarketCategoryGroup !== 'all') +
+    Number(activeMarketSubcategory !== 'all') +
+    Number(activeMarketCity !== 'all');
   const exploreMarketplaceListings = useMemo(() => {
     return getExploreListings({
       marketplaceListings: manuallyFilteredMarketplaceListings,
@@ -3104,27 +3301,67 @@ export default function Page() {
                   <Button
                     type="button"
                     size="sm"
-                    variant={activeMarketCategory === 'all' ? 'default' : 'outline'}
+                    variant={
+                      activeMarketCategoryGroup === 'all' ? 'default' : 'outline'
+                    }
                     className="h-9 shrink-0 rounded-full px-4"
-                    onClick={() => setSelectedMarketCategory('all')}
+                    onClick={() => {
+                      setSelectedMarketCategoryGroup('all');
+                      setSelectedMarketSubcategory('all');
+                    }}
                   >
                     الكل
                   </Button>
-                  {marketplaceCategoryOptions.map((category) => (
+                  {marketplaceCategoryGroups.map((group) => (
                     <Button
-                      key={category}
+                      key={group.label}
                       type="button"
                       size="sm"
                       variant={
-                        activeMarketCategory === category ? 'default' : 'outline'
+                        activeMarketCategoryGroup === group.label
+                          ? 'default'
+                          : 'outline'
                       }
                       className="h-9 shrink-0 rounded-full px-4"
-                      onClick={() => setSelectedMarketCategory(category)}
+                      onClick={() => {
+                        setSelectedMarketCategoryGroup(group.label);
+                        setSelectedMarketSubcategory('all');
+                      }}
                     >
-                      {category}
+                      {group.label}
                     </Button>
                   ))}
                 </div>
+
+                {activeMarketCategoryGroupConfig && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={
+                        activeMarketSubcategory === 'all' ? 'default' : 'outline'
+                      }
+                      className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      onClick={() => setSelectedMarketSubcategory('all')}
+                    >
+                      كل {activeMarketCategoryGroup}
+                    </Button>
+                    {activeMarketCategoryGroupConfig.categories.map((category) => (
+                      <Button
+                        key={category}
+                        type="button"
+                        size="sm"
+                        variant={
+                          activeMarketSubcategory === category ? 'default' : 'outline'
+                        }
+                        className="h-8 shrink-0 rounded-full px-3 text-xs"
+                        onClick={() => setSelectedMarketSubcategory(category)}
+                      >
+                        {category}
+                      </Button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
@@ -3135,7 +3372,7 @@ export default function Page() {
                       onChange={(event) => setSelectedMarketCity(event.target.value)}
                     >
                       <option value="all">كل المناطق</option>
-                      {marketplaceCityOptions.map((city) => (
+                      {saudiMarketplaceCities.map((city) => (
                         <option key={city} value={city}>
                           {city}
                         </option>
@@ -3182,7 +3419,8 @@ export default function Page() {
                         variant="ghost"
                         className="h-8 rounded-md px-2 text-blue-700 hover:text-blue-800 dark:text-blue-100"
                         onClick={() => {
-                          setSelectedMarketCategory('all');
+                          setSelectedMarketCategoryGroup('all');
+                          setSelectedMarketSubcategory('all');
                           setSelectedMarketCity('all');
                         }}
                       >
