@@ -1413,7 +1413,7 @@ function ListingCardView({
     return (
       <article
         className={cn(
-          'group grid w-full min-w-0 cursor-pointer grid-cols-[6.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[8.5rem_minmax(0,1fr)]',
+          'group grid w-full min-w-0 cursor-pointer grid-cols-[5.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[7.25rem_minmax(0,1fr)]',
           className,
         )}
         onClick={() => onOpen(listing)}
@@ -1427,7 +1427,7 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative min-h-28 bg-slate-100 sm:min-h-32">
+        <div className="relative min-h-24 bg-slate-100 sm:min-h-28">
           {listing.image ? (
             <img
               alt={listing.title}
@@ -1447,7 +1447,7 @@ function ListingCardView({
               size="icon-sm"
               variant="ghost"
               className={cn(
-                'absolute left-2 top-2 size-8 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white',
+                'absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white',
                 isFavorite
                   ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
                   : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
@@ -1459,15 +1459,15 @@ function ListingCardView({
                 onFavorite(listing);
               }}
             >
-              <Heart className={cn('size-4', isFavorite && 'fill-current')} />
+              <Heart className={cn('size-3.5', isFavorite && 'fill-current')} />
             </Button>
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-1.5 p-2.5 sm:p-3">
-          <h3 className="line-clamp-1 text-sm font-bold leading-6">
+        <div className="flex min-w-0 flex-col gap-1 p-2 sm:p-2.5">
+          <h3 className="line-clamp-1 text-[13px] font-bold leading-5 sm:text-sm">
             {listing.title}
           </h3>
-          <div className="text-base font-bold text-emerald-600 dark:text-emerald-300">
+          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-300">
             {listing.price}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -1475,16 +1475,16 @@ function ListingCardView({
             <span className="truncate">{listing.city}</span>
           </div>
           <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
               <BadgeCheck className="size-3" />
               {listing.status ?? 'موثق'}
             </span>
           </div>
-          <div className="flex justify-end border-t pt-2">
+          <div className="flex justify-end border-t pt-1.5">
             <Button
               size="icon-sm"
               variant="outline"
-              className="size-8 rounded-md"
+              className="size-7 rounded-md"
               aria-label="مقارنة الإعلان"
               onClick={(event) => {
                 event.stopPropagation();
@@ -3498,7 +3498,7 @@ export default function Page() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
-                  إعلان جديد
+                  أنشئ مع حمد
                   </Button>
                   <Button
                     type="button"
