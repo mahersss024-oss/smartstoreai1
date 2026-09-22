@@ -172,7 +172,7 @@ function AdminListingCard({
             <img
               key={image.id}
               alt=""
-              className="h-16 w-16 rounded-md border object-cover"
+              className="h-16 w-16 rounded-md border bg-slate-100 object-contain dark:bg-slate-900"
               src={image.thumbnailUrl}
             />
           ))}

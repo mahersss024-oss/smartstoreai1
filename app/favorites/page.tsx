@@ -291,7 +291,7 @@ export default function FavoritesPage() {
                   >
                     <img
                       alt={favorite.listing?.title ?? 'صورة الإعلان'}
-                      className="aspect-[4/3] w-full object-cover"
+                      className="aspect-[4/3] w-full bg-slate-100 object-contain dark:bg-slate-900"
                       src={getListingImage(favorite.listing)}
                     />
                     <div className="grid gap-2 p-3">

@@ -1,5 +1,5 @@
-const productionCanonicalUrl = 'https://www.smartstore-ai.com';
-const productionHosts = new Set(['www.smartstore-ai.com', 'smartstore-ai.com']);
+const productionCanonicalUrl = 'https://www.souqhamad.com';
+const productionHosts = new Set(['www.souqhamad.com', 'souqhamad.com']);
 
 function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');

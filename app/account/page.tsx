@@ -1315,9 +1315,9 @@ export default function AccountPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_13rem]">
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
                       {listing.image ? (
-                        <img alt={listing.title} className="aspect-[16/10] w-full object-cover md:row-start-1 md:aspect-square md:self-start" src={listing.image} />
+                        <img alt={listing.title} className="aspect-[16/10] w-full bg-slate-100 object-contain dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start" src={listing.image} />
                       ) : (
                         <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
                           <div className="grid gap-1">
@@ -1493,8 +1493,8 @@ export default function AccountPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid min-w-0 gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:border-r xl:border-t-0">
-                          <div className="text-xs font-semibold text-muted-foreground">
+                        <div className="grid min-w-0 gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:max-h-44 xl:overflow-y-auto xl:border-r xl:border-t-0">
+                          <div className="text-xs font-semibold text-muted-foreground xl:sticky xl:top-0 xl:z-10 xl:bg-white xl:pb-1 dark:xl:bg-background">
                             صور الإعلان
                           </div>
                           <div className="grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2">

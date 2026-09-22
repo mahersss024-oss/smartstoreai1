@@ -14,13 +14,13 @@ test('production app base url ignores untrusted request origins', () => {
   try {
     assert.equal(
       getAppBaseUrl(new Request('https://attacker.example/api/auth/google/start')),
-      'https://www.smartstore-ai.com',
+      'https://www.souqhamad.com',
     );
     assert.equal(
       getAppBaseUrl(
-        new Request('https://smartstore-ai.com/api/auth/google/start'),
+        new Request('https://souqhamad.com/api/auth/google/start'),
       ),
-      'https://smartstore-ai.com',
+      'https://souqhamad.com',
     );
   } finally {
     env.NODE_ENV = previousNodeEnv;
@@ -39,12 +39,12 @@ test('configured production app base url still takes precedence', () => {
   const previousPublicAppUrl = env.NEXT_PUBLIC_APP_URL;
 
   env.NODE_ENV = 'production';
-  env.NEXT_PUBLIC_APP_URL = 'https://www.smartstore-ai.com/';
+  env.NEXT_PUBLIC_APP_URL = 'https://www.souqhamad.com/';
 
   try {
     assert.equal(
       getAppBaseUrl(new Request('https://attacker.example/api/auth/google/start')),
-      'https://www.smartstore-ai.com',
+      'https://www.souqhamad.com',
     );
   } finally {
     env.NODE_ENV = previousNodeEnv;

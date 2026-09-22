@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { GET as startGoogleAuth } from '@/app/api/auth/google/start/route';
+import { createCommissionAgreementCookie } from '@/lib/auth/session';
 import { createAppleClientSecret, isAppleAuthConfigured } from '@/lib/auth/apple';
 
 function readProjectFile(...segments: string[]) {
@@ -116,6 +118,36 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.match(callbackRoute, /fetchWithTimeout\(\s*'https:\/\/www\.googleapis\.com\/oauth2\/v3\/userinfo'/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
+});
+
+test('google auth start uses the configured سوق حمد callback url', async () => {
+  const previous = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+  };
+
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.NEXT_PUBLIC_APP_URL = 'https://www.souqhamad.com';
+
+  try {
+    const response = await startGoogleAuth(
+      new Request('https://www.souqhamad.com/api/auth/google/start', {
+        headers: {
+          cookie: createCommissionAgreementCookie(),
+        },
+      }),
+    );
+    const location = response.headers.get('location');
+
+    assert.ok(location);
+    assert.equal(
+      new URL(location).searchParams.get('redirect_uri'),
+      'https://www.souqhamad.com/api/auth/google/callback',
+    );
+  } finally {
+    restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
+    restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
+  }
 });
 
 test('home login control offers Google and Apple choices', () => {

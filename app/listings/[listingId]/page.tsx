@@ -219,13 +219,13 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             />
             <section className="hidden overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
               <div className="grid gap-2 p-3 md:grid-cols-[minmax(0,1fr)_7rem]">
-                <div className="aspect-[16/10] overflow-hidden rounded-md bg-slate-100">
-                  <img alt={listing.title ?? 'صورة الإعلان'} className="h-full w-full object-cover" src={images[0]} />
+                <div className="aspect-[16/10] overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
+                  <img alt={listing.title ?? 'صورة الإعلان'} className="h-full w-full object-contain" src={images[0]} />
                 </div>
                 <div className="grid grid-cols-4 gap-2 md:grid-cols-1">
                   {images.slice(0, 4).map((image, index) => (
-                    <div key={`${image}-${index}`} className="aspect-square overflow-hidden rounded-md border bg-slate-100">
-                      <img alt="" className="h-full w-full object-cover" src={image} />
+                    <div key={`${image}-${index}`} className="aspect-square overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900">
+                      <img alt="" className="h-full w-full object-contain" src={image} />
                     </div>
                   ))}
                 </div>

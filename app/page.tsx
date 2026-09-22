@@ -770,11 +770,11 @@ function formatCategory(category: string) {
 
 const marketplaceCategoryGroups = [
   {
-    label: 'الأجهزة',
+    label: 'إلكترونيات',
     categories: ['الجوالات', 'الأجهزة'],
   },
   {
-    label: 'السيارات',
+    label: 'سيارات ومركبات',
     categories: ['السيارات', 'قطع الغيار'],
   },
   {
@@ -782,20 +782,16 @@ const marketplaceCategoryGroups = [
     categories: ['العقارات'],
   },
   {
-    label: 'الأثاث والمنزل',
+    label: 'البيت والأثاث',
     categories: ['الأثاث', 'المنزل والحديقة'],
   },
   {
-    label: 'الشخصية والجمال',
-    categories: ['الموضة', 'ساعات وإكسسوارات', 'العناية والتجميل'],
+    label: 'أزياء ومستلزمات',
+    categories: ['الموضة', 'ساعات وإكسسوارات', 'العناية والتجميل', 'مستلزمات الأطفال'],
   },
   {
-    label: 'الرياضة والهوايات',
+    label: 'رياضة وهوايات وتعليم',
     categories: ['الرياضة', 'الألعاب والهوايات', 'الكتب والتعليم'],
-  },
-  {
-    label: 'الأطفال',
-    categories: ['مستلزمات الأطفال'],
   },
   {
     label: 'معدات وأدوات',
@@ -815,11 +811,11 @@ const manualListingCategoryOptions = [
   'real_estate',
   'furniture',
   'fashion',
+  'kids',
   'home_garden',
   'sports',
   'gaming_hobbies',
   'books_education',
-  'kids',
   'tools_equipment',
   'watches_accessories',
   'beauty',
@@ -1300,9 +1296,9 @@ function ListingChatLinkCard({
             افتح تفاصيل الإعلان والصور وخيارات التواصل من صفحة الإعلان.
           </div>
         </div>
-        <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-600 text-white shadow-sm shadow-blue-950/10">
+        <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-slate-900 dark:text-blue-200">
           {listing?.image ? (
-            <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
+            <img alt={listing.title} className="h-full w-full object-contain" src={listing.image} />
           ) : (
             <Store className="size-5" />
           )}
@@ -1430,11 +1426,11 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative aspect-square self-start bg-slate-100">
+        <div className="relative aspect-square self-start bg-slate-100 dark:bg-slate-900">
           {listing.image ? (
             <img
               alt={listing.title}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               src={listing.image}
             />
           ) : (
@@ -1524,9 +1520,9 @@ function ListingCardView({
       style={style}
       tabIndex={0}
     >
-      <div className="relative aspect-[16/10] bg-slate-100">
+      <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-900">
         {listing.image ? (
-          <img alt={listing.title} className="h-full w-full object-cover" src={listing.image} />
+          <img alt={listing.title} className="h-full w-full object-contain" src={listing.image} />
         ) : (
           <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
             <div className="grid gap-1">
@@ -4238,7 +4234,7 @@ export default function Page() {
                                 onClick={() => sendStarter(`اعرض لي تفاصيل ${listing.title}`)}
                               >
                                 {listing.image ? (
-                                  <img alt={listing.title} className="aspect-square rounded-md object-cover" src={listing.image} />
+                                  <img alt={listing.title} className="aspect-square rounded-md bg-slate-100 object-contain dark:bg-slate-900" src={listing.image} />
                                 ) : (
                                   <div className="grid aspect-square place-items-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                                     <ImageIcon className="size-4" />
