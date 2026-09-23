@@ -111,7 +111,7 @@ test('welcome component uses the market logo as the full-screen background', () 
   assert.doesNotMatch(component, /\/smartstore-logo\.png/);
 });
 
-test('welcome brand image covers the full viewport', () => {
+test('welcome brand image is not cropped on mobile and tablet', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
@@ -119,7 +119,10 @@ test('welcome brand image covers the full viewport', () => {
     assert.match(source, /app-welcome__brand[\s\S]*inset: 0/);
     assert.match(source, /app-welcome__brand[\s\S]*width: 100%/);
     assert.match(source, /app-welcome__brand[\s\S]*height: 100%/);
-    assert.match(source, /app-welcome__brand[\s\S]*object-fit: cover/);
+    assert.match(source, /app-welcome__brand[\s\S]*object-fit: contain/);
+    assert.match(source, /app-welcome__brand[\s\S]*padding: calc\(env\(safe-area-inset-top\)/);
+    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)/);
+    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)[\s\S]*object-fit: cover/);
     assert.doesNotMatch(source, /width: min\(132vw, 760px\)/);
     assert.doesNotMatch(source, /width: min\(96vw, 980px\)/);
     assert.doesNotMatch(source, /width: min\(82vw, 1100px\)/);

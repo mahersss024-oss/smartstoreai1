@@ -948,15 +948,16 @@
     width: 100%;
     max-width: none;
     height: 100%;
+    box-sizing: border-box;
+    padding: calc(env(safe-area-inset-top) + 0.75rem) 0
+      calc(env(safe-area-inset-bottom) + 9.5rem);
     pointer-events: none;
     user-select: none;
     -webkit-user-drag: none;
     display: block;
-    object-fit: cover;
+    object-fit: contain;
     object-position: center;
     filter: drop-shadow(0 22px 48px rgb(8 17 29 / 42%));
-    mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
   }
 
   .app-welcome__backdrop {
@@ -1017,14 +1018,33 @@
   }
 
   @media (min-width: 640px) {
+    .app-welcome__brand {
+      padding: calc(env(safe-area-inset-top) + 1rem) 0
+        calc(env(safe-area-inset-bottom) + 10.5rem);
+    }
+
     .app-welcome__content {
       padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
     }
   }
 
   @media (orientation: landscape) {
+    .app-welcome__brand {
+      padding: calc(env(safe-area-inset-top) + 0.5rem) 0
+        calc(env(safe-area-inset-bottom) + 5rem);
+    }
+
     .app-welcome__content {
       padding-bottom: calc(env(safe-area-inset-bottom) + 2.25rem);
+    }
+  }
+
+  @media (min-width: 1024px) and (orientation: landscape) {
+    .app-welcome__brand {
+      padding: 0;
+      object-fit: cover;
+      mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
     }
   }
 

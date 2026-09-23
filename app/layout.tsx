@@ -118,14 +118,14 @@ html[data-app-display='standalone'] #smartstore-welcome {
   width: 100%;
   max-width: none;
   height: 100%;
+  box-sizing: border-box;
+  padding: calc(env(safe-area-inset-top) + 0.75rem) 0 calc(env(safe-area-inset-bottom) + 9.5rem);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
 }
 #smartstore-welcome .app-welcome__content {
   position: relative;
@@ -139,6 +139,24 @@ html[data-app-display='standalone'] #smartstore-welcome {
   min-height: 100%;
   padding: 0 1.5rem calc(env(safe-area-inset-bottom) + 4.5rem);
   text-align: center;
+}
+@media (min-width: 640px) {
+  #smartstore-welcome .app-welcome__brand {
+    padding: calc(env(safe-area-inset-top) + 1rem) 0 calc(env(safe-area-inset-bottom) + 10.5rem);
+  }
+}
+@media (orientation: landscape) {
+  #smartstore-welcome .app-welcome__brand {
+    padding: calc(env(safe-area-inset-top) + 0.5rem) 0 calc(env(safe-area-inset-bottom) + 5rem);
+  }
+}
+@media (min-width: 1024px) and (orientation: landscape) {
+  #smartstore-welcome .app-welcome__brand {
+    padding: 0;
+    object-fit: cover;
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+  }
 }
 @keyframes app-welcome-lifecycle {
   0%, 82% { opacity: 1; }
