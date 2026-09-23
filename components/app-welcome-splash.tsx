@@ -14,7 +14,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
-const WELCOME_BACKGROUND_SRC = '/hamad-market-logo.jpeg';
+const WELCOME_WORDMARK_SRC = '/hamad-market-wordmark.png';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is
@@ -94,7 +94,7 @@ export function AppWelcomeSplash() {
           used as a decorative splash layer. */}
       <img
         className="app-welcome__brand"
-        src={WELCOME_BACKGROUND_SRC}
+        src={WELCOME_WORDMARK_SRC}
         alt=""
         aria-hidden="true"
       />

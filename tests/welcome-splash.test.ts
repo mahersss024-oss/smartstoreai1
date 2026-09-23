@@ -95,6 +95,10 @@ test('welcome logo asset exists in public assets', () => {
     existsSync(join(process.cwd(), 'public', 'hamad-market-logo.jpeg')),
     true,
   );
+  assert.equal(
+    existsSync(join(process.cwd(), 'public', 'hamad-market-wordmark.png')),
+    true,
+  );
 });
 
 test('welcome component uses the market logo as a single foreground brand layer', () => {
@@ -103,7 +107,8 @@ test('welcome component uses the market logo as a single foreground brand layer'
     'utf8',
   );
 
-  assert.match(component, /\/hamad-market-logo\.jpeg/);
+  assert.match(component, /\/hamad-market-wordmark\.png/);
+  assert.doesNotMatch(component, /\/hamad-market-logo\.jpeg/);
   assert.doesNotMatch(component, /--app-welcome-bg/);
   assert.match(component, /سوقك الذكي للبيع والشراء/);
   assert.doesNotMatch(component, /app-welcome__logo/);
