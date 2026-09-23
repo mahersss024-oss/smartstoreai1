@@ -155,7 +155,7 @@ export function ListingImageGallery({
             </button>
           </div>
           <div
-            className="relative grid min-h-0 touch-pan-y place-items-center"
+            className="relative grid min-h-0 touch-pan-y place-items-center px-3 sm:px-16"
             onTouchEnd={(event) =>
               handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)
             }
@@ -165,7 +165,7 @@ export function ListingImageGallery({
           >
             <img
               alt={title}
-              className="h-full w-full object-contain"
+              className="h-full w-full max-w-6xl object-contain"
               onError={(event) => showImageFallback(event.currentTarget)}
               src={selectedImage}
             />

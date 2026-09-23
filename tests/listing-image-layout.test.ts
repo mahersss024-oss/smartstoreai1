@@ -25,7 +25,8 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /onTouchEnd/);
   assert.match(source, /absolute left-3 top-1\/2/);
   assert.match(source, /absolute right-3 top-1\/2/);
-  assert.match(source, /className="h-full w-full object-contain"[\s\S]*src=\{selectedImage\}/);
+  assert.match(source, /className="relative grid min-h-0 touch-pan-y place-items-center px-3 sm:px-16"/);
+  assert.match(source, /className="h-full w-full max-w-6xl object-contain"[\s\S]*src=\{selectedImage\}/);
   assert.doesNotMatch(source, /className="max-h-full max-w-full object-contain"[\s\S]*src=\{selectedImage\}/);
   assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
   assert.match(source, /className="h-full w-full object-contain"/);
