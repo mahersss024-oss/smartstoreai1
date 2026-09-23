@@ -165,7 +165,7 @@ export function ListingImageGallery({
           >
             <img
               alt={title}
-              className="max-h-full max-w-full object-contain"
+              className="h-full w-full object-contain"
               onError={(event) => showImageFallback(event.currentTarget)}
               src={selectedImage}
             />
