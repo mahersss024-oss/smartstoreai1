@@ -150,6 +150,24 @@ function createObjectKey(input: StoreListingObjectInput) {
   )}`;
 }
 
+function awsEncode(value: string) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function buildCanonicalQuery(params: Array<[string, string]>) {
+  return params
+    .map(([key, value]) => [awsEncode(key), awsEncode(value)] as const)
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+      const keyComparison = leftKey.localeCompare(rightKey);
+
+      return keyComparison || leftValue.localeCompare(rightValue);
+    })
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&');
+}
+
 function buildPublicUrl(config: S3ObjectStorageConfig, key: string, uploadUrl: URL) {
   if (!config.publicUrl) {
     return uploadUrl.toString();
@@ -202,13 +220,11 @@ function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   return hmac(serviceKey, 'aws4_request');
 }
 
-function createSignedPutRequest({
-  body,
+function createPresignedPutRequest({
   key,
   mediaType,
   config,
 }: {
-  body: Buffer;
   key: string;
   mediaType: string;
   config: S3ObjectStorageConfig;
@@ -224,28 +240,35 @@ function createSignedPutRequest({
   );
   const amzDate = getAmzDate();
   const dateStamp = getDateStamp(amzDate);
-  const payloadHash = sha256Hex(body);
+  const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
+  const credential = `${config.accessKeyId}/${credentialScope}`;
+  const signedHeaders = 'host';
+  const payloadHash = 'UNSIGNED-PAYLOAD';
+  const queryParams: Array<[string, string]> = [
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Content-Sha256', payloadHash],
+    ['X-Amz-Credential', credential],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', '300'],
+    ['X-Amz-SignedHeaders', signedHeaders],
+  ];
+  const canonicalQuery = buildCanonicalQuery(queryParams);
   const canonicalUri = uploadUrl.pathname
     .split('/')
-    .map((segment) => encodeURIComponent(segment))
+    .map((segment) => awsEncode(segment))
     .join('/');
   const canonicalHeaders = [
-    `content-type:${mediaType}`,
     `host:${uploadUrl.host}`,
-    `x-amz-content-sha256:${payloadHash}`,
-    `x-amz-date:${amzDate}`,
     '',
   ].join('\n');
-  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
   const canonicalRequest = [
     'PUT',
     canonicalUri,
-    '',
+    canonicalQuery,
     canonicalHeaders,
     signedHeaders,
     payloadHash,
   ].join('\n');
-  const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
   const stringToSign = [
     'AWS4-HMAC-SHA256',
     amzDate,
@@ -253,20 +276,17 @@ function createSignedPutRequest({
     sha256Hex(canonicalRequest),
   ].join('\n');
   const signature = hmacHex(getSigningKey(config, dateStamp), stringToSign);
-  const authorization = [
-    'AWS4-HMAC-SHA256',
-    `Credential=${config.accessKeyId}/${credentialScope}`,
-    `SignedHeaders=${signedHeaders}`,
-    `Signature=${signature}`,
-  ].join(', ');
+
+  for (const [key, value] of queryParams) {
+    uploadUrl.searchParams.set(key, value);
+  }
+
+  uploadUrl.searchParams.set('X-Amz-Signature', signature);
 
   return {
     uploadUrl,
     headers: {
-      Authorization: authorization,
       'Content-Type': mediaType,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
     },
   };
 }
@@ -275,8 +295,7 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   const config = getS3ObjectStorageConfig();
   const body = Buffer.from(input.data);
   const key = createObjectKey(input);
-  const request = createSignedPutRequest({
-    body,
+  const request = createPresignedPutRequest({
     key,
     mediaType: input.mediaType,
     config,

@@ -10,6 +10,12 @@ import {
 const cloudinaryEnvKeys = [
   'SMARTSTORE_IMAGE_STORAGE',
   'SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS',
+  'SMARTSTORE_OBJECT_STORAGE_ENDPOINT',
+  'SMARTSTORE_OBJECT_STORAGE_BUCKET',
+  'SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID',
+  'SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY',
+  'SMARTSTORE_OBJECT_STORAGE_REGION',
+  'SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL',
   'CLOUDINARY_CLOUD_NAME',
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
@@ -56,6 +62,66 @@ test('reports missing Cloudinary configuration when Cloudinary storage is enable
     ]);
   } finally {
     restore();
+  }
+});
+
+test('uploads listing images to S3-compatible storage with SigV4 query signing', async () => {
+  const restoreEnv = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 's3',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT:
+      'https://account-id.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+    SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+  });
+  const originalFetch = globalThis.fetch;
+  const uploaded: {
+    url: URL | null;
+    headers: Headers;
+  } = {
+    url: null,
+    headers: new Headers(),
+  };
+
+  globalThis.fetch = async (input, init) => {
+    uploaded.url = new URL(String(input));
+    uploaded.headers = new Headers(init?.headers);
+
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    const now = new Date();
+    const expectedPrefix = `listings/${now.getUTCFullYear()}/${String(
+      now.getUTCMonth() + 1,
+    ).padStart(2, '0')}/image-1.jpg`;
+    const result = await storeListingObject({
+      data: new Uint8Array([1, 2, 3]),
+      mediaType: 'image/jpeg',
+      imageId: 'image-1',
+      fileName: 'car.jpg',
+    });
+
+    assert.ok(uploaded.url);
+    assert.equal(uploaded.url.host, 'account-id.r2.cloudflarestorage.com');
+    assert.equal(uploaded.url.pathname, `/listing-images/${expectedPrefix}`);
+    assert.equal(
+      uploaded.url.searchParams.get('X-Amz-Algorithm'),
+      'AWS4-HMAC-SHA256',
+    );
+    assert.equal(
+      uploaded.url.searchParams.get('X-Amz-SignedHeaders'),
+      'host',
+    );
+    assert.equal(uploaded.headers.has('Authorization'), false);
+    assert.equal(uploaded.headers.get('Content-Type'), 'image/jpeg');
+    assert.equal(result?.key, expectedPrefix);
+    assert.equal(result?.url, `https://images.example.com/${expectedPrefix}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
   }
 });
 
