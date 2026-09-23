@@ -2,12 +2,44 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
+import type { TouchEvent, WheelEvent } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ImageIcon,
+  RotateCcw,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 
 type ListingImageGalleryProps = {
   images: string[];
   title: string;
 };
+
+const minImageZoom = 1;
+const maxImageZoom = 4;
+const imageZoomStep = 0.5;
+
+function clampImageZoom(value: number) {
+  return Math.min(maxImageZoom, Math.max(minImageZoom, Number(value.toFixed(2))));
+}
+
+function getTouchDistance(touches: {
+  length: number;
+  0?: { clientX: number; clientY: number };
+  1?: { clientX: number; clientY: number };
+}) {
+  if (touches.length < 2 || !touches[0] || !touches[1]) {
+    return null;
+  }
+
+  return Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY,
+  );
+}
 
 export function ListingImageGallery({
   images,
@@ -16,7 +48,10 @@ export function ListingImageGallery({
   const visibleImages = images.slice(0, 8);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [imageZoom, setImageZoom] = useState(1);
   const touchStartXRef = useRef<number | null>(null);
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef(1);
   const selectedImage = visibleImages[selectedImageIndex] ?? visibleImages[0] ?? '';
   const shouldShowThumbnails = visibleImages.length > 1;
   const selectedImageLabel = `${selectedImageIndex + 1} / ${visibleImages.length}`;
@@ -26,20 +61,34 @@ export function ListingImageGallery({
   };
   const openLightbox = (index: number) => {
     setSelectedImageIndex(index);
+    setImageZoom(1);
     setIsLightboxOpen(true);
   };
+  const zoomIn = () => {
+    setImageZoom((currentZoom) => clampImageZoom(currentZoom + imageZoomStep));
+  };
+  const zoomOut = () => {
+    setImageZoom((currentZoom) => clampImageZoom(currentZoom - imageZoomStep));
+  };
+  const resetZoom = () => {
+    setImageZoom(1);
+  };
   const showPreviousImage = useCallback(() => {
+    setImageZoom(1);
     setSelectedImageIndex((currentIndex) =>
       currentIndex === 0 ? visibleImages.length - 1 : currentIndex - 1,
     );
   }, [visibleImages.length]);
   const showNextImage = useCallback(() => {
+    setImageZoom(1);
     setSelectedImageIndex((currentIndex) =>
       currentIndex === visibleImages.length - 1 ? 0 : currentIndex + 1,
     );
   }, [visibleImages.length]);
   const handleLightboxTouchEnd = (x: number) => {
-    if (!shouldShowThumbnails || touchStartXRef.current === null) {
+    pinchStartDistanceRef.current = null;
+
+    if (!shouldShowThumbnails || imageZoom > 1 || touchStartXRef.current === null) {
       touchStartXRef.current = null;
       return;
     }
@@ -57,6 +106,38 @@ export function ListingImageGallery({
     }
 
     showNextImage();
+  };
+  const handleLightboxTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touchDistance = getTouchDistance(event.touches);
+
+    if (touchDistance !== null) {
+      pinchStartDistanceRef.current = touchDistance;
+      pinchStartZoomRef.current = imageZoom;
+      touchStartXRef.current = null;
+      return;
+    }
+
+    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+  };
+  const handleLightboxTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const touchDistance = getTouchDistance(event.touches);
+
+    if (touchDistance === null || pinchStartDistanceRef.current === null) {
+      return;
+    }
+
+    event.preventDefault();
+    setImageZoom(
+      clampImageZoom(
+        pinchStartZoomRef.current * (touchDistance / pinchStartDistanceRef.current),
+      ),
+    );
+  };
+  const handleLightboxWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setImageZoom((currentZoom) =>
+      clampImageZoom(currentZoom + (event.deltaY < 0 ? imageZoomStep : -imageZoomStep)),
+    );
   };
 
   useEffect(() => {
@@ -155,22 +236,58 @@ export function ListingImageGallery({
             </button>
           </div>
           <div
-            className="relative grid min-h-0 touch-pan-y place-items-center px-3 sm:px-16"
+            className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 sm:px-16"
             onTouchEnd={(event) =>
               handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)
             }
-            onTouchStart={(event) => {
-              touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
-            }}
+            onTouchMove={handleLightboxTouchMove}
+            onTouchStart={handleLightboxTouchStart}
+            onWheel={handleLightboxWheel}
           >
             <img
               alt={title}
-              className="h-full w-full max-w-6xl object-contain"
+              className="h-full w-full max-w-6xl object-contain transition-transform duration-150"
               onError={(event) => showImageFallback(event.currentTarget)}
+              onDoubleClick={() => {
+                setImageZoom((currentZoom) => (currentZoom > 1 ? 1 : 2));
+              }}
               src={selectedImage}
+              style={{ transform: `scale(${imageZoom})` }}
             />
             <div hidden className="grid h-full w-full place-items-center text-slate-300">
               <ImageIcon className="size-10" />
+            </div>
+            <div className="absolute top-3 flex items-center gap-2 rounded-full bg-black/35 p-1 text-white backdrop-blur-sm sm:top-4">
+              <button
+                aria-label="تصغير الصورة"
+                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
+                disabled={imageZoom <= minImageZoom}
+                onClick={zoomOut}
+                type="button"
+              >
+                <ZoomOut className="size-5" />
+              </button>
+              <span className="min-w-12 text-center text-sm font-semibold tabular-nums">
+                {Math.round(imageZoom * 100)}%
+              </span>
+              <button
+                aria-label="تكبير الصورة"
+                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
+                disabled={imageZoom >= maxImageZoom}
+                onClick={zoomIn}
+                type="button"
+              >
+                <ZoomIn className="size-5" />
+              </button>
+              <button
+                aria-label="إعادة حجم الصورة"
+                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
+                disabled={imageZoom === 1}
+                onClick={resetZoom}
+                type="button"
+              >
+                <RotateCcw className="size-5" />
+              </button>
             </div>
             {shouldShowThumbnails && (
               <>
