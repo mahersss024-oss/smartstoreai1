@@ -79,6 +79,11 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   display: none;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  width: 100vw;
+  min-width: 100vw;
+  height: 100dvh;
+  min-height: 100svh;
   overflow: hidden;
   background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   padding-top: env(safe-area-inset-top);
