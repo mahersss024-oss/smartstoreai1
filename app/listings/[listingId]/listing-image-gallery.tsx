@@ -64,6 +64,10 @@ export function ListingImageGallery({
     setImageZoom(1);
     setIsLightboxOpen(true);
   };
+  const selectLightboxImage = (index: number) => {
+    setSelectedImageIndex(index);
+    setImageZoom(1);
+  };
   const zoomIn = () => {
     setImageZoom((currentZoom) => clampImageZoom(currentZoom + imageZoomStep));
   };
@@ -225,18 +229,50 @@ export function ListingImageGallery({
           className="fixed inset-0 z-[10000] grid grid-rows-[auto_1fr_auto] bg-black text-white"
           role="dialog"
         >
-          <div className="flex items-center justify-between px-4 py-5">
-            <button
-              aria-label="إغلاق عارض الصور"
-              className="grid size-11 place-items-center rounded-full text-white transition hover:bg-white/10"
-              onClick={() => setIsLightboxOpen(false)}
-              type="button"
-            >
-              <X className="size-7" />
-            </button>
+          <div className="z-20 flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="إغلاق عارض الصور"
+                className="grid size-11 place-items-center rounded-full text-white transition hover:bg-white/10"
+                onClick={() => setIsLightboxOpen(false)}
+                type="button"
+              >
+                <X className="size-7" />
+              </button>
+              <button
+                aria-label="تصغير الصورة"
+                className="grid size-11 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
+                disabled={imageZoom <= minImageZoom}
+                onClick={zoomOut}
+                type="button"
+              >
+                <ZoomOut className="size-6" />
+              </button>
+              <button
+                aria-label="تكبير الصورة"
+                className="grid size-11 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
+                disabled={imageZoom >= maxImageZoom}
+                onClick={zoomIn}
+                type="button"
+              >
+                <ZoomIn className="size-6" />
+              </button>
+              <button
+                aria-label="إعادة حجم الصورة"
+                className="hidden size-11 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:grid"
+                disabled={imageZoom === 1}
+                onClick={resetZoom}
+                type="button"
+              >
+                <RotateCcw className="size-5" />
+              </button>
+            </div>
+            <span className="rounded-full bg-black/35 px-3 py-1 text-sm font-semibold tabular-nums text-white/90">
+              {Math.round(imageZoom * 100)}%
+            </span>
           </div>
           <div
-            className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 sm:px-16"
+            className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 py-3 sm:px-20 sm:py-4"
             onTouchEnd={(event) =>
               handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)
             }
@@ -245,8 +281,15 @@ export function ListingImageGallery({
             onWheel={handleLightboxWheel}
           >
             <img
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
+              src={selectedImage}
+            />
+            <div className="absolute inset-0 bg-black/55" />
+            <img
               alt={title}
-              className="h-full w-full max-w-6xl object-contain transition-transform duration-150"
+              className="relative z-10 h-full w-full max-w-6xl object-contain transition-transform duration-150 sm:h-auto sm:max-h-[68dvh] sm:w-auto sm:max-w-[min(88vw,44rem)]"
               onError={(event) => showImageFallback(event.currentTarget)}
               onDoubleClick={() => {
                 setImageZoom((currentZoom) => (currentZoom > 1 ? 1 : 2));
@@ -254,46 +297,14 @@ export function ListingImageGallery({
               src={selectedImage}
               style={{ transform: `scale(${imageZoom})` }}
             />
-            <div hidden className="grid h-full w-full place-items-center text-slate-300">
+            <div hidden className="relative z-10 grid h-full w-full place-items-center text-slate-300">
               <ImageIcon className="size-10" />
-            </div>
-            <div className="absolute top-3 flex items-center gap-2 rounded-full bg-black/35 p-1 text-white backdrop-blur-sm sm:top-4">
-              <button
-                aria-label="تصغير الصورة"
-                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
-                disabled={imageZoom <= minImageZoom}
-                onClick={zoomOut}
-                type="button"
-              >
-                <ZoomOut className="size-5" />
-              </button>
-              <span className="min-w-12 text-center text-sm font-semibold tabular-nums">
-                {Math.round(imageZoom * 100)}%
-              </span>
-              <button
-                aria-label="تكبير الصورة"
-                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
-                disabled={imageZoom >= maxImageZoom}
-                onClick={zoomIn}
-                type="button"
-              >
-                <ZoomIn className="size-5" />
-              </button>
-              <button
-                aria-label="إعادة حجم الصورة"
-                className="grid size-10 place-items-center rounded-full transition hover:bg-white/15 disabled:opacity-40"
-                disabled={imageZoom === 1}
-                onClick={resetZoom}
-                type="button"
-              >
-                <RotateCcw className="size-5" />
-              </button>
             </div>
             {shouldShowThumbnails && (
               <>
                 <button
                   aria-label="الصورة السابقة"
-                  className="absolute left-3 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:left-6 sm:size-14"
+                  className="absolute left-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:left-6 sm:size-14"
                   onClick={showPreviousImage}
                   type="button"
                 >
@@ -301,7 +312,7 @@ export function ListingImageGallery({
                 </button>
                 <button
                   aria-label="الصورة التالية"
-                  className="absolute right-3 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:right-6 sm:size-14"
+                  className="absolute right-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:right-6 sm:size-14"
                   onClick={showNextImage}
                   type="button"
                 >
@@ -310,28 +321,58 @@ export function ListingImageGallery({
               </>
             )}
           </div>
-          <div className="flex items-center justify-center gap-10 px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-5">
-            <button
-              aria-label="الصورة السابقة"
-              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
-              disabled={!shouldShowThumbnails}
-              onClick={showPreviousImage}
-              type="button"
-            >
-              <ChevronLeft className="size-8" />
-            </button>
-            <span className="min-w-16 text-center text-2xl font-medium tabular-nums">
-              {selectedImageLabel}
-            </span>
-            <button
-              aria-label="الصورة التالية"
-              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
-              disabled={!shouldShowThumbnails}
-              onClick={showNextImage}
-              type="button"
-            >
-              <ChevronRight className="size-8" />
-            </button>
+          <div className="z-20 flex flex-col items-center gap-3 px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3">
+            {shouldShowThumbnails && (
+              <div className="hidden max-w-[min(88vw,44rem)] grid-cols-8 gap-2 sm:grid">
+                {visibleImages.map((image, index) => {
+                  const isSelected = index === selectedImageIndex;
+
+                  return (
+                    <button
+                      key={`lightbox-${image}-${index}`}
+                      aria-label={`عرض الصورة ${index + 1}`}
+                      aria-pressed={isSelected}
+                      className={`aspect-[4/3] overflow-hidden rounded-md border bg-black/40 transition ${
+                        isSelected
+                          ? 'border-white ring-2 ring-white/35'
+                          : 'border-white/15 hover:border-white/60'
+                      }`}
+                      onClick={() => selectLightboxImage(index)}
+                      type="button"
+                    >
+                      <img
+                        alt=""
+                        className="h-full w-full object-cover"
+                        src={image}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-10">
+              <button
+                aria-label="الصورة السابقة"
+                className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
+                disabled={!shouldShowThumbnails}
+                onClick={showPreviousImage}
+                type="button"
+              >
+                <ChevronLeft className="size-8" />
+              </button>
+              <span className="min-w-16 text-center text-xl font-medium tabular-nums text-white/95">
+                {selectedImageLabel}
+              </span>
+              <button
+                aria-label="الصورة التالية"
+                className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
+                disabled={!shouldShowThumbnails}
+                onClick={showNextImage}
+                type="button"
+              >
+                <ChevronRight className="size-8" />
+              </button>
+            </div>
           </div>
         </div>
       )}

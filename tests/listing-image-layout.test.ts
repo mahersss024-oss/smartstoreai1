@@ -35,10 +35,15 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /ZoomIn/);
   assert.match(source, /ZoomOut/);
   assert.match(source, /RotateCcw/);
+  assert.match(source, /selectLightboxImage/);
+  assert.match(source, /absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl/);
+  assert.match(source, /absolute inset-0 bg-black\/55/);
   assert.match(source, /absolute left-3 top-1\/2/);
   assert.match(source, /absolute right-3 top-1\/2/);
-  assert.match(source, /className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 sm:px-16"/);
-  assert.match(source, /className="h-full w-full max-w-6xl object-contain transition-transform duration-150"[\s\S]*src=\{selectedImage\}/);
+  assert.match(source, /className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 py-3 sm:px-20 sm:py-4"/);
+  assert.match(source, /className="relative z-10 h-full w-full max-w-6xl object-contain transition-transform duration-150 sm:h-auto sm:max-h-\[68dvh\] sm:w-auto sm:max-w-\[min\(88vw,44rem\)\]"[\s\S]*src=\{selectedImage\}/);
+  assert.match(source, /className="hidden max-w-\[min\(88vw,44rem\)\] grid-cols-8 gap-2 sm:grid"/);
+  assert.match(source, /onClick=\{\(\) => selectLightboxImage\(index\)\}/);
   assert.match(source, /style=\{\{ transform: `scale\(\$\{imageZoom\}\)` \}\}/);
   assert.doesNotMatch(source, /className="max-h-full max-w-full object-contain"[\s\S]*src=\{selectedImage\}/);
   assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
