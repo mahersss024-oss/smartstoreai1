@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TouchEvent, WheelEvent } from 'react';
+import type { MouseEvent, TouchEvent, WheelEvent } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,12 +18,40 @@ type ListingImageGalleryProps = {
   title: string;
 };
 
+type ImagePan = {
+  x: number;
+  y: number;
+};
+
 const minImageZoom = 1;
 const maxImageZoom = 4;
 const imageZoomStep = 0.5;
+const emptyImagePan: ImagePan = { x: 0, y: 0 };
 
 function clampImageZoom(value: number) {
   return Math.min(maxImageZoom, Math.max(minImageZoom, Number(value.toFixed(2))));
+}
+
+function clampValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getBoundedImagePan(
+  pan: ImagePan,
+  zoom: number,
+  viewport: HTMLDivElement | null,
+) {
+  if (zoom <= 1 || !viewport) {
+    return emptyImagePan;
+  }
+
+  const maxX = (viewport.clientWidth * (zoom - 1)) / 2;
+  const maxY = (viewport.clientHeight * (zoom - 1)) / 2;
+
+  return {
+    x: clampValue(pan.x, -maxX, maxX),
+    y: clampValue(pan.y, -maxY, maxY),
+  };
 }
 
 function getTouchDistance(touches: {
@@ -49,9 +77,22 @@ export function ListingImageGallery({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
+  const [imagePan, setImagePan] = useState<ImagePan>(emptyImagePan);
+  const imageViewportRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
+  const touchPanStartRef = useRef<{
+    x: number;
+    y: number;
+    pan: ImagePan;
+  } | null>(null);
   const pinchStartDistanceRef = useRef<number | null>(null);
   const pinchStartZoomRef = useRef(1);
+  const pinchStartPanRef = useRef<ImagePan>(emptyImagePan);
+  const mousePanStartRef = useRef<{
+    x: number;
+    y: number;
+    pan: ImagePan;
+  } | null>(null);
   const selectedImage = visibleImages[selectedImageIndex] ?? visibleImages[0] ?? '';
   const shouldShowThumbnails = visibleImages.length > 1;
   const selectedImageLabel = `${selectedImageIndex + 1} / ${visibleImages.length}`;
@@ -62,35 +103,52 @@ export function ListingImageGallery({
   const openLightbox = (index: number) => {
     setSelectedImageIndex(index);
     setImageZoom(1);
+    setImagePan(emptyImagePan);
     setIsLightboxOpen(true);
   };
   const selectLightboxImage = (index: number) => {
     setSelectedImageIndex(index);
     setImageZoom(1);
+    setImagePan(emptyImagePan);
+  };
+  const updateImageZoom = (getNextZoom: (currentZoom: number) => number) => {
+    setImageZoom((currentZoom) => {
+      const nextZoom = clampImageZoom(getNextZoom(currentZoom));
+
+      setImagePan((currentPan) =>
+        getBoundedImagePan(currentPan, nextZoom, imageViewportRef.current),
+      );
+
+      return nextZoom;
+    });
   };
   const zoomIn = () => {
-    setImageZoom((currentZoom) => clampImageZoom(currentZoom + imageZoomStep));
+    updateImageZoom((currentZoom) => currentZoom + imageZoomStep);
   };
   const zoomOut = () => {
-    setImageZoom((currentZoom) => clampImageZoom(currentZoom - imageZoomStep));
+    updateImageZoom((currentZoom) => currentZoom - imageZoomStep);
   };
   const resetZoom = () => {
     setImageZoom(1);
+    setImagePan(emptyImagePan);
   };
   const showPreviousImage = useCallback(() => {
     setImageZoom(1);
+    setImagePan(emptyImagePan);
     setSelectedImageIndex((currentIndex) =>
       currentIndex === 0 ? visibleImages.length - 1 : currentIndex - 1,
     );
   }, [visibleImages.length]);
   const showNextImage = useCallback(() => {
     setImageZoom(1);
+    setImagePan(emptyImagePan);
     setSelectedImageIndex((currentIndex) =>
       currentIndex === visibleImages.length - 1 ? 0 : currentIndex + 1,
     );
   }, [visibleImages.length]);
   const handleLightboxTouchEnd = (x: number) => {
     pinchStartDistanceRef.current = null;
+    touchPanStartRef.current = null;
 
     if (!shouldShowThumbnails || imageZoom > 1 || touchStartXRef.current === null) {
       touchStartXRef.current = null;
@@ -117,31 +175,94 @@ export function ListingImageGallery({
     if (touchDistance !== null) {
       pinchStartDistanceRef.current = touchDistance;
       pinchStartZoomRef.current = imageZoom;
+      pinchStartPanRef.current = imagePan;
       touchStartXRef.current = null;
+      touchPanStartRef.current = null;
       return;
     }
 
+    touchPanStartRef.current = {
+      x: event.changedTouches[0]?.clientX ?? 0,
+      y: event.changedTouches[0]?.clientY ?? 0,
+      pan: imagePan,
+    };
     touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
   };
   const handleLightboxTouchMove = (event: TouchEvent<HTMLDivElement>) => {
     const touchDistance = getTouchDistance(event.touches);
 
-    if (touchDistance === null || pinchStartDistanceRef.current === null) {
+    if (touchDistance !== null && pinchStartDistanceRef.current !== null) {
+      event.preventDefault();
+
+      const nextZoom = clampImageZoom(
+        pinchStartZoomRef.current * (touchDistance / pinchStartDistanceRef.current),
+      );
+
+      setImageZoom(nextZoom);
+      setImagePan(
+        getBoundedImagePan(pinchStartPanRef.current, nextZoom, imageViewportRef.current),
+      );
+
+      return;
+    }
+
+    if (imageZoom <= 1 || !touchPanStartRef.current || !event.touches[0]) {
       return;
     }
 
     event.preventDefault();
-    setImageZoom(
-      clampImageZoom(
-        pinchStartZoomRef.current * (touchDistance / pinchStartDistanceRef.current),
+    setImagePan(
+      getBoundedImagePan(
+        {
+          x:
+            touchPanStartRef.current.pan.x +
+            event.touches[0].clientX -
+            touchPanStartRef.current.x,
+          y:
+            touchPanStartRef.current.pan.y +
+            event.touches[0].clientY -
+            touchPanStartRef.current.y,
+        },
+        imageZoom,
+        imageViewportRef.current,
       ),
     );
   };
   const handleLightboxWheel = (event: WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setImageZoom((currentZoom) =>
-      clampImageZoom(currentZoom + (event.deltaY < 0 ? imageZoomStep : -imageZoomStep)),
+    updateImageZoom((currentZoom) =>
+      currentZoom + (event.deltaY < 0 ? imageZoomStep : -imageZoomStep),
     );
+  };
+  const handleLightboxMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (imageZoom <= 1) {
+      return;
+    }
+
+    mousePanStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pan: imagePan,
+    };
+  };
+  const handleLightboxMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    if (imageZoom <= 1 || !mousePanStartRef.current) {
+      return;
+    }
+
+    setImagePan(
+      getBoundedImagePan(
+        {
+          x: mousePanStartRef.current.pan.x + event.clientX - mousePanStartRef.current.x,
+          y: mousePanStartRef.current.pan.y + event.clientY - mousePanStartRef.current.y,
+        },
+        imageZoom,
+        imageViewportRef.current,
+      ),
+    );
+  };
+  const endMousePan = () => {
+    mousePanStartRef.current = null;
   };
 
   useEffect(() => {
@@ -272,7 +393,14 @@ export function ListingImageGallery({
             </span>
           </div>
           <div
-            className="relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 py-3 sm:px-20 sm:py-4"
+            ref={imageViewportRef}
+            className={`relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 py-3 sm:px-20 sm:py-4 ${
+              imageZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
+            onMouseDown={handleLightboxMouseDown}
+            onMouseLeave={endMousePan}
+            onMouseMove={handleLightboxMouseMove}
+            onMouseUp={endMousePan}
             onTouchEnd={(event) =>
               handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)
             }
@@ -289,13 +417,20 @@ export function ListingImageGallery({
             <div className="absolute inset-0 bg-black/55" />
             <img
               alt={title}
-              className="relative z-10 h-full w-full max-w-6xl object-contain transition-transform duration-150 sm:h-auto sm:max-h-[68dvh] sm:w-auto sm:max-w-[min(88vw,44rem)]"
+              className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-[68dvh] sm:w-auto sm:max-w-[min(88vw,44rem)]"
               onError={(event) => showImageFallback(event.currentTarget)}
               onDoubleClick={() => {
-                setImageZoom((currentZoom) => (currentZoom > 1 ? 1 : 2));
+                if (imageZoom > 1) {
+                  resetZoom();
+                  return;
+                }
+
+                updateImageZoom(() => 2);
               }}
               src={selectedImage}
-              style={{ transform: `scale(${imageZoom})` }}
+              style={{
+                transform: `translate3d(${imagePan.x}px, ${imagePan.y}px, 0) scale(${imageZoom})`,
+              }}
             />
             <div hidden className="relative z-10 grid h-full w-full place-items-center text-slate-300">
               <ImageIcon className="size-10" />
