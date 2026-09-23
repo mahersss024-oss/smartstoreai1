@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 
-const minimumSupportedNodeMajor = 24;
-const maximumSupportedNodeMajor = 26;
+const minimumSupportedNodeMajor = 22;
+const maximumSupportedNodeMajor = 24;
 
 function getNodeMajorVersion() {
   return Number.parseInt(process.versions.node.split('.')[0] ?? '', 10);
@@ -99,4 +99,3 @@ child.on('exit', (code, signal) => {
 
   process.exit(code ?? 0);
 });
-

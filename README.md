@@ -4,7 +4,7 @@
 
 ## Setup
 
-- Node.js: 24.x to 26.x (24.x recommended for deployment parity)
+- Node.js: 22.x to 24.x (22.x recommended for deployment parity)
 - pnpm: 10.32.1+
 - Production: set `SMARTSTORE_MARKETPLACE_STORE=database`
 
