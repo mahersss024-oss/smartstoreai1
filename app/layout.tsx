@@ -100,16 +100,12 @@ html[data-app-display='standalone'] #smartstore-welcome {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: var(--app-welcome-bg);
-  background-repeat: no-repeat;
-}
-#smartstore-welcome::before {
   z-index: 0;
-  background-position: center;
-  background-size: cover;
-  filter: blur(18px) saturate(1.1);
-  opacity: 0.5;
-  transform: scale(1.12);
+  background:
+    radial-gradient(circle at 50% 28%, rgb(28 194 111 / 30%), transparent 34%),
+    radial-gradient(circle at 72% 48%, rgb(17 124 139 / 34%), transparent 42%),
+    linear-gradient(160deg, rgb(8 17 29 / 76%), rgb(13 43 40 / 42%) 48%, rgb(17 124 139 / 34%));
+  opacity: 1;
 }
 #smartstore-welcome .app-welcome__brand {
   position: absolute;
@@ -152,10 +148,8 @@ html[data-app-display='standalone'] #smartstore-welcome {
 }
 @media (min-width: 1024px) and (orientation: landscape) {
   #smartstore-welcome .app-welcome__brand {
-    padding: 0;
-    object-fit: cover;
-    mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
+    padding: calc(env(safe-area-inset-top) + 1rem) 0 calc(env(safe-area-inset-bottom) + 9rem);
+    object-fit: contain;
   }
 }
 @keyframes app-welcome-lifecycle {

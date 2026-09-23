@@ -97,14 +97,14 @@ test('welcome logo asset exists in public assets', () => {
   );
 });
 
-test('welcome component uses the market logo as the full-screen background', () => {
+test('welcome component uses the market logo as a single foreground brand layer', () => {
   const component = readFileSync(
     join(process.cwd(), 'components', 'app-welcome-splash.tsx'),
     'utf8',
   );
 
   assert.match(component, /\/hamad-market-logo\.jpeg/);
-  assert.match(component, /--app-welcome-bg/);
+  assert.doesNotMatch(component, /--app-welcome-bg/);
   assert.match(component, /سوقك الذكي للبيع والشراء/);
   assert.doesNotMatch(component, /app-welcome__logo/);
   assert.doesNotMatch(component, /app-welcome__title/);
@@ -122,10 +122,27 @@ test('welcome brand image is not cropped on mobile and tablet', () => {
     assert.match(source, /app-welcome__brand[\s\S]*object-fit: contain/);
     assert.match(source, /app-welcome__brand[\s\S]*padding: calc\(env\(safe-area-inset-top\)/);
     assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)/);
-    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)[\s\S]*object-fit: cover/);
+    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)[\s\S]*object-fit: contain/);
+    assert.doesNotMatch(source, /app-welcome__brand[\s\S]{0,500}object-fit: cover/);
     assert.doesNotMatch(source, /width: min\(132vw, 760px\)/);
     assert.doesNotMatch(source, /width: min\(96vw, 980px\)/);
     assert.doesNotMatch(source, /width: min\(82vw, 1100px\)/);
+  }
+});
+
+test('welcome background does not duplicate the brand image behind itself', () => {
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  for (const source of [globals, layout]) {
+    assert.doesNotMatch(source, /app-welcome::before[\s\S]{0,360}background-image: var\(--app-welcome-bg\)/);
+    assert.doesNotMatch(source, /smartstore-welcome::before[\s\S]{0,360}background-image: var\(--app-welcome-bg\)/);
+    assert.doesNotMatch(source, /app-welcome::before[\s\S]{0,360}filter: blur\(18px\) saturate\(1\.1\)/);
+    assert.doesNotMatch(source, /smartstore-welcome::before[\s\S]{0,360}filter: blur\(18px\) saturate\(1\.1\)/);
+    assert.doesNotMatch(source, /app-welcome::before[\s\S]{0,360}transform: scale\(1\.12\)/);
+    assert.doesNotMatch(source, /smartstore-welcome::before[\s\S]{0,360}transform: scale\(1\.12\)/);
+    assert.match(source, /radial-gradient\(circle at 50% 28%/);
+    assert.match(source, /linear-gradient\(160deg/);
   }
 });
 

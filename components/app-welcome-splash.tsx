@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import {
   APP_DISPLAY_MODE_ATTR,
@@ -88,7 +88,6 @@ export function AppWelcomeSplash() {
       id={WELCOME_ID}
       className="app-welcome"
       role="presentation"
-      style={{ '--app-welcome-bg': `url(${WELCOME_BACKGROUND_SRC})` } as CSSProperties}
     >
       <div className="app-welcome__backdrop" aria-hidden="true" />
       {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset
