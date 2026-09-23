@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
 
 type ListingImageGalleryProps = {
@@ -16,6 +16,7 @@ export function ListingImageGallery({
   const visibleImages = images.slice(0, 8);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const touchStartXRef = useRef<number | null>(null);
   const selectedImage = visibleImages[selectedImageIndex] ?? visibleImages[0] ?? '';
   const shouldShowThumbnails = visibleImages.length > 1;
   const selectedImageLabel = `${selectedImageIndex + 1} / ${visibleImages.length}`;
@@ -37,6 +38,26 @@ export function ListingImageGallery({
       currentIndex === visibleImages.length - 1 ? 0 : currentIndex + 1,
     );
   }, [visibleImages.length]);
+  const handleLightboxTouchEnd = (x: number) => {
+    if (!shouldShowThumbnails || touchStartXRef.current === null) {
+      touchStartXRef.current = null;
+      return;
+    }
+
+    const swipeDistance = x - touchStartXRef.current;
+    touchStartXRef.current = null;
+
+    if (Math.abs(swipeDistance) < 45) {
+      return;
+    }
+
+    if (swipeDistance > 0) {
+      showPreviousImage();
+      return;
+    }
+
+    showNextImage();
+  };
 
   useEffect(() => {
     if (!isLightboxOpen) {
@@ -120,7 +141,7 @@ export function ListingImageGallery({
         <div
           aria-label="عارض صور الإعلان"
           aria-modal="true"
-          className="fixed inset-0 z-50 grid grid-rows-[auto_1fr_auto] bg-black text-white"
+          className="fixed inset-0 z-[10000] grid grid-rows-[auto_1fr_auto] bg-black text-white"
           role="dialog"
         >
           <div className="flex items-center justify-between px-4 py-5">
@@ -133,7 +154,15 @@ export function ListingImageGallery({
               <X className="size-7" />
             </button>
           </div>
-          <div className="grid min-h-0 place-items-center">
+          <div
+            className="relative grid min-h-0 touch-pan-y place-items-center"
+            onTouchEnd={(event) =>
+              handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)
+            }
+            onTouchStart={(event) => {
+              touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+            }}
+          >
             <img
               alt={title}
               className="max-h-full max-w-full object-contain"
@@ -143,11 +172,31 @@ export function ListingImageGallery({
             <div hidden className="grid h-full w-full place-items-center text-slate-300">
               <ImageIcon className="size-10" />
             </div>
+            {shouldShowThumbnails && (
+              <>
+                <button
+                  aria-label="الصورة السابقة"
+                  className="absolute left-3 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:left-6 sm:size-14"
+                  onClick={showPreviousImage}
+                  type="button"
+                >
+                  <ChevronLeft className="size-8" />
+                </button>
+                <button
+                  aria-label="الصورة التالية"
+                  className="absolute right-3 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:right-6 sm:size-14"
+                  onClick={showNextImage}
+                  type="button"
+                >
+                  <ChevronRight className="size-8" />
+                </button>
+              </>
+            )}
           </div>
-          <div className="flex items-center justify-center gap-10 px-4 pb-8 pt-5">
+          <div className="flex items-center justify-center gap-10 px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-5">
             <button
               aria-label="الصورة السابقة"
-              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
+              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
               disabled={!shouldShowThumbnails}
               onClick={showPreviousImage}
               type="button"
@@ -159,7 +208,7 @@ export function ListingImageGallery({
             </span>
             <button
               aria-label="الصورة التالية"
-              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
+              className="grid size-12 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40 sm:hidden"
               disabled={!shouldShowThumbnails}
               onClick={showNextImage}
               type="button"

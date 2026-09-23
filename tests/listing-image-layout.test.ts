@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('listing details keeps up to eight thumbnails in a four-column grid below the main image', async () => {
+test('listing details keeps up to eight thumbnails and opens a full-screen lightbox', async () => {
   const source = await readFile(
     new URL('../app/listings/[listingId]/listing-image-gallery.tsx', import.meta.url),
     'utf8',
@@ -14,11 +14,17 @@ test('listing details keeps up to eight thumbnails in a four-column grid below t
   assert.match(source, /isLightboxOpen/);
   assert.match(source, /openLightbox\(selectedImageIndex\)/);
   assert.match(source, /openLightbox\(index\)/);
-  assert.match(source, /aria-label="عارض صور الإعلان"/);
-  assert.match(source, /className="fixed inset-0 z-50 grid grid-rows-\[auto_1fr_auto\] bg-black text-white"/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /className="fixed inset-0 z-\[10000\] grid grid-rows-\[auto_1fr_auto\] bg-black text-white"/);
   assert.match(source, /selectedImageLabel = `\$\{selectedImageIndex \+ 1\} \/ \$\{visibleImages\.length\}`/);
   assert.match(source, /showPreviousImage/);
   assert.match(source, /showNextImage/);
+  assert.match(source, /touchStartXRef/);
+  assert.match(source, /handleLightboxTouchEnd/);
+  assert.match(source, /onTouchStart/);
+  assert.match(source, /onTouchEnd/);
+  assert.match(source, /absolute left-3 top-1\/2/);
+  assert.match(source, /absolute right-3 top-1\/2/);
   assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
   assert.match(source, /className="h-full w-full object-contain"/);
   assert.match(source, /dark:bg-slate-950/);
