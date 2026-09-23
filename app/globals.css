@@ -944,17 +944,16 @@
   .app-welcome__brand {
     position: absolute;
     z-index: 2;
-    top: 36%;
-    left: 50%;
-    width: min(132vw, 760px);
+    inset: 0;
+    width: 100%;
     max-width: none;
-    height: auto;
+    height: 100%;
     pointer-events: none;
-    transform: translate(-50%, -50%);
     user-select: none;
     -webkit-user-drag: none;
     display: block;
-    object-fit: contain;
+    object-fit: cover;
+    object-position: center;
     filter: drop-shadow(0 22px 48px rgb(8 17 29 / 42%));
     mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
@@ -1018,22 +1017,12 @@
   }
 
   @media (min-width: 640px) {
-    .app-welcome__brand {
-      top: 39%;
-      width: min(96vw, 980px);
-    }
-
     .app-welcome__content {
       padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
     }
   }
 
   @media (orientation: landscape) {
-    .app-welcome__brand {
-      top: 44%;
-      width: min(82vw, 1100px);
-    }
-
     .app-welcome__content {
       padding-bottom: calc(env(safe-area-inset-bottom) + 2.25rem);
     }

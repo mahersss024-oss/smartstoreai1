@@ -114,16 +114,16 @@ html[data-app-display='standalone'] #smartstore-welcome {
 #smartstore-welcome .app-welcome__brand {
   position: absolute;
   z-index: 2;
-  top: 36%;
-  left: 50%;
-  width: min(132vw, 760px);
+  inset: 0;
+  width: 100%;
   max-width: none;
-  height: auto;
+  height: 100%;
   pointer-events: none;
-  transform: translate(-50%, -50%);
   user-select: none;
   -webkit-user-drag: none;
   display: block;
+  object-fit: cover;
+  object-position: center;
   mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 13%, #000 87%, transparent 100%);
 }
