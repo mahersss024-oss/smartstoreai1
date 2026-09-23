@@ -11,6 +11,14 @@ test('listing details keeps up to eight thumbnails in a four-column grid below t
   assert.match(source, /visibleImages = images\.slice\(0, 8\)/);
   assert.match(source, /shouldShowThumbnails = visibleImages\.length > 1/);
   assert.match(source, /\{shouldShowThumbnails && \(/);
+  assert.match(source, /isLightboxOpen/);
+  assert.match(source, /openLightbox\(selectedImageIndex\)/);
+  assert.match(source, /openLightbox\(index\)/);
+  assert.match(source, /aria-label="عارض صور الإعلان"/);
+  assert.match(source, /className="fixed inset-0 z-50 grid grid-rows-\[auto_1fr_auto\] bg-black text-white"/);
+  assert.match(source, /selectedImageLabel = `\$\{selectedImageIndex \+ 1\} \/ \$\{visibleImages\.length\}`/);
+  assert.match(source, /showPreviousImage/);
+  assert.match(source, /showNextImage/);
   assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
   assert.match(source, /className="h-full w-full object-contain"/);
   assert.match(source, /dark:bg-slate-950/);
