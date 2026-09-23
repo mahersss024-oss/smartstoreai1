@@ -16,6 +16,9 @@ const objectStorageEnvKeys = [
   'SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY',
   'SMARTSTORE_OBJECT_STORAGE_REGION',
   'SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_ZONE_ID',
+  'CLOUDFLARE_CACHE_PURGE_TIMEOUT_MS',
 ] as const;
 
 function withEnv(values: Record<string, string | undefined>) {
@@ -83,6 +86,8 @@ test('uploads listing images to S3-compatible storage with SigV4 query signing',
     SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
     SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
     SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+    CLOUDFLARE_API_TOKEN: undefined,
+    CLOUDFLARE_ZONE_ID: undefined,
   });
   const originalFetch = globalThis.fetch;
   const uploaded: {
@@ -177,6 +182,109 @@ test('deletes stored listing image variants from S3-compatible storage', async (
       '/listing-images/listings/2026/09/image-1-thumbnail.jpg',
       '/listing-images/listings/2026/09/image-1.jpg',
     ].sort());
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+test('purges Cloudflare cache for deleted listing image variants when configured', async () => {
+  const restoreEnv = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 's3',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT:
+      'https://account-id.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+    SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+    CLOUDFLARE_API_TOKEN: 'cf-token',
+    CLOUDFLARE_ZONE_ID: 'cf-zone',
+  });
+  const originalFetch = globalThis.fetch;
+  const purges: Array<{
+    url: string;
+    authorization: string | null;
+    files: string[];
+  }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+
+    if (url.host === 'api.cloudflare.com') {
+      purges.push({
+        url: url.toString(),
+        authorization: new Headers(init?.headers).get('Authorization'),
+        files: ((JSON.parse(String(init?.body)) as { files: string[] }).files),
+      });
+
+      return Response.json({ success: true });
+    }
+
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    const urls = [
+      'https://images.example.com/listings/2026/09/image-1.jpg',
+      'https://images.example.com/listings/2026/09/image-1-display.jpg',
+      'https://images.example.com/listings/2026/09/image-1-thumbnail.jpg',
+    ];
+
+    assert.equal(
+      await deleteListingObject({
+        imageId: 'image-1',
+        urls,
+      }),
+      true,
+    );
+    assert.equal(
+      purges[0]?.url,
+      'https://api.cloudflare.com/client/v4/zones/cf-zone/purge_cache',
+    );
+    assert.equal(purges[0]?.authorization, 'Bearer cf-token');
+    assert.deepEqual(purges[0]?.files.sort(), urls.sort());
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+test('keeps image deletion successful when Cloudflare cache purge fails', async () => {
+  const restoreEnv = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 's3',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT:
+      'https://account-id.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+    SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+    CLOUDFLARE_API_TOKEN: 'cf-token',
+    CLOUDFLARE_ZONE_ID: 'cf-zone',
+  });
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+
+    if (url.host === 'api.cloudflare.com') {
+      return Response.json({ success: false }, { status: 500 });
+    }
+
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    assert.equal(
+      await deleteListingObject({
+        imageId: 'image-1',
+        urls: [
+          'https://images.example.com/listings/2026/09/image-1.jpg',
+        ],
+      }),
+      true,
+    );
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv();

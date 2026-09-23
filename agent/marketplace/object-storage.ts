@@ -25,6 +25,11 @@ type S3ObjectStorageConfig = {
   publicUrl?: string;
 };
 
+type CloudflareCachePurgeConfig = {
+  apiToken: string;
+  zoneId: string;
+};
+
 function getObjectStorageMode() {
   return process.env.SMARTSTORE_IMAGE_STORAGE?.trim().toLowerCase();
 }
@@ -279,6 +284,28 @@ function createPresignedRequest({
   };
 }
 
+function getCloudflareCachePurgeConfig(): CloudflareCachePurgeConfig | null {
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
+
+  if (!apiToken || !zoneId) {
+    return null;
+  }
+
+  return { apiToken, zoneId };
+}
+
+function getCloudflareCachePurgeTimeoutMs() {
+  const rawValue = process.env.CLOUDFLARE_CACHE_PURGE_TIMEOUT_MS?.trim();
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : 10_000;
+
+  if (!Number.isFinite(parsedValue)) {
+    return 10_000;
+  }
+
+  return Math.min(Math.max(parsedValue, 1_000), 30_000);
+}
+
 async function storeListingObjectInS3(input: StoreListingObjectInput) {
   const config = getS3ObjectStorageConfig();
   const body = Buffer.from(input.data);
@@ -414,6 +441,48 @@ async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string)
   }
 }
 
+async function purgeCloudflareCacheByUrls(urls: string[]) {
+  const config = getCloudflareCachePurgeConfig();
+
+  if (!config || urls.length === 0) {
+    return false;
+  }
+
+  const response = await fetchWithTimeout(
+    `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ files: urls }),
+    },
+    getCloudflareCachePurgeTimeoutMs(),
+  );
+
+  if (!response.ok) {
+    const responseText = await getStorageResponseText(response);
+
+    throw new Error(
+      `Cloudflare cache purge failed with status ${response.status}${
+        responseText ? `: ${responseText}` : ''
+      }.`,
+    );
+  }
+
+  return true;
+}
+
+async function purgeCloudflareCacheBestEffort(urls: string[]) {
+  try {
+    await purgeCloudflareCacheByUrls(urls);
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[cloudflare_cache_purge] failure=${errorName}`);
+  }
+}
+
 export async function deleteListingObject(input: DeleteListingObjectInput) {
   if (!isObjectStorageEnabled()) {
     return false;
@@ -429,12 +498,14 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
 
   const config = getS3ObjectStorageConfig();
   const keys = new Set<string>();
+  const purgeUrls = new Set<string>();
 
   for (const url of input.urls ?? []) {
     const key = getStoredObjectKeyFromUrl(config, url);
 
     if (key) {
       keys.add(key);
+      purgeUrls.add(url);
     }
   }
 
@@ -443,6 +514,7 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
   }
 
   await Promise.all([...keys].map((key) => deleteStoredObjectKey(config, key)));
+  await purgeCloudflareCacheBestEffort([...purgeUrls]);
 
   return true;
 }
