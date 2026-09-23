@@ -110,18 +110,17 @@ html[data-app-display='standalone'] #smartstore-welcome {
 #smartstore-welcome .app-welcome__brand {
   position: absolute;
   z-index: 2;
-  inset: 0;
-  width: 100%;
-  max-width: none;
-  height: 100%;
+  left: 50%;
+  top: 42%;
+  width: min(78vw, 26rem);
+  max-width: calc(100vw - 2rem);
+  height: auto;
   box-sizing: border-box;
-  padding: calc(env(safe-area-inset-top) + 0.75rem) 0 calc(env(safe-area-inset-bottom) + 9.5rem);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
   display: block;
-  object-fit: contain;
-  object-position: center;
+  transform: translate(-50%, -50%);
 }
 #smartstore-welcome .app-welcome__content {
   position: relative;
@@ -138,18 +137,20 @@ html[data-app-display='standalone'] #smartstore-welcome {
 }
 @media (min-width: 640px) {
   #smartstore-welcome .app-welcome__brand {
-    padding: calc(env(safe-area-inset-top) + 1rem) 0 calc(env(safe-area-inset-bottom) + 10.5rem);
+    top: 41%;
+    width: min(56vw, 30rem);
   }
 }
 @media (orientation: landscape) {
   #smartstore-welcome .app-welcome__brand {
-    padding: calc(env(safe-area-inset-top) + 0.5rem) 0 calc(env(safe-area-inset-bottom) + 5rem);
+    top: 40%;
+    width: min(42vw, 30rem);
   }
 }
 @media (min-width: 1024px) and (orientation: landscape) {
   #smartstore-welcome .app-welcome__brand {
-    padding: calc(env(safe-area-inset-top) + 1rem) 0 calc(env(safe-area-inset-bottom) + 9rem);
-    object-fit: contain;
+    top: 40%;
+    width: min(36vw, 34rem);
   }
 }
 @keyframes app-welcome-lifecycle {

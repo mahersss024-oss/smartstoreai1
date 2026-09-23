@@ -116,19 +116,21 @@ test('welcome component uses the market logo as a single foreground brand layer'
   assert.doesNotMatch(component, /\/smartstore-logo\.png/);
 });
 
-test('welcome brand image is not cropped on mobile and tablet', () => {
+test('welcome brand wordmark is centered and kept at a professional size', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
   for (const source of [globals, layout]) {
-    assert.match(source, /app-welcome__brand[\s\S]*inset: 0/);
-    assert.match(source, /app-welcome__brand[\s\S]*width: 100%/);
-    assert.match(source, /app-welcome__brand[\s\S]*height: 100%/);
-    assert.match(source, /app-welcome__brand[\s\S]*object-fit: contain/);
-    assert.match(source, /app-welcome__brand[\s\S]*padding: calc\(env\(safe-area-inset-top\)/);
+    assert.match(source, /app-welcome__brand[\s\S]*left: 50%/);
+    assert.match(source, /app-welcome__brand[\s\S]*top: 42%/);
+    assert.match(source, /app-welcome__brand[\s\S]*width: min\(78vw, 26rem\)/);
+    assert.match(source, /app-welcome__brand[\s\S]*height: auto/);
+    assert.match(source, /app-welcome__brand[\s\S]*transform: translate\(-50%, -50%\)/);
     assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)/);
-    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)[\s\S]*object-fit: contain/);
+    assert.match(source, /@media \(min-width: 1024px\) and \(orientation: landscape\)[\s\S]*width: min\(36vw, 34rem\)/);
     assert.doesNotMatch(source, /app-welcome__brand[\s\S]{0,500}object-fit: cover/);
+    assert.doesNotMatch(source, /app-welcome__brand[^{]*\{[^}]*width: 100%/);
+    assert.doesNotMatch(source, /app-welcome__brand[^{]*\{[^}]*height: 100%/);
     assert.doesNotMatch(source, /width: min\(132vw, 760px\)/);
     assert.doesNotMatch(source, /width: min\(96vw, 980px\)/);
     assert.doesNotMatch(source, /width: min\(82vw, 1100px\)/);
