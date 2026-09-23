@@ -158,6 +158,30 @@ function buildPublicUrl(config: S3ObjectStorageConfig, key: string, uploadUrl: U
   return `${config.publicUrl.replace(/\/$/, '')}/${key}`;
 }
 
+function formatErrorForLog(error: unknown) {
+  if (!(error instanceof Error)) {
+    return 'unknown error';
+  }
+
+  const cause = error.cause;
+  const causeParts: string[] = [];
+
+  if (cause instanceof Error) {
+    causeParts.push(cause.name, cause.message);
+    const causeCode = (cause as { code?: unknown }).code;
+
+    if (typeof causeCode === 'string' && causeCode) {
+      causeParts.push(`code=${causeCode}`);
+    }
+  }
+
+  return [error.name, error.message, causeParts.join(' ')]
+    .filter(Boolean)
+    .join(' / ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+}
+
 function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   if (!config.secretAccessKey) {
     throw new Error('Missing object storage secret access key.');
@@ -249,15 +273,23 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
     mediaType: input.mediaType,
     config,
   });
-  const response = await fetchWithTimeout(
-    request.uploadUrl,
-    {
-      method: 'PUT',
-      headers: request.headers,
-      body,
-    },
-    getObjectStorageTimeoutMs(),
-  );
+  let response: Response;
+
+  try {
+    response = await fetchWithTimeout(
+      request.uploadUrl,
+      {
+        method: 'PUT',
+        headers: request.headers,
+        body,
+      },
+      getObjectStorageTimeoutMs(),
+    );
+  } catch (error) {
+    throw new Error(
+      `Object storage upload request failed for ${request.uploadUrl.host}${request.uploadUrl.pathname}: ${formatErrorForLog(error)}.`,
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
