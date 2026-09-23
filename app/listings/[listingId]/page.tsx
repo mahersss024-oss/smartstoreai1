@@ -225,10 +225,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   <img
                     alt={listing.title ?? 'صورة الإعلان'}
                     className="h-full w-full object-contain"
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                      event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                    }}
                     src={images[0]}
                   />
                   <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
@@ -241,10 +237,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                       <img
                         alt=""
                         className="h-full w-full object-contain"
-                        onError={(event) => {
-                          event.currentTarget.hidden = true;
-                          event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                        }}
                         src={image}
                       />
                       <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
