@@ -23,13 +23,6 @@ type S3ObjectStorageConfig = {
   publicUrl?: string;
 };
 
-type CloudinaryStorageConfig = {
-  cloudName: string;
-  apiKey: string;
-  apiSecret: string;
-  folder: string;
-};
-
 function getObjectStorageMode() {
   return process.env.SMARTSTORE_IMAGE_STORAGE?.trim().toLowerCase();
 }
@@ -37,7 +30,7 @@ function getObjectStorageMode() {
 function isObjectStorageEnabled() {
   const mode = getObjectStorageMode();
 
-  return mode === 'object' || mode === 's3' || mode === 'cloudinary';
+  return mode === 'object' || mode === 's3';
 }
 
 function getObjectStorageTimeoutMs() {
@@ -64,31 +57,9 @@ function getS3ObjectStorageConfig(): S3ObjectStorageConfig {
   };
 }
 
-function getCloudinaryStorageConfig(): CloudinaryStorageConfig {
-  return {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() ?? '',
-    apiKey: process.env.CLOUDINARY_API_KEY?.trim() ?? '',
-    apiSecret: process.env.CLOUDINARY_API_SECRET?.trim() ?? '',
-    folder:
-      process.env.CLOUDINARY_FOLDER?.trim() || 'smartstore/listings',
-  };
-}
-
 export function getMissingObjectStorageConfig() {
   if (!isObjectStorageEnabled()) {
     return [];
-  }
-
-  if (getObjectStorageMode() === 'cloudinary') {
-    const cloudinaryConfig = getCloudinaryStorageConfig();
-
-    return [
-      ['CLOUDINARY_CLOUD_NAME', cloudinaryConfig.cloudName],
-      ['CLOUDINARY_API_KEY', cloudinaryConfig.apiKey],
-      ['CLOUDINARY_API_SECRET', cloudinaryConfig.apiSecret],
-    ]
-      .filter(([, value]) => !value)
-      .map(([key]) => key);
   }
 
   const s3Config = getS3ObjectStorageConfig();
@@ -105,10 +76,6 @@ export function getMissingObjectStorageConfig() {
 
 function sha256Hex(value: Buffer | string) {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function sha1Hex(value: string) {
-  return createHash('sha1').update(value).digest('hex');
 }
 
 function hmac(key: Buffer | string, value: string) {
@@ -334,125 +301,6 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   };
 }
 
-function createCloudinarySignature(
-  params: Record<string, string | number>,
-  apiSecret: string,
-) {
-  const payload = Object.entries(params)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('&');
-
-  return sha1Hex(`${payload}${apiSecret}`);
-}
-
-async function storeListingObjectInCloudinary(input: StoreListingObjectInput) {
-  const config = getCloudinaryStorageConfig();
-  const timestamp = Math.floor(Date.now() / 1000);
-  const uploadParams = {
-    folder: config.folder,
-    public_id: input.imageId,
-    timestamp,
-  };
-  const formData = new FormData();
-  const arrayBuffer = input.data.buffer.slice(
-    input.data.byteOffset,
-    input.data.byteOffset + input.data.byteLength,
-  ) as ArrayBuffer;
-  const blob = new Blob([arrayBuffer], { type: input.mediaType });
-
-  formData.append(
-    'file',
-    blob,
-    input.fileName ?? `${input.imageId}.${getExtension(input.mediaType)}`,
-  );
-  formData.append('api_key', config.apiKey);
-  formData.append('folder', uploadParams.folder);
-  formData.append('public_id', uploadParams.public_id);
-  formData.append('timestamp', String(uploadParams.timestamp));
-  formData.append(
-    'signature',
-    createCloudinarySignature(uploadParams, config.apiSecret),
-  );
-
-  const response = await fetchWithTimeout(
-    `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-      config.cloudName,
-    )}/image/upload`,
-    {
-      method: 'POST',
-      body: formData,
-    },
-    getObjectStorageTimeoutMs(),
-  );
-
-  if (!response.ok) {
-    throw new Error(`Cloudinary upload failed with status ${response.status}.`);
-  }
-
-  const result = (await response.json()) as {
-    public_id?: unknown;
-    secure_url?: unknown;
-    url?: unknown;
-  };
-  const url =
-    typeof result.secure_url === 'string'
-      ? result.secure_url
-      : typeof result.url === 'string'
-        ? result.url
-        : null;
-
-  if (!url) {
-    throw new Error('Cloudinary upload response is missing a secure URL.');
-  }
-
-  return {
-    key:
-      typeof result.public_id === 'string'
-        ? result.public_id
-        : `${config.folder}/${input.imageId}`,
-    url,
-  };
-}
-
-async function deleteListingObjectFromCloudinary(input: DeleteListingObjectInput) {
-  const config = getCloudinaryStorageConfig();
-  const timestamp = Math.floor(Date.now() / 1000);
-  const publicId = `${config.folder.replace(/\/$/, '')}/${input.imageId}`;
-  const destroyParams = {
-    public_id: publicId,
-    timestamp,
-  };
-  const formData = new FormData();
-
-  formData.append('api_key', config.apiKey);
-  formData.append('public_id', destroyParams.public_id);
-  formData.append('timestamp', String(destroyParams.timestamp));
-  formData.append(
-    'signature',
-    createCloudinarySignature(destroyParams, config.apiSecret),
-  );
-
-  const response = await fetchWithTimeout(
-    `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-      config.cloudName,
-    )}/image/destroy`,
-    {
-      method: 'POST',
-      body: formData,
-    },
-    getObjectStorageTimeoutMs(),
-  );
-
-  if (!response.ok) {
-    throw new Error(`Cloudinary delete failed with status ${response.status}.`);
-  }
-
-  const result = (await response.json()) as { result?: unknown };
-
-  return result.result === 'ok' || result.result === 'not found';
-}
-
 export async function storeListingObject(input: StoreListingObjectInput) {
   if (!isObjectStorageEnabled()) {
     return null;
@@ -466,14 +314,12 @@ export async function storeListingObject(input: StoreListingObjectInput) {
     );
   }
 
-  if (getObjectStorageMode() === 'cloudinary') {
-    return storeListingObjectInCloudinary(input);
-  }
-
   return storeListingObjectInS3(input);
 }
 
-export async function deleteListingObject(input: DeleteListingObjectInput) {
+export async function deleteListingObject(_input: DeleteListingObjectInput) {
+  void _input;
+
   if (!isObjectStorageEnabled()) {
     return false;
   }
@@ -484,10 +330,6 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
     throw new Error(
       `Missing object storage configuration: ${missingConfig.join(', ')}`,
     );
-  }
-
-  if (getObjectStorageMode() === 'cloudinary') {
-    return deleteListingObjectFromCloudinary(input);
   }
 
   return false;

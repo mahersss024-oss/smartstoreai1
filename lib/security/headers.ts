@@ -1,13 +1,12 @@
 // Centralized security header definitions for the whole site.
 //
 // The Content-Security-Policy is intentionally strict but allows the external
-// origins سوق حمد actually uses: Google profile images, Cloudinary, and
-// an optional object-storage public domain. Style-src keeps `'unsafe-inline'`
+// origins Souq Hamad actually uses: Google profile images and the configured
+// object-storage public domain. Style-src keeps `'unsafe-inline'`
 // because theme tokens are injected via inline <style> and Next.js streams
 // inline styles.
 
 const imageOrigins = [
-  'https://res.cloudinary.com',
   'https://lh3.googleusercontent.com',
 ];
 

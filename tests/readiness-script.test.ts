@@ -17,11 +17,15 @@ const productionEnv = {
   SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS: '30000',
   SMARTSTORE_RATE_LIMIT_REDIS_TIMEOUT_MS: '2000',
   SMARTSTORE_PUSH_TIMEOUT_MS: '10000',
-  SMARTSTORE_IMAGE_STORAGE: 'cloudinary',
+  SMARTSTORE_IMAGE_STORAGE: 's3',
   SMARTSTORE_MARKETPLACE_STORE: 'database',
-  CLOUDINARY_CLOUD_NAME: 'smartstore',
-  CLOUDINARY_API_KEY: 'cloudinary-key',
-  CLOUDINARY_API_SECRET: 'cloudinary-secret',
+  SMARTSTORE_OBJECT_STORAGE_ENDPOINT:
+    'https://account-id.r2.cloudflarestorage.com',
+  SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+  SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'object-access-key',
+  SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'object-secret-key',
+  SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+  SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.smartstore-ai.com',
 } satisfies Record<string, string>;
 
 test('readiness fails production when durable store dependencies are missing', () => {

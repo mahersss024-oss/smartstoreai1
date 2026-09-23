@@ -167,8 +167,8 @@ Required staging variables:
 - `DEEPSEEK_API_KEY`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `SMARTSTORE_IMAGE_STORAGE=cloudinary`, `s3`, or `object`
-- The matching Cloudinary or S3-compatible storage credentials
+- `SMARTSTORE_IMAGE_STORAGE=s3` or `object`
+- The matching S3-compatible storage credentials
 
 Optional but launch-relevant variables:
 

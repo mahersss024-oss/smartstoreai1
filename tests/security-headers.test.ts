@@ -49,7 +49,6 @@ test('csp permits framework eval but no remote scripts', () => {
 test('csp allows the marketplace image and auth origins', () => {
   const csp = buildContentSecurityPolicy();
 
-  assert.match(csp, /img-src[^;]*res\.cloudinary\.com/);
   assert.match(csp, /img-src[^;]*lh3\.googleusercontent\.com/);
   assert.match(csp, /connect-src[^;]*accounts\.google\.com/);
 });
@@ -85,4 +84,3 @@ test('adds HSTS only in production', () => {
     env.NODE_ENV = previousNodeEnv;
   }
 });
-

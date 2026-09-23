@@ -289,24 +289,6 @@ function validateImageStorage(
     return;
   }
 
-  if (mode === 'cloudinary') {
-    const missing = [
-      'CLOUDINARY_CLOUD_NAME',
-      'CLOUDINARY_API_KEY',
-      'CLOUDINARY_API_SECRET',
-    ].filter((key) => !present(env, key));
-
-    pushCheck(
-      checks,
-      'image_storage',
-      missing.length ? 'fail' : 'pass',
-      missing.length
-        ? `Cloudinary configuration is missing: ${missing.join(', ')}.`
-        : 'Cloudinary image storage is configured.',
-    );
-    return;
-  }
-
   if (mode === 'object' || mode === 's3') {
     const missing = [
       'SMARTSTORE_OBJECT_STORAGE_ENDPOINT',

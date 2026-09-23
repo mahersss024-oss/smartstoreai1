@@ -83,20 +83,22 @@ When the database store is enabled, listings, images, conversations, messages, f
 
 ## Listing Image Storage
 
-For production, use hosted image storage. Cloudinary is the simplest no-card option for early launch:
+For production, use hosted S3-compatible image storage such as Cloudflare R2:
 
 ```env
-SMARTSTORE_IMAGE_STORAGE=cloudinary
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-CLOUDINARY_FOLDER=smartstore/listings
+SMARTSTORE_IMAGE_STORAGE=s3
+SMARTSTORE_OBJECT_STORAGE_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+SMARTSTORE_OBJECT_STORAGE_BUCKET=smartstore-listings
+SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID=...
+SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY=...
+SMARTSTORE_OBJECT_STORAGE_REGION=auto
+SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL=https://PUBLIC_BUCKET_OR_CDN_DOMAIN
 SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
 SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
-Keep `CLOUDINARY_API_SECRET` server-side only in Render environment variables.
-`SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS` caps Cloudinary/S3 upload and delete
+Keep object storage access keys server-side only in Render environment variables.
+`SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS` caps S3-compatible upload and delete
 requests so a stalled image provider cannot hold the request open indefinitely.
 `SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Production can
 lower this value, but the application caps it at `8` to protect storage,
@@ -128,20 +130,6 @@ in production; the account key takes priority when both are present.
 
 Keep these values managed in the Render dashboard so payment recipients can be
 changed without a code deployment.
-
-Alternatively, set these Render environment variables with an S3-compatible provider such as Cloudflare R2, AWS S3, or another compatible storage service:
-
-```env
-SMARTSTORE_IMAGE_STORAGE=object
-SMARTSTORE_OBJECT_STORAGE_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
-SMARTSTORE_OBJECT_STORAGE_BUCKET=smartstore-listings
-SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID=...
-SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY=...
-SMARTSTORE_OBJECT_STORAGE_REGION=auto
-SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL=https://PUBLIC_BUCKET_OR_CDN_DOMAIN
-SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
-SMARTSTORE_MAX_IMAGES_PER_LISTING=8
-```
 
 `SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL` must be a public bucket URL or CDN URL that can serve uploaded listing images in the browser. If `SMARTSTORE_IMAGE_STORAGE` is empty, the app keeps the local development fallback.
 
