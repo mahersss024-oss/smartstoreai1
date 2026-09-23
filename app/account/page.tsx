@@ -32,6 +32,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ListingShareButton } from '@/components/listing-share-button';
+import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { createUploadableImageFile } from '@/lib/client-image-normalization';
@@ -1243,6 +1244,8 @@ export default function AccountPage() {
                 </div>
               ) : null}
             </section>
+
+            <PushNotificationSettings />
 
             <section className="grid gap-3 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
               <div className="flex flex-wrap items-center justify-between gap-3">

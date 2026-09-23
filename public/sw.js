@@ -89,3 +89,63 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  let payload = {};
+
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+
+  const title =
+    typeof payload.title === 'string' && payload.title.trim()
+      ? payload.title
+      : 'سوق حمد';
+  const body =
+    typeof payload.body === 'string' && payload.body.trim()
+      ? payload.body
+      : 'لديك تحديث جديد.';
+  const url =
+    typeof payload.url === 'string' && payload.url.startsWith('/')
+      ? payload.url
+      : '/';
+  const tag =
+    typeof payload.tag === 'string' && payload.tag.trim()
+      ? payload.tag
+      : undefined;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: '/icon.png',
+      badge: '/apple-icon.png',
+      data: { url },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin);
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if ('focus' in client && client.url === targetUrl.href) {
+            return client.focus();
+          }
+        }
+
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl.href);
+        }
+
+        return undefined;
+      }),
+  );
+});

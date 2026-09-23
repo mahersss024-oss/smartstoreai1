@@ -13,6 +13,7 @@ import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+import { notifyConversationMessage } from '@/lib/push/conversation-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,6 +271,22 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency
       ? idempotency.complete(responseBody, 201)
       : Response.json(responseBody, { status: 201 });
+  }
+
+  if (
+    'body' in parsed.data &&
+    result.status === 'sent' &&
+    result.conversation &&
+    result.message
+  ) {
+    await notifyConversationMessage({
+      conversation: result.conversation,
+      message: result.message,
+      senderName: session.user.name,
+    }).catch((error) => {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[push_notifications] message_notify_failed=${errorName}`);
+    });
   }
 
   return idempotency
