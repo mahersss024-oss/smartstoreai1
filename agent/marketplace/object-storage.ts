@@ -8,10 +8,12 @@ type StoreListingObjectInput = {
   mediaType: string;
   imageId: string;
   fileName?: string;
+  variant?: 'original' | 'display' | 'thumbnail';
 };
 
 type DeleteListingObjectInput = {
   imageId: string;
+  urls?: string[];
 };
 
 type S3ObjectStorageConfig = {
@@ -110,8 +112,10 @@ function createObjectKey(input: StoreListingObjectInput) {
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const variantSuffix =
+    input.variant && input.variant !== 'original' ? `-${input.variant}` : '';
 
-  return `listings/${year}/${month}/${input.imageId}.${getExtension(
+  return `listings/${year}/${month}/${input.imageId}${variantSuffix}.${getExtension(
     input.mediaType,
     input.fileName,
   )}`;
@@ -142,6 +146,8 @@ function buildPublicUrl(config: S3ObjectStorageConfig, key: string, uploadUrl: U
 
   return `${config.publicUrl.replace(/\/$/, '')}/${key}`;
 }
+
+const listingObjectCacheControl = 'public, max-age=31536000, immutable';
 
 function formatErrorForLog(error: unknown) {
   if (!(error instanceof Error)) {
@@ -187,13 +193,15 @@ function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   return hmac(serviceKey, 'aws4_request');
 }
 
-function createPresignedPutRequest({
+function createPresignedRequest({
+  method,
   key,
   mediaType,
   config,
 }: {
+  method: 'PUT' | 'DELETE';
   key: string;
-  mediaType: string;
+  mediaType?: string;
   config: S3ObjectStorageConfig;
 }) {
   if (!config.endpoint || !config.bucket || !config.accessKeyId) {
@@ -209,7 +217,23 @@ function createPresignedPutRequest({
   const dateStamp = getDateStamp(amzDate);
   const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
   const credential = `${config.accessKeyId}/${credentialScope}`;
-  const signedHeaders = 'host';
+  const requestHeaders: Record<string, string> =
+    method === 'PUT'
+      ? {
+          'Cache-Control': listingObjectCacheControl,
+          'Content-Type': mediaType ?? 'application/octet-stream',
+        }
+      : {};
+  const canonicalHeaderEntries = [
+    ['host', uploadUrl.host],
+    ...Object.entries(requestHeaders).map(([key, value]) => [
+      key.toLowerCase(),
+      value,
+    ]),
+  ].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  const signedHeaders = canonicalHeaderEntries
+    .map(([key]) => key)
+    .join(';');
   const payloadHash = 'UNSIGNED-PAYLOAD';
   const queryParams: Array<[string, string]> = [
     ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
@@ -224,12 +248,11 @@ function createPresignedPutRequest({
     .split('/')
     .map((segment) => awsEncode(segment))
     .join('/');
-  const canonicalHeaders = [
-    `host:${uploadUrl.host}`,
-    '',
-  ].join('\n');
+  const canonicalHeaders = `${canonicalHeaderEntries
+    .map(([key, value]) => `${key}:${String(value).trim()}`)
+    .join('\n')}\n`;
   const canonicalRequest = [
-    'PUT',
+    method,
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
@@ -252,9 +275,7 @@ function createPresignedPutRequest({
 
   return {
     uploadUrl,
-    headers: {
-      'Content-Type': mediaType,
-    },
+    headers: requestHeaders,
   };
 }
 
@@ -262,7 +283,8 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   const config = getS3ObjectStorageConfig();
   const body = Buffer.from(input.data);
   const key = createObjectKey(input);
-  const request = createPresignedPutRequest({
+  const request = createPresignedRequest({
+    method: 'PUT',
     key,
     mediaType: input.mediaType,
     config,
@@ -317,9 +339,82 @@ export async function storeListingObject(input: StoreListingObjectInput) {
   return storeListingObjectInS3(input);
 }
 
-export async function deleteListingObject(_input: DeleteListingObjectInput) {
-  void _input;
+function getStoredObjectKeyFromUrl(config: S3ObjectStorageConfig, urlValue: string) {
+  if (!urlValue) {
+    return null;
+  }
 
+  let url: URL;
+
+  try {
+    url = new URL(urlValue);
+  } catch {
+    return null;
+  }
+
+  if (config.publicUrl) {
+    const publicUrl = new URL(config.publicUrl);
+    const publicPathPrefix = publicUrl.pathname.replace(/\/$/, '');
+
+    if (url.origin === publicUrl.origin) {
+      const path = decodeURIComponent(url.pathname);
+
+      if (!publicPathPrefix || path.startsWith(`${publicPathPrefix}/`)) {
+        return path.slice(publicPathPrefix.length + 1).replace(/^\/+/, '');
+      }
+    }
+  }
+
+  const endpoint = new URL(config.endpoint);
+  const endpointPathPrefix = endpoint.pathname.replace(/\/$/, '');
+  const bucketPrefix = `${endpointPathPrefix}/${config.bucket}`.replace(
+    /\/+/g,
+    '/',
+  );
+  const path = decodeURIComponent(url.pathname);
+
+  if (url.host === endpoint.host && path.startsWith(`${bucketPrefix}/`)) {
+    return path.slice(bucketPrefix.length + 1).replace(/^\/+/, '');
+  }
+
+  return null;
+}
+
+async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string) {
+  const request = createPresignedRequest({
+    method: 'DELETE',
+    key,
+    config,
+  });
+  let response: Response;
+
+  try {
+    response = await fetchWithTimeout(
+      request.uploadUrl,
+      {
+        method: 'DELETE',
+        headers: request.headers,
+      },
+      getObjectStorageTimeoutMs(),
+    );
+  } catch (error) {
+    throw new Error(
+      `Object storage delete request failed for ${request.uploadUrl.host}${request.uploadUrl.pathname}: ${formatErrorForLog(error)}.`,
+    );
+  }
+
+  if (!response.ok && response.status !== 404) {
+    const responseText = await getStorageResponseText(response);
+
+    throw new Error(
+      `Object storage delete failed with status ${response.status}${
+        responseText ? `: ${responseText}` : ''
+      }.`,
+    );
+  }
+}
+
+export async function deleteListingObject(input: DeleteListingObjectInput) {
   if (!isObjectStorageEnabled()) {
     return false;
   }
@@ -332,5 +427,22 @@ export async function deleteListingObject(_input: DeleteListingObjectInput) {
     );
   }
 
-  return false;
+  const config = getS3ObjectStorageConfig();
+  const keys = new Set<string>();
+
+  for (const url of input.urls ?? []) {
+    const key = getStoredObjectKeyFromUrl(config, url);
+
+    if (key) {
+      keys.add(key);
+    }
+  }
+
+  if (!keys.size) {
+    return false;
+  }
+
+  await Promise.all([...keys].map((key) => deleteStoredObjectKey(config, key)));
+
+  return true;
 }

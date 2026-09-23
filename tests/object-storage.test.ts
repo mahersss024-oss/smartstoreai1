@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  deleteListingObject,
   getMissingObjectStorageConfig,
   storeListingObject,
 } from '@/agent/marketplace/object-storage';
@@ -120,12 +121,62 @@ test('uploads listing images to S3-compatible storage with SigV4 query signing',
     );
     assert.equal(
       uploaded.url.searchParams.get('X-Amz-SignedHeaders'),
-      'host',
+      'cache-control;content-type;host',
     );
     assert.equal(uploaded.headers.has('Authorization'), false);
     assert.equal(uploaded.headers.get('Content-Type'), 'image/jpeg');
+    assert.equal(
+      uploaded.headers.get('Cache-Control'),
+      'public, max-age=31536000, immutable',
+    );
     assert.equal(result?.key, expectedPrefix);
     assert.equal(result?.url, `https://images.example.com/${expectedPrefix}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+test('deletes stored listing image variants from S3-compatible storage', async () => {
+  const restoreEnv = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 's3',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT:
+      'https://account-id.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+    SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+  });
+  const originalFetch = globalThis.fetch;
+  const deletedPaths: string[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+
+    if (init?.method === 'DELETE') {
+      deletedPaths.push(url.pathname);
+    }
+
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    const deleted = await deleteListingObject({
+      imageId: 'image-1',
+      urls: [
+        'https://images.example.com/listings/2026/09/image-1.jpg',
+        'https://images.example.com/listings/2026/09/image-1-display.jpg',
+        'https://images.example.com/listings/2026/09/image-1-thumbnail.jpg',
+      ],
+    });
+
+    assert.equal(deleted, true);
+    assert.deepEqual(deletedPaths.sort(), [
+      '/listing-images/listings/2026/09/image-1-display.jpg',
+      '/listing-images/listings/2026/09/image-1-thumbnail.jpg',
+      '/listing-images/listings/2026/09/image-1.jpg',
+    ].sort());
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv();

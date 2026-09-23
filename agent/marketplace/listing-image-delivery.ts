@@ -6,18 +6,25 @@ type ListingImageUrls = {
 
 export function createListingImageDeliveryUrls(
   originalUrl: string,
+  variants: {
+    displayUrl?: string | null;
+    thumbnailUrl?: string | null;
+  } = {},
 ): ListingImageUrls {
   return {
     originalUrl,
-    displayUrl: originalUrl,
-    thumbnailUrl: originalUrl,
+    displayUrl: variants.displayUrl || originalUrl,
+    thumbnailUrl: variants.thumbnailUrl || variants.displayUrl || originalUrl,
   };
 }
 
 export function normalizeListingImageDeliveryUrls<T extends ListingImageUrls>(
   image: T,
 ): T {
-  const urls = createListingImageDeliveryUrls(image.originalUrl);
+  const urls = createListingImageDeliveryUrls(image.originalUrl, {
+    displayUrl: image.displayUrl,
+    thumbnailUrl: image.thumbnailUrl,
+  });
 
   return {
     ...image,

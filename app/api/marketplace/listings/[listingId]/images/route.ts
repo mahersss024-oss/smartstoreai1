@@ -34,6 +34,20 @@ const supportedMimeTypes = new Set([
 const maxImageBytes = 12 * 1024 * 1024;
 const maxImageUploadRequestBytes = maxImageBytes + 1024 * 1024;
 
+function getOptionalImageFile(formData: FormData, key: string) {
+  const file = formData.get(key);
+
+  if (!(file instanceof File) || file.size === 0) {
+    return null;
+  }
+
+  if (!supportedMimeTypes.has(file.type) || file.size > maxImageBytes) {
+    return null;
+  }
+
+  return file;
+}
+
 function createTrustedSecondaryImageComplianceDecision(
   expectedCategory?: string,
 ): ImageComplianceDecision {
@@ -171,6 +185,14 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const displayFile = getOptionalImageFile(formData, 'displayImage');
+  const thumbnailFile = getOptionalImageFile(formData, 'thumbnailImage');
+  const displayFileBuffer = displayFile
+    ? Buffer.from(await displayFile.arrayBuffer())
+    : null;
+  const thumbnailFileBuffer = thumbnailFile
+    ? Buffer.from(await thumbnailFile.arrayBuffer())
+    : null;
   const listingText = [
     existingListing.title,
     existingListing.description,
@@ -258,6 +280,7 @@ export async function POST(request: Request, context: RouteContext) {
       mediaType: file.type,
       imageId,
       fileName: file.name,
+      variant: 'original',
     });
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
@@ -293,6 +316,42 @@ export async function POST(request: Request, context: RouteContext) {
       : Response.json(responseBody, { status: 415 });
   }
 
+  let displayUrl = imageUrl;
+  let thumbnailUrl = imageUrl;
+
+  if (displayFile && displayFileBuffer) {
+    try {
+      displayUrl =
+        (await createPersistentListingImageUrl({
+          data: new Uint8Array(displayFileBuffer),
+          mediaType: displayFile.type,
+          imageId,
+          fileName: displayFile.name,
+          variant: 'display',
+        })) ?? imageUrl;
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_display_storage] failure=${errorName}`);
+    }
+  }
+
+  if (thumbnailFile && thumbnailFileBuffer) {
+    try {
+      thumbnailUrl =
+        (await createPersistentListingImageUrl({
+          data: new Uint8Array(thumbnailFileBuffer),
+          mediaType: thumbnailFile.type,
+          imageId,
+          fileName: thumbnailFile.name,
+          variant: 'thumbnail',
+        })) ?? displayUrl;
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_thumbnail_storage] failure=${errorName}`);
+      thumbnailUrl = displayUrl;
+    }
+  }
+
   const quality = analyzeImageQuality({
     fileName: file.name,
     mimeType: file.type,
@@ -304,7 +363,10 @@ export async function POST(request: Request, context: RouteContext) {
     isRelevantToListing:
       formData.get('isRelevantToListing') === 'false' ? false : undefined,
   });
-  const imageUrls = createListingImageDeliveryUrls(imageUrl);
+  const imageUrls = createListingImageDeliveryUrls(imageUrl, {
+    displayUrl,
+    thumbnailUrl,
+  });
   const image: ListingImage = {
     id: imageId,
     listingId,

@@ -113,7 +113,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
-  assert.match(homePage, /formData\.append\('image', await createUploadableImageFile\(image\)\)/);
+    assert.match(homePage, /createListingImageUploadFiles\(image\)/);
+    assert.match(homePage, /formData\.append\('displayImage', uploadFiles\.display\)/);
+    assert.match(homePage, /formData\.append\('thumbnailImage', uploadFiles\.thumbnail\)/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
   assert.match(homePage, /relative aspect-square self-start bg-slate-100/);
@@ -151,5 +153,5 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.match(homePage, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(adminListingsPage, /overflow-x-auto/);
   assert.match(listingGallery, /grid-cols-4/);
-  assert.match(listingGallery, /onClick=\{\(\) => setSelectedImage\(image\)\}/);
+  assert.match(listingGallery, /onClick=\{\(\) => openLightbox\(index\)\}/);
 });

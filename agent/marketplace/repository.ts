@@ -693,7 +693,10 @@ async function deleteListingObjectsBestEffort(listing: memoryStore.ListingRecord
   await Promise.all(
     listing.images.map(async (image) => {
       try {
-        await deleteListingObject({ imageId: image.id });
+        await deleteListingObject({
+          imageId: image.id,
+          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
+        });
       } catch (error) {
         const errorName = error instanceof Error ? error.name : 'UnknownError';
         console.warn(`[listing_draft_storage_delete] failure=${errorName}`);
@@ -1317,7 +1320,14 @@ export async function deleteListingImageForSeller(
   });
 
   try {
-    await deleteListingObject({ imageId });
+    await deleteListingObject({
+      imageId,
+      urls: [
+        imageToDelete.originalUrl,
+        imageToDelete.displayUrl,
+        imageToDelete.thumbnailUrl,
+      ],
+    });
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[listing_image_storage_delete] failure=${errorName}`);

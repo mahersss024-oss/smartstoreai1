@@ -1,6 +1,10 @@
 const normalizedImageMimeType = "image/jpeg";
 const normalizedImageQuality = 0.88;
 const normalizedImageMaxDimension = 1800;
+const displayImageQuality = 0.84;
+const displayImageMaxDimension = 1200;
+const thumbnailImageQuality = 0.78;
+const thumbnailImageMaxDimension = 480;
 const uploadSafeImageMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -10,14 +14,18 @@ const uploadSafeImageMimeTypes = new Set([
 const imageFileNamePattern =
   /\.(avif|bmp|gif|heic|heif|jfif|jpe?g|png|svg|tiff?|webp)$/i;
 
-function getNormalizedImageSize(width: number, height: number) {
+function getNormalizedImageSize(
+  width: number,
+  height: number,
+  maxDimension = normalizedImageMaxDimension
+) {
   const largestSide = Math.max(width, height);
 
-  if (largestSide <= normalizedImageMaxDimension) {
+  if (largestSide <= maxDimension) {
     return { width, height };
   }
 
-  const scale = normalizedImageMaxDimension / largestSide;
+  const scale = maxDimension / largestSide;
 
   return {
     width: Math.max(1, Math.round(width * scale)),
@@ -76,7 +84,13 @@ async function loadDrawableImage(blob: Blob): Promise<CanvasImageSource> {
   return loadImageElement(blob);
 }
 
-export async function convertImageBlobToJpegDataUrl(blob: Blob) {
+export async function convertImageBlobToJpegDataUrl(
+  blob: Blob,
+  options: {
+    maxDimension?: number;
+    quality?: number;
+  } = {}
+) {
   const image = await loadDrawableImage(blob);
   const sourceWidth =
     "width" in image && typeof image.width === "number" ? image.width : 0;
@@ -87,7 +101,11 @@ export async function convertImageBlobToJpegDataUrl(blob: Blob) {
     throw new Error("Image attachment has invalid dimensions.");
   }
 
-  const size = getNormalizedImageSize(sourceWidth, sourceHeight);
+  const size = getNormalizedImageSize(
+    sourceWidth,
+    sourceHeight,
+    options.maxDimension ?? normalizedImageMaxDimension
+  );
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
@@ -117,7 +135,7 @@ export async function convertImageBlobToJpegDataUrl(blob: Blob) {
         reject(new Error("Image attachment could not be converted."));
       },
       normalizedImageMimeType,
-      normalizedImageQuality
+      options.quality ?? normalizedImageQuality
     );
   });
 
@@ -142,17 +160,25 @@ export async function convertAttachmentBlobToDataUrl(
   };
 }
 
-export async function createNormalizedImageFile(file: File) {
+export async function createNormalizedImageFile(
+  file: File,
+  options: {
+    maxDimension?: number;
+    quality?: number;
+    suffix?: string;
+  } = {}
+) {
   if (!isProbablyImageFile(file, file.type, file.name)) {
     return file;
   }
 
-  const dataUrl = await convertImageBlobToJpegDataUrl(file);
+  const dataUrl = await convertImageBlobToJpegDataUrl(file, options);
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   const normalizedName = file.name.replace(/\.[^.]+$/, "") || "image";
+  const suffix = options.suffix ? `-${options.suffix}` : "";
 
-  return new File([blob], `${normalizedName}.jpg`, {
+  return new File([blob], `${normalizedName}${suffix}.jpg`, {
     type: normalizedImageMimeType,
     lastModified: Date.now(),
   });
@@ -164,6 +190,56 @@ export async function createUploadableImageFile(file: File) {
   } catch (error) {
     if (uploadSafeImageMimeTypes.has(file.type.toLowerCase())) {
       return file;
+    }
+
+    throw error;
+  }
+}
+
+export type ListingImageUploadFiles = {
+  original: File;
+  display: File | null;
+  thumbnail: File | null;
+};
+
+export async function createListingImageUploadFiles(
+  file: File
+): Promise<ListingImageUploadFiles> {
+  if (!isProbablyImageFile(file, file.type, file.name)) {
+    return {
+      original: file,
+      display: null,
+      thumbnail: null,
+    };
+  }
+
+  try {
+    const [original, display, thumbnail] = await Promise.all([
+      createNormalizedImageFile(file),
+      createNormalizedImageFile(file, {
+        maxDimension: displayImageMaxDimension,
+        quality: displayImageQuality,
+        suffix: "display",
+      }),
+      createNormalizedImageFile(file, {
+        maxDimension: thumbnailImageMaxDimension,
+        quality: thumbnailImageQuality,
+        suffix: "thumbnail",
+      }),
+    ]);
+
+    return {
+      original,
+      display,
+      thumbnail,
+    };
+  } catch (error) {
+    if (uploadSafeImageMimeTypes.has(file.type.toLowerCase())) {
+      return {
+        original: file,
+        display: null,
+        thumbnail: null,
+      };
     }
 
     throw error;

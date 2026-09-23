@@ -67,7 +67,7 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
-import { createUploadableImageFile } from '@/lib/client-image-normalization';
+import { createListingImageUploadFiles } from '@/lib/client-image-normalization';
 import {
   getAssistantResultListings,
   getCanLoadMoreExploreListings,
@@ -3265,7 +3265,16 @@ export default function Page() {
       for (const image of manualListingImages.slice(0, 8)) {
         try {
           const formData = new FormData();
-          formData.append('image', await createUploadableImageFile(image));
+          const uploadFiles = await createListingImageUploadFiles(image);
+          formData.append('image', uploadFiles.original);
+
+          if (uploadFiles.display) {
+            formData.append('displayImage', uploadFiles.display);
+          }
+
+          if (uploadFiles.thumbnail) {
+            formData.append('thumbnailImage', uploadFiles.thumbnail);
+          }
 
           const uploadResponse = await fetch(
             `/api/marketplace/listings/${createdListing.id}/images`,

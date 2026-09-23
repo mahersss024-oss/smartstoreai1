@@ -23,6 +23,12 @@ export type UploadedListingImage = {
   data: Uint8Array;
   mediaType: string;
   fileName?: string;
+  displayData?: Uint8Array;
+  displayMediaType?: string;
+  displayFileName?: string;
+  thumbnailData?: Uint8Array;
+  thumbnailMediaType?: string;
+  thumbnailFileName?: string;
 };
 
 type ModelImageFilePart = {
@@ -74,11 +80,13 @@ export async function createPersistentListingImageUrl({
   mediaType,
   imageId,
   fileName,
+  variant = 'original',
 }: {
   data: Uint8Array;
   mediaType: string;
   imageId: string;
   fileName?: string;
+  variant?: 'original' | 'display' | 'thumbnail';
 }) {
   if (!supportedMimeTypes.has(mediaType)) {
     return null;
@@ -89,6 +97,7 @@ export async function createPersistentListingImageUrl({
     mediaType,
     imageId,
     fileName,
+    variant,
   });
 
   if (storedObject?.url) {
@@ -176,18 +185,42 @@ export async function saveUploadedListingImagesForSeller({
       mediaType: uploadedImage.mediaType,
       imageId,
       fileName: uploadedImage.fileName,
+      variant: 'original',
     });
 
     if (!imageUrl) {
       continue;
     }
+    const displayUrl =
+      uploadedImage.displayData && uploadedImage.displayMediaType
+        ? await createPersistentListingImageUrl({
+            data: uploadedImage.displayData,
+            mediaType: uploadedImage.displayMediaType,
+            imageId,
+            fileName: uploadedImage.displayFileName,
+            variant: 'display',
+          })
+        : imageUrl;
+    const thumbnailUrl =
+      uploadedImage.thumbnailData && uploadedImage.thumbnailMediaType
+        ? await createPersistentListingImageUrl({
+            data: uploadedImage.thumbnailData,
+            mediaType: uploadedImage.thumbnailMediaType,
+            imageId,
+            fileName: uploadedImage.thumbnailFileName,
+            variant: 'thumbnail',
+          })
+        : displayUrl;
 
     const quality = analyzeImageQuality({
       fileName: uploadedImage.fileName,
       mimeType: uploadedImage.mediaType,
       sizeBytes: uploadedImage.data.byteLength,
     });
-    const imageUrls = createListingImageDeliveryUrls(imageUrl);
+    const imageUrls = createListingImageDeliveryUrls(imageUrl, {
+      displayUrl: displayUrl ?? imageUrl,
+      thumbnailUrl: thumbnailUrl ?? displayUrl ?? imageUrl,
+    });
     const image: ListingImage = {
       id: imageId,
       listingId,

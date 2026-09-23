@@ -35,7 +35,7 @@ import { ListingShareButton } from '@/components/listing-share-button';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
-import { createUploadableImageFile } from '@/lib/client-image-normalization';
+import { createListingImageUploadFiles } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -888,9 +888,17 @@ export default function AccountPage() {
       setUploadingListingId(listing.id);
 
       try {
-        const uploadFile = await createUploadableImageFile(file);
+        const uploadFiles = await createListingImageUploadFiles(file);
         const formData = new FormData();
-        formData.append('image', uploadFile);
+        formData.append('image', uploadFiles.original);
+
+        if (uploadFiles.display) {
+          formData.append('displayImage', uploadFiles.display);
+        }
+
+        if (uploadFiles.thumbnail) {
+          formData.append('thumbnailImage', uploadFiles.thumbnail);
+        }
 
         const response = await fetch(
           `/api/marketplace/listings/${listing.id}/images`,
