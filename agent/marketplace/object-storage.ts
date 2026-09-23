@@ -182,6 +182,14 @@ function formatErrorForLog(error: unknown) {
     .slice(0, 300);
 }
 
+async function getStorageResponseText(response: Response) {
+  try {
+    return (await response.text()).replace(/\s+/g, ' ').slice(0, 500);
+  } catch {
+    return '';
+  }
+}
+
 function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   if (!config.secretAccessKey) {
     throw new Error('Missing object storage secret access key.');
@@ -292,8 +300,12 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   }
 
   if (!response.ok) {
+    const responseText = await getStorageResponseText(response);
+
     throw new Error(
-      `Object storage upload failed with status ${response.status}.`,
+      `Object storage upload failed with status ${response.status}${
+        responseText ? `: ${responseText}` : ''
+      }.`,
     );
   }
 
