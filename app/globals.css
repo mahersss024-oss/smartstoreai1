@@ -905,7 +905,7 @@
     /* Safety net: the overlay auto-hides via pure CSS even if JS never runs.
        The animation holds it visible, then fades it out and keeps it gone
        (forwards fill). JS only adds the "seen this session" shortcut. */
-    animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1)
+    animation: app-welcome-lifecycle 4250ms cubic-bezier(0.22, 1, 0.36, 1)
       forwards;
   }
 
@@ -919,7 +919,7 @@
   }
 
   [data-app-display="standalone"] .app-welcome {
-    animation-duration: 1700ms;
+    animation-duration: 2720ms;
     animation-name: app-welcome-standalone-lifecycle;
   }
 
@@ -1045,8 +1045,8 @@
     0% {
       opacity: 1;
     }
-    /* ~2.4s visible, then a ~0.52s fade. */
-    82% {
+    /* 3.6s visible, then a 0.65s fade. */
+    85% {
       opacity: 1;
     }
     100% {
@@ -1059,7 +1059,7 @@
     0% {
       opacity: 1;
     }
-    74% {
+    81% {
       opacity: 1;
     }
     100% {

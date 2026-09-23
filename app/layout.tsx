@@ -3,7 +3,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { appConfig } from "./app-config";
 import { AppWelcomeSplash } from "@/components/app-welcome-splash";
-import { buildWelcomeInitScript } from "@/lib/welcome/config";
+import {
+  buildWelcomeInitScript,
+  WELCOME_FADE_MS,
+  WELCOME_STANDALONE_FADE_MS,
+  WELCOME_STANDALONE_VISIBLE_MS,
+  WELCOME_VISIBLE_MS,
+} from "@/lib/welcome/config";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
@@ -12,6 +18,15 @@ import { NativeAppBridge } from "@/components/native-app-bridge";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
+const welcomeLifecycleMs = WELCOME_VISIBLE_MS + WELCOME_FADE_MS;
+const welcomeStandaloneLifecycleMs =
+  WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS;
+const welcomeVisiblePercent = Math.round(
+  (WELCOME_VISIBLE_MS / welcomeLifecycleMs) * 100,
+);
+const welcomeStandaloneVisiblePercent = Math.round(
+  (WELCOME_STANDALONE_VISIBLE_MS / welcomeStandaloneLifecycleMs) * 100,
+);
 
 export const metadata: Metadata = {
   title: appConfig.metadata.title,
@@ -88,11 +103,11 @@ html[data-welcome='skip'] #smartstore-welcome { display: none !important; }
   background: linear-gradient(150deg, #08111d 0%, #0d2b28 44%, #117c8b 100%);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  animation: app-welcome-lifecycle 2920ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: app-welcome-lifecycle ${welcomeLifecycleMs}ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 html[data-welcome='show'] #smartstore-welcome { display: flex; }
 html[data-app-display='standalone'] #smartstore-welcome {
-  animation-duration: 1700ms;
+  animation-duration: ${welcomeStandaloneLifecycleMs}ms;
   animation-name: app-welcome-standalone-lifecycle;
 }
 #smartstore-welcome::before {
@@ -154,11 +169,11 @@ html[data-app-display='standalone'] #smartstore-welcome {
   }
 }
 @keyframes app-welcome-lifecycle {
-  0%, 82% { opacity: 1; }
+  0%, ${welcomeVisiblePercent}% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
 }
 @keyframes app-welcome-standalone-lifecycle {
-  0%, 74% { opacity: 1; }
+  0%, ${welcomeStandaloneVisiblePercent}% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
 }
 `;

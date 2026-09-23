@@ -71,13 +71,13 @@ test('returning visits reveal the app before paint', () => {
 
 test('welcome overlay uses a stable id and sane timings', () => {
   assert.equal(WELCOME_ID, 'smartstore-welcome');
-  assert.ok(WELCOME_VISIBLE_MS >= 2000, 'overlay should stay long enough to read');
-  assert.ok(WELCOME_VISIBLE_MS <= 4000, 'overlay should not overstay');
+  assert.ok(WELCOME_VISIBLE_MS >= 3400, 'overlay should stay long enough to read');
+  assert.ok(WELCOME_VISIBLE_MS <= 4200, 'overlay should not overstay');
   assert.ok(WELCOME_FADE_MS >= 400, 'fade should be smooth');
   assert.ok(WELCOME_FADE_MS <= 1000, 'fade should not feel sluggish');
   assert.ok(
-    WELCOME_VISIBLE_MS + WELCOME_FADE_MS <= 3100,
-    'welcome should not leave a long empty background after the logo exits',
+    WELCOME_VISIBLE_MS + WELCOME_FADE_MS <= 4500,
+    'welcome should stay intentional without blocking the app for too long',
   );
   assert.ok(
     WELCOME_STANDALONE_VISIBLE_MS < WELCOME_VISIBLE_MS,
@@ -85,7 +85,7 @@ test('welcome overlay uses a stable id and sane timings', () => {
   );
   assert.ok(WELCOME_STANDALONE_FADE_MS <= WELCOME_FADE_MS);
   assert.ok(
-    WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS <= 1900,
+    WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS <= 3000,
     'installed app welcome should finish quickly after the native launch screen',
   );
 });
@@ -201,13 +201,13 @@ test('welcome content fades only with the overlay background', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
-  assert.match(globals, /app-welcome-lifecycle 2920ms/);
+  assert.match(globals, /app-welcome-lifecycle 4250ms/);
   assert.match(globals, /animation: app-welcome-rise 820ms/);
   assert.match(globals, /animation-duration: 640ms/);
   assert.doesNotMatch(globals, /app-welcome-content-exit/);
   assert.doesNotMatch(globals, /app-welcome-standalone-content-exit/);
-  assert.match(layout, /app-welcome-lifecycle 2920ms/);
-  assert.match(layout, /animation-duration: 1700ms/);
+  assert.match(layout, /app-welcome-lifecycle \$\{welcomeLifecycleMs\}ms/);
+  assert.match(layout, /animation-duration: \$\{welcomeStandaloneLifecycleMs\}ms/);
 });
 
 test('welcome overlay is opt-in and has no independent boot cover', () => {
