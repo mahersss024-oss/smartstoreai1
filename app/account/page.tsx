@@ -59,7 +59,6 @@ export default function AccountPage() {
   const [profilePicture, setProfilePicture] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
   const [savedProfileName, setSavedProfileName] = useState('');
-  const [savedProfilePicture, setSavedProfilePicture] = useState('');
   const [savedProfilePhone, setSavedProfilePhone] = useState('');
   const [isEditingProfilePhone, setIsEditingProfilePhone] = useState(false);
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
@@ -77,8 +76,7 @@ export default function AccountPage() {
   const hasSavedProfilePhone = Boolean(savedProfilePhone);
   const isProfilePhoneInputLocked =
     hasSavedProfilePhone && !isEditingProfilePhone;
-  const hasProfileIdentityChanges =
-    profileName !== savedProfileName || profilePicture !== savedProfilePicture;
+  const hasProfileNameChanges = profileName !== savedProfileName;
 
   const refreshSession = useCallback(() => {
     setIsSessionLoading(true);
@@ -91,7 +89,6 @@ export default function AccountPage() {
         setProfilePicture(payload.user?.picture ?? '');
         setProfilePhone(payload.user?.phoneNumber ?? '');
         setSavedProfileName(payload.user?.name ?? '');
-        setSavedProfilePicture(payload.user?.picture ?? '');
         setSavedProfilePhone(payload.user?.phoneNumber ?? '');
         setIsEditingProfilePhone(false);
       })
@@ -101,7 +98,6 @@ export default function AccountPage() {
         setProfilePicture('');
         setProfilePhone('');
         setSavedProfileName('');
-        setSavedProfilePicture('');
         setSavedProfilePhone('');
         setIsEditingProfilePhone(false);
       })
@@ -134,7 +130,6 @@ export default function AccountPage() {
       setProfilePicture('');
       setProfilePhone('');
       setSavedProfileName('');
-      setSavedProfilePicture('');
       setSavedProfilePhone('');
       setIsEditingProfilePhone(false);
       setProfileNotice(null);
@@ -195,7 +190,6 @@ export default function AccountPage() {
       setProfilePicture(payload.user.picture ?? '');
       setProfilePhone(payload.user.phoneNumber ?? '');
       setSavedProfileName(payload.user.name ?? '');
-      setSavedProfilePicture(payload.user.picture ?? '');
       setSavedProfilePhone(payload.user.phoneNumber ?? '');
       setIsEditingProfilePhone(false);
       setProfileNotice({
@@ -270,7 +264,6 @@ export default function AccountPage() {
           : payload.user ?? null,
       }));
       setProfilePicture(payload.user.picture);
-      setSavedProfilePicture(payload.user.picture);
       setProfileNotice({
         tone: 'success',
         message: 'تم تحديث صورة الحساب بنجاح.',
@@ -327,7 +320,6 @@ export default function AccountPage() {
       setProfilePicture('');
       setProfilePhone('');
       setSavedProfileName('');
-      setSavedProfilePicture('');
       setSavedProfilePhone('');
       setIsEditingProfilePhone(false);
       router.push('/');
@@ -550,23 +542,26 @@ export default function AccountPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      disabled={isSavingProfile || isUploadingProfilePicture}
+                      disabled={
+                        isSavingProfile ||
+                        isUploadingProfilePicture ||
+                        !hasProfileNameChanges
+                      }
                       onClick={() => void saveProfile()}
                       type="button"
                     >
                       <Save className="size-4" />
-                      {isSavingProfile ? 'جار الحفظ...' : 'حفظ بيانات الحساب'}
+                      {isSavingProfile ? 'جار الحفظ...' : 'حفظ الاسم الظاهر'}
                     </Button>
                     <Button
                       className="rounded-md"
                       disabled={
                         isSavingProfile ||
                         isUploadingProfilePicture ||
-                        !hasProfileIdentityChanges
+                        !hasProfileNameChanges
                       }
                       onClick={() => {
                         setProfileName(savedProfileName);
-                        setProfilePicture(savedProfilePicture);
                       }}
                       type="button"
                       variant="outline"

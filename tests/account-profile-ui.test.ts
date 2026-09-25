@@ -21,7 +21,8 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /JPG أو PNG أو WEBP حتى 4MB/);
   assert.match(page, /displayName: profileName/);
   assert.match(page, /picture: profilePicture/);
-  assert.match(page, /hasProfileIdentityChanges/);
+  assert.match(page, /hasProfileNameChanges/);
+  assert.match(page, /حفظ الاسم الظاهر/);
   assert.match(page, /saveProfile/);
   assert.match(page, /savedProfilePhone/);
   assert.match(page, /editProfilePhone/);
