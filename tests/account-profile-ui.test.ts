@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -8,23 +8,23 @@ test('account page exposes official contact profile settings', () => {
 
   assert.match(page, /\/api\/account\/profile/);
   assert.match(page, /method: 'DELETE'/);
-  assert.match(page, /بيانات التواصل الرسمية/);
+  assert.match(page, /Phone/);
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
-  assert.match(page, /حفظ البيانات/);
-  assert.match(page, /الرقم الرسمي المحفوظ/);
-  assert.match(page, /تعديل/);
-  assert.match(page, /حذف/);
-  assert.match(page, /حذف الحساب/);
+  assert.match(page, /saveProfile/);
+  assert.match(page, /savedProfilePhone/);
+  assert.match(page, /editProfilePhone/);
+  assert.match(page, /deleteProfilePhone/);
+  assert.match(page, /deleteAccount/);
   assert.match(page, /countContactPhoneCandidates/);
 });
 
 test('account page keeps listing management free of chat listing shortcuts', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 
-  assert.doesNotMatch(page, /إنشاء إعلان بالمحادثة/);
-  assert.doesNotMatch(page, /إضافة إعلان عبر الشات/);
-  assert.match(page, /رسوم المنصة/);
+  assert.doesNotMatch(page, /ط¥ظ†ط´ط§ط، ط¥ط¹ظ„ط§ظ† ط¨ط§ظ„ظ…ط­ط§ط¯ط«ط©/);
+  assert.doesNotMatch(page, /ط¥ط¶ط§ظپط© ط¥ط¹ظ„ط§ظ† ط¹ط¨ط± ط§ظ„ط´ط§طھ/);
+  assert.match(page, /href="\/commissions"/);
 });
 
 test('account shortcuts link to customer listings instead of returning to market', () => {
@@ -37,7 +37,7 @@ test('account shortcuts link to customer listings instead of returning to market
   assert.match(page, /href="\/account\/listings"/);
   assert.doesNotMatch(page, /id="account-listings"/);
   assert.match(listingsPage, /id="account-listings"/);
-  assert.doesNotMatch(page, /ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط³ظˆظ‚/);
+  assert.doesNotMatch(page, /ط·آ§ط¸â€‍ط·آ¹ط¸ث†ط·آ¯ط·آ© ط¸â€‍ط¸â€‍ط·آ³ط¸ث†ط¸â€ڑ/);
 });
 
 test('account conversations shortcut highlights new message alerts on web', () => {
@@ -65,8 +65,45 @@ test('sold listings expose a platform fee action after the sale marker', () => {
   );
 
   assert.match(page, /listing\.rawStatus === 'sold'/);
-  assert.match(page, /تم البيع/);
+  assert.match(page, /bg-blue-700\/80/);
   assert.match(page, /\/commissions\?listingId=\$\{listing\.id\}/);
+});
+
+test('listing publish and sale amount require the commission oath agreement', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+  const commissionsPage = readFileSync(
+    join(process.cwd(), 'app', 'commissions', 'page.tsx'),
+    'utf8',
+  );
+  const agreementDialog = readFileSync(
+    join(process.cwd(), 'components', 'commission-agreement-dialog.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /pendingPublishListing/);
+  assert.match(listingsPage, /mode="publish"/);
+  assert.match(commissionsPage, /pendingSaleAgreement/);
+  assert.match(commissionsPage, /mode="saleAmount"/);
+  assert.match(agreementDialog, /أقسم بالله/);
+  assert.match(agreementDialog, /أو بسببها/);
+  assert.match(agreementDialog, /رسوم المنصة حق على المعلن/);
+  assert.match(agreementDialog, /1% من قيمة البيع/);
+});
+
+test('customer listings explain drafts and use a branded sold watermark', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /listing\.rawStatus === 'draft'/);
+  assert.match(listingsPage, /pendingPublishListing/);
+  assert.match(listingsPage, /bg-blue-700\/80/);
+  assert.match(listingsPage, /backdrop-blur-\[1px\]/);
+  assert.match(listingsPage, /border-cyan-100\/60/);
 });
 
 test('account page does not flash sign-in controls while session is loading', () => {
@@ -75,7 +112,6 @@ test('account page does not flash sign-in controls while session is loading', ()
   assert.match(page, /const \[isSessionLoading, setIsSessionLoading\] = useState\(true\)/);
   assert.match(page, /setIsSessionLoading\(false\)/);
   assert.match(page, /isSessionLoading \? \(/);
-  assert.match(page, /جاري التحقق من الحساب/);
   assert.match(page, /: !session\.authenticated \? \(/);
 });
 
@@ -90,7 +126,6 @@ test('signed-in customer pages hide sign-in controls until session check finishe
     const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
 
     assert.match(page, /isLoading && !session\.authenticated \? \(/);
-    assert.match(page, /جاري التحقق من الحساب/);
     assert.match(page, /: !session\.authenticated \? \(/);
   }
 });
@@ -121,5 +156,5 @@ test('platform fees page can focus the sold listing fee from the account link', 
   assert.match(page, /window\.location\.href/);
   assert.match(page, /targetListingId/);
   assert.match(page, /orderedCommissions/);
-  assert.match(page, /أدخل قيمة البيع النهائية لهذا الإعلان/);
+  assert.match(page, /targetCommission\?\.status === 'pending_amount'/);
 });

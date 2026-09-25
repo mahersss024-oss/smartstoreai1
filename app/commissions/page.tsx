@@ -15,6 +15,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -131,6 +132,10 @@ export default function CommissionsPage() {
   const [copiedPaymentValue, setCopiedPaymentValue] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingSaleAgreement, setPendingSaleAgreement] = useState<{
+    commissionId: string;
+    productValue: number;
+  } | null>(null);
   const updateRequestKeysRef = useRef<Record<string, string>>({});
 
   const totalDue = useMemo(
@@ -267,7 +272,7 @@ export default function CommissionsPage() {
   });
 
   const updateSaleAmount = useCallback(
-    async (event: FormEvent<HTMLFormElement>, commissionId: string) => {
+    (event: FormEvent<HTMLFormElement>, commissionId: string) => {
       event.preventDefault();
       const productValue = Number(amounts[commissionId]);
 
@@ -276,12 +281,24 @@ export default function CommissionsPage() {
         return;
       }
 
-      const requestKey =
-        updateRequestKeysRef.current[commissionId] ??
-        createClientIdempotencyKey('commission-update');
-      updateRequestKeysRef.current[commissionId] = requestKey;
+      setPendingSaleAgreement({ commissionId, productValue });
+    },
+    [amounts],
+  );
 
-      try {
+  const confirmSaleAmountAgreement = useCallback(async () => {
+    if (!pendingSaleAgreement) {
+      return;
+    }
+
+    const { commissionId, productValue } = pendingSaleAgreement;
+    const requestKey =
+      updateRequestKeysRef.current[commissionId] ??
+      createClientIdempotencyKey('commission-update');
+    updateRequestKeysRef.current[commissionId] = requestKey;
+
+    try {
+      setPendingSaleAgreement(null);
       const response = await fetch(`/api/marketplace/commissions/${commissionId}`, {
         method: 'PATCH',
         headers: {
@@ -298,12 +315,10 @@ export default function CommissionsPage() {
 
       setAmounts((current) => ({ ...current, [commissionId]: '' }));
       await refreshCommissions();
-      } finally {
+    } finally {
       delete updateRequestKeysRef.current[commissionId];
-      }
-    },
-    [amounts, refreshCommissions],
-  );
+    }
+  }, [pendingSaleAgreement, refreshCommissions]);
 
   const copyPaymentValue = useCallback(async (value: string) => {
     try {
@@ -323,6 +338,12 @@ export default function CommissionsPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <CommissionAgreementDialog
+        mode="saleAmount"
+        onCancel={() => setPendingSaleAgreement(null)}
+        onConfirm={confirmSaleAmountAgreement}
+        open={Boolean(pendingSaleAgreement)}
+      />
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">

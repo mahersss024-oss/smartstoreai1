@@ -26,6 +26,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { createListingImageUploadFiles } from '@/lib/client-image-normalization';
@@ -333,6 +334,8 @@ export default function AccountListingsPage() {
     null,
   );
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
+  const [pendingPublishListing, setPendingPublishListing] =
+    useState<ListingCard | null>(null);
   const [savingListingId, setSavingListingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ListingEditForm>({
     title: '',
@@ -515,6 +518,11 @@ export default function AccountListingsPage() {
         return;
       }
 
+      if (action === 'publish') {
+        setPendingPublishListing(listing);
+        return;
+      }
+
       const labels = {
         publish: 'نشر الإعلان',
         pause: 'إيقاف الإعلان',
@@ -552,7 +560,7 @@ export default function AccountListingsPage() {
           );
         }
 
-        if (!response.ok && action === 'publish') {
+        if (!response.ok && (action as string) === 'publish') {
           setEditingListingId(listing.id);
           setEditForm(createEditFormFromListing(listing));
           setEditNotice({
@@ -569,6 +577,57 @@ export default function AccountListingsPage() {
     },
     [refreshListings],
   );
+
+  const confirmPublishListing = useCallback(() => {
+    const listing = pendingPublishListing;
+
+    if (!listing) {
+      return;
+    }
+
+    setPendingPublishListing(null);
+
+    void fetch(`/api/marketplace/listings/${listing.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': createClientIdempotencyKey('listing-publish'),
+      },
+      body: JSON.stringify({ action: 'publish' }),
+    }).then(async (response) => {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+        listing?: ApiListingRecord;
+      } | null;
+
+      if (payload?.listing) {
+        const updatedListing = listingRecordToCard(payload.listing);
+
+        setListings((currentListings) =>
+          currentListings.map((currentListing) =>
+            currentListing.id === updatedListing.id
+              ? updatedListing
+              : currentListing,
+          ),
+        );
+      }
+
+      if (!response.ok) {
+        setEditingListingId(listing.id);
+        setEditForm(createEditFormFromListing(listing));
+        setEditNotice({
+          listingId: listing.id,
+          tone: 'warning',
+          message:
+            payload?.message ??
+            'لا يمكن نشر الإعلان الآن. تأكد من وجود صورة حقيقية مطابقة وأن بيانات الإعلان لا تخالف سياسة السوق.',
+        });
+      }
+
+      void refreshListings(1);
+    });
+  }, [pendingPublishListing, refreshListings]);
 
   const startEditingListing = useCallback((listing: ListingCard) => {
     setEditingListingId(listing.id);
@@ -861,6 +920,12 @@ export default function AccountListingsPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <CommissionAgreementDialog
+        mode="publish"
+        onCancel={() => setPendingPublishListing(null)}
+        onConfirm={confirmPublishListing}
+        open={Boolean(pendingPublishListing)}
+      />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:gap-3 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -1019,8 +1084,8 @@ export default function AccountListingsPage() {
                             </div>
                           </div>
                           {listing.rawStatus === 'sold' && (
-                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/10">
-                              <span className="-rotate-12 rounded-md border border-white/70 bg-slate-950/55 px-4 py-2 text-lg font-black text-white shadow-lg">
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-gradient-to-br from-slate-950/15 via-blue-950/20 to-cyan-950/15 backdrop-blur-[1px]">
+                              <span className="-rotate-6 rounded-lg border border-cyan-100/60 bg-blue-700/80 px-5 py-2 text-lg font-black text-white shadow-[0_12px_34px_rgba(15,23,42,0.28)] ring-1 ring-white/20">
                                 تم البيع
                               </span>
                             </div>
@@ -1033,8 +1098,8 @@ export default function AccountListingsPage() {
                             <span>لا توجد صورة حقيقية</span>
                           </div>
                           {listing.rawStatus === 'sold' && (
-                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/10">
-                              <span className="-rotate-12 rounded-md border border-white/70 bg-slate-950/55 px-4 py-2 text-lg font-black text-white shadow-lg">
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-gradient-to-br from-slate-950/15 via-blue-950/20 to-cyan-950/15 backdrop-blur-[1px]">
+                              <span className="-rotate-6 rounded-lg border border-cyan-100/60 bg-blue-700/80 px-5 py-2 text-lg font-black text-white shadow-[0_12px_34px_rgba(15,23,42,0.28)] ring-1 ring-white/20">
                                 تم البيع
                               </span>
                             </div>
@@ -1050,6 +1115,11 @@ export default function AccountListingsPage() {
                           </span>
                           </div>
                           <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{listing.description}</p>
+                          {listing.rawStatus === 'draft' && (
+                            <div className="rounded-md border border-amber-300/70 bg-amber-50 px-2.5 py-2 text-[11px] font-bold leading-5 text-amber-800 dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-100">
+                              مسودة - غير منشور. لن يظهر الإعلان للعملاء حتى تضغط نشر وتوافق على اتفاقية الرسوم.
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                             <span className="truncate font-semibold text-slate-950 dark:text-card-foreground">{listing.price}</span>
                             <span className="truncate">{listing.city}</span>
