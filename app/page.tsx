@@ -3149,7 +3149,7 @@ export default function Page() {
     ],
   );
 
-  const submitManualListing = useCallback(async () => {
+  const submitManualListing = useCallback(async (options?: { publishAfterSave?: boolean }) => {
     if (isSubmittingManualListing) {
       return;
     }
@@ -3261,6 +3261,8 @@ export default function Page() {
 
       const createdListing = responsePayload.listing;
       let uploadedImages = 0;
+      let publishStatus: 'not_requested' | 'published' | 'blocked' = 'not_requested';
+      let publishMessage = '';
 
       for (const image of manualListingImages.slice(0, 8)) {
         try {
@@ -3299,18 +3301,62 @@ export default function Page() {
         }
       }
 
+      if (options?.publishAfterSave) {
+        const publishResponse = await fetch(
+          `/api/marketplace/listings/${createdListing.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': createClientIdempotencyKey(
+                'manual-listing-publish',
+              ),
+            },
+            body: JSON.stringify({ action: 'publish' }),
+          },
+        );
+        const publishPayload = (await publishResponse.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        if (publishResponse.ok) {
+          publishStatus = 'published';
+        } else {
+          publishStatus = 'blocked';
+          publishMessage =
+            publishPayload?.message ??
+            'تم حفظ الإعلان، لكنه يحتاج صورة حقيقية أو مراجعة قبل النشر.';
+        }
+      }
+
+      const hasPartialImageUpload =
+        manualListingImages.length > 0 && uploadedImages < manualListingImages.length;
+      const nextManualListingNotice: ManualListingNotice =
+        publishStatus === 'published'
+          ? {
+              tone: 'success',
+              message: 'تم حفظ الإعلان ونشره بنجاح.',
+            }
+          : publishStatus === 'blocked'
+            ? {
+                tone: 'warning',
+                message: publishMessage,
+              }
+            : hasPartialImageUpload
+              ? {
+                  tone: 'warning',
+                  message:
+                    'تم حفظ الإعلان في حسابي كمسودة، لكن لم تُرفع كل الصور. يمكنك إكمال الصور ثم نشر الإعلان من صفحة حسابي.',
+                }
+              : {
+                  tone: 'success',
+                  message:
+                    'تم حفظ الإعلان في حسابي كمسودة. يمكنك مراجعته وإضافة الصور ثم نشره من صفحة حسابي.',
+                };
+
       setManualListingForm(defaultManualListingForm);
       setManualListingImages([]);
-      setManualListingNotice({
-        tone:
-          manualListingImages.length > 0 && uploadedImages < manualListingImages.length
-            ? 'warning'
-            : 'success',
-        message:
-          manualListingImages.length > 0 && uploadedImages < manualListingImages.length
-            ? 'تم حفظ الإعلان في حسابي كمسودة، لكن لم تُرفع كل الصور. يمكنك إكمال الصور ثم نشر الإعلان من صفحة حسابي.'
-            : 'تم حفظ الإعلان في حسابي كمسودة. يمكنك مراجعته وإضافة الصور ثم نشره من صفحة حسابي.',
-      });
+      setManualListingNotice(nextManualListingNotice);
       setIsManualListingOpen(false);
       setIsManualListingFallbackDismissed(true);
       void refreshMarketplaceListings();
@@ -3871,10 +3917,23 @@ export default function Page() {
                     </Button>
                     <Button
                       type="submit"
-                      className="rounded-md bg-blue-600 hover:bg-blue-700"
+                      variant="outline"
+                      className="rounded-md"
                       disabled={isSubmittingManualListing}
                     >
                       {isSubmittingManualListing ? 'جاري الحفظ...' : 'حفظ الإعلان'}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-md bg-blue-600 hover:bg-blue-700"
+                      disabled={isSubmittingManualListing}
+                      onClick={() =>
+                        void submitManualListing({ publishAfterSave: true })
+                      }
+                    >
+                      {isSubmittingManualListing
+                        ? 'جاري الحفظ...'
+                        : 'حفظ ونشر'}
                     </Button>
                   </div>
                 </form>
