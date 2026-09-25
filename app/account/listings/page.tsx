@@ -1117,7 +1117,7 @@ export default function AccountListingsPage() {
                           <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{listing.description}</p>
                           {listing.rawStatus === 'draft' && (
                             <div className="rounded-md border border-amber-300/70 bg-amber-50 px-2.5 py-2 text-[11px] font-bold leading-5 text-amber-800 dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-100">
-                              مسودة - غير منشور. لن يظهر الإعلان للعملاء حتى تضغط نشر وتوافق على اتفاقية الرسوم.
+                              مسودة - غير منشور. لن يظهر الإعلان للعملاء حتى تضغط نشر الإعلان وتوافق على اتفاقية الرسوم.
                             </div>
                           )}
                           <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
@@ -1386,7 +1386,7 @@ export default function AccountListingsPage() {
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'publish')}>
                           <Megaphone className="size-3.5" />
-                          نشر
+                          نشر الإعلان
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'pause')}>
                           <Pause className="size-3.5" />

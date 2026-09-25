@@ -268,7 +268,7 @@ function AdminListingCard({
         </Button>
         <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'published' })}>
           <CheckCircle2 className="size-4" />
-          نشر
+          نشر الإعلان
         </Button>
         <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'paused' })}>
           <Pause className="size-4" />

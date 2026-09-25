@@ -63,6 +63,7 @@ import {
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -1792,6 +1793,8 @@ export default function Page() {
     useState<ManualListingNotice | null>(null);
   const [isSubmittingManualListing, setIsSubmittingManualListing] =
     useState(false);
+  const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
+    useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
     useState(false);
   const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
@@ -3377,6 +3380,11 @@ export default function Page() {
     session.authenticated,
   ]);
 
+  const confirmManualPublishAgreement = useCallback(() => {
+    setIsManualPublishAgreementOpen(false);
+    void submitManualListing({ publishAfterSave: true });
+  }, [submitManualListing]);
+
   const openListing = useCallback(
     (listing: ListingCard) => {
       const nextSelectedListingContext = toSelectedListingContext(listing);
@@ -3552,6 +3560,12 @@ export default function Page() {
       )}
       dir="rtl"
     >
+      <CommissionAgreementDialog
+        mode="publish"
+        onCancel={() => setIsManualPublishAgreementOpen(false)}
+        onConfirm={confirmManualPublishAgreement}
+        open={isManualPublishAgreementOpen}
+      />
       <div
         className={cn(
           'mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0',
@@ -3927,13 +3941,11 @@ export default function Page() {
                       type="button"
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
                       disabled={isSubmittingManualListing}
-                      onClick={() =>
-                        void submitManualListing({ publishAfterSave: true })
-                      }
+                      onClick={() => setIsManualPublishAgreementOpen(true)}
                     >
                       {isSubmittingManualListing
                         ? 'جاري الحفظ...'
-                        : 'حفظ ونشر'}
+                        : 'حفظ ونشر الإعلان'}
                     </Button>
                   </div>
                 </form>
