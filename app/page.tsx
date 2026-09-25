@@ -1314,6 +1314,8 @@ function ListingChatLinkCard({
               <img
                 alt={listing.title}
                 className="h-full w-full object-contain"
+                decoding="async"
+                loading="lazy"
                 onError={(event) => {
                   event.currentTarget.hidden = true;
                   event.currentTarget.nextElementSibling?.removeAttribute('hidden');
@@ -1443,6 +1445,7 @@ function ListingCardView({
       <article
         className={cn(
           'group grid w-full min-w-0 cursor-pointer grid-cols-[5.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[7.25rem_minmax(0,1fr)]',
+          '[contain-intrinsic-size:160px] [content-visibility:auto]',
           className,
         )}
         onClick={() => onOpen(listing)}
@@ -1462,6 +1465,8 @@ function ListingCardView({
               <img
                 alt={listing.title}
                 className="h-full w-full object-contain"
+                decoding="async"
+                loading="lazy"
                 onError={(event) => showImageFallback(event.currentTarget)}
                 src={listing.image}
               />
@@ -1546,6 +1551,7 @@ function ListingCardView({
     <article
       className={cn(
         'w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]',
+        '[contain-intrinsic-size:320px] [content-visibility:auto]',
         className,
       )}
       onClick={() => onOpen(listing)}
@@ -1565,6 +1571,8 @@ function ListingCardView({
             <img
               alt={listing.title}
               className="h-full w-full object-contain"
+              decoding="async"
+              loading="lazy"
               onError={(event) => showImageFallback(event.currentTarget)}
               src={listing.image}
             />
@@ -4383,6 +4391,8 @@ export default function Page() {
                                     <img
                                       alt={listing.title}
                                       className="h-full w-full object-contain"
+                                      decoding="async"
+                                      loading="lazy"
                                       onError={(event) => {
                                         event.currentTarget.hidden = true;
                                         event.currentTarget.nextElementSibling?.removeAttribute('hidden');

@@ -15,6 +15,10 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /profilePictureFile/);
   assert.match(page, /\/api\/account\/profile\/picture/);
   assert.match(page, /uploadProfilePicture/);
+  assert.match(page, /profilePicturePreview/);
+  assert.match(page, /URL\.createObjectURL\(file\)/);
+  assert.match(page, /visibleProfilePicture/);
+  assert.match(page, /decoding="async"/);
   assert.match(page, /رفع صورة عرض الحساب/);
   assert.doesNotMatch(page, /profilePictureUrl/);
   assert.doesNotMatch(page, /رابط صورة الحساب/);
@@ -117,7 +121,7 @@ test('account conversations shortcut highlights new message alerts on web', () =
   assert.match(alertHook, /senderId !== currentUserId/);
   assert.match(alertHook, /syncUnreadConversations/);
   assert.match(alertHook, /const isUserIdControlled = userId !== undefined/);
-  assert.match(alertHook, /if \(currentUserId\) \{\s*void syncUnreadConversations\(\);\s*return;\s*\}/);
+  assert.match(alertHook, /if \(currentUserId\) \{\s*setHasConversationAlert\(false\);\s*void syncUnreadConversations\(\);\s*return;\s*\}/);
   assert.match(alertHook, /if \(isUserIdControlled\) \{\s*setHasConversationAlert\(false\);\s*return;\s*\}/);
 });
 
@@ -167,6 +171,9 @@ test('customer listings explain drafts and use a branded sold watermark', () => 
   assert.match(listingsPage, /bg-blue-700\/80/);
   assert.match(listingsPage, /backdrop-blur-\[1px\]/);
   assert.match(listingsPage, /border-cyan-100\/60/);
+  assert.match(listingsPage, /loading="lazy"/);
+  assert.match(listingsPage, /decoding="async"/);
+  assert.match(listingsPage, /\[content-visibility:auto\]/);
 });
 
 test('account page does not flash sign-in controls while session is loading', () => {

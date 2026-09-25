@@ -144,6 +144,7 @@ export function useConversationMessageAlert({
     queueMicrotask(() => {
       if (!cancelled) {
         if (currentUserId) {
+          setHasConversationAlert(false);
           void syncUnreadConversations();
           return;
         }

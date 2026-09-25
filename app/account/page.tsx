@@ -57,6 +57,7 @@ export default function AccountPage() {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
+  const [profilePicturePreview, setProfilePicturePreview] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
   const [savedProfileName, setSavedProfileName] = useState('');
   const [savedProfilePhone, setSavedProfilePhone] = useState('');
@@ -77,6 +78,7 @@ export default function AccountPage() {
   const isProfilePhoneInputLocked =
     hasSavedProfilePhone && !isEditingProfilePhone;
   const hasProfileNameChanges = profileName !== savedProfileName;
+  const visibleProfilePicture = profilePicturePreview || profilePicture;
 
   const refreshSession = useCallback(() => {
     setIsSessionLoading(true);
@@ -122,12 +124,21 @@ export default function AccountPage() {
     };
   }, [refreshSession]);
 
+  useEffect(() => {
+    return () => {
+      if (profilePicturePreview) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
+    };
+  }, [profilePicturePreview]);
+
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       setSession({ authenticated: false, user: null });
       setIsSessionLoading(false);
       setProfileName('');
       setProfilePicture('');
+      setProfilePicturePreview('');
       setProfilePhone('');
       setSavedProfileName('');
       setSavedProfilePhone('');
@@ -224,6 +235,14 @@ export default function AccountPage() {
       return;
     }
 
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePicturePreview((currentPreview) => {
+      if (currentPreview) {
+        URL.revokeObjectURL(currentPreview);
+      }
+
+      return previewUrl;
+    });
     setIsUploadingProfilePicture(true);
     setProfileNotice(null);
 
@@ -242,11 +261,25 @@ export default function AccountPage() {
       } | null;
 
       if (response.status === 401) {
+        setProfilePicturePreview((currentPreview) => {
+          if (currentPreview) {
+            URL.revokeObjectURL(currentPreview);
+          }
+
+          return '';
+        });
         router.push('/api/auth/google/start');
         return;
       }
 
       if (!response.ok || !payload?.user?.picture) {
+        setProfilePicturePreview((currentPreview) => {
+          if (currentPreview) {
+            URL.revokeObjectURL(currentPreview);
+          }
+
+          return '';
+        });
         setProfileNotice({
           tone: 'danger',
           message:
@@ -263,12 +296,34 @@ export default function AccountPage() {
           ? { ...currentSession.user, ...payload.user }
           : payload.user ?? null,
       }));
-      setProfilePicture(payload.user.picture);
+      const nextPicture = payload.user.picture;
+      const image = new window.Image();
+      const applyUploadedPicture = () => {
+        setProfilePicture(nextPicture);
+        setProfilePicturePreview((currentPreview) => {
+          if (currentPreview) {
+            URL.revokeObjectURL(currentPreview);
+          }
+
+          return '';
+        });
+      };
+
+      image.onload = applyUploadedPicture;
+      image.onerror = applyUploadedPicture;
+      image.src = nextPicture;
       setProfileNotice({
         tone: 'success',
         message: 'تم تحديث صورة الحساب بنجاح.',
       });
     } catch {
+      setProfilePicturePreview((currentPreview) => {
+        if (currentPreview) {
+          URL.revokeObjectURL(currentPreview);
+        }
+
+        return '';
+      });
       setProfileNotice({
         tone: 'danger',
         message: 'تعذر رفع صورة الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
@@ -318,6 +373,7 @@ export default function AccountPage() {
       setSession({ authenticated: false, user: null });
       setProfileName('');
       setProfilePicture('');
+      setProfilePicturePreview('');
       setProfilePhone('');
       setSavedProfileName('');
       setSavedProfilePhone('');
@@ -404,8 +460,13 @@ export default function AccountPage() {
           <>
             <section className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card lg:grid-cols-[1fr_18rem]">
               <div className="flex min-w-0 items-center gap-4">
-                {session.user?.picture ? (
-                  <img alt="" className="size-16 rounded-md object-cover" src={session.user.picture} />
+                {visibleProfilePicture ? (
+                  <img
+                    alt=""
+                    className="size-16 rounded-md object-cover"
+                    decoding="async"
+                    src={visibleProfilePicture}
+                  />
                 ) : (
                   <div className="grid size-16 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                     <User className="size-8" />
@@ -495,11 +556,12 @@ export default function AccountPage() {
               </div>
               <div className="grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
                 <div className="grid place-items-start">
-                  {profilePicture ? (
+                  {visibleProfilePicture ? (
                     <img
                       alt="صورة الحساب"
                       className="size-24 rounded-md border object-cover shadow-sm"
-                      src={profilePicture}
+                      decoding="async"
+                      src={visibleProfilePicture}
                     />
                   ) : (
                     <div className="grid size-24 place-items-center rounded-md border bg-blue-50 text-blue-700 shadow-sm dark:bg-blue-400/10 dark:text-blue-200">

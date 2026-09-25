@@ -1077,12 +1077,14 @@ export default function AccountListingsPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm [contain-intrinsic-size:260px] [content-visibility:auto] dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
                       {listing.image ? (
                         <div className="relative aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
                           <img
                             alt={listing.title}
                             className="h-full w-full object-contain"
+                            decoding="async"
+                            loading="lazy"
                             onError={(event) => {
                               event.currentTarget.hidden = true;
                               event.currentTarget.nextElementSibling?.removeAttribute('hidden');
@@ -1306,6 +1308,8 @@ export default function AccountListingsPage() {
                                       <img
                                         alt=""
                                         className="h-full w-full object-contain"
+                                        decoding="async"
+                                        loading="lazy"
                                         onError={(event) => {
                                           event.currentTarget.hidden = true;
                                           event.currentTarget.nextElementSibling?.removeAttribute('hidden');
