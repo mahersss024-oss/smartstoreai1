@@ -568,6 +568,27 @@
     transform: scale(1.06);
   }
 
+  .smartstore-ai-bubble__label {
+    pointer-events: none;
+    position: absolute;
+    left: 3.35rem;
+    top: 50%;
+    z-index: 1;
+    width: max-content;
+    max-width: 7rem;
+    transform: translateY(-50%);
+    border: 1px solid rgb(125 211 252 / 0.34);
+    border-radius: 9999px;
+    background: rgb(15 23 42 / 0.82);
+    box-shadow: 0 10px 26px rgb(15 23 42 / 0.18);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1;
+    padding: 0.45rem 0.65rem;
+    white-space: nowrap;
+  }
+
   .smartstore-ai-bubble__glint {
     position: absolute;
     inset: 0.45rem;

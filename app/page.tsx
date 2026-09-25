@@ -4474,6 +4474,9 @@ export default function Page() {
           <span className="smartstore-ai-bubble__core" aria-hidden="true">
             <img alt="" src="/hamad-assistant-bubble.png" />
           </span>
+          <span className="smartstore-ai-bubble__label" aria-hidden="true">
+            اسأل حمد
+          </span>
           <span className="smartstore-ai-bubble__glint" aria-hidden="true" />
         </button>
       )}
