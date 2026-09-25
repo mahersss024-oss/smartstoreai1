@@ -405,13 +405,6 @@ export default function ConversationPage() {
         return;
       }
 
-      if (containsManualContactDetails(messageBody)) {
-        setNotice(
-          'لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا داخل المحادثة. استخدم زر مشاركة رقم التواصل الرسمي.',
-        );
-        return;
-      }
-
       setIsSending(true);
       setNotice('');
 
@@ -446,7 +439,7 @@ export default function ConversationPage() {
 
         if (response.status === 422) {
           setNotice(
-            'لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا داخل المحادثة. استخدم زر مشاركة رقم التواصل الرسمي.',
+            'لا يمكن إرسال هذه الرسالة لأنها تحتوي على محتوى مخالف لسياسة السوق.',
           );
           return;
         }
@@ -912,7 +905,7 @@ export default function ConversationPage() {
               />
               {draftHasManualContact && (
                 <p className="text-xs leading-6 text-amber-700 dark:text-amber-200">
-                  لا تظهر أرقام الجوال أو الإيميلات داخل الشات. استخدم مشاركة الرقم الرسمية من البائع.
+                  تذكير: مشاركة معلومات التواصل أو الدفع خارج المنصة مسؤوليتك. لا تحول مبالغ قبل التأكد.
                 </p>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">

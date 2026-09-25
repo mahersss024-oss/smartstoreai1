@@ -92,6 +92,8 @@ test('seller buyer conversation hides blocked messages and uses official contact
   assert.match(source, /action: 'share_contact'/);
   assert.match(source, /message\.type === 'contact_share'/);
   assert.match(source, /مشاركة الرقم/);
+  assert.match(source, /مشاركة معلومات التواصل أو الدفع خارج المنصة مسؤوليتك/);
+  assert.doesNotMatch(source, /لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا/);
   assert.doesNotMatch(source, /محجوبة/);
 });
 

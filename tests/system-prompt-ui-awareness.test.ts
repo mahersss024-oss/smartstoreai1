@@ -28,7 +28,8 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /\/listing-policy/);
   assert.match(systemPrompt, /\/terms/);
   assert.match(systemPrompt, /\/privacy/);
-  assert.match(systemPrompt, /Manual phone numbers and emails are blocked/);
+  assert.match(systemPrompt, /Buyer-seller chat allows direct contact details/);
+  assert.match(systemPrompt, /users own responsibility/);
   assert.match(systemPrompt, /Do not claim to see hidden UI state, click buttons, navigate pages/);
   assert.match(systemPrompt, /The assistant only sees and acts through explicit platform capabilities/);
   assert.match(systemPrompt, /Do not invent listings, sellers, prices/);

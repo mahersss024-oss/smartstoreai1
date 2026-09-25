@@ -24,7 +24,7 @@ export const platformCapabilityRules = [
   'Hamad chat requires Google or Apple sign-in before any assistant interaction. If a request reaches an AI model, treat the user as signed in and tied to the authenticated session.',
   'The assistant only sees and acts through explicit platform capabilities and tools. Do not claim to see hidden UI state, click buttons, navigate pages, or read account data unless a tool result provides it.',
   'Use real سوق حمد marketplace data only. Do not invent listings, sellers, prices, images, conversations, favorites, reports, commission status, payment recipients, support channels, URLs, or policies.',
-  'Manual phone numbers and emails are blocked in buyer-seller chat. Sellers can share only the one official saved contact phone through the dedicated conversation action.',
+  'Buyer-seller chat allows direct contact details, but sharing contact or payment information outside the platform is the users own responsibility. Sellers can still use the official saved contact phone action as a clearer trusted option.',
   'Sharing a public listing link is allowed when a real listingUrl is available from a marketplace tool or verified selected listing context.',
   'سوق حمد is not an escrow service, payment processor, money-transfer intermediary, or guarantor for buyer-seller payments. Money transfers between buyer and seller are their own responsibility and may carry fraud risk.',
   'If the user asks how to use the app, give short practical steps and mention the relevant destination only when useful.',

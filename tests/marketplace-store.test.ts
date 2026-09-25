@@ -282,7 +282,7 @@ test('deleting a conversation hides it only from the deleting participant', () =
   );
 });
 
-test('blocks conversation messages that move contact outside the platform', () => {
+test('allows conversation messages that include external contact details', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-2',
     category: 'cars',
@@ -291,23 +291,22 @@ test('blocks conversation messages that move contact outside the platform', () =
   publishListing(listing.id);
 
   const opened = createConversationForListing(listing.id, 'buyer:messages-2');
-  const blocked = addConversationMessage(
+  const sent = addConversationMessage(
     opened.conversation?.id ?? '',
     'buyer:messages-2',
     'هذا رقمي 0501234567 تواصل واتساب',
   );
 
-  assert.equal(blocked.status, 'message_blocked');
-  assert.equal(blocked.message, null);
-  assert.equal(blocked.reasons.includes('external_contact_attempt'), true);
+  assert.equal(sent.status, 'sent');
+  assert.equal(sent.message?.body, 'هذا رقمي 0501234567 تواصل واتساب');
   assert.equal(
     getConversationForUser(opened.conversation?.id ?? '', 'buyer:messages-2')
       ?.messages.length,
-    0,
+    1,
   );
 });
 
-test('blocks manual direct contact even for inspection coordination', () => {
+test('allows manual direct contact for inspection coordination', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-3',
     category: 'cars',
@@ -322,8 +321,8 @@ test('blocks manual direct contact even for inspection coordination', () => {
     'ممكن موعد معاينة اليوم مساءً وهذا رقمي 0501234567',
   );
 
-  assert.equal(sent.status, 'message_blocked');
-  assert.equal(sent.message, null);
+  assert.equal(sent.status, 'sent');
+  assert.equal(sent.message?.body, 'ممكن موعد معاينة اليوم مساءً وهذا رقمي 0501234567');
 });
 
 test('lets the seller share the official saved phone number', () => {

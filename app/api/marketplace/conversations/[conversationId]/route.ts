@@ -276,7 +276,7 @@ export async function POST(request: Request, context: RouteContext) {
     const responseBody = {
       error: 'message_blocked',
       message:
-        'Manual phone numbers and emails are not allowed in buyer-seller chat. Use the official contact sharing button.',
+        'This message contains marketplace policy content that is not allowed in buyer-seller chat.',
       reasons: result.reasons,
       conversation: result.conversation,
     };
