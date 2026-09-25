@@ -4473,10 +4473,6 @@ export default function Page() {
           <span className="smartstore-ai-bubble__halo" aria-hidden="true" />
           <span className="smartstore-ai-bubble__core" aria-hidden="true">
             <img alt="" src="/hamad-assistant-bubble.png" />
-            <span className="smartstore-ai-bubble__label">
-              <span className="smartstore-ai-bubble__label-prompt">اسأل</span>
-              <span className="smartstore-ai-bubble__label-name">حمد</span>
-            </span>
           </span>
           <span className="smartstore-ai-bubble__glint" aria-hidden="true" />
         </button>

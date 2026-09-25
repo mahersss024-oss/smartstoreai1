@@ -568,35 +568,6 @@
     transform: scale(1.06);
   }
 
-  .smartstore-ai-bubble__label {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    display: grid;
-    place-content: center;
-    gap: 0.05rem;
-    background: radial-gradient(circle at 50% 62%, rgb(15 23 42 / 0.54), transparent 58%);
-    color: white;
-    direction: rtl;
-    line-height: 0.9;
-    text-align: center;
-    text-shadow:
-      0 1px 2px rgb(15 23 42 / 0.76),
-      0 0 12px rgb(14 165 233 / 0.52);
-    white-space: nowrap;
-  }
-
-  .smartstore-ai-bubble__label-prompt {
-    font-size: 0.55rem;
-    font-weight: 800;
-  }
-
-  .smartstore-ai-bubble__label-name {
-    font-size: 1rem;
-    font-weight: 950;
-  }
-
   .smartstore-ai-bubble__glint {
     position: absolute;
     inset: 0.45rem;

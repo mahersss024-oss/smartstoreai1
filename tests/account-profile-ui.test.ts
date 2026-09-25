@@ -29,15 +29,22 @@ test('account page keeps listing management free of chat listing shortcuts', () 
 
 test('account shortcuts link to customer listings instead of returning to market', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
 
-  assert.match(page, /href="#account-listings"/);
-  assert.match(page, /إعلاناتي/);
-  assert.match(page, /id="account-listings"/);
-  assert.doesNotMatch(page, /العودة للسوق/);
+  assert.match(page, /href="\/account\/listings"/);
+  assert.doesNotMatch(page, /id="account-listings"/);
+  assert.match(listingsPage, /id="account-listings"/);
+  assert.doesNotMatch(page, /ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط³ظˆظ‚/);
 });
 
 test('sold listings expose a platform fee action after the sale marker', () => {
-  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const page = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
 
   assert.match(page, /listing\.rawStatus === 'sold'/);
   assert.match(page, /تم البيع/);
