@@ -115,6 +115,9 @@ test('account conversations shortcut highlights new message alerts on web', () =
   assert.match(alertHook, /smartstore_conversation_alert/);
   assert.match(alertHook, /senderId !== currentUserId/);
   assert.match(alertHook, /syncUnreadConversations/);
+  assert.match(alertHook, /const isUserIdControlled = userId !== undefined/);
+  assert.match(alertHook, /if \(currentUserId\) \{\s*void syncUnreadConversations\(\);\s*return;\s*\}/);
+  assert.match(alertHook, /if \(isUserIdControlled\) \{\s*setHasConversationAlert\(false\);\s*return;\s*\}/);
 });
 
 test('sold listings expose a platform fee action after the sale marker', () => {

@@ -41,6 +41,7 @@ export function useConversationMessageAlert({
   const pathname = usePathname();
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [hasConversationAlert, setHasConversationAlert] = useState(false);
+  const isUserIdControlled = userId !== undefined;
   const currentUserId = userId === undefined ? sessionUserId : userId;
 
   const syncUnreadConversations = useCallback(async () => {
@@ -142,17 +143,26 @@ export function useConversationMessageAlert({
 
     queueMicrotask(() => {
       if (!cancelled) {
+        if (currentUserId) {
+          void syncUnreadConversations();
+          return;
+        }
+
+        if (isUserIdControlled) {
+          setHasConversationAlert(false);
+          return;
+        }
+
         setHasConversationAlert(
           window.localStorage.getItem(conversationAlertStorageKey) === '1',
         );
-        void syncUnreadConversations();
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [pathname, syncUnreadConversations]);
+  }, [currentUserId, isUserIdControlled, pathname, syncUnreadConversations]);
 
   useSmartstoreRealtime({
     enabled:
