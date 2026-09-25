@@ -15,12 +15,15 @@ import {
   User,
 } from 'lucide-react';
 
+import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
+
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   primary?: boolean;
   active?: boolean;
+  alert?: boolean;
   action?: 'more';
 };
 
@@ -45,6 +48,7 @@ export function MobileBottomNavigation() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const { hasConversationAlert } = useConversationMessageAlert();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isAssistantChatViewOpen, setIsAssistantChatViewOpen] = useState(false);
@@ -147,6 +151,7 @@ export function MobileBottomNavigation() {
       href: '/conversations',
       label: 'محادثاتي',
       icon: MessageCircle,
+      alert: hasConversationAlert,
     },
     {
       href: '/',
@@ -242,6 +247,7 @@ export function MobileBottomNavigation() {
             const Icon = item.icon;
             const active = item.active ?? isActive(pathname, item.href);
             const pending = isPending && pendingHref === item.href;
+            const showAlert = Boolean(item.alert && !active);
 
             return (
               <button
@@ -264,15 +270,23 @@ export function MobileBottomNavigation() {
                 type="button"
               >
                 <span
-                  className={`grid place-items-center rounded-full transition-all duration-200 ${
+                  className={`relative grid place-items-center rounded-full transition-all duration-200 ${
                     active
                       ? 'size-10 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                      : showAlert
+                        ? 'size-9 bg-rose-500/10 text-rose-500 shadow-[0_0_18px_rgba(244,63,94,0.55)] ring-1 ring-rose-400/60 dark:bg-rose-400/15 dark:text-rose-200 dark:shadow-[0_0_22px_rgba(251,113,133,0.5)]'
                       : item.primary
                         ? 'size-10 bg-transparent text-current'
                         : 'size-8 bg-transparent text-current'
                   }`}
                 >
-                  <Icon className="size-5" />
+                  {showAlert && (
+                    <>
+                      <span className="pointer-events-none absolute top-2 h-7 w-7 rounded-full bg-rose-500/25 blur-md" />
+                      <span className="absolute top-2.5 h-2 w-2 rounded-full bg-gradient-to-br from-rose-300 to-red-600 shadow-[0_0_10px_rgba(244,63,94,0.95)]" />
+                    </>
+                  )}
+                  <Icon className="relative z-10 size-5" />
                 </span>
                 <span className="truncate">{pending ? '...' : item.label}</span>
               </button>

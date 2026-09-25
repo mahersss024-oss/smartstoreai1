@@ -40,6 +40,24 @@ test('account shortcuts link to customer listings instead of returning to market
   assert.doesNotMatch(page, /ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط³ظˆظ‚/);
 });
 
+test('account conversations shortcut highlights new message alerts on web', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const alertHook = readFileSync(
+    join(process.cwd(), 'hooks', 'use-conversation-message-alert.ts'),
+    'utf8',
+  );
+
+  assert.match(page, /useConversationMessageAlert/);
+  assert.match(page, /userId: session\.user\?\.id \?\? null/);
+  assert.match(page, /hasConversationAlert/);
+  assert.match(page, /href="\/conversations"/);
+  assert.match(page, /shadow-\[0_0_18px_rgba\(244,63,94,0\.28\)\]/);
+  assert.match(page, /from-rose-300 to-red-600/);
+  assert.match(alertHook, /eventTypes: \['message_created'\]/);
+  assert.match(alertHook, /smartstore_conversation_alert/);
+  assert.match(alertHook, /senderId === currentUserId/);
+});
+
 test('sold listings expose a platform fee action after the sale marker', () => {
   const page = readFileSync(
     join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),

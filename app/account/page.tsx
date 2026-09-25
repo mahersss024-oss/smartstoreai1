@@ -23,6 +23,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
+import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { Button } from '@ui/button';
 
@@ -58,6 +59,9 @@ export default function AccountPage() {
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const { hasConversationAlert } = useConversationMessageAlert({
+    userId: session.user?.id ?? null,
+  });
 
   const isAdmin =
     session.user?.role === 'owner' ||
@@ -350,9 +354,24 @@ export default function AccountPage() {
                     إعلاناتي
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="rounded-md">
-                  <Link href="/conversations">
-                    <MessageCircle className="size-4" />
+                <Button
+                  asChild
+                  variant="outline"
+                  className={`rounded-md ${
+                    hasConversationAlert
+                      ? 'border-rose-400/70 bg-rose-500/5 text-rose-700 shadow-[0_0_18px_rgba(244,63,94,0.28)] dark:border-rose-300/50 dark:bg-rose-400/10 dark:text-rose-100 dark:shadow-[0_0_22px_rgba(251,113,133,0.24)]'
+                      : ''
+                  }`}
+                >
+                  <Link className="relative" href="/conversations">
+                    {hasConversationAlert && (
+                      <span className="absolute -top-1 right-2 h-2.5 w-2.5 rounded-full bg-gradient-to-br from-rose-300 to-red-600 shadow-[0_0_10px_rgba(244,63,94,0.95)]" />
+                    )}
+                    <MessageCircle
+                      className={`size-4 ${
+                        hasConversationAlert ? 'text-rose-500' : ''
+                      }`}
+                    />
                     محادثاتي
                   </Link>
                 </Button>

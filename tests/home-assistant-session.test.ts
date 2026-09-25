@@ -114,6 +114,22 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
   assert.doesNotMatch(mobileNavigation, /item\.primary \? \([\s\S]*bg-blue-600 text-white/);
 });
 
+test('mobile bottom navigation highlights conversations when a new message arrives', () => {
+  const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
+  const alertHook = readProjectFile('hooks', 'use-conversation-message-alert.ts');
+
+  assert.match(mobileNavigation, /useConversationMessageAlert/);
+  assert.match(mobileNavigation, /alert: hasConversationAlert/);
+  assert.match(mobileNavigation, /showAlert/);
+  assert.match(mobileNavigation, /shadow-\[0_0_18px_rgba\(244,63,94,0\.55\)\]/);
+  assert.match(mobileNavigation, /from-rose-300 to-red-600/);
+  assert.match(alertHook, /useSmartstoreRealtime/);
+  assert.match(alertHook, /eventTypes: \['message_created'\]/);
+  assert.match(alertHook, /senderId === currentUserId/);
+  assert.match(alertHook, /smartstore_conversation_alert/);
+  assert.match(alertHook, /pathname\.startsWith\('\/conversations'\)/);
+});
+
 test('tablet keeps account access in the bottom navigation instead of the top header', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
