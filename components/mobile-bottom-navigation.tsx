@@ -263,27 +263,17 @@ export function MobileBottomNavigation() {
                 }}
                 type="button"
               >
-                {item.primary ? (
-                  <span
-                    className={`grid size-10 place-items-center rounded-full transition-all duration-200 ${
-                      active
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
-                        : 'bg-transparent text-current'
-                    }`}
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                ) : (
-                  <span
-                    className={`grid size-8 place-items-center rounded-full transition-colors ${
-                      active
-                        ? 'bg-blue-50 dark:bg-blue-400/10'
-                        : 'bg-transparent'
-                    }`}
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                )}
+                <span
+                  className={`grid place-items-center rounded-full transition-all duration-200 ${
+                    active
+                      ? 'size-10 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                      : item.primary
+                        ? 'size-10 bg-transparent text-current'
+                        : 'size-8 bg-transparent text-current'
+                  }`}
+                >
+                  <Icon className="size-5" />
+                </span>
                 <span className="truncate">{pending ? '...' : item.label}</span>
               </button>
             );

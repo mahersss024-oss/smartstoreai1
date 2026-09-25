@@ -110,7 +110,8 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
   assert.match(mobileNavigation, /aria-label=\{item\.label\}/);
   assert.doesNotMatch(mobileNavigation, /iconOnly/);
   assert.doesNotMatch(mobileNavigation, /sr-only/);
-  assert.match(mobileNavigation, /active[\s\S]*bg-blue-600 text-white/);
+  assert.match(mobileNavigation, /active[\s\S]*size-10 bg-blue-600 text-white/);
+  assert.doesNotMatch(mobileNavigation, /item\.primary \? \([\s\S]*bg-blue-600 text-white/);
 });
 
 test('home assistant starter search is generic instead of a fixed car city example', () => {
