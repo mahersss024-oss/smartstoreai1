@@ -98,6 +98,12 @@ type LocationSettings = {
   language: 'ar';
 };
 
+type MarketplaceCityCoordinate = {
+  city: string;
+  latitude: number;
+  longitude: number;
+};
+
 type AuthUser = {
   id: string;
   email: string;
@@ -1015,6 +1021,124 @@ const saudiMarketplaceCities = [
   'العويقيلة',
 ] satisfies string[];
 
+function marketplaceCityCoordinate(
+  cityIndex: number,
+  latitude: number,
+  longitude: number,
+): MarketplaceCityCoordinate | null {
+  const city = saudiMarketplaceCities[cityIndex];
+
+  return city ? { city, latitude, longitude } : null;
+}
+
+const marketplaceCityCoordinates = [
+  marketplaceCityCoordinate(0, 24.7136, 46.6753),
+  marketplaceCityCoordinate(1, 24.734, 46.575),
+  marketplaceCityCoordinate(2, 24.1557, 47.312),
+  marketplaceCityCoordinate(3, 24.5077, 44.3924),
+  marketplaceCityCoordinate(4, 25.9045, 45.3455),
+  marketplaceCityCoordinate(5, 24.0717, 45.2808),
+  marketplaceCityCoordinate(7, 20.4597, 44.8501),
+  marketplaceCityCoordinate(8, 26.2995, 44.8154),
+  marketplaceCityCoordinate(9, 25.252, 45.252),
+  marketplaceCityCoordinate(11, 23.9065, 42.9172),
+  marketplaceCityCoordinate(20, 21.3891, 39.8579),
+  marketplaceCityCoordinate(21, 21.4858, 39.1925),
+  marketplaceCityCoordinate(22, 21.4373, 40.5127),
+  marketplaceCityCoordinate(23, 19.1264, 41.0789),
+  marketplaceCityCoordinate(25, 22.7986, 39.0349),
+  marketplaceCityCoordinate(36, 21.4024, 39.4849),
+  marketplaceCityCoordinate(37, 24.5247, 39.5692),
+  marketplaceCityCoordinate(38, 24.0895, 38.0618),
+  marketplaceCityCoordinate(39, 26.6085, 37.9232),
+  marketplaceCityCoordinate(42, 23.7829, 38.7905),
+  marketplaceCityCoordinate(46, 26.4207, 50.0888),
+  marketplaceCityCoordinate(47, 26.2172, 50.1971),
+  marketplaceCityCoordinate(48, 26.2361, 50.0393),
+  marketplaceCityCoordinate(49, 25.3833, 49.6),
+  marketplaceCityCoordinate(50, 26.5652, 50.0089),
+  marketplaceCityCoordinate(51, 27.0046, 49.646),
+  marketplaceCityCoordinate(52, 28.4328, 45.9708),
+  marketplaceCityCoordinate(53, 28.4391, 48.4913),
+  marketplaceCityCoordinate(54, 26.6437, 50.1592),
+  marketplaceCityCoordinate(55, 25.934, 49.6688),
+  marketplaceCityCoordinate(59, 26.3592, 43.9818),
+  marketplaceCityCoordinate(60, 26.0913, 43.9875),
+  marketplaceCityCoordinate(61, 25.8694, 43.4973),
+  marketplaceCityCoordinate(63, 26.1442, 43.6578),
+  marketplaceCityCoordinate(71, 18.2164, 42.5053),
+  marketplaceCityCoordinate(72, 18.3064, 42.7292),
+  marketplaceCityCoordinate(73, 20.0087, 42.5987),
+  marketplaceCityCoordinate(74, 19.1458, 42.1207),
+  marketplaceCityCoordinate(81, 18.55, 42.05),
+  marketplaceCityCoordinate(85, 27.5114, 41.7208),
+  marketplaceCityCoordinate(86, 27.8877, 42.4105),
+  marketplaceCityCoordinate(94, 28.3838, 36.5662),
+  marketplaceCityCoordinate(95, 26.2455, 36.4525),
+  marketplaceCityCoordinate(96, 27.3493, 35.6977),
+  marketplaceCityCoordinate(97, 27.6338, 38.5543),
+  marketplaceCityCoordinate(98, 25.0213, 37.2685),
+  marketplaceCityCoordinate(99, 29.2833, 34.95),
+  marketplaceCityCoordinate(101, 16.8892, 42.5611),
+  marketplaceCityCoordinate(102, 17.1495, 42.6254),
+  marketplaceCityCoordinate(103, 16.9689, 42.8325),
+  marketplaceCityCoordinate(104, 16.596, 42.9448),
+  marketplaceCityCoordinate(105, 17.3753, 42.5247),
+  marketplaceCityCoordinate(106, 17.7229, 42.2526),
+  marketplaceCityCoordinate(113, 16.7059, 42.1182),
+  marketplaceCityCoordinate(114, 17.5446, 44.2289),
+  marketplaceCityCoordinate(115, 17.4667, 47.1),
+  marketplaceCityCoordinate(116, 17.83, 44.32),
+  marketplaceCityCoordinate(122, 20.0129, 41.4677),
+  marketplaceCityCoordinate(123, 19.8618, 41.5776),
+  marketplaceCityCoordinate(130, 29.9697, 40.2064),
+  marketplaceCityCoordinate(131, 31.3318, 37.3428),
+  marketplaceCityCoordinate(134, 30.9753, 41.0381),
+].filter(
+  (cityCoordinate): cityCoordinate is MarketplaceCityCoordinate =>
+    Boolean(cityCoordinate),
+);
+
+function getDistanceInKilometers(
+  first: Pick<MarketplaceCityCoordinate, 'latitude' | 'longitude'>,
+  second: Pick<MarketplaceCityCoordinate, 'latitude' | 'longitude'>,
+) {
+  const earthRadiusInKilometers = 6371;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = toRadians(second.latitude - first.latitude);
+  const longitudeDelta = toRadians(second.longitude - first.longitude);
+  const firstLatitude = toRadians(first.latitude);
+  const secondLatitude = toRadians(second.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    earthRadiusInKilometers *
+    2 *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+}
+
+function getNearestMarketplaceCity(
+  latitude: number,
+  longitude: number,
+): MarketplaceCityCoordinate | null {
+  return (
+    marketplaceCityCoordinates
+      .map((cityCoordinate) => ({
+        ...cityCoordinate,
+        distance: getDistanceInKilometers(
+          { latitude, longitude },
+          cityCoordinate,
+        ),
+      }))
+      .sort((first, second) => first.distance - second.distance)[0] ?? null
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -1790,6 +1914,11 @@ export default function Page() {
   const [selectedMarketSubcategory, setSelectedMarketSubcategory] =
     useState('all');
   const [selectedMarketCity, setSelectedMarketCity] = useState('all');
+  const [nearbyMarketplaceCity, setNearbyMarketplaceCity] =
+    useState<string | null>(null);
+  const [nearbyMarketplaceNotice, setNearbyMarketplaceNotice] = useState('');
+  const [isLocatingNearbyListings, setIsLocatingNearbyListings] =
+    useState(false);
   const [marketplaceSearchInput, setMarketplaceSearchInput] = useState('');
   const [marketplaceSearchQuery, setMarketplaceSearchQuery] = useState('');
   const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
@@ -2614,6 +2743,10 @@ export default function Page() {
       params.set('q', effectiveQuery.trim());
     }
 
+    if (activeMarketCity !== 'all') {
+      params.set('city', activeMarketCity);
+    }
+
     params.set('page', String(page));
     params.set('limit', '24');
 
@@ -2676,7 +2809,7 @@ export default function Page() {
           setIsLoadingListings(false);
         }
       });
-  }, [marketplaceSearchQuery]);
+  }, [activeMarketCity, marketplaceSearchQuery]);
 
   const refreshFavoriteListingIds = useCallback(() => {
     return fetch('/api/marketplace/me/favorites?page=1&limit=48', {
@@ -3513,6 +3646,51 @@ export default function Page() {
     [favoriteListingIds, refreshMarketplaceListings, router],
   );
 
+  const handleNearbyMarketplaceSearch = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setNearbyMarketplaceNotice(
+        'البحث القريب يحتاج تفعيل خدمة الموقع في المتصفح.',
+      );
+      return;
+    }
+
+    setIsLocatingNearbyListings(true);
+    setNearbyMarketplaceNotice('جار تحديد أقرب منطقة لإعلاناتك...');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nearestCity = getNearestMarketplaceCity(
+          position.coords.latitude,
+          position.coords.longitude,
+        );
+
+        setIsLocatingNearbyListings(false);
+
+        if (!nearestCity) {
+          setNearbyMarketplaceNotice(
+            'تعذر تحديد مدينة قريبة ضمن مناطق السوق الحالية.',
+          );
+          return;
+        }
+
+        setNearbyMarketplaceCity(nearestCity.city);
+        setSelectedMarketCity(nearestCity.city);
+        setNearbyMarketplaceNotice(`تم عرض الإعلانات القريبة من ${nearestCity.city}.`);
+      },
+      () => {
+        setIsLocatingNearbyListings(false);
+        setNearbyMarketplaceNotice(
+          'لم يتم السماح بالوصول للموقع. يمكنك اختيار المنطقة يدويًا.',
+        );
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 5 * 60 * 1000,
+        timeout: 10 * 1000,
+      },
+    );
+  }, []);
+
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       clearHomeAssistantRuntimeState();
@@ -3635,8 +3813,14 @@ export default function Page() {
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" variant="ghost" aria-label="الإشعارات" className="hidden sm:inline-flex">
-                    <Bell className="size-4" />
+                  <Button asChild size="icon-sm" variant="ghost" className="hidden sm:inline-flex">
+                    <Link
+                      aria-label="الإشعارات"
+                      href="/account#notifications"
+                      onClick={closeAssistantForNavigation}
+                    >
+                      <Bell className="size-4" />
+                    </Link>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>الإشعارات</TooltipContent>
@@ -4092,7 +4276,11 @@ export default function Page() {
                       <DropdownMenuSeparator />
                       <DropdownMenuRadioGroup
                         value={activeMarketCity}
-                        onValueChange={setSelectedMarketCity}
+                        onValueChange={(value) => {
+                          setSelectedMarketCity(value);
+                          setNearbyMarketplaceCity(null);
+                          setNearbyMarketplaceNotice('');
+                        }}
                       >
                         <DropdownMenuRadioItem value="all">
                           كل المناطق
@@ -4107,12 +4295,22 @@ export default function Page() {
                   </DropdownMenu>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={
+                      nearbyMarketplaceCity &&
+                      activeMarketCity === nearbyMarketplaceCity
+                        ? 'default'
+                        : 'outline'
+                    }
                     className="h-10 rounded-md"
-                    disabled
+                    disabled={isLocatingNearbyListings}
+                    onClick={handleNearbyMarketplaceSearch}
                     title="القريب يحتاج إذن الموقع الجغرافي"
                   >
-                    <MapPin className="size-4" />
+                    {isLocatingNearbyListings ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <MapPin className="size-4" />
+                    )}
                     القريب
                   </Button>
                   <Button
@@ -4131,6 +4329,12 @@ export default function Page() {
                   </Button>
                 </div>
 
+                {nearbyMarketplaceNotice && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 text-right text-xs font-medium text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
+                    {nearbyMarketplaceNotice}
+                  </div>
+                )}
+
                 {isMarketFilterOpen && (
                   <div className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50/70 p-3 text-right text-xs text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
                     <span>
@@ -4148,6 +4352,8 @@ export default function Page() {
                           setSelectedMarketCategoryGroup('all');
                           setSelectedMarketSubcategory('all');
                           setSelectedMarketCity('all');
+                          setNearbyMarketplaceCity(null);
+                          setNearbyMarketplaceNotice('');
                         }}
                       >
                         <X className="size-3.5" />

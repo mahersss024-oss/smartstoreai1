@@ -208,7 +208,10 @@ export function PushNotificationSettings() {
           : 'تصل الإشعارات عند وصول رسالة جديدة في محادثاتك.';
 
   return (
-    <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <section
+      id="notifications"
+      className="scroll-mt-20 grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">

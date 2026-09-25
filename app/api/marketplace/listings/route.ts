@@ -34,6 +34,8 @@ const createListingSchema = z.object({
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get('q') ?? undefined;
+  const cityParam = url.searchParams.get('city')?.trim();
+  const city = cityParam && cityParam !== 'all' ? cityParam : undefined;
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 24,
     maxLimit: 48,
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
 
   const listings = await listMarketplaceListings({
     query,
+    city,
     page: pagination.page,
     limit: pagination.limit + 1,
   });
