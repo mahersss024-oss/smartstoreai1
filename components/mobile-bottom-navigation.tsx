@@ -22,7 +22,6 @@ type NavItem = {
   primary?: boolean;
   active?: boolean;
   action?: 'more';
-  iconOnly?: boolean;
 };
 
 function isActive(pathname: string, href: string) {
@@ -146,9 +145,8 @@ export function MobileBottomNavigation() {
     { href: '/account', label: 'حسابي', icon: User },
     {
       href: '/conversations',
-      label: 'رسائلي',
+      label: 'محادثاتي',
       icon: MessageCircle,
-      iconOnly: true,
     },
     {
       href: '/',
@@ -266,7 +264,13 @@ export function MobileBottomNavigation() {
                 type="button"
               >
                 {item.primary ? (
-                  <span className="grid size-10 place-items-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/25 transition-transform duration-200">
+                  <span
+                    className={`grid size-10 place-items-center rounded-full transition-all duration-200 ${
+                      active
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                        : 'bg-transparent text-current'
+                    }`}
+                  >
                     <Icon className="size-5" />
                   </span>
                 ) : (
@@ -280,11 +284,7 @@ export function MobileBottomNavigation() {
                     <Icon className="size-5" />
                   </span>
                 )}
-                {item.iconOnly ? (
-                  <span className="sr-only">{pending ? '...' : item.label}</span>
-                ) : (
-                  <span className="truncate">{pending ? '...' : item.label}</span>
-                )}
+                <span className="truncate">{pending ? '...' : item.label}</span>
               </button>
             );
           })}

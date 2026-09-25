@@ -100,16 +100,17 @@ test('mobile bottom navigation is hidden while assistant chat view is open', () 
   assert.match(mobileNavigation, /isAssistantChatViewOpen[\s\S]*return null/);
 });
 
-test('mobile bottom navigation exposes messages as an icon-only tab', () => {
+test('mobile bottom navigation exposes messages with a visible label', () => {
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
   assert.match(mobileNavigation, /href: '\/conversations'/);
-  assert.match(mobileNavigation, /label: 'رسائلي'/);
-  assert.match(mobileNavigation, /iconOnly: true/);
+  assert.match(mobileNavigation, /label: 'محادثاتي'/);
   assert.match(mobileNavigation, /grid-cols-4/);
   assert.match(mobileNavigation, /w-1\/4/);
   assert.match(mobileNavigation, /aria-label=\{item\.label\}/);
-  assert.match(mobileNavigation, /sr-only/);
+  assert.doesNotMatch(mobileNavigation, /iconOnly/);
+  assert.doesNotMatch(mobileNavigation, /sr-only/);
+  assert.match(mobileNavigation, /active[\s\S]*bg-blue-600 text-white/);
 });
 
 test('home assistant starter search is generic instead of a fixed car city example', () => {
