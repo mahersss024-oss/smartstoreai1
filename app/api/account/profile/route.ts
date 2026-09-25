@@ -13,7 +13,53 @@ import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
 
-const maxProfileRequestBytes = 2 * 1024;
+const maxProfileRequestBytes = 5 * 1024;
+
+function normalizeProfileDisplayName(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const name = value.replace(/\s+/g, ' ').trim();
+
+  if (!name) {
+    return null;
+  }
+
+  if (name.length > 80) {
+    return { error: 'Display name must be 80 characters or less.' } as const;
+  }
+
+  return name;
+}
+
+function normalizeProfilePictureUrl(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const picture = value.trim();
+
+  if (!picture) {
+    return null;
+  }
+
+  if (picture.length > 2048) {
+    return { error: 'Profile picture URL is too long.' } as const;
+  }
+
+  try {
+    const url = new URL(picture);
+
+    if (url.protocol !== 'https:') {
+      return { error: 'Profile picture URL must start with https.' } as const;
+    }
+
+    return url.toString();
+  } catch {
+    return { error: 'Profile picture URL is invalid.' } as const;
+  }
+}
 
 function shouldPersistUserProfile() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
@@ -54,15 +100,39 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as {
+    displayName?: unknown;
     phoneNumber?: unknown;
+    picture?: unknown;
   } | null;
   const phoneValidation = normalizeContactPhoneNumber(body?.phoneNumber);
+  const displayName = normalizeProfileDisplayName(body?.displayName);
+  const picture = normalizeProfilePictureUrl(body?.picture);
 
   if (!phoneValidation.ok) {
     return NextResponse.json(
       {
         error: 'invalid_phone_number',
         message: phoneValidation.message,
+      },
+      { status: 400, headers: noStoreHeaders },
+    );
+  }
+
+  if (displayName && typeof displayName === 'object') {
+    return NextResponse.json(
+      {
+        error: 'invalid_display_name',
+        message: displayName.error,
+      },
+      { status: 400, headers: noStoreHeaders },
+    );
+  }
+
+  if (picture && typeof picture === 'object') {
+    return NextResponse.json(
+      {
+        error: 'invalid_profile_picture',
+        message: picture.error,
       },
       { status: 400, headers: noStoreHeaders },
     );
@@ -82,6 +152,8 @@ export async function PATCH(request: Request) {
   const profileData = {
     phoneNumber: phoneValidation.phoneNumber,
     phoneUpdatedAt: phoneValidation.phoneNumber ? now : null,
+    ...(displayName !== undefined ? { name: displayName } : {}),
+    ...(picture !== undefined ? { picture } : {}),
   };
   const existingUserByEmail = await prisma.user.findUnique({
     where: { email: session.user.email },

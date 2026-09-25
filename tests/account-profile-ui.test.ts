@@ -11,12 +11,68 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /Phone/);
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
+  assert.match(page, /profileDisplayName/);
+  assert.match(page, /profilePictureUrl/);
+  assert.match(page, /profilePictureFile/);
+  assert.match(page, /\/api\/account\/profile\/picture/);
+  assert.match(page, /uploadProfilePicture/);
+  assert.match(page, /رفع صورة عرض الحساب/);
+  assert.match(page, /displayName: profileName/);
+  assert.match(page, /picture: profilePicture/);
+  assert.match(page, /hasProfileIdentityChanges/);
   assert.match(page, /saveProfile/);
   assert.match(page, /savedProfilePhone/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
   assert.match(page, /deleteAccount/);
   assert.match(page, /countContactPhoneCandidates/);
+});
+
+test('account profile api accepts editable display name and secure profile picture URL', () => {
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'account', 'profile', 'route.ts'),
+    'utf8',
+  );
+
+  assert.match(route, /displayName\?: unknown/);
+  assert.match(route, /picture\?: unknown/);
+  assert.match(route, /normalizeProfileDisplayName/);
+  assert.match(route, /normalizeProfilePictureUrl/);
+  assert.match(route, /url\.protocol !== 'https:'/);
+  assert.match(route, /\{ name: displayName \}/);
+  assert.match(route, /\{ picture \}/);
+});
+
+test('account profile picture upload stores a persistent display image for the account', () => {
+  const route = readFileSync(
+    join(
+      process.cwd(),
+      'app',
+      'api',
+      'account',
+      'profile',
+      'picture',
+      'route.ts',
+    ),
+    'utf8',
+  );
+  const storage = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'profile-image-storage.ts'),
+    'utf8',
+  );
+  const objectStorage = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'object-storage.ts'),
+    'utf8',
+  );
+
+  assert.match(route, /export async function POST/);
+  assert.match(route, /getAuthSession/);
+  assert.match(route, /formData\.get\('image'\)/);
+  assert.match(route, /maxProfileImageBytes = 4 \* 1024 \* 1024/);
+  assert.match(route, /createPersistentProfileImageUrl/);
+  assert.match(route, /update: \{ picture \}/);
+  assert.match(storage, /objectPrefix: 'profiles'/);
+  assert.match(objectStorage, /objectPrefix\?: 'listings' \| 'profiles'/);
 });
 
 test('account page keeps listing management free of chat listing shortcuts', () => {

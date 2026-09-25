@@ -294,6 +294,15 @@ test('session api exposes the owner role for the configured owner email', async 
   }
 });
 
+test('session api reads saved profile name and picture from the database profile', () => {
+  const route = readProjectFile('app', 'api', 'auth', 'session', 'route.ts');
+
+  assert.match(route, /name: true/);
+  assert.match(route, /picture: true/);
+  assert.match(route, /user\.name = profile\.name \?\? undefined/);
+  assert.match(route, /user\.picture = profile\.picture \?\? undefined/);
+});
+
 test('session api does not expose stale admin role when database verification fails', async () => {
   const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;

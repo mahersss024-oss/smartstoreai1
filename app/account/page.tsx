@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Heart,
+  Image as ImageIcon,
   LogOut,
   Megaphone,
   MessageCircle,
@@ -17,6 +18,7 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  Upload,
   User,
 } from 'lucide-react';
 
@@ -53,11 +55,16 @@ export default function AccountPage() {
     user: null,
   });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [profileName, setProfileName] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
+  const [savedProfileName, setSavedProfileName] = useState('');
+  const [savedProfilePicture, setSavedProfilePicture] = useState('');
   const [savedProfilePhone, setSavedProfilePhone] = useState('');
   const [isEditingProfilePhone, setIsEditingProfilePhone] = useState(false);
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const { hasConversationAlert } = useConversationMessageAlert({
     userId: session.user?.id ?? null,
@@ -70,6 +77,8 @@ export default function AccountPage() {
   const hasSavedProfilePhone = Boolean(savedProfilePhone);
   const isProfilePhoneInputLocked =
     hasSavedProfilePhone && !isEditingProfilePhone;
+  const hasProfileIdentityChanges =
+    profileName !== savedProfileName || profilePicture !== savedProfilePicture;
 
   const refreshSession = useCallback(() => {
     setIsSessionLoading(true);
@@ -78,13 +87,21 @@ export default function AccountPage() {
       .then((response) => response.json() as Promise<AuthSessionPayload>)
       .then((payload) => {
         setSession(payload);
+        setProfileName(payload.user?.name ?? '');
+        setProfilePicture(payload.user?.picture ?? '');
         setProfilePhone(payload.user?.phoneNumber ?? '');
+        setSavedProfileName(payload.user?.name ?? '');
+        setSavedProfilePicture(payload.user?.picture ?? '');
         setSavedProfilePhone(payload.user?.phoneNumber ?? '');
         setIsEditingProfilePhone(false);
       })
       .catch(() => {
         setSession({ authenticated: false, user: null });
+        setProfileName('');
+        setProfilePicture('');
         setProfilePhone('');
+        setSavedProfileName('');
+        setSavedProfilePicture('');
         setSavedProfilePhone('');
         setIsEditingProfilePhone(false);
       })
@@ -113,7 +130,11 @@ export default function AccountPage() {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       setSession({ authenticated: false, user: null });
       setIsSessionLoading(false);
+      setProfileName('');
+      setProfilePicture('');
       setProfilePhone('');
+      setSavedProfileName('');
+      setSavedProfilePicture('');
       setSavedProfilePhone('');
       setIsEditingProfilePhone(false);
       setProfileNotice(null);
@@ -136,7 +157,11 @@ export default function AccountPage() {
       const response = await fetch('/api/account/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: nextPhoneNumber }),
+        body: JSON.stringify({
+          displayName: profileName,
+          phoneNumber: nextPhoneNumber,
+          picture: profilePicture,
+        }),
       });
       const payload = (await response.json().catch(() => null)) as {
         user?: AuthUser;
@@ -166,14 +191,16 @@ export default function AccountPage() {
           ? { ...currentSession.user, ...payload.user }
           : payload.user ?? null,
       }));
+      setProfileName(payload.user.name ?? '');
+      setProfilePicture(payload.user.picture ?? '');
       setProfilePhone(payload.user.phoneNumber ?? '');
+      setSavedProfileName(payload.user.name ?? '');
+      setSavedProfilePicture(payload.user.picture ?? '');
       setSavedProfilePhone(payload.user.phoneNumber ?? '');
       setIsEditingProfilePhone(false);
       setProfileNotice({
         tone: 'success',
-        message: payload.user.phoneNumber
-          ? 'تم حفظ رقم التواصل الرسمي في حسابك.'
-          : 'تم حذف رقم التواصل من حسابك.',
+        message: 'تم حفظ بيانات الحساب بنجاح.',
       });
     } catch {
       setProfileNotice({
@@ -183,7 +210,7 @@ export default function AccountPage() {
     } finally {
       setIsSavingProfile(false);
     }
-  }, [profilePhone, router]);
+  }, [profileName, profilePhone, profilePicture, router]);
 
   const editProfilePhone = useCallback(() => {
     setProfilePhone(savedProfilePhone);
@@ -197,6 +224,66 @@ export default function AccountPage() {
   const deleteProfilePhone = useCallback(() => {
     void saveProfile('');
   }, [saveProfile]);
+
+  const uploadProfilePicture = useCallback(async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingProfilePicture(true);
+    setProfileNotice(null);
+
+    try {
+      const formData = new FormData();
+      formData.set('image', file);
+
+      const response = await fetch('/api/account/profile/picture', {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        user?: AuthUser;
+        message?: string;
+        error?: string;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok || !payload?.user?.picture) {
+        setProfileNotice({
+          tone: 'danger',
+          message:
+            payload?.message ??
+            payload?.error ??
+            'تعذر رفع صورة الحساب الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setSession((currentSession) => ({
+        ...currentSession,
+        user: currentSession.user
+          ? { ...currentSession.user, ...payload.user }
+          : payload.user ?? null,
+      }));
+      setProfilePicture(payload.user.picture);
+      setSavedProfilePicture(payload.user.picture);
+      setProfileNotice({
+        tone: 'success',
+        message: 'تم تحديث صورة الحساب بنجاح.',
+      });
+    } catch {
+      setProfileNotice({
+        tone: 'danger',
+        message: 'تعذر رفع صورة الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
+      });
+    } finally {
+      setIsUploadingProfilePicture(false);
+    }
+  }, [router]);
 
   const deleteAccount = useCallback(async () => {
     if (
@@ -236,7 +323,11 @@ export default function AccountPage() {
       }
 
       setSession({ authenticated: false, user: null });
+      setProfileName('');
+      setProfilePicture('');
       setProfilePhone('');
+      setSavedProfileName('');
+      setSavedProfilePicture('');
       setSavedProfilePhone('');
       setIsEditingProfilePhone(false);
       router.push('/');
@@ -395,6 +486,111 @@ export default function AccountPage() {
                     </Link>
                   </Button>
                 )}
+              </div>
+            </section>
+
+            <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex items-start gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <ImageIcon className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-bold">بيانات الملف الشخصي</h2>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    يمكنك تعديل الاسم وصورة الحساب التي تظهر داخل صفحة حسابك وواجهات السوق.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
+                <div className="grid place-items-start">
+                  {profilePicture ? (
+                    <img
+                      alt="صورة الحساب"
+                      className="size-24 rounded-md border object-cover shadow-sm"
+                      src={profilePicture}
+                    />
+                  ) : (
+                    <div className="grid size-24 place-items-center rounded-md border bg-blue-50 text-blue-700 shadow-sm dark:bg-blue-400/10 dark:text-blue-200">
+                      <User className="size-10" />
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-semibold transition hover:bg-accent">
+                      <Upload className="size-4" />
+                      {isUploadingProfilePicture ? 'جار رفع الصورة...' : 'رفع صورة عرض الحساب'}
+                      <input
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="sr-only"
+                        disabled={isUploadingProfilePicture}
+                        name="profilePictureFile"
+                        type="file"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          event.target.value = '';
+                          void uploadProfilePicture(file);
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                      JPG أو PNG أو WEBP حتى 4MB.
+                    </span>
+                  </div>
+                  <label className="grid gap-1 text-sm font-semibold">
+                    الاسم الظاهر
+                    <input
+                      className="h-11 rounded-md border bg-background px-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      disabled={isSavingProfile || isUploadingProfilePicture}
+                      maxLength={80}
+                      name="profileDisplayName"
+                      placeholder="اسمك في سوق حمد"
+                      type="text"
+                      value={profileName}
+                      onChange={(event) => setProfileName(event.target.value)}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm font-semibold">
+                    رابط صورة الحساب
+                    <input
+                      className="h-11 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      disabled={isSavingProfile || isUploadingProfilePicture}
+                      dir="ltr"
+                      name="profilePictureUrl"
+                      placeholder="https://example.com/avatar.jpg"
+                      type="url"
+                      value={profilePicture}
+                      onChange={(event) => setProfilePicture(event.target.value)}
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      className="rounded-md bg-blue-600 hover:bg-blue-700"
+                      disabled={isSavingProfile || isUploadingProfilePicture}
+                      onClick={() => void saveProfile()}
+                      type="button"
+                    >
+                      <Save className="size-4" />
+                      {isSavingProfile ? 'جار الحفظ...' : 'حفظ بيانات الحساب'}
+                    </Button>
+                    <Button
+                      className="rounded-md"
+                      disabled={
+                        isSavingProfile ||
+                        isUploadingProfilePicture ||
+                        !hasProfileIdentityChanges
+                      }
+                      onClick={() => {
+                        setProfileName(savedProfileName);
+                        setProfilePicture(savedProfilePicture);
+                      }}
+                      type="button"
+                      variant="outline"
+                    >
+                      إلغاء التعديل
+                    </Button>
+                  </div>
+                </div>
               </div>
             </section>
 

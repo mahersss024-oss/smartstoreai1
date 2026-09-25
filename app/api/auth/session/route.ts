@@ -36,7 +36,13 @@ export async function GET(request: Request) {
     try {
       const profile = await prisma.user.findUnique({
         where: { id: user.id },
-        select: { phoneNumber: true, role: true, deletedAt: true },
+        select: {
+          name: true,
+          phoneNumber: true,
+          picture: true,
+          role: true,
+          deletedAt: true,
+        },
       });
 
       if (!profile || profile.deletedAt) {
@@ -57,6 +63,8 @@ export async function GET(request: Request) {
       }
 
       if (profile) {
+        user.name = profile.name ?? undefined;
+        user.picture = profile.picture ?? undefined;
         user.phoneNumber = profile.phoneNumber ?? undefined;
         user.role = isConfiguredAdminEmail(session.user.email)
           ? 'owner'

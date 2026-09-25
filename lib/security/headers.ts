@@ -1,7 +1,7 @@
 // Centralized security header definitions for the whole site.
 //
 // The Content-Security-Policy is intentionally strict but allows the external
-// origins Souq Hamad actually uses: Google profile images and the configured
+// origins Souq Hamad actually uses: HTTPS profile images and the configured
 // object-storage public domain. Style-src keeps `'unsafe-inline'`
 // because theme tokens are injected via inline <style> and Next.js streams
 // inline styles.
@@ -34,7 +34,7 @@ function readPublicImageOrigin() {
 
 export function buildContentSecurityPolicy() {
   const publicImageOrigin = readPublicImageOrigin();
-  const imgSrc = ["'self'", 'data:', 'blob:', ...imageOrigins];
+  const imgSrc = ["'self'", 'data:', 'blob:', 'https:', ...imageOrigins];
 
   if (publicImageOrigin) {
     imgSrc.push(publicImageOrigin);

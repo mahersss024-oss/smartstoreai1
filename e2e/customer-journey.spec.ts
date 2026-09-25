@@ -63,7 +63,7 @@ const corePageText: Record<string, RegExp> = {
   '/account': /حسابي/i,
   '/conversations': /محادثات/i,
   '/favorites': /إعلانات محفوظة|المفضلة/i,
-  '/commissions': /العمولة|عمولاتي/i,
+  '/commissions': /رسوم المنصة|العمولة|عمولاتي/i,
 };
 
 test('visitor can reach the marketplace and choose an auth provider', async ({

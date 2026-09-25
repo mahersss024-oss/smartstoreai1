@@ -143,7 +143,11 @@ async function persistAppleUserRegistration(
   if (existingUserByEmail && existingUserByEmail.id !== user.id) {
     const updatedUser = await prisma.user.update({
       where: { email: user.email },
-      data: registrationData,
+      data: {
+        ...registrationData,
+        name: existingUserByEmail.name ?? user.name,
+        picture: existingUserByEmail.picture ?? user.picture,
+      },
     });
 
     return {
@@ -162,7 +166,11 @@ async function persistAppleUserRegistration(
       role: getConfiguredRoleForEmail(user.email),
       ...registrationData,
     },
-    update: registrationData,
+    update: {
+      ...registrationData,
+      name: existingUserByEmail?.name ?? user.name,
+      picture: existingUserByEmail?.picture ?? user.picture,
+    },
   });
 
   return {

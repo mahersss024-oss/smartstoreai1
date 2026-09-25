@@ -8,6 +8,7 @@ type StoreListingObjectInput = {
   mediaType: string;
   imageId: string;
   fileName?: string;
+  objectPrefix?: 'listings' | 'profiles';
   variant?: 'original' | 'display' | 'thumbnail';
 };
 
@@ -120,7 +121,7 @@ function createObjectKey(input: StoreListingObjectInput) {
   const variantSuffix =
     input.variant && input.variant !== 'original' ? `-${input.variant}` : '';
 
-  return `listings/${year}/${month}/${input.imageId}${variantSuffix}.${getExtension(
+  return `${input.objectPrefix ?? 'listings'}/${year}/${month}/${input.imageId}${variantSuffix}.${getExtension(
     input.mediaType,
     input.fileName,
   )}`;
