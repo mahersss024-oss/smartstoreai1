@@ -116,6 +116,7 @@ function createClientIdempotencyKey(scope: string) {
 }
 
 export default function CommissionsPage() {
+  const [targetListingId, setTargetListingId] = useState<string | null>(null);
   const [session, setSession] = useState<AuthSessionPayload>({
     authenticated: false,
     user: null,
@@ -138,6 +139,32 @@ export default function CommissionsPage() {
         .filter((commission) => commission.status === 'due')
         .reduce((total, commission) => total + (commission.commissionAmount ?? 0), 0),
     [commissions],
+  );
+  const orderedCommissions = useMemo(() => {
+    if (!targetListingId) {
+      return commissions;
+    }
+
+    return [...commissions].sort((left, right) => {
+      if (left.listingId === targetListingId) {
+        return -1;
+      }
+
+      if (right.listingId === targetListingId) {
+        return 1;
+      }
+
+      return 0;
+    });
+  }, [commissions, targetListingId]);
+  const targetCommission = useMemo(
+    () =>
+      targetListingId
+        ? commissions.find(
+            (commission) => commission.listingId === targetListingId,
+          )
+        : undefined,
+    [commissions, targetListingId],
   );
 
   const refreshCommissions = useCallback(async (page = 1) => {
@@ -201,6 +228,7 @@ export default function CommissionsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+    setTargetListingId(new URL(window.location.href).searchParams.get('listingId'));
 
     let cancelled = false;
     queueMicrotask(() => {
@@ -367,6 +395,11 @@ export default function CommissionsPage() {
                 {notice}
               </div>
             )}
+            {targetListingId && targetCommission?.status === 'pending_amount' && (
+              <div className="rounded-md border border-blue-500/30 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm dark:bg-blue-400/10 dark:text-blue-100">
+                أدخل قيمة البيع النهائية لهذا الإعلان ليتم حساب رسوم المنصة.
+              </div>
+            )}
 
             <section className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -485,8 +518,15 @@ export default function CommissionsPage() {
               ) : (
                 <div className="grid gap-4">
                   <div className="grid gap-3">
-                    {commissions.map((commission) => (
-                      <article key={commission.id} className="grid gap-3 rounded-md border p-3">
+                    {orderedCommissions.map((commission) => (
+                      <article
+                        key={commission.id}
+                        className={`grid gap-3 rounded-md border p-3 ${
+                          commission.listingId === targetListingId
+                            ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20 dark:bg-blue-400/10'
+                            : ''
+                        }`}
+                      >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h2 className="text-base font-bold">

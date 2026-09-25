@@ -27,6 +27,14 @@ test('account page keeps listing management free of chat listing shortcuts', () 
   assert.match(page, /رسوم المنصة/);
 });
 
+test('sold listings expose a platform fee action after the sale marker', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /listing\.rawStatus === 'sold'/);
+  assert.match(page, /تم البيع/);
+  assert.match(page, /\/commissions\?listingId=\$\{listing\.id\}/);
+});
+
 test('account page does not flash sign-in controls while session is loading', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 
@@ -71,4 +79,13 @@ test('signed-in customer pages do not fetch protected account data before sessio
       /Promise\.all\(\[[\s\S]*fetch\('\/api\/auth\/session'[\s\S]*api\/marketplace/,
     );
   }
+});
+
+test('platform fees page can focus the sold listing fee from the account link', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'commissions', 'page.tsx'), 'utf8');
+
+  assert.match(page, /window\.location\.href/);
+  assert.match(page, /targetListingId/);
+  assert.match(page, /orderedCommissions/);
+  assert.match(page, /أدخل قيمة البيع النهائية لهذا الإعلان/);
 });

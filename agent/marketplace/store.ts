@@ -335,18 +335,14 @@ function ensureCommissionForSoldListing(listing: ListingRecord) {
   }
 
   const timestamp = nowIso();
-  const productValue = typeof listing.price === 'number' ? listing.price : null;
   const commission: CommissionRecord = {
     id: randomUUID(),
     listingId: listing.id,
     sellerId: listing.sellerId,
-    productValue,
+    productValue: null,
     commissionRatePercent: 1,
-    commissionAmount:
-      typeof productValue === 'number'
-        ? calculateCommissionAmount(productValue)
-        : null,
-    status: typeof productValue === 'number' ? 'due' : 'pending_amount',
+    commissionAmount: null,
+    status: 'pending_amount',
     source: 'site_sale',
     createdAt: timestamp,
     updatedAt: timestamp,

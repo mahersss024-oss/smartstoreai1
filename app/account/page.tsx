@@ -1320,7 +1320,7 @@ export default function AccountPage() {
                     {listings.map((listing) => (
                       <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
                       {listing.image ? (
-                        <div className="aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
+                        <div className="relative aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
                           <img
                             alt={listing.title}
                             className="h-full w-full object-contain"
@@ -1336,13 +1336,27 @@ export default function AccountPage() {
                               <span>لا توجد صورة حقيقية</span>
                             </div>
                           </div>
+                          {listing.rawStatus === 'sold' && (
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/10">
+                              <span className="-rotate-12 rounded-md border border-white/70 bg-slate-950/55 px-4 py-2 text-lg font-black text-white shadow-lg">
+                                تم البيع
+                              </span>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
+                        <div className="relative grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
                           <div className="grid gap-1">
                             <ImageIcon className="mx-auto size-5" />
                             <span>لا توجد صورة حقيقية</span>
                           </div>
+                          {listing.rawStatus === 'sold' && (
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/10">
+                              <span className="-rotate-12 rounded-md border border-white/70 bg-slate-950/55 px-4 py-2 text-lg font-black text-white shadow-lg">
+                                تم البيع
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="min-w-0 md:row-start-1">
@@ -1580,7 +1594,7 @@ export default function AccountPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-7">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-8">
                         {listing.status === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}`}>
@@ -1630,6 +1644,14 @@ export default function AccountPage() {
                           <CheckCircle2 className="size-3.5" />
                           بيع
                         </Button>
+                        {listing.rawStatus === 'sold' && (
+                          <Button asChild size="sm" variant="outline" className="rounded-md border-blue-500/40 text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-400/10">
+                            <Link href={`/commissions?listingId=${listing.id}`}>
+                              <Percent className="size-3.5" />
+                              رسوم المنصة
+                            </Link>
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'delete')}>
                           <Trash2 className="size-3.5" />
                           حذف

@@ -1047,25 +1047,15 @@ export async function setListingStatusForSeller(
       return updatedListing;
     }
 
-    const productValue =
-      updatedListing.price &&
-      typeof updatedListing.price === 'object' &&
-      'toNumber' in updatedListing.price
-        ? updatedListing.price.toNumber()
-        : null;
-
     await tx.commission.upsert({
       where: { listingId },
       create: {
         listingId,
         sellerId,
-        productValue,
+        productValue: null,
         commissionRatePercent: 1,
-        commissionAmount:
-          typeof productValue === 'number'
-            ? Math.round(productValue * 0.01 * 100) / 100
-            : null,
-        status: typeof productValue === 'number' ? 'due' : 'pending_amount',
+        commissionAmount: null,
+        status: 'pending_amount',
       },
       update: {},
     });

@@ -634,7 +634,7 @@ test('updates report moderation status', () => {
   assert.equal(reviewed.status, 'reviewed');
 });
 
-test('creates a 1 percent commission when a seller marks a priced listing as sold', () => {
+test('creates a pending platform fee record when a seller marks a listing as sold', () => {
   const listing = createListingDraft({
     sellerId: 'seller:commission-1',
     category: 'mobile_phones',
@@ -647,9 +647,9 @@ test('creates a 1 percent commission when a seller marks a priced listing as sol
   const commissions = listSellerCommissions('seller:commission-1');
 
   assert.equal(commissions.length, 1);
-  assert.equal(commissions[0]?.productValue, 2500);
-  assert.equal(commissions[0]?.commissionAmount, 25);
-  assert.equal(commissions[0]?.status, 'due');
+  assert.equal(commissions[0]?.productValue, null);
+  assert.equal(commissions[0]?.commissionAmount, null);
+  assert.equal(commissions[0]?.status, 'pending_amount');
 });
 
 test('allows seller to provide final sale amount for pending commission', () => {
