@@ -12,6 +12,7 @@
     "test:db:integration": "node scripts/test.mjs tests/db-integration.test.ts",
     "test:e2e": "playwright test",
     "test:ai-load": "tsx scripts/ai-path-load-test.ts",
+    "images:orphans:dry-run": "tsx scripts/r2-orphaned-listing-images-dry-run.ts",
     "verify": "pnpm exec tsc --noEmit && pnpm lint && pnpm test && pnpm build && pnpm audit --audit-level moderate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

@@ -174,6 +174,8 @@ function AdminListingCard({
               <img
                 alt=""
                 className="h-full w-full object-contain"
+                decoding="async"
+                loading="lazy"
                 onError={(event) => {
                   event.currentTarget.hidden = true;
                   event.currentTarget.nextElementSibling?.removeAttribute('hidden');

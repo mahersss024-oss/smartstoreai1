@@ -20,7 +20,10 @@ import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { ListingContactActions } from './contact-actions';
-import { ListingImageGallery } from './listing-image-gallery';
+import {
+  ListingImageGallery,
+  type ListingGalleryImage,
+} from './listing-image-gallery';
 import { ListingSafetyActions } from './listing-safety-actions';
 
 type PageProps = {
@@ -171,17 +174,43 @@ export default async function ListingDetailsPage({ params }: PageProps) {
     (image) => image.status === 'approved',
   );
   const durableApprovedImages = approvedImages
-    .map((image) =>
-      getDurableImageUrl(
+    .map((image): ListingGalleryImage | null => {
+      const originalUrl = getDurableImageUrl(
+        image.originalUrl,
+        image.displayUrl,
+        image.thumbnailUrl,
+      );
+      const displayUrl = getDurableImageUrl(
         image.displayUrl,
         image.originalUrl,
         image.thumbnailUrl,
-      ),
-    )
-    .filter((image): image is string => Boolean(image));
+      );
+      const thumbnailUrl = getDurableImageUrl(
+        image.thumbnailUrl,
+        image.displayUrl,
+        image.originalUrl,
+      );
+
+      if (!originalUrl || !displayUrl || !thumbnailUrl) {
+        return null;
+      }
+
+      return {
+        originalUrl,
+        displayUrl,
+        thumbnailUrl,
+      };
+    })
+    .filter((image): image is ListingGalleryImage => Boolean(image));
   const images = durableApprovedImages.length
     ? durableApprovedImages
-    : [missingListingImageDataUrl];
+    : [
+        {
+          originalUrl: missingListingImageDataUrl,
+          displayUrl: missingListingImageDataUrl,
+          thumbnailUrl: missingListingImageDataUrl,
+        },
+      ];
   const attributes = Object.entries(listing.attributes).filter(([, value]) => {
     return value !== null && value !== undefined && String(value).trim() !== '';
   });

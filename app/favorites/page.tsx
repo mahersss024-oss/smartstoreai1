@@ -305,6 +305,8 @@ export default function FavoritesPage() {
                       <img
                         alt={favorite.listing?.title ?? 'صورة الإعلان'}
                         className="h-full w-full object-contain"
+                        decoding="async"
+                        loading="lazy"
                         onError={(event) => {
                           event.currentTarget.hidden = true;
                           event.currentTarget.nextElementSibling?.removeAttribute('hidden');

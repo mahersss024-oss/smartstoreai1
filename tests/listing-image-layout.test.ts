@@ -56,7 +56,18 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /absolute right-3 top-1\/2/);
   assert.match(source, /ref=\{imageViewportRef\}/);
   assert.match(source, /cursor-grab active:cursor-grabbing/);
-  assert.match(source, /className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-\[68dvh\] sm:w-auto sm:max-w-\[min\(88vw,44rem\)\]"[\s\S]*src=\{selectedImage\}/);
+  assert.match(source, /type ListingGalleryImage = \{/);
+  assert.match(source, /originalUrl: string/);
+  assert.match(source, /displayUrl: string/);
+  assert.match(source, /thumbnailUrl: string/);
+  assert.match(source, /src=\{selectedDisplayUrl\}/);
+  assert.match(source, /src=\{thumbnailUrl\}/);
+  assert.match(source, /src=\{selectedOriginalUrl\}/);
+  assert.match(source, /fetchPriority="high"/);
+  assert.match(source, /decoding="async"/);
+  assert.match(source, /new Image\(\)/);
+  assert.match(source, /image\.src = nextDisplayUrl/);
+  assert.match(source, /className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-\[68dvh\] sm:w-auto sm:max-w-\[min\(88vw,44rem\)\]"[\s\S]*src=\{selectedOriginalUrl\}/);
   assert.match(source, /className="hidden max-w-\[min\(88vw,44rem\)\] grid-cols-8 gap-2 sm:grid"/);
   assert.match(source, /onClick=\{\(\) => selectLightboxImage\(index\)\}/);
   assert.match(source, /translate3d\(\$\{imagePan\.x\}px, \$\{imagePan\.y\}px, 0\) scale\(\$\{imageZoom\}\)/);
@@ -69,6 +80,36 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.doesNotMatch(source, /max-h-\[18rem\]/);
   assert.doesNotMatch(source, /grid gap-2 p-2 sm:p-3/);
   assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
+});
+
+test('listing details passes display, thumbnail, and original image variants to the gallery', async () => {
+  const source = await readFile(
+    new URL('../app/listings/[listingId]/page.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(source, /type ListingGalleryImage/);
+  assert.match(source, /originalUrl: missingListingImageDataUrl/);
+  assert.match(source, /displayUrl: missingListingImageDataUrl/);
+  assert.match(source, /thumbnailUrl: missingListingImageDataUrl/);
+  assert.match(source, /image\.originalUrl,[\s\S]*image\.displayUrl,[\s\S]*image\.thumbnailUrl/);
+  assert.match(source, /image\.displayUrl,[\s\S]*image\.originalUrl,[\s\S]*image\.thumbnailUrl/);
+  assert.match(source, /image\.thumbnailUrl,[\s\S]*image\.displayUrl,[\s\S]*image\.originalUrl/);
+});
+
+test('R2 orphan image audit is dry-run only', async () => {
+  const source = await readFile(
+    new URL('../scripts/r2-orphaned-listing-images-dry-run.ts', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(source, /dry-run only/);
+  assert.match(source, /SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL/);
+  assert.match(source, /Potential orphaned objects/);
+  assert.match(source, /not referenced by ListingImage original\/display\/thumbnail URLs/);
+  assert.doesNotMatch(source, /method:\s*'DELETE'/);
+  assert.doesNotMatch(source, /deleteStoredObject/);
+  assert.doesNotMatch(source, /purge_cache/);
 });
 
 test('account listing primary image does not stretch with the image manager', async () => {

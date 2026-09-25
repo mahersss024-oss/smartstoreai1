@@ -14,8 +14,14 @@ import {
 } from 'lucide-react';
 
 type ListingImageGalleryProps = {
-  images: string[];
+  images: ListingGalleryImage[];
   title: string;
+};
+
+export type ListingGalleryImage = {
+  originalUrl: string;
+  displayUrl: string;
+  thumbnailUrl: string;
 };
 
 type ImagePan = {
@@ -69,6 +75,10 @@ function getTouchDistance(touches: {
   );
 }
 
+function getImageKey(image: ListingGalleryImage, index: number) {
+  return `${image.originalUrl}-${image.displayUrl}-${image.thumbnailUrl}-${index}`;
+}
+
 export function ListingImageGallery({
   images,
   title,
@@ -94,6 +104,16 @@ export function ListingImageGallery({
     pan: ImagePan;
   } | null>(null);
   const selectedImage = visibleImages[selectedImageIndex] ?? visibleImages[0] ?? '';
+  const selectedDisplayUrl =
+    typeof selectedImage === 'string' ? selectedImage : selectedImage?.displayUrl ?? '';
+  const selectedOriginalUrl =
+    typeof selectedImage === 'string'
+      ? selectedImage
+      : selectedImage?.originalUrl ?? selectedDisplayUrl;
+  const selectedThumbnailUrl =
+    typeof selectedImage === 'string'
+      ? selectedImage
+      : selectedImage?.thumbnailUrl ?? selectedDisplayUrl;
   const shouldShowThumbnails = visibleImages.length > 1;
   const selectedImageLabel = `${selectedImageIndex + 1} / ${visibleImages.length}`;
   const showImageFallback = (image: HTMLImageElement) => {
@@ -291,6 +311,29 @@ export function ListingImageGallery({
     };
   }, [isLightboxOpen, shouldShowThumbnails, showNextImage, showPreviousImage]);
 
+  useEffect(() => {
+    if (!selectedDisplayUrl || visibleImages.length <= 1) {
+      return;
+    }
+
+    const nextImage =
+      visibleImages[
+        selectedImageIndex === visibleImages.length - 1
+          ? 0
+          : selectedImageIndex + 1
+      ];
+    const nextDisplayUrl =
+      typeof nextImage === 'string' ? nextImage : nextImage?.displayUrl;
+
+    if (!nextDisplayUrl || nextDisplayUrl === selectedDisplayUrl) {
+      return;
+    }
+
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = nextDisplayUrl;
+  }, [selectedDisplayUrl, selectedImageIndex, visibleImages]);
+
   return (
     <section className="w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
       <div className="grid gap-2">
@@ -303,8 +346,10 @@ export function ListingImageGallery({
           <img
             alt={title}
             className="h-full w-full object-contain"
+            decoding="async"
+            fetchPriority="high"
             onError={(event) => showImageFallback(event.currentTarget)}
-            src={selectedImage}
+            src={selectedDisplayUrl}
           />
           <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
             <ImageIcon className="size-8" />
@@ -314,10 +359,16 @@ export function ListingImageGallery({
           <div className="grid grid-cols-4 gap-1.5 px-2 pb-2 sm:px-3 sm:pb-3">
             {visibleImages.map((image, index) => {
               const isSelected = index === selectedImageIndex;
+              const thumbnailUrl =
+                typeof image === 'string' ? image : image.thumbnailUrl;
 
               return (
                 <button
-                  key={`${image}-${index}`}
+                  key={
+                    typeof image === 'string'
+                      ? `${image}-${index}`
+                      : getImageKey(image, index)
+                  }
                   aria-label={`فتح الصورة ${index + 1} بالحجم الكامل`}
                   aria-pressed={isSelected}
                   className={`aspect-square overflow-hidden rounded-md border bg-slate-100 transition ${
@@ -331,8 +382,10 @@ export function ListingImageGallery({
                   <img
                     alt=""
                     className="h-full w-full object-contain"
+                    decoding="async"
+                    loading={index === 0 ? 'eager' : 'lazy'}
                     onError={(event) => showImageFallback(event.currentTarget)}
-                    src={image}
+                    src={thumbnailUrl}
                   />
                   <span hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
                     <ImageIcon className="size-4" />
@@ -343,7 +396,7 @@ export function ListingImageGallery({
           </div>
         )}
       </div>
-      {isLightboxOpen && selectedImage && (
+      {isLightboxOpen && selectedOriginalUrl && (
         <div
           aria-label="عارض صور الإعلان"
           aria-modal="true"
@@ -412,12 +465,14 @@ export function ListingImageGallery({
               alt=""
               aria-hidden="true"
               className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
-              src={selectedImage}
+              decoding="async"
+              src={selectedThumbnailUrl || selectedDisplayUrl}
             />
             <div className="absolute inset-0 bg-black/55" />
             <img
               alt={title}
               className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-[68dvh] sm:w-auto sm:max-w-[min(88vw,44rem)]"
+              decoding="async"
               onError={(event) => showImageFallback(event.currentTarget)}
               onDoubleClick={() => {
                 if (imageZoom > 1) {
@@ -427,7 +482,7 @@ export function ListingImageGallery({
 
                 updateImageZoom(() => 2);
               }}
-              src={selectedImage}
+              src={selectedOriginalUrl}
               style={{
                 transform: `translate3d(${imagePan.x}px, ${imagePan.y}px, 0) scale(${imageZoom})`,
               }}
@@ -461,10 +516,16 @@ export function ListingImageGallery({
               <div className="hidden max-w-[min(88vw,44rem)] grid-cols-8 gap-2 sm:grid">
                 {visibleImages.map((image, index) => {
                   const isSelected = index === selectedImageIndex;
+                  const thumbnailUrl =
+                    typeof image === 'string' ? image : image.thumbnailUrl;
 
                   return (
                     <button
-                      key={`lightbox-${image}-${index}`}
+                      key={
+                        typeof image === 'string'
+                          ? `lightbox-${image}-${index}`
+                          : `lightbox-${getImageKey(image, index)}`
+                      }
                       aria-label={`عرض الصورة ${index + 1}`}
                       aria-pressed={isSelected}
                       className={`aspect-[4/3] overflow-hidden rounded-md border bg-black/40 transition ${
@@ -478,7 +539,9 @@ export function ListingImageGallery({
                       <img
                         alt=""
                         className="h-full w-full object-cover"
-                        src={image}
+                        decoding="async"
+                        loading="lazy"
+                        src={thumbnailUrl}
                       />
                     </button>
                   );

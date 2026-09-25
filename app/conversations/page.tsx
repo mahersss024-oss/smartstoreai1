@@ -475,6 +475,8 @@ export default function ConversationsPage() {
                           <img
                             alt={conversation.listing?.title ?? 'صورة الإعلان'}
                             className="size-14 rounded-md object-cover"
+                            decoding="async"
+                            loading="lazy"
                             src={getListingImage(conversation.listing)}
                           />
                           <div className="min-w-0">
