@@ -181,6 +181,12 @@
     width: 100%;
   }
 
+  @media (pointer: coarse) and (max-width: 1023px) {
+    body {
+      overscroll-behavior-y: contain;
+    }
+  }
+
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;

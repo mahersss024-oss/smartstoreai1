@@ -110,12 +110,12 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manual-listing-publish/);
   assert.match(homePage, /JSON\.stringify\(\{ action: 'publish' \}\)/);
   assert.match(homePage, /حفظ ونشر الإعلان/);
-  assert.match(homePage, /تم حفظ الإعلان ونشره بنجاح/);
+  assert.match(homePage, /تم حفظ ونشر الإعلان بنجاح/);
   assert.match(homePage, /manualListingForm\.priceMode === 'negotiable'/);
   assert.match(homePage, /saleTerms: 'negotiable'/);
   assert.match(homePage, /disabled=\{manualListingForm\.priceMode === 'bid'\}/);
-  assert.match(homePage, /تم حفظ الإعلان في حسابي كمسودة/);
-  assert.match(homePage, /نشره من صفحة حسابي/);
+  assert.match(homePage, /تم حفظ الإعلان بنجاح/);
+  assert.match(homePage, /صفحة حسابي لإدارة الإعلان/);
   assert.match(homePage, /!isManualListingVisible && manualListingNotice/);
   assert.match(homePage, /الذهاب إلى حسابي للنشر/);
   assert.match(homePage, /manual-listing-image-upload/);

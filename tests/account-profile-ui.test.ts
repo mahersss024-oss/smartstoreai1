@@ -53,9 +53,10 @@ test('account conversations shortcut highlights new message alerts on web', () =
   assert.match(page, /href="\/conversations"/);
   assert.match(page, /shadow-\[0_0_18px_rgba\(244,63,94,0\.28\)\]/);
   assert.match(page, /from-rose-300 to-red-600/);
-  assert.match(alertHook, /eventTypes: \['message_created'\]/);
+  assert.match(alertHook, /eventTypes: \['message_created', 'conversation_updated'\]/);
   assert.match(alertHook, /smartstore_conversation_alert/);
-  assert.match(alertHook, /senderId === currentUserId/);
+  assert.match(alertHook, /senderId !== currentUserId/);
+  assert.match(alertHook, /syncUnreadConversations/);
 });
 
 test('sold listings expose a platform fee action after the sale marker', () => {

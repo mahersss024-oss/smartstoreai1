@@ -2702,6 +2702,19 @@ export default function Page() {
       });
   }, []);
 
+  useEffect(() => {
+    const onPullRefresh = () => {
+      void refreshMarketplaceListings(undefined, 1, { showLoading: false });
+      void refreshFavoriteListingIds();
+    };
+
+    window.addEventListener('smartstore:pull-refresh', onPullRefresh);
+
+    return () => {
+      window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
+    };
+  }, [refreshFavoriteListingIds, refreshMarketplaceListings]);
+
   const scheduleRealtimeListingsRefresh = useCallback(() => {
     if (realtimeRefreshTimerRef.current !== null) {
       return;
@@ -3328,7 +3341,7 @@ export default function Page() {
           publishStatus = 'blocked';
           publishMessage =
             publishPayload?.message ??
-            'تم حفظ الإعلان، لكنه يحتاج صورة حقيقية أو مراجعة قبل النشر.';
+            'لم يتم نشر الإعلان بنجاح، ويتطلب بيانات إضافية. الرجاء الذهاب إلى حسابي ثم إعلاناتي لإدارة الإعلان واستكمال البيانات ثم نشره.';
         }
       }
 
@@ -3338,7 +3351,8 @@ export default function Page() {
         publishStatus === 'published'
           ? {
               tone: 'success',
-              message: 'تم حفظ الإعلان ونشره بنجاح.',
+              message:
+                'تم حفظ ونشر الإعلان بنجاح. يمكنك الذهاب إلى حسابي لإدارة الإعلان.',
             }
           : publishStatus === 'blocked'
             ? {
@@ -3349,12 +3363,12 @@ export default function Page() {
               ? {
                   tone: 'warning',
                   message:
-                    'تم حفظ الإعلان في حسابي كمسودة، لكن لم تُرفع كل الصور. يمكنك إكمال الصور ثم نشر الإعلان من صفحة حسابي.',
+                    'تم حفظ الإعلان بنجاح. يمكنك الذهاب إلى صفحة حسابي لإدارة الإعلان.',
                 }
               : {
                   tone: 'success',
                   message:
-                    'تم حفظ الإعلان في حسابي كمسودة. يمكنك مراجعته وإضافة الصور ثم نشره من صفحة حسابي.',
+                    'تم حفظ الإعلان بنجاح. يمكنك الذهاب إلى صفحة حسابي لإدارة الإعلان.',
                 };
 
       setManualListingForm(defaultManualListingForm);

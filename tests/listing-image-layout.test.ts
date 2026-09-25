@@ -73,7 +73,7 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
 
 test('account listing primary image does not stretch with the image manager', async () => {
   const source = await readFile(
-    new URL('../app/account/page.tsx', import.meta.url),
+    new URL('../app/account/listings/page.tsx', import.meta.url),
     'utf8',
   );
 

@@ -17,6 +17,14 @@ test('platform capabilities define what chat can do and what requires confirmati
   assert.equal(byAction.get('create_listing_draft')?.requiresAuth, true);
   assert.equal(byAction.get('create_listing_draft')?.requiresConfirmation, false);
   assert.equal(byAction.get('publish_or_status_change')?.requiresConfirmation, true);
+  assert.match(
+    byAction.get('publish_or_status_change')?.canDo ?? '',
+    /cannot publish listings/,
+  );
+  assert.match(
+    byAction.get('publish_or_status_change')?.userGuidance ?? '',
+    /press the publish button themselves/,
+  );
   assert.deepEqual(byAction.get('open_conversation')?.allowedTools, []);
   assert.match(
     byAction.get('open_conversation')?.userGuidance ?? '',
@@ -39,6 +47,7 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(renderedCapabilities, /searchMarketplaceListings/);
   assert.match(renderedCapabilities, /structured/);
   assert.match(renderedCapabilities, /createListingDraft/);
+  assert.match(renderedCapabilities, /Assistant chat cannot publish listings/);
   assert.match(renderedCapabilities, /The assistant only sees and acts through explicit platform capabilities/);
   assert.match(renderedCapabilities, /not an escrow service, payment processor, money-transfer intermediary, or guarantor/);
   assert.match(renderedCapabilities, /fraud risk/);

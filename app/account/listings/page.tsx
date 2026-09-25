@@ -400,6 +400,18 @@ export default function AccountListingsPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const onPullRefresh = () => {
+      void refreshListings(1);
+    };
+
+    window.addEventListener('smartstore:pull-refresh', onPullRefresh);
+
+    return () => {
+      window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
+    };
+  }, [refreshListings]);
+
   const listingsLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(listingsPagination?.hasMore),
     isLoading: isListingsLoading,

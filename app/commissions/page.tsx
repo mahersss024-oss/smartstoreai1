@@ -231,6 +231,18 @@ export default function CommissionsPage() {
   }, []);
 
   useEffect(() => {
+    const onPullRefresh = () => {
+      void refreshCommissions(1);
+    };
+
+    window.addEventListener('smartstore:pull-refresh', onPullRefresh);
+
+    return () => {
+      window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
+    };
+  }, [refreshCommissions]);
+
+  useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
     setTargetListingId(new URL(window.location.href).searchParams.get('listingId'));

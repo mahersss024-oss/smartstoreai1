@@ -839,6 +839,74 @@ export function getConversationForUser(conversationId: string, userId: string) {
   };
 }
 
+export function deleteConversationForUser(conversationId: string, userId: string) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (
+    !conversation ||
+    (conversation.buyerId !== userId && conversation.sellerId !== userId)
+  ) {
+    return { status: 'not_found' as const };
+  }
+
+  conversations.delete(conversationId);
+
+  return { status: 'deleted' as const, conversation };
+}
+
+export function markConversationReadForUser(conversationId: string, userId: string) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (
+    !conversation ||
+    (conversation.buyerId !== userId && conversation.sellerId !== userId)
+  ) {
+    return { status: 'not_found' as const };
+  }
+
+  const readAt = nowIso();
+  let changed = false;
+
+  conversation.messages = conversation.messages.map((message) => {
+    if (message.status !== 'sent' || message.senderId === userId) {
+      return message;
+    }
+
+    const readBy =
+      typeof message.metadata.readBy === 'object' &&
+      message.metadata.readBy !== null &&
+      !Array.isArray(message.metadata.readBy)
+        ? (message.metadata.readBy as Record<string, unknown>)
+        : {};
+
+    if (typeof readBy[userId] === 'string') {
+      return message;
+    }
+
+    changed = true;
+
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        readBy: {
+          ...readBy,
+          [userId]: readAt,
+        },
+      },
+    };
+  });
+
+  if (changed) {
+    conversations.set(conversation.id, conversation);
+    persistStore();
+  }
+
+  return { status: 'read' as const, conversation };
+}
+
 function getOtherConversationUser(conversation: Conversation, userId: string) {
   if (conversation.buyerId === userId) {
     return conversation.sellerId;

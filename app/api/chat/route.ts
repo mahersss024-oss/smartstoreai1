@@ -44,7 +44,6 @@ import {
   getListing,
   listSellerListings,
   resetIncompleteSellerDrafts,
-  setListingStatusForSeller,
 } from '@/agent/marketplace/repository';
 import {
   applyAllowedRequestToLatestUserMessage,
@@ -705,7 +704,7 @@ function buildMarketplaceInterfaceScopeMessage(content: string) {
   };
 }
 
-async function publishLatestReadyDraftFromConfirmation({
+async function guideLatestReadyDraftPublishFromConfirmation({
   userRequest,
   language,
   session,
@@ -723,8 +722,8 @@ async function publishLatestReadyDraftFromConfirmation({
   if (!session) {
     return createTextUIResponse(
       language === 'en'
-        ? `${authRequiredMarker} Sign in first, then send "publish" again and I will publish the ready listing.`
-        : `${authRequiredMarker} سجّل دخولك أولًا، ثم اكتب "انشر" مرة أخرى وسأنشر الإعلان الجاهز.`,
+        ? `${authRequiredMarker} Sign in first, then go to Account > My listings to review and publish the listing yourself.`
+        : `${authRequiredMarker} سجّل دخولك أولًا، ثم اذهب إلى حسابي ثم إعلاناتي لمراجعة الإعلان ونشره بنفسك.`,
     );
   }
 
@@ -741,38 +740,24 @@ async function publishLatestReadyDraftFromConfirmation({
       return null;
     }
 
-    const published = await setListingStatusForSeller(
-      draft.id,
-      session.user.id,
-      'published',
-    );
-
-    if (!published || published.status !== 'published') {
-      return createTextUIResponse(
-        language === 'en'
-          ? 'The listing was not published because it still needs review or is no longer available in your account.'
-          : 'لم يتم نشر الإعلان لأنه لا يزال يحتاج مراجعة أو لم يعد متاحًا ضمن حسابك.',
-      );
-    }
-
     const listingUrl = getPublicListingUrl(
-      published.id,
+      draft.id,
       getAppBaseUrl(request),
     );
 
     return createTextUIResponse(
       language === 'en'
-        ? `Published successfully.\n\n${published.title ?? 'Listing'}\nPrice: ${formatListingPriceForChat(published.price, language)}\nCity: ${published.city ?? 'Not specified'}\n\n[Open listing](${listingUrl})`
-        : `تم نشر الإعلان بنجاح.\n\n${published.title ?? 'إعلانك'}\nالسعر: ${formatListingPriceForChat(published.price, language)}\nالمدينة: ${published.city ?? 'غير محددة'}\n\n[فتح الإعلان](${listingUrl})`,
+        ? `The listing is ready as a draft. To publish it, go to Account > My listings, review it, then press "Publish listing".\n\n${draft.title ?? 'Listing'}\nPrice: ${formatListingPriceForChat(draft.price, language)}\nCity: ${draft.city ?? 'Not specified'}\n\n[Open listing](${listingUrl})`
+        : `تم تجهيز الإعلان كمسودة. لن أنشره نيابة عنك. اذهب إلى حسابي ثم إعلاناتي، راجع الإعلان، ثم اضغط "نشر الإعلان".\n\n${draft.title ?? 'إعلانك'}\nالسعر: ${formatListingPriceForChat(draft.price, language)}\nالمدينة: ${draft.city ?? 'غير محددة'}\n\n[فتح الإعلان](${listingUrl})`,
     );
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[direct_publish] failure=${errorName}`);
+    console.warn(`[direct_publish_guidance] failure=${errorName}`);
 
     return createTextUIResponse(
       language === 'en'
-        ? 'I could not publish the listing right now because the marketplace record could not be updated. Please try again shortly.'
-        : 'تعذر نشر الإعلان الآن لأن سجل الإعلان لم يتم تحديثه في السوق. أعد المحاولة بعد لحظات.',
+        ? 'I could not inspect the ready draft right now. Go to Account > My listings and publish it yourself after review.'
+        : 'تعذر فحص المسودة الجاهزة الآن. اذهب إلى حسابي ثم إعلاناتي وانشر الإعلان بنفسك بعد المراجعة.',
     );
   }
 }
@@ -1350,7 +1335,7 @@ export async function POST(request: Request) {
   const marketplaceInterfaceSystemMessage = marketplaceInterfaceContext
     ? buildMarketplaceInterfaceSystemMessage(marketplaceInterfaceContext)
     : null;
-  const directPublishResponse = await publishLatestReadyDraftFromConfirmation({
+  const directPublishResponse = await guideLatestReadyDraftPublishFromConfirmation({
     userRequest: preliminaryUserRequest,
     language,
     session,

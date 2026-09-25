@@ -65,10 +65,12 @@ export const platformCapabilities: PlatformCapability[] = [
   },
   {
     action: 'publish_or_status_change',
-    canDo: 'Publish, pause, republish, mark sold, or delete seller-owned listings.',
+    canDo: 'Prepare seller-owned listings for manual publishing, and pause, mark sold, or delete seller-owned listings. Assistant chat cannot publish listings.',
     requiresAuth: true,
     requiresConfirmation: true,
     allowedTools: ['setListingStatus'],
+    userGuidance:
+      'For publishing, direct the seller to Account > My listings so they can review the draft and press the publish button themselves.',
   },
   {
     action: 'listing_images',

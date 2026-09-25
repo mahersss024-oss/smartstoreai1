@@ -194,6 +194,21 @@ function getSharedPhoneNumber(message: ConversationMessage) {
   return typeof phoneNumber === 'string' ? phoneNumber : '';
 }
 
+function isMessageReadBy(message: ConversationMessage, userId?: string | null) {
+  if (!userId) {
+    return false;
+  }
+
+  const readBy = message.metadata?.readBy;
+
+  return (
+    typeof readBy === 'object' &&
+    readBy !== null &&
+    !Array.isArray(readBy) &&
+    typeof (readBy as Record<string, unknown>)[userId] === 'string'
+  );
+}
+
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams<{ conversationId: string }>();
@@ -217,6 +232,12 @@ export default function ConversationPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const isSeller = session.user?.id === conversation?.sellerId;
+  const otherParticipantId =
+    conversation && session.user?.id
+      ? session.user.id === conversation.sellerId
+        ? conversation.buyerId
+        : conversation.sellerId
+      : null;
   const roleLabel = isSeller ? 'أنت البائع' : 'أنت المشتري';
   const visibleMessages = useMemo(
     () =>
@@ -281,6 +302,18 @@ export default function ConversationPage() {
       }
     }
   }, [conversationId, router]);
+
+  useEffect(() => {
+    const onPullRefresh = () => {
+      void refreshConversation({ showLoading: false, clearNotice: false });
+    };
+
+    window.addEventListener('smartstore:pull-refresh', onPullRefresh);
+
+    return () => {
+      window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
+    };
+  }, [refreshConversation]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -764,6 +797,14 @@ export default function ConversationPage() {
                         )}
                         <span className="text-[11px] text-muted-foreground">
                           {formatMessageTime(message.createdAt)}
+                          {mine && otherParticipantId && (
+                            <>
+                              {' · '}
+                              {isMessageReadBy(message, otherParticipantId)
+                                ? 'تمت القراءة'
+                                : 'غير مقروءة'}
+                            </>
+                          )}
                         </span>
                       </div>
                     );

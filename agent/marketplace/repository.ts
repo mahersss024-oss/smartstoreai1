@@ -430,23 +430,25 @@ function toConversationRecord(
     buyerId: conversation.buyerId,
     status: conversation.status as Conversation['status'],
     messages:
-      conversation.messages?.map(
-        (message) =>
-          ({
-            id: message.id,
-            conversationId: message.conversationId,
-            senderId: message.senderId,
-            body: message.body,
-            status: message.status,
-            type:
-              message.type === 'contact_share'
-                ? 'contact_share'
-                : 'text',
-            reasons: message.reasons,
-            metadata: asRecord(message.metadata),
-            createdAt: message.createdAt.toISOString(),
-          }) as ConversationMessage,
-      ) ?? [],
+      conversation.messages
+        ?.toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+        .map(
+          (message) =>
+            ({
+              id: message.id,
+              conversationId: message.conversationId,
+              senderId: message.senderId,
+              body: message.body,
+              status: message.status,
+              type:
+                message.type === 'contact_share'
+                  ? 'contact_share'
+                  : 'text',
+              reasons: message.reasons,
+              metadata: asRecord(message.metadata),
+              createdAt: message.createdAt.toISOString(),
+            }) as ConversationMessage,
+        ) ?? [],
     createdAt: conversation.createdAt.toISOString(),
     updatedAt: conversation.updatedAt.toISOString(),
     listing: conversation.listing ? toListingRecord(conversation.listing) : null,
@@ -1472,7 +1474,7 @@ export async function listUserConversationsPage(
       OR: [{ buyerId: userId }, { sellerId: userId }],
     },
     include: {
-      messages: { orderBy: { createdAt: 'asc' }, take: 10 },
+      messages: { orderBy: { createdAt: 'desc' }, take: 10 },
       listing: {
         include: {
           images: {
@@ -1516,6 +1518,141 @@ export async function getConversationForUser(
   });
 
   return conversation ? toConversationRecord(conversation) : null;
+}
+
+export async function deleteConversationForUser(
+  conversationId: string,
+  userId: string,
+) {
+  if (!shouldUseDatabaseStore()) {
+    const result = memoryStore.deleteConversationForUser(conversationId, userId);
+
+    if (result.status === 'deleted') {
+      safelyPublishRealtimeEvent({
+        type: 'conversation_updated',
+        payload: {
+          conversationId: result.conversation.id,
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          buyerId: result.conversation.buyerId,
+          status: 'deleted',
+        },
+        visibility: {
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+    }
+
+    return result;
+  }
+
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      OR: [{ buyerId: userId }, { sellerId: userId }],
+    },
+  });
+
+  if (!conversation) {
+    return { status: 'not_found' as const };
+  }
+
+  await prisma.conversation.delete({
+    where: { id: conversation.id },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: conversation.id,
+      listingId: conversation.listingId,
+      sellerId: conversation.sellerId,
+      buyerId: conversation.buyerId,
+      status: 'deleted',
+    },
+    visibility: {
+      userIds: [conversation.sellerId, conversation.buyerId],
+    },
+  });
+
+  return { status: 'deleted' as const, conversation };
+}
+
+export async function markConversationReadForUser(
+  conversationId: string,
+  userId: string,
+) {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.markConversationReadForUser(conversationId, userId);
+  }
+
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      OR: [{ buyerId: userId }, { sellerId: userId }],
+    },
+    include: {
+      messages: {
+        where: {
+          status: 'sent',
+          senderId: { not: userId },
+        },
+      },
+    },
+  });
+
+  if (!conversation) {
+    return { status: 'not_found' as const };
+  }
+
+  const readAt = new Date().toISOString();
+  const updates = conversation.messages
+    .map((message) => {
+      const metadata = asRecord(message.metadata);
+      const readBy =
+        typeof metadata.readBy === 'object' &&
+        metadata.readBy !== null &&
+        !Array.isArray(metadata.readBy)
+          ? (metadata.readBy as Record<string, unknown>)
+          : {};
+
+      if (typeof readBy[userId] === 'string') {
+        return null;
+      }
+
+      return prisma.conversationMessage.update({
+        where: { id: message.id },
+        data: {
+          metadata: toPrismaJsonObject({
+            ...metadata,
+            readBy: {
+              ...readBy,
+              [userId]: readAt,
+            },
+          }),
+        },
+      });
+    })
+    .filter((update): update is NonNullable<typeof update> => Boolean(update));
+
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
+    safelyPublishRealtimeEvent({
+      type: 'conversation_updated',
+      payload: {
+        conversationId: conversation.id,
+        listingId: conversation.listingId,
+        sellerId: conversation.sellerId,
+        buyerId: conversation.buyerId,
+        status: conversation.status,
+      },
+      visibility: {
+        userIds: [conversation.sellerId, conversation.buyerId],
+      },
+    });
+  }
+
+  return { status: 'read' as const, conversation };
 }
 
 function getOtherConversationUserId(conversation: Conversation, userId: string) {

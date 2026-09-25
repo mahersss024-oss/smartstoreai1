@@ -19,14 +19,14 @@ test('public listing urls are stable and shareable', () => {
 
 test('published listings expose share controls in seller account and details pages', () => {
   const shareButton = readProjectFile('components', 'listing-share-button.tsx');
-  const accountPage = readProjectFile('app', 'account', 'page.tsx');
+  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
 
   assert.match(shareButton, /navigator\.share/);
   assert.match(shareButton, /navigator\.clipboard/);
   assert.match(shareButton, /postToNative/);
-  assert.match(accountPage, /listing\.status === 'published'/);
-  assert.match(accountPage, /<ListingShareButton/);
+  assert.match(accountListingsPage, /listing\.status === 'published'/);
+  assert.match(accountListingsPage, /<ListingShareButton/);
   assert.match(listingPage, /<ListingShareButton/);
 });
 

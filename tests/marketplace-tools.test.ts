@@ -5,6 +5,7 @@ import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import {
   addListingImageForSeller,
   createListingDraft,
+  publishListing,
 } from '@/agent/marketplace/store';
 import type { AuthSession } from '@/lib/auth/session';
 
@@ -20,8 +21,8 @@ function createTestSession(userId: string): AuthSession {
   };
 }
 
-test('publishes the latest matching seller draft when listingId is omitted', async () => {
-  const sellerId = 'seller:tool-publish-current-draft';
+test('pauses the latest matching seller listing when listingId is omitted', async () => {
+  const sellerId = 'seller:tool-pause-current-listing';
   const listing = createListingDraft({
     sellerId,
     category: 'cars',
@@ -29,7 +30,7 @@ test('publishes the latest matching seller draft when listingId is omitted', asy
   });
 
   addListingImageForSeller(listing.id, sellerId, {
-    id: 'tool-publish-current-draft-image',
+    id: 'tool-pause-current-listing-image',
     listingId: listing.id,
     originalUrl: 'https://images.example.test/camry-original.jpg',
     displayUrl: 'https://images.example.test/camry-display.jpg',
@@ -39,23 +40,21 @@ test('publishes the latest matching seller draft when listingId is omitted', asy
     status: 'approved',
     enhancements: [],
   });
+  publishListing(listing.id);
 
   const tools = createMarketplaceTools(createTestSession(sellerId));
   const executeSetListingStatus = tools.setListingStatus.execute as unknown as (
-    input: { status: 'published' },
+    input: { status: 'paused' },
     options: Record<string, never>,
   ) => Promise<{ status: string; listingUrl?: string; listing: { id: string } }>;
   const result = await executeSetListingStatus(
-    { status: 'published' },
+    { status: 'paused' },
     {},
   );
 
-  assert.equal(result?.status, 'published');
+  assert.equal(result?.status, 'paused');
   assert.equal(result?.listing.id, listing.id);
-  assert.equal(
-    result?.listingUrl,
-    `http://localhost:3000/listings/${encodeURIComponent(listing.id)}`,
-  );
+  assert.equal(result?.listingUrl, undefined);
 });
 
 test('marketplace tools do not let assistant chat open buyer seller conversations', () => {

@@ -10,6 +10,42 @@ function readConversationPage() {
   );
 }
 
+function readConversationsIndexPage() {
+  return readFileSync(
+    join(process.cwd(), 'app', 'conversations', 'page.tsx'),
+    'utf8',
+  );
+}
+
+function readConversationRoute() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      'app',
+      'api',
+      'marketplace',
+      'conversations',
+      '[conversationId]',
+      'route.ts',
+    ),
+    'utf8',
+  );
+}
+
+function readConversationAlertHook() {
+  return readFileSync(
+    join(process.cwd(), 'hooks', 'use-conversation-message-alert.ts'),
+    'utf8',
+  );
+}
+
+function readMarketplaceRepository() {
+  return readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'repository.ts'),
+    'utf8',
+  );
+}
+
 test('seller buyer conversation scrolls to the latest message', () => {
   const source = readConversationPage();
 
@@ -62,4 +98,59 @@ test('seller buyer conversation does not imply سوق حمد guarantees payment 
   assert.match(source, /تحويل الأموال بين البائع والمشتري مسؤولية الطرفين/);
   assert.match(source, /المنصة لا تضمنه/);
   assert.doesNotMatch(source, /التواصل والدفع داخل سوق حمد/);
+});
+test('conversations list uses compact cards with a small delete menu', () => {
+  const source = readConversationsIndexPage();
+
+  assert.match(source, /DropdownMenu/);
+  assert.match(source, /MoreVertical/);
+  assert.match(source, /حذف المحادثة/);
+  assert.match(source, /هل أنت متأكد من حذف هذه المحادثة؟/);
+  assert.match(source, /تم حذف المحادثة بنجاح/);
+  assert.match(source, /تعذر حذف المحادثة\. حاول مرة أخرى/);
+  assert.match(source, /grid-cols-\[3\.75rem_minmax\(0,1fr\)_auto\]/);
+});
+
+test('conversations list keeps each conversation card horizontal on every viewport', () => {
+  const source = readConversationsIndexPage();
+  const cardLinkMatch = source.match(
+    /className="([^"]*grid min-w-0 grid-cols-\[3\.75rem_minmax\(0,1fr\)_auto\][^"]*)"/,
+  );
+
+  assert.ok(cardLinkMatch, 'conversation card link should use a fixed horizontal grid');
+  assert.doesNotMatch(cardLinkMatch[1], /\b(?:sm|md|lg|xl):grid-cols-/);
+  assert.doesNotMatch(cardLinkMatch[1], /\b(?:sm|md|lg|xl):flex-col\b/);
+});
+
+test('conversation deletion is enforced by the server route', () => {
+  const route = readConversationRoute();
+
+  assert.match(route, /export async function DELETE/);
+  assert.match(route, /getAuthSession/);
+  assert.match(route, /deleteConversationForUser/);
+  assert.match(route, /conversation_not_found/);
+});
+
+test('conversation read state is marked by the server and shown quietly in UI', () => {
+  const route = readConversationRoute();
+  const repository = readMarketplaceRepository();
+  const conversationPage = readConversationPage();
+  const conversationsPage = readConversationsIndexPage();
+
+  assert.match(route, /markConversationReadForUser/);
+  assert.match(repository, /readBy/);
+  assert.match(repository, /senderId: \{ not: userId \}/);
+  assert.match(conversationPage, /تمت القراءة/);
+  assert.match(conversationPage, /غير مقروءة/);
+  assert.match(conversationsPage, /غير مقروءة/);
+  assert.match(conversationsPage, /hasUnreadMessages/);
+});
+
+test('conversation navigation alert syncs unread state from the server', () => {
+  const hook = readConversationAlertHook();
+
+  assert.match(hook, /syncUnreadConversations/);
+  assert.match(hook, /\/api\/marketplace\/me\/conversations/);
+  assert.match(hook, /conversation_updated/);
+  assert.match(hook, /readBy/);
 });

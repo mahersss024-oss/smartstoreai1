@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -11,6 +11,30 @@ type UseConversationMessageAlertOptions = {
   userId?: string | null;
 };
 
+type ConversationMessageAlertRecord = {
+  senderId: string;
+  status: 'sent' | 'blocked';
+  metadata?: Record<string, unknown>;
+};
+
+function isMessageReadBy(
+  message: ConversationMessageAlertRecord,
+  userId?: string | null,
+) {
+  if (!userId) {
+    return false;
+  }
+
+  const readBy = message.metadata?.readBy;
+
+  return (
+    typeof readBy === 'object' &&
+    readBy !== null &&
+    !Array.isArray(readBy) &&
+    typeof (readBy as Record<string, unknown>)[userId] === 'string'
+  );
+}
+
 export function useConversationMessageAlert({
   userId,
 }: UseConversationMessageAlertOptions = {}) {
@@ -18,6 +42,48 @@ export function useConversationMessageAlert({
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [hasConversationAlert, setHasConversationAlert] = useState(false);
   const currentUserId = userId === undefined ? sessionUserId : userId;
+
+  const syncUnreadConversations = useCallback(async () => {
+    if (!currentUserId || pathname.startsWith('/conversations')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/marketplace/me/conversations?page=1&limit=48', {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        conversations?: Array<{
+          messages?: ConversationMessageAlertRecord[];
+        }>;
+      };
+      const hasUnread = Boolean(
+        payload.conversations?.some((conversation) =>
+          conversation.messages?.some(
+            (message) =>
+              message.status === 'sent' &&
+              message.senderId !== currentUserId &&
+              !isMessageReadBy(message, currentUserId),
+          ),
+        ),
+      );
+
+      if (hasUnread) {
+        window.localStorage.setItem(conversationAlertStorageKey, '1');
+      } else {
+        window.localStorage.removeItem(conversationAlertStorageKey);
+      }
+
+      setHasConversationAlert(hasUnread);
+    } catch {
+      // Keep the current visual state if the unread sync is temporarily unavailable.
+    }
+  }, [currentUserId, pathname]);
 
   useEffect(() => {
     if (userId !== undefined) {
@@ -79,13 +145,14 @@ export function useConversationMessageAlert({
         setHasConversationAlert(
           window.localStorage.getItem(conversationAlertStorageKey) === '1',
         );
+        void syncUnreadConversations();
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, syncUnreadConversations]);
 
   useSmartstoreRealtime({
     enabled:
@@ -93,19 +160,25 @@ export function useConversationMessageAlert({
       !pathname.startsWith('/conversations') &&
       !pathname.startsWith('/admin') &&
       !pathname.startsWith('/api'),
-    eventTypes: ['message_created'],
+    eventTypes: ['message_created', 'conversation_updated'],
     onEvent: (event) => {
-      if (
-        event.type !== 'message_created' ||
-        event.payload.status !== 'sent' ||
-        event.payload.senderId === currentUserId ||
-        pathname.startsWith('/conversations')
-      ) {
+      if (pathname.startsWith('/conversations')) {
         return;
       }
 
-      window.localStorage.setItem(conversationAlertStorageKey, '1');
-      setHasConversationAlert(true);
+      if (event.type === 'conversation_updated') {
+        void syncUnreadConversations();
+        return;
+      }
+
+      if (
+        event.type === 'message_created' &&
+        event.payload.status === 'sent' &&
+        event.payload.senderId !== currentUserId
+      ) {
+        window.localStorage.setItem(conversationAlertStorageKey, '1');
+        setHasConversationAlert(true);
+      }
     },
   });
 

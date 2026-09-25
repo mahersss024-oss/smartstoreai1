@@ -156,7 +156,7 @@ const updateListingDetailsInputSchema = listingDetailsInputSchema
   });
 
 type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
-type ListingStatusAction = 'published' | 'paused' | 'sold' | 'deleted';
+type ListingStatusAction = 'paused' | 'sold' | 'deleted';
 
 function normalizeListingDetailsInput(
   input: Partial<ListingDetailsInput>,
@@ -187,10 +187,6 @@ function normalizeListingDetailsInput(
 }
 
 function getFallbackStatusesForAction(status: ListingStatusAction) {
-  if (status === 'published') {
-    return new Set(['draft', 'paused', 'pending']);
-  }
-
   if (status === 'paused' || status === 'sold') {
     return new Set(['published']);
   }
@@ -689,10 +685,10 @@ export function createMarketplaceTools(
 
     setListingStatus: tool({
       description:
-        'Publish, pause, mark sold, or delete a seller-owned listing. Use only after explicit user confirmation for the selected listing. If the user clearly refers to the current draft or latest owned listing and no listingId is available, omit listingId so the tool can use the most recent matching seller listing.',
+        'Pause, mark sold, or delete a seller-owned listing. Publishing is not available to assistant chat; guide the seller to Account > My listings so they can review and press the publish button themselves. Use only after explicit user confirmation for the selected listing. If the user clearly refers to the current editable listing and no listingId is available, omit listingId so the tool can use the most recent matching seller listing.',
       inputSchema: z.object({
         listingId: z.string().min(1).optional(),
-        status: z.enum(['published', 'paused', 'sold', 'deleted']),
+        status: z.enum(['paused', 'sold', 'deleted']),
       }),
       execute: async ({ listingId, status }) => {
         if (!session) {

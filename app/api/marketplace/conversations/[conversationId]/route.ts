@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   addConversationMessage,
   blockConversationUser,
+  deleteConversationForUser,
   getConversationBlockStatus,
   getConversationForUser,
+  markConversationReadForUser,
   reportConversationUser,
   shareSellerContact,
 } from '@/agent/marketplace/repository';
@@ -60,6 +62,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { conversationId } = await context.params;
+  await markConversationReadForUser(conversationId, session.user.id);
   const conversation = await getConversationForUser(conversationId, session.user.id);
 
   if (!conversation) {
@@ -73,6 +76,35 @@ export async function GET(request: Request, context: RouteContext) {
 
   return Response.json(
     { conversation, blockStatus },
+    { headers: noStoreHeaders },
+  );
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return Response.json(
+      {
+        error: 'auth_required',
+        message: 'Sign-in is required to delete conversations.',
+      },
+      { status: 401 },
+    );
+  }
+
+  const { conversationId } = await context.params;
+  const result = await deleteConversationForUser(conversationId, session.user.id);
+
+  if (result.status === 'not_found') {
+    return Response.json({ error: 'conversation_not_found' }, { status: 404 });
+  }
+
+  return Response.json(
+    {
+      status: 'deleted',
+      message: 'Conversation deleted successfully.',
+    },
     { headers: noStoreHeaders },
   );
 }

@@ -7,7 +7,9 @@ import {
   ArrowRight,
   BadgeCheck,
   MessageCircle,
+  MoreVertical,
   ShieldCheck,
+  Trash2,
   User,
 } from 'lucide-react';
 
@@ -16,6 +18,12 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
 
 type AuthUser = {
   id: string;
@@ -52,6 +60,7 @@ type ConversationRecord = {
     body: string;
     senderId: string;
     status: 'sent' | 'blocked';
+    metadata?: Record<string, unknown>;
     createdAt: string;
   }>;
   updatedAt: string;
@@ -102,6 +111,24 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
+function isMessageReadBy(
+  message: ConversationRecord['messages'][number],
+  userId?: string | null,
+) {
+  if (!userId) {
+    return false;
+  }
+
+  const readBy = message.metadata?.readBy;
+
+  return (
+    typeof readBy === 'object' &&
+    readBy !== null &&
+    !Array.isArray(readBy) &&
+    typeof (readBy as Record<string, unknown>)[userId] === 'string'
+  );
+}
+
 export default function ConversationsPage() {
   const [session, setSession] = useState<AuthSessionPayload>({
     authenticated: false,
@@ -111,6 +138,11 @@ export default function ConversationsPage() {
   const [conversationsPagination, setConversationsPagination] =
     useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+  const [conversationNotice, setConversationNotice] = useState<{
+    tone: 'success' | 'danger';
+    message: string;
+  } | null>(null);
 
   const conversationsCount = conversations.length;
   const openConversationsCount = useMemo(
@@ -179,6 +211,18 @@ export default function ConversationsPage() {
   }, []);
 
   useEffect(() => {
+    const onPullRefresh = () => {
+      void refreshConversations(1, { showLoading: false });
+    };
+
+    window.addEventListener('smartstore:pull-refresh', onPullRefresh);
+
+    return () => {
+      window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
+    };
+  }, [refreshConversations]);
+
+  useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
 
@@ -241,6 +285,53 @@ export default function ConversationsPage() {
       void refreshConversations(conversationsPagination?.nextPage ?? 1);
     },
   });
+
+  const deleteConversation = useCallback(async (conversation: ConversationRecord) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه المحادثة؟')) {
+      return;
+    }
+
+    setDeletingConversationId(conversation.id);
+    setConversationNotice(null);
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/conversations/${conversation.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Idempotency-Key': `conversation-delete-${conversation.id}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setConversationNotice({
+          tone: 'danger',
+          message: 'تعذر حذف المحادثة. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setConversations((currentConversations) =>
+        currentConversations.filter(
+          (currentConversation) => currentConversation.id !== conversation.id,
+        ),
+      );
+      setConversationNotice({
+        tone: 'success',
+        message: 'تم حذف المحادثة بنجاح.',
+      });
+      void refreshConversations(1, { showLoading: false });
+    } catch {
+      setConversationNotice({
+        tone: 'danger',
+        message: 'تعذر حذف المحادثة. حاول مرة أخرى.',
+      });
+    } finally {
+      setDeletingConversationId(null);
+    }
+  }, [refreshConversations]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -327,6 +418,17 @@ export default function ConversationsPage() {
                 <MessageCircle className="size-4 text-blue-600" />
                 قائمة المحادثات
               </div>
+              {conversationNotice && (
+                <div
+                  className={`mb-3 rounded-md border px-3 py-2 text-xs font-semibold ${
+                    conversationNotice.tone === 'success'
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-300/30 dark:bg-emerald-400/10 dark:text-emerald-100'
+                      : 'border-red-300 bg-red-50 text-red-800 dark:border-red-300/30 dark:bg-red-400/10 dark:text-red-100'
+                  }`}
+                >
+                  {conversationNotice.message}
+                </div>
+              )}
 
               {isLoading && conversations.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
@@ -344,47 +446,100 @@ export default function ConversationsPage() {
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  <div className="grid gap-3">
+                  <div className="grid gap-2">
                     {conversations.map((conversation) => {
                     const lastMessage = [...conversation.messages]
                       .reverse()
                       .find((message) => message.status === 'sent');
                     const isSeller = session.user?.id === conversation.sellerId;
+                    const hasUnreadMessages = conversation.messages.some(
+                      (message) =>
+                        message.status === 'sent' &&
+                        message.senderId !== session.user?.id &&
+                        !isMessageReadBy(message, session.user?.id),
+                    );
 
                     return (
-                      <Link
+                      <div
                         key={conversation.id}
-                        className="grid gap-3 rounded-md border p-3 transition hover:border-blue-400 hover:bg-blue-50/60 dark:hover:bg-blue-400/10 md:grid-cols-[5rem_1fr_auto]"
-                        href={`/conversations/${conversation.id}`}
+                        className={`grid grid-cols-[minmax(0,1fr)_2.25rem] overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:bg-blue-50/60 dark:bg-card dark:hover:bg-blue-400/10 ${
+                          hasUnreadMessages
+                            ? 'border-rose-300 shadow-rose-950/10 dark:border-rose-400/40'
+                            : ''
+                        }`}
                       >
-                        <img
-                          alt={conversation.listing?.title ?? 'صورة الإعلان'}
-                          className="aspect-square w-full rounded-md object-cover md:size-20"
-                          src={getListingImage(conversation.listing)}
-                        />
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="truncate text-base font-bold">
-                              {conversation.listing?.title ?? 'إعلان غير متاح'}
-                            </h3>
-                            <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                              {isSeller ? 'بائع' : 'مشتري'}
-                            </span>
+                        <Link
+                          className="grid min-w-0 grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2"
+                          href={`/conversations/${conversation.id}`}
+                        >
+                          <img
+                            alt={conversation.listing?.title ?? 'صورة الإعلان'}
+                            className="size-14 rounded-md object-cover"
+                            src={getListingImage(conversation.listing)}
+                          />
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <h3 className="truncate text-sm font-bold">
+                                {conversation.listing?.title ?? 'إعلان غير متاح'}
+                              </h3>
+                              <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                                {isSeller ? 'بائع' : 'مشتري'}
+                              </span>
+                              {hasUnreadMessages && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-400/15 dark:text-rose-100">
+                                  <span className="size-1.5 rounded-full bg-rose-500" />
+                                  غير مقروءة
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                              {lastMessage?.body ?? 'لم تبدأ الرسائل بعد'}
+                            </p>
+                            <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="truncate">{formatPrice(conversation.listing?.price)}</span>
+                              <span className="shrink-0">{formatUpdatedAt(conversation.updatedAt)}</span>
+                            </div>
                           </div>
-                          <p className="mt-1 truncate text-sm text-muted-foreground">
-                            {lastMessage?.body ?? 'لم تبدأ الرسائل بعد'}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            <span>{formatPrice(conversation.listing?.price)}</span>
-                            <span>{conversation.listing?.city ?? 'السعودية'}</span>
-                            <span>{formatUpdatedAt(conversation.updatedAt)}</span>
+                          <div className="hidden items-center gap-1 text-xs text-emerald-700 dark:text-emerald-200 sm:flex">
+                            <BadgeCheck className="size-4" />
+                            {conversation.status === 'open' ? 'مفتوحة' : 'مغلقة'}
                           </div>
+                        </Link>
+                        <div className="grid place-items-center border-r">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                aria-label="خيارات المحادثة"
+                                className="size-8 rounded-md"
+                                disabled={deletingConversationId === conversation.id}
+                                size="icon-sm"
+                                variant="ghost"
+                              >
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-40">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/conversations/${conversation.id}`}>
+                                  <MessageCircle className="size-4" />
+                                  فتح المحادثة
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                disabled={deletingConversationId === conversation.id}
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  void deleteConversation(conversation);
+                                }}
+                              >
+                                <Trash2 className="size-4" />
+                                حذف المحادثة
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-200">
-                          <BadgeCheck className="size-4" />
-                          {conversation.status === 'open' ? 'مفتوحة' : 'مغلقة'}
-                        </div>
-                      </Link>
+                      </div>
                     );
                     })}
                   </div>
