@@ -114,6 +114,14 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
   assert.doesNotMatch(mobileNavigation, /item\.primary \? \([\s\S]*bg-blue-600 text-white/);
 });
 
+test('tablet keeps account access in the bottom navigation instead of the top header', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /href="\/account" onClick=\{closeAssistantForNavigation\}/);
+  assert.match(homePage, /className="hidden rounded-md lg:inline-flex"/);
+  assert.doesNotMatch(homePage, /className="hidden rounded-md sm:inline-flex"[\s\S]*href="\/account"/);
+});
+
 test('home assistant starter search is generic instead of a fixed car city example', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

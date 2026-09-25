@@ -3608,7 +3608,7 @@ export default function Page() {
               <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <>
-                  <Button asChild variant="outline" size="sm" className="hidden rounded-md sm:inline-flex">
+                  <Button asChild variant="outline" size="sm" className="hidden rounded-md lg:inline-flex">
                     <Link href="/account" onClick={closeAssistantForNavigation}>
                       <User className="size-4" />
                       حسابي
