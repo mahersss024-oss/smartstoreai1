@@ -154,7 +154,7 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.doesNotMatch(htmlRule, /touch-action:/);
   assert.doesNotMatch(bodyRule, /touch-action:/);
   assert.match(globalCss, /\.smartstore-ai-bubble \{[\s\S]*touch-action: none;/);
-  assert.match(homePage, /hamad-assistant-bubble\.png/);
+  assert.ok(homePage.includes('/hamad-assistant-bubble.png?v=ask-hamad-20260925'));
   assert.doesNotMatch(homePage, /smartstore-ai-bubble__label/);
   assert.doesNotMatch(globalCss, /smartstore-ai-bubble__label/);
   assert.match(homePage, /اسأل/);

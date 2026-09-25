@@ -864,7 +864,7 @@ export default function AccountListingsPage() {
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:gap-3 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-            <Link className="grid size-9 place-items-center rounded-md border bg-white dark:bg-background" href="/">
+            <Link className="grid size-9 place-items-center rounded-md border bg-white dark:bg-background" href="/account">
               <ArrowRight className="size-4" />
             </Link>
             <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm sm:size-10">
