@@ -27,6 +27,15 @@ test('account page keeps listing management free of chat listing shortcuts', () 
   assert.match(page, /رسوم المنصة/);
 });
 
+test('account shortcuts link to customer listings instead of returning to market', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /href="#account-listings"/);
+  assert.match(page, /إعلاناتي/);
+  assert.match(page, /id="account-listings"/);
+  assert.doesNotMatch(page, /العودة للسوق/);
+});
+
 test('sold listings expose a platform fee action after the sale marker', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 

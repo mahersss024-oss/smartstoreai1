@@ -10,7 +10,6 @@ import {
   BadgeCheck,
   CheckCircle2,
   Heart,
-  Home,
   ImageIcon,
   LogOut,
   Megaphone,
@@ -1127,9 +1126,9 @@ export default function AccountPage() {
               </div>
               <div className="grid gap-2">
                 <Button asChild variant="outline" className="rounded-md">
-                  <Link href="/">
-                    <Home className="size-4" />
-                    العودة للسوق
+                  <Link href="#account-listings">
+                    <Megaphone className="size-4" />
+                    إعلاناتي
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="rounded-md">
@@ -1289,7 +1288,10 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section
+              className="scroll-mt-24 rounded-md border bg-white p-4 shadow-sm dark:bg-card"
+              id="account-listings"
+            >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
