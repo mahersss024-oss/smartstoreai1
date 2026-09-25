@@ -303,8 +303,8 @@ export default function AdminHomePage() {
       {
         href: '/admin/commissions',
         icon: <Percent className="size-4" />,
-        label: 'إدارة العمولات',
-        text: 'تحديث حالة العمولة أو حذف سجل عمولة.',
+        label: 'إدارة رسوم المنصة',
+        text: 'تحديث حالة الرسوم أو حذف سجل رسوم.',
         visible: canManageCommissions,
       },
       {
@@ -419,13 +419,13 @@ export default function AdminHomePage() {
               <StatCard icon={<MessageCircle className="size-4" />} label="المحادثات" value={formatNumber(overview.totals.conversations)} />
               <StatCard icon={<MessageCircle className="size-4" />} label="الرسائل" value={formatNumber(overview.totals.messages)} />
               <StatCard icon={<Flag className="size-4" />} label="البلاغات" value={formatNumber(overview.totals.reports)} />
-              <StatCard icon={<Percent className="size-4" />} label="العمولات" value={formatNumber(overview.totals.commissions)} />
+              <StatCard icon={<Percent className="size-4" />} label="رسوم المنصة" value={formatNumber(overview.totals.commissions)} />
               <StatCard icon={<ShieldCheck className="size-4" />} label="إجراءات الإدارة" value={formatNumber(overview.totals.adminActions)} />
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2">
-              <StatCard icon={<Percent className="size-4" />} label="إجمالي العمولات المستحقة" value={formatMoney(overview.money.dueCommissions)} />
-              <StatCard icon={<Percent className="size-4" />} label="إجمالي العمولات المدفوعة" value={formatMoney(overview.money.paidCommissions)} />
+              <StatCard icon={<Percent className="size-4" />} label="إجمالي الرسوم المستحقة" value={formatMoney(overview.money.dueCommissions)} />
+              <StatCard icon={<Percent className="size-4" />} label="إجمالي الرسوم المدفوعة" value={formatMoney(overview.money.paidCommissions)} />
             </section>
 
             <section className="grid gap-3 lg:grid-cols-4">
@@ -448,7 +448,7 @@ export default function AdminHomePage() {
               <StatusBlock title="حالات الإعلانات" statuses={overview.statuses.listings} />
               <StatusBlock title="حالات الصور" statuses={overview.statuses.images} />
               <StatusBlock title="حالات البلاغات" statuses={overview.statuses.reports} />
-              <StatusBlock title="حالات العمولات" statuses={overview.statuses.commissions} />
+              <StatusBlock title="حالات رسوم المنصة" statuses={overview.statuses.commissions} />
             </section>
           </>
         )}

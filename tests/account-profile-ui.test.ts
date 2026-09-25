@@ -19,6 +19,14 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /countContactPhoneCandidates/);
 });
 
+test('account page keeps listing management free of chat listing shortcuts', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.doesNotMatch(page, /إنشاء إعلان بالمحادثة/);
+  assert.doesNotMatch(page, /إضافة إعلان عبر الشات/);
+  assert.match(page, /رسوم المنصة/);
+});
+
 test('account page does not flash sign-in controls while session is loading', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 

@@ -568,7 +568,7 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
                       <Percent className="size-4 text-blue-600" />
-                      العمولات: {formatNumber(user.counts.commissions)}
+                      رسوم المنصة: {formatNumber(user.counts.commissions)}
                     </div>
                     <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
                       <Phone className="size-4 text-blue-600" />
@@ -576,7 +576,7 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
                       <BadgeCheck className="size-4 text-blue-600" />
-                      اتفاقية العمولة: {user.commissionAgreementAccepted ? 'مقبولة' : 'غير مقبولة'}
+                      اتفاقية رسوم المنصة: {user.commissionAgreementAccepted ? 'مقبولة' : 'غير مقبولة'}
                     </div>
                     <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
                       الرسائل: {formatNumber(user.counts.messages)}

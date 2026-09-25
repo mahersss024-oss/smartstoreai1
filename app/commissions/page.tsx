@@ -307,9 +307,9 @@ export default function CommissionsPage() {
               <Percent className="size-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">عمولات البيع</h1>
+              <h1 className="truncate text-base font-bold">رسوم المنصة</h1>
               <p className="truncate text-xs text-muted-foreground">
-                عمولة 1% على البيع الذي يتم عبر الموقع
+                رسوم 1% على البيع الذي يتم عبر الموقع
               </p>
             </div>
           </div>
@@ -322,7 +322,7 @@ export default function CommissionsPage() {
               <Receipt className="mx-auto size-12 text-blue-600" />
               <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
               <p className="text-sm leading-7 text-muted-foreground">
-                نتحقق من جلسة الدخول قبل عرض العمولات.
+                نتحقق من جلسة الدخول قبل عرض رسوم المنصة.
               </p>
             </div>
           </section>
@@ -330,7 +330,7 @@ export default function CommissionsPage() {
           <section className="grid min-h-[28rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />
-              <h2 className="text-xl font-bold">سجل الدخول لعرض العمولات</h2>
+              <h2 className="text-xl font-bold">سجل الدخول لعرض رسوم المنصة</h2>
               <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
                   <GoogleMark className="size-5" />
@@ -349,7 +349,7 @@ export default function CommissionsPage() {
           <>
             <section className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-                <div className="text-xs text-muted-foreground">عمولات مستحقة</div>
+                <div className="text-xs text-muted-foreground">رسوم مستحقة</div>
                 <div className="mt-1 text-2xl font-bold">{formatMoney(totalDue)}</div>
               </div>
               <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
@@ -375,15 +375,15 @@ export default function CommissionsPage() {
                     <CreditCard className="size-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold">طرق دفع العمولة</h2>
+                    <h2 className="text-base font-bold">طرق دفع رسوم المنصة</h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      اختر الجهة المناسبة وحوّل عمولة البيع، ثم احتفظ بصورة الإيصال للمراجعة.
+                      اختر الجهة المناسبة وحوّل رسوم البيع، ثم احتفظ بصورة الإيصال للمراجعة.
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                    عمولة 1%
+                    رسوم 1%
                   </span>
                   <Button
                     asChild
@@ -393,7 +393,7 @@ export default function CommissionsPage() {
                   >
                     <Link href="/commission-policy">
                       <FileText className="size-3.5" />
-                      سياسة العمولة
+                      سياسة رسوم المنصة
                     </Link>
                   </Button>
                 </div>
@@ -401,7 +401,7 @@ export default function CommissionsPage() {
 
               {paymentMethods.length === 0 ? (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  لم يتم إعداد بيانات دفع العمولة بعد.
+                  لم يتم إعداد بيانات دفع رسوم المنصة بعد.
                 </div>
               ) : (
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -476,11 +476,11 @@ export default function CommissionsPage() {
 
               {isLoading && commissions.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-                  جار تحميل العمولات...
+                  جار تحميل رسوم المنصة...
                 </div>
               ) : commissions.length === 0 ? (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
-                  لا توجد عمولات حتى الآن.
+                  لا توجد رسوم مستحقة حتى الآن.
                 </div>
               ) : (
                 <div className="grid gap-4">
@@ -494,7 +494,7 @@ export default function CommissionsPage() {
                           </h2>
                           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                             <span>قيمة البيع: {formatMoney(commission.productValue)}</span>
-                            <span>العمولة: {formatMoney(commission.commissionAmount)}</span>
+                            <span>رسوم المنصة: {formatMoney(commission.commissionAmount)}</span>
                             <span>{formatStatus(commission.status)}</span>
                           </div>
                         </div>
@@ -524,7 +524,7 @@ export default function CommissionsPage() {
                             value={amounts[commission.id] ?? ''}
                           />
                           <Button className="rounded-md bg-blue-600 hover:bg-blue-700">
-                            تحديث العمولة
+                            تحديث رسوم المنصة
                           </Button>
                         </form>
                       )}

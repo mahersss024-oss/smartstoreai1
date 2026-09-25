@@ -20,7 +20,7 @@ type LegalPolicyPageProps = {
 const policyLinks = [
   { href: '/terms', label: 'شروط الاستخدام' },
   { href: '/listing-policy', label: 'سياسة الإعلانات' },
-  { href: '/commission-policy', label: 'سياسة العمولة' },
+  { href: '/commission-policy', label: 'سياسة رسوم المنصة' },
   { href: '/privacy', label: 'سياسة الخصوصية' },
 ];
 

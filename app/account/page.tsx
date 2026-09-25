@@ -1126,12 +1126,6 @@ export default function AccountPage() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
-                  <Link href="/">
-                    <MessageCircle className="size-4" />
-                    إنشاء إعلان بالمحادثة
-                  </Link>
-                </Button>
                 <Button asChild variant="outline" className="rounded-md">
                   <Link href="/">
                     <Home className="size-4" />
@@ -1153,7 +1147,7 @@ export default function AccountPage() {
                 <Button asChild variant="outline" className="rounded-md">
                   <Link href="/commissions">
                     <Percent className="size-4" />
-                    العمولات
+                    رسوم المنصة
                   </Link>
                 </Button>
                 {isAdmin && (
@@ -1304,12 +1298,6 @@ export default function AccountPage() {
                   </div>
                   <h2 className="mt-1 text-lg font-bold">قائمة إعلانات العميل</h2>
                 </div>
-                <Button asChild variant="outline" className="rounded-md">
-                  <Link href="/">
-                    <MessageCircle className="size-4" />
-                    إضافة إعلان عبر الشات
-                  </Link>
-                </Button>
               </div>
 
               {isListingsLoading && listings.length === 0 ? (

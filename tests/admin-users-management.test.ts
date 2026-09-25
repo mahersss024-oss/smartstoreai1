@@ -27,7 +27,7 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /حذف المستخدم/);
   assert.match(page, /method: 'DELETE'/);
   assert.match(page, /حفظ التعديلات/);
-  assert.match(page, /اتفاقية العمولة/);
+  assert.match(page, /اتفاقية رسوم المنصة/);
 });
 
 test('admin pages verify access before protected admin api requests', () => {

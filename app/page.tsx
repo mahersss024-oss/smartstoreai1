@@ -3546,7 +3546,7 @@ export default function Page() {
                 سياسة الإعلانات
               </Link>
               <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/commission-policy">
-                العمولة
+                رسوم المنصة
               </Link>
             </nav>
 
@@ -3608,7 +3608,7 @@ export default function Page() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
-                  أنشئ مع حمد
+                  أنشئ إعلانك مع حمد
                   </Button>
                   <Button
                     type="button"
@@ -3625,7 +3625,7 @@ export default function Page() {
                     }}
                   >
                     <Store className="size-4" />
-                    إدخال إعلان
+                    أنشئ إعلانك يدويًا
                   </Button>
                 </div>
               </div>

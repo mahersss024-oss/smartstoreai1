@@ -41,8 +41,8 @@ const cleanupScopes: Array<{
 }> = [
   {
     value: 'commissions',
-    label: 'حذف العمولات',
-    description: 'يحذف سجلات العمولات فقط.',
+    label: 'حذف رسوم المنصة',
+    description: 'يحذف سجلات رسوم المنصة فقط.',
   },
   {
     value: 'conversations',

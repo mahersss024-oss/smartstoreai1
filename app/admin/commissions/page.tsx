@@ -116,7 +116,7 @@ export default function AdminCommissionsPage() {
       }
 
       if (!response.ok) {
-        setNotice('تعذر تحميل العمولات.');
+        setNotice('تعذر تحميل رسوم المنصة.');
         return;
       }
 
@@ -187,7 +187,7 @@ export default function AdminCommissionsPage() {
       });
 
       if (!response.ok) {
-        setNotice('تعذر تحديث حالة العمولة.');
+        setNotice('تعذر تحديث حالة الرسوم.');
         return;
       }
 
@@ -198,7 +198,7 @@ export default function AdminCommissionsPage() {
 
   const deleteCommission = useCallback(
     async (commissionId: string) => {
-      if (!window.confirm('هل تريد حذف سجل العمولة؟')) {
+      if (!window.confirm('هل تريد حذف سجل الرسوم؟')) {
         return;
       }
 
@@ -207,11 +207,11 @@ export default function AdminCommissionsPage() {
       });
 
       if (!response.ok) {
-        setNotice('تعذر حذف سجل العمولة.');
+        setNotice('تعذر حذف سجل الرسوم.');
         return;
       }
 
-      setNotice('تم حذف سجل العمولة.');
+      setNotice('تم حذف سجل الرسوم.');
       await refreshCommissions(1);
     },
     [refreshCommissions],
@@ -231,9 +231,9 @@ export default function AdminCommissionsPage() {
               <Percent className="size-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">إدارة العمولات</h1>
+              <h1 className="truncate text-base font-bold">إدارة رسوم المنصة</h1>
               <p className="truncate text-xs text-muted-foreground">
-                متابعة عمولة 1% من عمليات البيع داخل الموقع
+                متابعة رسوم 1% من عمليات البيع داخل الموقع
               </p>
             </div>
           </div>
@@ -264,12 +264,12 @@ export default function AdminCommissionsPage() {
         <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
           <div className="mb-4 flex items-center gap-2 text-sm font-bold">
             <Receipt className="size-4 text-blue-600" />
-            سجل العمولات
+            سجل رسوم المنصة
           </div>
 
           {isLoading && commissions.length === 0 ? (
             <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-              جار تحميل العمولات...
+              جار تحميل رسوم المنصة...
             </div>
           ) : commissions.length === 0 ? (
             <div className="grid min-h-56 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
@@ -288,7 +288,7 @@ export default function AdminCommissionsPage() {
                       <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                         <span>البائع: {commission.sellerId}</span>
                         <span>قيمة البيع: {formatMoney(commission.productValue)}</span>
-                        <span>العمولة: {formatMoney(commission.commissionAmount)}</span>
+                        <span>رسوم المنصة: {formatMoney(commission.commissionAmount)}</span>
                         <span>{formatStatus(commission.status)}</span>
                       </div>
                     </div>

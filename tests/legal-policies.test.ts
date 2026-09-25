@@ -13,8 +13,8 @@ test('registration agreement explicitly accepts platform policies', () => {
   assert.match(agreementPage, /شروط الاستخدام/);
   assert.match(agreementPage, /سياسة الخصوصية/);
   assert.match(agreementPage, /سياسة الإعلانات/);
-  assert.match(agreementPage, /سياسة العمولة/);
-  assert.match(agreementPage, /أقر بعمولة 1%/);
+  assert.match(agreementPage, /سياسة رسوم المنصة/);
+  assert.match(agreementPage, /أقر برسوم منصة 1%/);
 });
 
 test('privacy policy describes service providers without naming vendors', () => {

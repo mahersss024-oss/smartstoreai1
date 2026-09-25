@@ -824,7 +824,7 @@ export default function AdminModerationPage() {
             <Button asChild variant="outline" className="rounded-md">
               <Link href="/admin/commissions">
                 <Percent className="size-4" />
-                العمولات
+                رسوم المنصة
               </Link>
             </Button>
             <ThemeToggle language="ar" />

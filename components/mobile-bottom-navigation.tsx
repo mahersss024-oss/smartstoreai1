@@ -7,6 +7,7 @@ import {
   FileText,
   Grid2X2,
   Home,
+  MessageCircle,
   Percent,
   ShieldCheck,
   Store,
@@ -21,6 +22,7 @@ type NavItem = {
   primary?: boolean;
   active?: boolean;
   action?: 'more';
+  iconOnly?: boolean;
 };
 
 function isActive(pathname: string, href: string) {
@@ -49,7 +51,7 @@ export function MobileBottomNavigation() {
   const [isAssistantChatViewOpen, setIsAssistantChatViewOpen] = useState(false);
 
   useEffect(() => {
-    ['/', '/account', '/terms'].forEach((href) => {
+    ['/', '/account', '/conversations', '/terms'].forEach((href) => {
       router.prefetch(href);
     });
   }, [router]);
@@ -136,12 +138,18 @@ export function MobileBottomNavigation() {
     { href: '/terms', label: 'الشروط', icon: FileText },
     { href: '/privacy', label: 'الخصوصية', icon: ShieldCheck },
     { href: '/listing-policy', label: 'سياسة الإعلانات', icon: Store },
-    { href: '/commission-policy', label: 'سياسة العمولة', icon: Percent },
+    { href: '/commission-policy', label: 'سياسة رسوم المنصة', icon: Percent },
   ];
 
   const moreActive = moreLinks.some((item) => isActive(pathname, item.href));
   const items: NavItem[] = [
     { href: '/account', label: 'حسابي', icon: User },
+    {
+      href: '/conversations',
+      label: 'رسائلي',
+      icon: MessageCircle,
+      iconOnly: true,
+    },
     {
       href: '/',
       label: 'الرئيسية',
@@ -228,10 +236,10 @@ export function MobileBottomNavigation() {
         }`}
       >
         <div
-          className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
-          style={{ right: `${indicatorIndex * (100 / 3)}%` }}
+          className="pointer-events-none absolute top-0 h-0.5 w-1/4 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
+          style={{ right: `${indicatorIndex * 25}%` }}
         />
-        <div className="grid h-16 grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        <div className="grid h-16 grid-cols-4 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           {items.map((item) => {
             const Icon = item.icon;
             const active = item.active ?? isActive(pathname, item.href);
@@ -241,6 +249,7 @@ export function MobileBottomNavigation() {
               <button
                 key={item.label}
                 aria-current={active ? 'page' : undefined}
+                aria-label={item.label}
                 className={`relative grid min-w-0 place-items-center gap-1 rounded-2xl transition duration-200 active:scale-95 ${
                   active
                     ? 'text-blue-600 dark:text-blue-300'
@@ -271,7 +280,11 @@ export function MobileBottomNavigation() {
                     <Icon className="size-5" />
                   </span>
                 )}
-                <span className="truncate">{pending ? '...' : item.label}</span>
+                {item.iconOnly ? (
+                  <span className="sr-only">{pending ? '...' : item.label}</span>
+                ) : (
+                  <span className="truncate">{pending ? '...' : item.label}</span>
+                )}
               </button>
             );
           })}
