@@ -155,8 +155,12 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.doesNotMatch(bodyRule, /touch-action:/);
   assert.match(globalCss, /\.smartstore-ai-bubble \{[\s\S]*touch-action: none;/);
   assert.match(homePage, /smartstore-ai-bubble__label/);
-  assert.match(homePage, /اسأل حمد/);
+  assert.match(homePage, /smartstore-ai-bubble__label-prompt/);
+  assert.match(homePage, /smartstore-ai-bubble__label-name/);
+  assert.match(homePage, /اسأل/);
+  assert.match(homePage, /حمد/);
   assert.match(globalCss, /\.smartstore-ai-bubble__label \{[\s\S]*pointer-events: none;/);
+  assert.match(globalCss, /\.smartstore-ai-bubble__label-name \{[\s\S]*font-size: 1rem;/);
   assert.match(homePage, /setPointerCapture\(event\.pointerId\)/);
   assert.match(homePage, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(adminListingsPage, /overflow-x-auto/);
