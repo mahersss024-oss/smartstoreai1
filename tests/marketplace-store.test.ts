@@ -32,6 +32,7 @@ import {
   setListingStatusForSeller,
   shareSellerContact,
   toggleFavoriteListing,
+  unblockConversationUser,
   updateCommissionSaleAmountForSeller,
 } from '@/agent/marketplace/store';
 
@@ -411,6 +412,50 @@ test('lets conversation participants report and block the other user', () => {
   assert.equal(blockStatus?.blockedByMe, true);
   assert.equal(afterBlock.status, 'conversation_blocked');
   assert.equal(afterBlock.message, null);
+});
+
+test('lets the blocker remove their own conversation block', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:messages-unblock',
+    category: 'cars',
+    title: 'سيارة للبيع',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(
+    listing.id,
+    'buyer:messages-unblock',
+  );
+
+  blockConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:messages-unblock',
+    'conversation_block',
+  );
+  const blockedMessage = addConversationMessage(
+    opened.conversation?.id ?? '',
+    'seller:messages-unblock',
+    'هل ما زال العرض مناسبًا؟',
+  );
+  const unblock = unblockConversationUser(
+    opened.conversation?.id ?? '',
+    'buyer:messages-unblock',
+  );
+  const blockStatus = getConversationBlockStatus(
+    opened.conversation?.id ?? '',
+    'buyer:messages-unblock',
+  );
+  const afterUnblockMessage = addConversationMessage(
+    opened.conversation?.id ?? '',
+    'seller:messages-unblock',
+    'شكرًا لك',
+  );
+
+  assert.equal(blockedMessage.status, 'conversation_blocked');
+  assert.equal(unblock.status, 'unblocked');
+  assert.equal(blockStatus?.blocked, false);
+  assert.equal(blockStatus?.blockedByMe, false);
+  assert.equal(afterUnblockMessage.status, 'sent');
 });
 
 test('prevents duplicate open conversation reports from the same reporter', () => {

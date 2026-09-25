@@ -22,6 +22,7 @@ import {
   Send,
   ShieldCheck,
   Store,
+  Unlock,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -227,6 +228,7 @@ export default function ConversationPage() {
   const [isSharingContact, setIsSharingContact] = useState(false);
   const [isReportingUser, setIsReportingUser] = useState(false);
   const [isBlockingUser, setIsBlockingUser] = useState(false);
+  const [isUnblockingUser, setIsUnblockingUser] = useState(false);
   const [blockStatus, setBlockStatus] =
     useState<ConversationBlockStatus | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -247,6 +249,9 @@ export default function ConversationPage() {
   );
   const draftHasManualContact = containsManualContactDetails(draft);
   const isConversationBlocked = Boolean(blockStatus?.blocked);
+  const canUnblockConversation = Boolean(
+    isConversationBlocked && blockStatus?.blockedByMe,
+  );
 
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
@@ -662,6 +667,63 @@ export default function ConversationPage() {
     router,
   ]);
 
+  const unblockConversationParticipant = useCallback(async () => {
+    if (!conversation || isUnblockingUser || !canUnblockConversation) {
+      return;
+    }
+
+    if (!window.confirm('هل تؤكد إزالة الحظر والسماح بالرسائل الجديدة؟')) {
+      return;
+    }
+
+    setIsUnblockingUser(true);
+    setNotice('');
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/conversations/${conversationId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': createClientIdempotencyKey('user-unblock'),
+          },
+          body: JSON.stringify({
+            action: 'unblock_user',
+          }),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        blockStatus?: ConversationBlockStatus;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok) {
+        setNotice('تعذر إزالة الحظر الآن.');
+        return;
+      }
+
+      setBlockStatus(
+        payload?.blockStatus ?? { blocked: false, blockedByMe: false },
+      );
+      setNotice('تمت إزالة الحظر. يمكن إرسال رسائل جديدة في هذه المحادثة.');
+      void refreshConversation({ showLoading: false, clearNotice: false });
+    } finally {
+      setIsUnblockingUser(false);
+    }
+  }, [
+    canUnblockConversation,
+    conversation,
+    conversationId,
+    isUnblockingUser,
+    refreshConversation,
+    router,
+  ]);
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-6xl gap-4 px-4 py-5 sm:px-6">
@@ -721,17 +783,31 @@ export default function ConversationPage() {
                   <Flag className="size-3.5" />
                   {isReportingUser ? 'جار الإبلاغ...' : 'إبلاغ'}
                 </Button>
-                <Button
-                  className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
-                  disabled={!conversation || isBlockingUser || isConversationBlocked}
-                  onClick={() => void blockConversationParticipant()}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Ban className="size-3.5" />
-                  {isConversationBlocked ? 'محظورة' : isBlockingUser ? 'جار الحظر...' : 'حظر'}
-                </Button>
+                {canUnblockConversation ? (
+                  <Button
+                    className="rounded-md border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-200"
+                    disabled={!conversation || isUnblockingUser}
+                    onClick={() => void unblockConversationParticipant()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Unlock className="size-3.5" />
+                    {isUnblockingUser ? 'جار إزالة الحظر...' : 'إزالة الحظر'}
+                  </Button>
+                ) : (
+                  <Button
+                    className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
+                    disabled={!conversation || isBlockingUser || isConversationBlocked}
+                    onClick={() => void blockConversationParticipant()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Ban className="size-3.5" />
+                    {isConversationBlocked ? 'محظورة' : isBlockingUser ? 'جار الحظر...' : 'حظر'}
+                  </Button>
+                )}
                 <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   {conversation?.status === 'open' ? 'مفتوحة' : 'مغلقة'}
                 </span>

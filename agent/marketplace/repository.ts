@@ -2148,6 +2148,95 @@ export async function blockConversationUser(
   };
 }
 
+export async function unblockConversationUser(
+  conversationId: string,
+  blocker: Actor,
+) {
+  const blockerId = getActorId(blocker);
+
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.unblockConversationUser(conversationId, blockerId);
+  }
+
+  const conversation = await getConversationForUser(conversationId, blockerId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+      blockStatus: null,
+    };
+  }
+
+  const blockedId = getOtherConversationUserId(conversation, blockerId);
+
+  if (!blockedId) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+      blockStatus: null,
+    };
+  }
+
+  const existingBlock = await prisma.userBlock.findUnique({
+    where: {
+      blockerId_blockedId: {
+        blockerId,
+        blockedId,
+      },
+    },
+  });
+
+  if (!existingBlock) {
+    return {
+      status: 'not_blocked' as const,
+      block: null,
+      conversation,
+      blockStatus: await getConversationBlockStatus(conversationId, blockerId),
+    };
+  }
+
+  await prisma.userBlock.delete({
+    where: {
+      blockerId_blockedId: {
+        blockerId,
+        blockedId,
+      },
+    },
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: conversation.id,
+      listingId: conversation.listingId,
+      sellerId: conversation.sellerId,
+      buyerId: conversation.buyerId,
+      status: conversation.status,
+    },
+    visibility: {
+      includeAdmins: true,
+      userIds: [conversation.sellerId, conversation.buyerId],
+    },
+  });
+
+  return {
+    status: 'unblocked' as const,
+    block: {
+      id: existingBlock.id,
+      blockerId: existingBlock.blockerId,
+      blockedId: existingBlock.blockedId,
+      conversationId: existingBlock.conversationId ?? undefined,
+      reason: existingBlock.reason ?? undefined,
+      createdAt: existingBlock.createdAt.toISOString(),
+    },
+    conversation,
+    blockStatus: await getConversationBlockStatus(conversationId, blockerId),
+  };
+}
+
 export async function addConversationMessage(
   conversationId: string,
   sender: Actor,

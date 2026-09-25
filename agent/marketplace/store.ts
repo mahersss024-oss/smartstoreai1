@@ -1108,6 +1108,57 @@ export function blockConversationUser(
   };
 }
 
+export function unblockConversationUser(
+  conversationId: string,
+  blockerId: string,
+) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (!conversation) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+      blockStatus: null,
+    };
+  }
+
+  const blockedId = getOtherConversationUser(conversation, blockerId);
+
+  if (!blockedId) {
+    return {
+      status: 'not_found' as const,
+      block: null,
+      conversation: null,
+      blockStatus: null,
+    };
+  }
+
+  const existingBlock = [...userBlocks.values()].find(
+    (block) => block.blockerId === blockerId && block.blockedId === blockedId,
+  );
+
+  if (!existingBlock) {
+    return {
+      status: 'not_blocked' as const,
+      block: null,
+      conversation,
+      blockStatus: getConversationBlockStatus(conversationId, blockerId),
+    };
+  }
+
+  userBlocks.delete(existingBlock.id);
+  persistStore();
+
+  return {
+    status: 'unblocked' as const,
+    block: existingBlock,
+    conversation,
+    blockStatus: getConversationBlockStatus(conversationId, blockerId),
+  };
+}
+
 export function listUserFavorites(userId: string) {
   seedListings();
 

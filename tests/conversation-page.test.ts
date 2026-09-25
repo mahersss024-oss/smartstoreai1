@@ -60,8 +60,11 @@ test('seller buyer conversation exposes report and block controls', () => {
 
   assert.match(source, /reportConversationUser/);
   assert.match(source, /blockConversationParticipant/);
+  assert.match(source, /unblockConversationParticipant/);
   assert.match(source, /action: 'report_user'/);
   assert.match(source, /action: 'block_user'/);
+  assert.match(source, /action: 'unblock_user'/);
+  assert.match(source, /canUnblockConversation/);
   assert.match(source, /isConversationBlocked/);
 });
 

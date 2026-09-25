@@ -9,6 +9,7 @@ import {
   markConversationReadForUser,
   reportConversationUser,
   shareSellerContact,
+  unblockConversationUser,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -34,11 +35,15 @@ const blockUserSchema = z.object({
   action: z.literal('block_user'),
   reason: z.string().trim().max(120).optional(),
 });
+const unblockUserSchema = z.object({
+  action: z.literal('unblock_user'),
+});
 const conversationPostSchema = z.union([
   sendMessageSchema,
   shareContactSchema,
   reportUserSchema,
   blockUserSchema,
+  unblockUserSchema,
 ]);
 const maxConversationMessageRequestBytes = 8 * 1024;
 
@@ -171,7 +176,9 @@ export async function POST(request: Request, context: RouteContext) {
           ? 'conversation_user_report'
           : action === 'block_user'
             ? 'conversation_user_block'
-            : 'message_send',
+            : action === 'unblock_user'
+              ? 'conversation_user_unblock'
+              : 'message_send',
     actorKey: `${session.user.id}:${conversationId}`,
   });
 
@@ -183,6 +190,7 @@ export async function POST(request: Request, context: RouteContext) {
     | Awaited<ReturnType<typeof shareSellerContact>>
     | Awaited<ReturnType<typeof reportConversationUser>>
     | Awaited<ReturnType<typeof blockConversationUser>>
+    | Awaited<ReturnType<typeof unblockConversationUser>>
     | Awaited<ReturnType<typeof addConversationMessage>>;
 
   if ('body' in parsed.data) {
@@ -198,12 +206,14 @@ export async function POST(request: Request, context: RouteContext) {
       reason: parsed.data.reason,
       details: parsed.data.details,
     });
-  } else {
+  } else if (parsed.data.action === 'block_user') {
     result = await blockConversationUser(
       conversationId,
       session.user,
       parsed.data.reason,
     );
+  } else {
+    result = await unblockConversationUser(conversationId, session.user);
   }
 
   if (result.status === 'not_found') {
@@ -303,6 +313,33 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency
       ? idempotency.complete(responseBody, 201)
       : Response.json(responseBody, { status: 201 });
+  }
+
+  if (result.status === 'not_blocked') {
+    const responseBody = {
+      error: 'conversation_not_blocked_by_user',
+      message: 'This conversation is not blocked by the current user.',
+      conversation: result.conversation,
+      blockStatus: result.blockStatus,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 409)
+      : Response.json(responseBody, { status: 409 });
+  }
+
+  if (result.status === 'unblocked') {
+    const responseBody = {
+      ...result,
+      blockStatus: result.blockStatus ?? {
+        blocked: false,
+        blockedByMe: false,
+      },
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 200)
+      : Response.json(responseBody, { status: 200 });
   }
 
   if (
