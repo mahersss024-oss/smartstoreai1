@@ -12,11 +12,13 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
   assert.match(page, /profileDisplayName/);
-  assert.match(page, /profilePictureUrl/);
   assert.match(page, /profilePictureFile/);
   assert.match(page, /\/api\/account\/profile\/picture/);
   assert.match(page, /uploadProfilePicture/);
   assert.match(page, /رفع صورة عرض الحساب/);
+  assert.doesNotMatch(page, /profilePictureUrl/);
+  assert.doesNotMatch(page, /رابط صورة الحساب/);
+  assert.doesNotMatch(page, /JPG أو PNG أو WEBP حتى 4MB/);
   assert.match(page, /displayName: profileName/);
   assert.match(page, /picture: profilePicture/);
   assert.match(page, /hasProfileIdentityChanges/);

@@ -138,11 +138,23 @@ function paginateListings<T>(listings: T[], filters: MarketplaceListingFilters) 
 function normalizeConversationMessages(
   messages: Conversation['messages'] = [],
 ) {
-  return messages.map((message) => ({
-    ...message,
-    type: message.type ?? 'text',
-    metadata: message.metadata ?? {},
-  }));
+  return messages
+    .filter((message) => message.type !== 'conversation_hidden')
+    .map((message) => ({
+      ...message,
+      type: message.type ?? 'text',
+      metadata: message.metadata ?? {},
+    }));
+}
+
+function isConversationHiddenForUser(
+  conversation: Conversation,
+  userId: string,
+) {
+  return conversation.messages.some(
+    (message) =>
+      message.type === 'conversation_hidden' && message.senderId === userId,
+  );
 }
 
 function persistStore() {
@@ -811,7 +823,8 @@ export function listUserConversations(userId: string) {
   return [...conversations.values()]
     .filter(
       (conversation) =>
-        conversation.buyerId === userId || conversation.sellerId === userId,
+        (conversation.buyerId === userId || conversation.sellerId === userId) &&
+        !isConversationHiddenForUser(conversation, userId),
     )
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((conversation) => ({
@@ -827,7 +840,8 @@ export function getConversationForUser(conversationId: string, userId: string) {
 
   if (
     !conversation ||
-    (conversation.buyerId !== userId && conversation.sellerId !== userId)
+    (conversation.buyerId !== userId && conversation.sellerId !== userId) ||
+    isConversationHiddenForUser(conversation, userId)
   ) {
     return null;
   }
@@ -845,12 +859,29 @@ export function deleteConversationForUser(conversationId: string, userId: string
 
   if (
     !conversation ||
-    (conversation.buyerId !== userId && conversation.sellerId !== userId)
+    (conversation.buyerId !== userId && conversation.sellerId !== userId) ||
+    isConversationHiddenForUser(conversation, userId)
   ) {
     return { status: 'not_found' as const };
   }
 
-  conversations.delete(conversationId);
+  if (!isConversationHiddenForUser(conversation, userId)) {
+    const timestamp = nowIso();
+    conversation.messages.push({
+      id: randomUUID(),
+      conversationId,
+      senderId: userId,
+      body: 'conversation_hidden',
+      status: 'blocked',
+      type: 'conversation_hidden',
+      reasons: ['hidden_by_user'],
+      metadata: { hiddenBy: userId },
+      createdAt: timestamp,
+    } as ConversationMessage);
+    conversation.updatedAt = timestamp;
+    conversations.set(conversation.id, conversation);
+    persistStore();
+  }
 
   return { status: 'deleted' as const, conversation };
 }
@@ -861,7 +892,8 @@ export function markConversationReadForUser(conversationId: string, userId: stri
 
   if (
     !conversation ||
-    (conversation.buyerId !== userId && conversation.sellerId !== userId)
+    (conversation.buyerId !== userId && conversation.sellerId !== userId) ||
+    isConversationHiddenForUser(conversation, userId)
   ) {
     return { status: 'not_found' as const };
   }

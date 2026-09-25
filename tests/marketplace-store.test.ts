@@ -10,6 +10,7 @@ import {
   blockConversationUser,
   createConversationForListing,
   createListingDraft,
+  deleteConversationForUser,
   deleteListingImageForSeller,
   getConversationBlockStatus,
   getConversationForUser,
@@ -230,6 +231,54 @@ test('stores internal buyer seller messages for conversation participants', () =
   assert.equal(sent.status, 'sent');
   assert.equal(buyerConversation?.messages.length, 1);
   assert.equal(sellerConversations.some((conversation) => conversation.id === opened.conversation?.id), true);
+});
+
+test('deleting a conversation hides it only from the deleting participant', () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:conversation-delete-local',
+    category: 'computers',
+    title: 'حاسب محمول للحذف المحلي',
+  });
+  publishListing(listing.id);
+
+  const opened = createConversationForListing(
+    listing.id,
+    'buyer:conversation-delete-local',
+  );
+  assert.equal(opened.status, 'created');
+
+  const deleted = deleteConversationForUser(
+    opened.conversation?.id ?? '',
+    'buyer:conversation-delete-local',
+  );
+
+  assert.equal(deleted.status, 'deleted');
+  assert.equal(
+    getConversationForUser(
+      opened.conversation?.id ?? '',
+      'buyer:conversation-delete-local',
+    ),
+    null,
+  );
+  assert.equal(
+    listUserConversations('buyer:conversation-delete-local').some(
+      (conversation) => conversation.id === opened.conversation?.id,
+    ),
+    false,
+  );
+  assert.equal(
+    listUserConversations('seller:conversation-delete-local').some(
+      (conversation) => conversation.id === opened.conversation?.id,
+    ),
+    true,
+  );
+  assert.notEqual(
+    getConversationForUser(
+      opened.conversation?.id ?? '',
+      'seller:conversation-delete-local',
+    ),
+    null,
+  );
 });
 
 test('blocks conversation messages that move contact outside the platform', () => {

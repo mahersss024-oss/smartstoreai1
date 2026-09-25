@@ -124,11 +124,16 @@ test('conversations list keeps each conversation card horizontal on every viewpo
 
 test('conversation deletion is enforced by the server route', () => {
   const route = readConversationRoute();
+  const repository = readMarketplaceRepository();
 
   assert.match(route, /export async function DELETE/);
   assert.match(route, /getAuthSession/);
   assert.match(route, /deleteConversationForUser/);
   assert.match(route, /conversation_not_found/);
+  assert.match(repository, /type: 'conversation_hidden'/);
+  assert.match(repository, /prisma\.conversationMessage\.upsert/);
+  assert.doesNotMatch(repository, /prisma\.conversation\.delete\(/);
+  assert.match(repository, /userIds: \[userId\]/);
 });
 
 test('conversation read state is marked by the server and shown quietly in UI', () => {

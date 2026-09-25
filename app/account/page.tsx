@@ -533,9 +533,6 @@ export default function AccountPage() {
                         }}
                       />
                     </label>
-                    <span className="text-xs text-muted-foreground">
-                      JPG أو PNG أو WEBP حتى 4MB.
-                    </span>
                   </div>
                   <label className="grid gap-1 text-sm font-semibold">
                     الاسم الظاهر
@@ -548,19 +545,6 @@ export default function AccountPage() {
                       type="text"
                       value={profileName}
                       onChange={(event) => setProfileName(event.target.value)}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm font-semibold">
-                    رابط صورة الحساب
-                    <input
-                      className="h-11 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      disabled={isSavingProfile || isUploadingProfilePicture}
-                      dir="ltr"
-                      name="profilePictureUrl"
-                      placeholder="https://example.com/avatar.jpg"
-                      type="url"
-                      value={profilePicture}
-                      onChange={(event) => setProfilePicture(event.target.value)}
                     />
                   </label>
                   <div className="flex flex-wrap items-center gap-2">

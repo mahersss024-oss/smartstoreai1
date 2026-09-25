@@ -432,6 +432,7 @@ function toConversationRecord(
     messages:
       conversation.messages
         ?.toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+        .filter((message) => message.type !== 'conversation_hidden')
         .map(
           (message) =>
             ({
@@ -1434,6 +1435,14 @@ export async function listUserConversations(userId: string) {
   const conversations = await prisma.conversation.findMany({
     where: {
       OR: [{ buyerId: userId }, { sellerId: userId }],
+      NOT: {
+        messages: {
+          some: {
+            senderId: userId,
+            type: 'conversation_hidden',
+          },
+        },
+      },
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
@@ -1472,6 +1481,14 @@ export async function listUserConversationsPage(
   const conversations = await prisma.conversation.findMany({
     where: {
       OR: [{ buyerId: userId }, { sellerId: userId }],
+      NOT: {
+        messages: {
+          some: {
+            senderId: userId,
+            type: 'conversation_hidden',
+          },
+        },
+      },
     },
     include: {
       messages: { orderBy: { createdAt: 'desc' }, take: 10 },
@@ -1535,10 +1552,10 @@ export async function deleteConversationForUser(
           listingId: result.conversation.listingId,
           sellerId: result.conversation.sellerId,
           buyerId: result.conversation.buyerId,
-          status: 'deleted',
+          status: 'hidden',
         },
         visibility: {
-          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+          userIds: [userId],
         },
       });
     }
@@ -1550,6 +1567,14 @@ export async function deleteConversationForUser(
     where: {
       id: conversationId,
       OR: [{ buyerId: userId }, { sellerId: userId }],
+      NOT: {
+        messages: {
+          some: {
+            senderId: userId,
+            type: 'conversation_hidden',
+          },
+        },
+      },
     },
   });
 
@@ -1557,8 +1582,23 @@ export async function deleteConversationForUser(
     return { status: 'not_found' as const };
   }
 
-  await prisma.conversation.delete({
-    where: { id: conversation.id },
+  await prisma.conversationMessage.upsert({
+    where: {
+      id: `${conversation.id}:hidden:${userId}`,
+    },
+    create: {
+      id: `${conversation.id}:hidden:${userId}`,
+      conversationId: conversation.id,
+      senderId: userId,
+      body: 'conversation_hidden',
+      status: 'blocked',
+      type: 'conversation_hidden',
+      reasons: ['hidden_by_user'],
+      metadata: toPrismaJsonObject({ hiddenBy: userId }),
+    },
+    update: {
+      metadata: toPrismaJsonObject({ hiddenBy: userId }),
+    },
   });
 
   safelyPublishRealtimeEvent({
@@ -1568,10 +1608,10 @@ export async function deleteConversationForUser(
       listingId: conversation.listingId,
       sellerId: conversation.sellerId,
       buyerId: conversation.buyerId,
-      status: 'deleted',
+      status: 'hidden',
     },
     visibility: {
-      userIds: [conversation.sellerId, conversation.buyerId],
+      userIds: [userId],
     },
   });
 
