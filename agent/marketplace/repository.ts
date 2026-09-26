@@ -905,6 +905,133 @@ export async function getSellerFollowState(sellerId: string, follower: Actor) {
   };
 }
 
+export async function listAccountFollows(actor: Actor) {
+  const userId = getActorId(actor);
+
+  if (!shouldUseDatabaseStore()) {
+    const following = [...memorySellerFollows.values()]
+      .filter((follow) => follow.followerId === userId)
+      .map((follow) => ({
+        id: follow.id,
+        userId: follow.sellerId,
+        name: getPublicSellerName({ id: follow.sellerId }),
+        picture: undefined as string | undefined,
+        createdAt: follow.createdAt,
+        publishedListingCount: memoryStore
+          .listSellerListings(follow.sellerId)
+          .filter((listing) => listing.status === 'published').length,
+        isFollowing: true,
+      }));
+    const followers = [...memorySellerFollows.values()]
+      .filter((follow) => follow.sellerId === userId)
+      .map((follow) => ({
+        id: follow.id,
+        userId: follow.followerId,
+        name: getPublicSellerName({ id: follow.followerId }),
+        picture: undefined as string | undefined,
+        createdAt: follow.createdAt,
+        publishedListingCount: memoryStore
+          .listSellerListings(follow.followerId)
+          .filter((listing) => listing.status === 'published').length,
+        isFollowing: memorySellerFollows.has(
+          getSellerFollowKey(userId, follow.followerId),
+        ),
+      }));
+
+    return {
+      following,
+      followers,
+      followingCount: following.length,
+      followerCount: followers.length,
+    };
+  }
+
+  const [followingRecords, followerRecords] = await Promise.all([
+    prisma.sellerFollow.findMany({
+      where: { followerId: userId },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            picture: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.sellerFollow.findMany({
+      where: { sellerId: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            picture: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+  const relatedUserIds = [
+    ...new Set([
+      ...followingRecords.map((follow) => follow.sellerId),
+      ...followerRecords.map((follow) => follow.followerId),
+    ]),
+  ];
+  const [listingCounts, viewerFollowing] = await Promise.all([
+    relatedUserIds.length
+      ? prisma.listing.groupBy({
+          by: ['sellerId'],
+          where: {
+            sellerId: { in: relatedUserIds },
+            status: 'published',
+          },
+          _count: { _all: true },
+        })
+      : [],
+    relatedUserIds.length
+      ? prisma.sellerFollow.findMany({
+          where: {
+            followerId: userId,
+            sellerId: { in: relatedUserIds },
+          },
+          select: { sellerId: true },
+        })
+      : [],
+  ]);
+  const countBySellerId = new Map(
+    listingCounts.map((count) => [count.sellerId, count._count._all]),
+  );
+  const viewerFollowingIds = new Set(
+    viewerFollowing.map((follow) => follow.sellerId),
+  );
+
+  return {
+    following: followingRecords.map((follow) => ({
+      id: follow.id,
+      userId: follow.seller.id,
+      name: getPublicSellerName(follow.seller),
+      picture: follow.seller.picture ?? undefined,
+      createdAt: follow.createdAt.toISOString(),
+      publishedListingCount: countBySellerId.get(follow.seller.id) ?? 0,
+      isFollowing: true,
+    })),
+    followers: followerRecords.map((follow) => ({
+      id: follow.id,
+      userId: follow.follower.id,
+      name: getPublicSellerName(follow.follower),
+      picture: follow.follower.picture ?? undefined,
+      createdAt: follow.createdAt.toISOString(),
+      publishedListingCount: countBySellerId.get(follow.follower.id) ?? 0,
+      isFollowing: viewerFollowingIds.has(follow.follower.id),
+    })),
+    followingCount: followingRecords.length,
+    followerCount: followerRecords.length,
+  };
+}
+
 export async function toggleSellerFollow(sellerId: string, follower: Actor) {
   const followerId = getActorId(follower);
 

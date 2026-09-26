@@ -126,6 +126,35 @@ test('account shortcuts link to customer listings instead of returning to market
   assert.doesNotMatch(page, /ط·آ§ط¸â€‍ط·آ¹ط¸ث†ط·آ¯ط·آ© ط¸â€‍ط¸â€‍ط·آ³ط¸ث†ط¸â€ڑ/);
 });
 
+test('account page links to a real follows list', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const followsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'follows', 'page.tsx'),
+    'utf8',
+  );
+  const followsRoute = readFileSync(
+    join(process.cwd(), 'app', 'api', 'marketplace', 'me', 'follows', 'route.ts'),
+    'utf8',
+  );
+  const repository = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'repository.ts'),
+    'utf8',
+  );
+
+  assert.match(page, /href="\/account\/follows"/);
+  assert.match(page, /قائمة المتابعة/);
+  assert.match(followsPage, /\/api\/marketplace\/me\/follows/);
+  assert.match(
+    followsPage,
+    /\/api\/marketplace\/users\/\$\{encodeURIComponent\(userId\)\}\/follow/,
+  );
+  assert.match(followsPage, /المتابعون/);
+  assert.match(followsPage, /المتابَعون/);
+  assert.match(followsRoute, /listAccountFollows/);
+  assert.match(repository, /export async function listAccountFollows/);
+  assert.match(repository, /prisma\.sellerFollow\.findMany/);
+});
+
 test('account conversations shortcut highlights new message alerts on web', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const alertHook = readFileSync(

@@ -22,6 +22,7 @@ import {
   Trash2,
   Upload,
   User,
+  UserPlus,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -525,6 +526,12 @@ export default function AccountPage() {
                   <Link href="/favorites">
                     <Heart className="size-4" />
                     المفضلة
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-md">
+                  <Link href="/account/follows">
+                    <UserPlus className="size-4" />
+                    قائمة المتابعة
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="rounded-md">
