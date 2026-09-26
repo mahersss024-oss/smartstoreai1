@@ -52,14 +52,14 @@ export default function CommissionAgreementPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-4xl content-center gap-4 px-4 py-6 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -72,7 +72,7 @@ export default function CommissionAgreementPage() {
           <ThemeToggle language="ar" />
         </header>
 
-        <section className="grid gap-5 rounded-md border bg-white p-5 shadow-sm dark:bg-card md:grid-cols-[16rem_1fr]">
+        <section className="grid gap-5 p-5 md:grid-cols-[16rem_1fr]">
           <div className="grid content-start gap-4 rounded-md bg-blue-50 p-4 text-blue-950 dark:bg-blue-400/10 dark:text-blue-50">
             <div className="grid size-14 place-items-center rounded-md bg-white text-blue-700 shadow-sm dark:bg-background dark:text-blue-200">
               <Percent className="size-7" />

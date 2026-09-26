@@ -939,12 +939,12 @@ export default function AccountListingsPage() {
         open={Boolean(pendingPublishListing)}
       />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:gap-3 sm:px-4">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/40 px-1 py-3 dark:border-white/10 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-            <Link className="grid size-9 place-items-center rounded-md border bg-white dark:bg-background" href="/account">
+            <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
             </Link>
-            <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm sm:size-10">
+            <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white dark:bg-card sm:size-10">
               <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -964,7 +964,7 @@ export default function AccountListingsPage() {
         </header>
 
         {isSessionLoading ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -978,7 +978,7 @@ export default function AccountListingsPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -1005,7 +1005,7 @@ export default function AccountListingsPage() {
           </section>
         ) : (
           <>
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <h2 className="text-base font-bold">إعلاناتي</h2>
                 <p className="mt-1 text-xs leading-6 text-muted-foreground">تابع إعلاناتك وعدلها وانشرها من صفحة مستقلة عن إعدادات الحساب.</p>
@@ -1027,26 +1027,26 @@ export default function AccountListingsPage() {
             </section>
 
             <section className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-md border bg-white p-3 text-center shadow-sm dark:bg-card">
+              <div className="border-t border-border/70 p-3 text-center">
                 <div className="text-2xl font-bold">{stats.published}</div>
                 <div className="text-xs text-muted-foreground">منشور</div>
               </div>
-              <div className="rounded-md border bg-white p-3 text-center shadow-sm dark:bg-card">
+              <div className="border-t border-border/70 p-3 text-center">
                 <div className="text-2xl font-bold">{stats.drafts}</div>
                 <div className="text-xs text-muted-foreground">مسودة</div>
               </div>
-              <div className="rounded-md border bg-white p-3 text-center shadow-sm dark:bg-card">
+              <div className="border-t border-border/70 p-3 text-center">
                 <div className="text-2xl font-bold">{stats.paused}</div>
                 <div className="text-xs text-muted-foreground">موقوف</div>
               </div>
-              <div className="rounded-md border bg-white p-3 text-center shadow-sm dark:bg-card">
+              <div className="border-t border-border/70 p-3 text-center">
                 <div className="text-2xl font-bold">{stats.sold}</div>
                 <div className="text-xs text-muted-foreground">مباع</div>
               </div>
             </section>
 
             <section
-              className="scroll-mt-24 rounded-md border bg-white p-4 shadow-sm dark:bg-card"
+              className="scroll-mt-24 p-4"
               id="account-listings"
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1077,7 +1077,7 @@ export default function AccountListingsPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden rounded-md border bg-white shadow-sm [contain-intrinsic-size:260px] [content-visibility:auto] dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden border-b bg-white [contain-intrinsic-size:260px] [content-visibility:auto] dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
                       {listing.image ? (
                         <div className="relative aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
                           <img

@@ -207,14 +207,14 @@ export default function FavoritesPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -236,7 +236,7 @@ export default function FavoritesPage() {
         </header>
 
         {isLoading && !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Heart className="mx-auto size-12 text-blue-600" />
               <div>
@@ -248,7 +248,7 @@ export default function FavoritesPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Heart className="mx-auto size-12 text-blue-600" />
               <div>
@@ -272,7 +272,7 @@ export default function FavoritesPage() {
             </div>
           </section>
         ) : (
-          <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <section className="p-4">
             <div className="mb-4 flex items-center gap-2 text-sm font-bold">
               <Heart className="size-4 text-blue-600" />
               إعلانات محفوظة
@@ -298,7 +298,7 @@ export default function FavoritesPage() {
                   {favorites.map((favorite) => (
                     <Link
                     key={favorite.id}
-                    className="overflow-hidden rounded-md border transition hover:border-blue-400 hover:shadow-md"
+                    className="overflow-hidden rounded-md bg-white transition hover:bg-blue-50/70 dark:bg-card dark:hover:bg-blue-400/10"
                     href={`/listings/${favorite.listingId}`}
                   >
                     <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-slate-900">

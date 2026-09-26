@@ -394,7 +394,7 @@ export default function AccountPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/70 bg-white/80 px-1 py-3 dark:border-white/10 dark:bg-transparent sm:gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/40 px-1 py-3 dark:border-white/10 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/">
               <ArrowRight className="size-4" />
@@ -419,7 +419,7 @@ export default function AccountPage() {
         </header>
 
         {isSessionLoading ? (
-          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -433,7 +433,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -460,7 +460,7 @@ export default function AccountPage() {
           </section>
         ) : (
           <>
-            <section className="grid gap-4 bg-white p-4 dark:bg-card lg:grid-cols-[1fr_18rem]">
+            <section className="grid gap-4 px-1 py-4 lg:grid-cols-[1fr_18rem]">
               <div className="flex min-w-0 items-center gap-4">
                 {visibleProfilePicture ? (
                   <img
@@ -544,7 +544,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 border-t bg-white p-4 dark:bg-card">
+            <section className="grid gap-3 border-t border-white/50 p-4 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Store className="size-5" />
@@ -584,7 +584,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 border-t bg-white p-4 dark:bg-card">
+            <section className="grid gap-3 border-t border-white/50 p-4 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <ImageIcon className="size-5" />
@@ -677,7 +677,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 border-t bg-white p-4 dark:bg-card">
+            <section className="grid gap-3 border-t border-white/50 p-4 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Phone className="size-5" />
@@ -765,7 +765,7 @@ export default function AccountPage() {
 
             <PushNotificationSettings />
 
-            <section className="grid gap-3 border-t border-red-500/30 bg-white p-4 dark:bg-card">
+            <section className="grid gap-3 border-t border-red-500/30 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-base font-bold text-red-700 dark:text-red-200">حذف الحساب</h2>

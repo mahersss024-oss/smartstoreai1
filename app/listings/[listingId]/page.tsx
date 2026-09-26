@@ -224,7 +224,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-1 py-3 dark:border-white/10 dark:bg-transparent">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
@@ -247,9 +247,9 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,38rem)_18rem]">
+        <section className="grid items-start gapx-1 py-4 lg:grid-cols-[minmax(0,38rem)_18rem]">
           <div className="grid min-w-0 gap-4">
-            <section className="bg-white p-4 dark:bg-card">
+            <section className="p-4">
               <div className="flex items-center gap-3">
                 <Link
                   href={`/sellers/${listing.sellerId}`}
@@ -293,7 +293,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               title={listing.title ?? 'صورة الإعلان'}
             />
 
-            <section className="bg-white p-4 dark:bg-card">
+            <section className="p-4">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -337,7 +337,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               </div>
             </section>
 
-            <section className="bg-white p-4 dark:bg-card">
+            <section className="p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <PackageCheck className="size-4 text-blue-600" />
                 بيانات المنتج
@@ -362,7 +362,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </div>
 
           <aside className="grid h-fit gap-4">
-            <section className="bg-white p-4 dark:bg-card">
+            <section className="p-4">
               <div className="mb-4">
                 <div className="text-xs text-muted-foreground">السعر المطلوب</div>
                 <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
@@ -376,7 +376,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
             </section>
 
-            <section className="bg-white p-4 dark:bg-card">
+            <section className="p-4">
               <div className="mb-3 text-sm font-bold">نشاط الإعلان</div>
               <div className="grid gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between gap-2 border-t py-2">

@@ -357,7 +357,7 @@ export default function CommissionsPage() {
         open={Boolean(pendingSaleAgreement)}
       />
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -378,7 +378,7 @@ export default function CommissionsPage() {
         </header>
 
         {isLoading && !session.authenticated ? (
-          <section className="grid min-h-[28rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[28rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />
               <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
@@ -388,7 +388,7 @@ export default function CommissionsPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[28rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[28rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />
               <h2 className="text-xl font-bold">سجل الدخول لعرض رسوم المنصة</h2>
@@ -409,22 +409,22 @@ export default function CommissionsPage() {
         ) : (
           <>
             <section className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="p-4">
                 <div className="text-xs text-muted-foreground">رسوم مستحقة</div>
                 <div className="mt-1 text-2xl font-bold">{formatMoney(totalDue)}</div>
               </div>
-              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="p-4">
                 <div className="text-xs text-muted-foreground">عدد السجلات</div>
                 <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
               </div>
-              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="p-4">
                 <div className="text-xs text-muted-foreground">النسبة</div>
                 <div className="mt-1 text-2xl font-bold">1%</div>
               </div>
             </section>
 
             {notice && (
-              <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
+              <div className="border-t border-white/50 px-4 py-3 text-sm text-muted-foreground dark:border-white/10">
                 {notice}
               </div>
             )}
@@ -434,7 +434,7 @@ export default function CommissionsPage() {
               </div>
             )}
 
-            <section className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="grid gap-4 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -477,7 +477,7 @@ export default function CommissionsPage() {
                     return (
                       <article
                         key={method.id}
-                        className={`grid gap-3 rounded-md border p-3 ${theme.card}`}
+                        className={`grid gap-3 border-t border-border/70 pt-3 ${theme.card}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -534,7 +534,7 @@ export default function CommissionsPage() {
               )}
             </section>
 
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="p-4">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold">
                 <Receipt className="size-4 text-blue-600" />
                 السجلات
@@ -554,7 +554,7 @@ export default function CommissionsPage() {
                     {orderedCommissions.map((commission) => (
                       <article
                         key={commission.id}
-                        className={`grid gap-3 rounded-md border p-3 ${
+                        className={`grid gap-3 border-t border-border/70 pt-3 ${
                           commission.listingId === targetListingId
                             ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20 dark:bg-blue-400/10'
                             : ''

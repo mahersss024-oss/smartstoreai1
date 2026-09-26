@@ -34,7 +34,7 @@ export function LegalPolicyPage({
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid w-full max-w-5xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
               <Image
@@ -57,7 +57,7 @@ export function LegalPolicyPage({
           </Button>
         </header>
 
-        <section className="grid gap-4 rounded-md border bg-white p-5 shadow-sm dark:bg-card">
+        <section className="grid gap-4 p-5">
           <div className="grid gap-2">
             <p className="text-sm leading-7 text-muted-foreground">
               آخر تحديث: {updatedAt}
@@ -86,7 +86,7 @@ export function LegalPolicyPage({
           {sections.map((section) => (
             <section
               key={section.title}
-              className="grid gap-3 rounded-md border bg-white p-5 shadow-sm dark:bg-card"
+              className="grid gap-3 border-t p-5"
             >
               <h2 className="text-lg font-bold">{section.title}</h2>
               {section.body && (
@@ -112,7 +112,7 @@ export function LegalPolicyPage({
           هذه الصفحات توضح قواعد تشغيل سوق حمد للمستخدمين. يمكن تحديثها عند تطوير الخدمة أو تغير المتطلبات النظامية.
         </section>
 
-        <section className="rounded-md border bg-white p-4 text-sm leading-7 shadow-sm dark:bg-card">
+        <section className="border-t border-white/50 p-4 text-sm leading-7 dark:border-white/10">
           <h2 className="mb-1 text-base font-bold">التواصل مع الإدارة</h2>
           <p className="text-muted-foreground">
             للاستفسارات الرسمية أو مراجعة السياسات:

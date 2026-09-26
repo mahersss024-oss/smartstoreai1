@@ -342,7 +342,7 @@ export default function ConversationsPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-1 py-3 dark:border-white/10 dark:bg-transparent">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -368,7 +368,7 @@ export default function ConversationsPage() {
         </header>
 
         {isLoading && !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
@@ -380,7 +380,7 @@ export default function ConversationsPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>

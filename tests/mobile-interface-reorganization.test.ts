@@ -39,3 +39,27 @@ test('account page exposes former more links without changing routes', () => {
   assert.match(page, /href="\/listing-policy"/);
   assert.match(page, /href="\/commission-policy"/);
 });
+
+test('customer market pages avoid heavy nested card styling', () => {
+  const files = [
+    readProjectFile('app', 'account', 'page.tsx'),
+    readProjectFile('app', 'account', 'listings', 'page.tsx'),
+    readProjectFile('app', 'favorites', 'page.tsx'),
+    readProjectFile('app', 'sellers', '[sellerId]', 'page.tsx'),
+    readProjectFile('app', 'commissions', 'page.tsx'),
+    readProjectFile('app', 'commission-agreement', 'page.tsx'),
+    readProjectFile('components', 'legal-policy-page.tsx'),
+  ];
+
+  for (const source of files) {
+    assert.doesNotMatch(source, /rounded-md border bg-white p-4 shadow-sm/);
+    assert.doesNotMatch(source, /rounded-md border bg-white p-5 shadow-sm/);
+    assert.doesNotMatch(source, /rounded-md border bg-white p-6 text-center shadow-sm/);
+    assert.doesNotMatch(source, /rounded-md border bg-white px-4 py-3 shadow-sm/);
+    assert.doesNotMatch(source, /rounded-md border bg-white shadow-sm/);
+    assert.doesNotMatch(source, /rounded-md border p-3/);
+    assert.doesNotMatch(source, /bg-white p-[45] dark:bg-card/);
+    assert.doesNotMatch(source, /bg-white\/80/);
+    assert.doesNotMatch(source, /border-b border-white\/70/);
+  }
+});

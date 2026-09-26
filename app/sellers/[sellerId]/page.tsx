@@ -92,14 +92,14 @@ export default async function SellerProfilePage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -115,7 +115,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
+        <section className="overflow-hidden bg-white dark:bg-card">
           <div className="h-28 bg-[linear-gradient(135deg,#0f766e,#0f172a_55%,#1d4ed8)] sm:h-36" />
           <div className="-mt-12 grid gap-4 px-4 pb-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-end sm:px-6">
             <div className="grid size-24 place-items-center overflow-hidden rounded-md border-4 border-white bg-[#0f766e] text-3xl font-bold text-white shadow-sm dark:border-card">
@@ -152,8 +152,8 @@ export default async function SellerProfilePage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card sm:grid-cols-3">
-          <div className="rounded-md border p-3">
+        <section className="grid gap-3 p-4 sm:grid-cols-3">
+          <div className="border-t border-border/70 pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <Star className="size-4 text-blue-600" />
               التقييم
@@ -171,7 +171,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
               تقييم المعلن
             </Button>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="border-t border-border/70 pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <MessageCircle className="size-4 text-blue-600" />
               التواصل
@@ -180,7 +180,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
               يتم فتح المحادثة من داخل الإعلان لحماية سياق البيع.
             </p>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="border-t border-border/70 pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <ShieldCheck className="size-4 text-blue-600" />
               السلامة
@@ -191,7 +191,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="rounded-md border bg-white shadow-sm dark:bg-card">
+        <section className="bg-white dark:bg-card">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="border-b-2 border-blue-600 px-1 pb-2 text-sm font-bold text-blue-700 dark:text-blue-300">
@@ -212,7 +212,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
                 <Link
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group overflow-hidden rounded-md border bg-[#f8fafc] transition hover:border-blue-500 dark:bg-[#101827]"
+                  className="group overflow-hidden rounded-md bg-[#f8fafc] transition hover:bg-blue-50/70 dark:bg-[#101827] dark:hover:bg-blue-400/10"
                 >
                   <div className="aspect-[4/3] overflow-hidden bg-[#0b1220]">
                     <img
