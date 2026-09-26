@@ -191,7 +191,7 @@ export default function AccountFollowsPage() {
           </section>
         ) : (
           <>
-            <section className="grid gap-3 rounded-md bg-white/70 p-3 dark:bg-card/45 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <section className="grid gap-3 px-1 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-2">
               {session.user?.picture ? (
                 <img
                   alt=""
@@ -218,7 +218,7 @@ export default function AccountFollowsPage() {
               </div>
             </section>
 
-            <div className="grid grid-cols-2 overflow-hidden rounded-md bg-white/60 p-1 dark:bg-card/35">
+            <div className="grid grid-cols-2 overflow-hidden rounded-md bg-white/50 p-1 dark:bg-card/30">
               <button
                 type="button"
                 className={`rounded-md px-3 py-2 text-sm font-bold transition ${
@@ -252,7 +252,7 @@ export default function AccountFollowsPage() {
                 visiblePeople.map((person) => (
                   <div
                     key={`${activeTab}:${person.userId}`}
-                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-white/70 p-3 dark:bg-card/45"
+                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200/70 p-3 last:border-b-0 dark:border-white/10"
                   >
                     <Link href={encodeSellerHref(person.userId)}>
                       <PersonAvatar person={person} />

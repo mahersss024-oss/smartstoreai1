@@ -460,7 +460,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : (
-          <div className="rounded-md border bg-white/60 px-3 py-3 dark:bg-card/35 sm:px-4">
+          <div className="grid gap-2 px-1 py-3 sm:px-2">
             <section className="grid gap-4 px-1 py-4 lg:grid-cols-[1fr_18rem]">
               <div className="flex min-w-0 items-center gap-4">
                 {visibleProfilePicture ? (
@@ -551,7 +551,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 px-1 py-5">
+            <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Store className="size-5" />
@@ -591,7 +591,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 px-1 py-5">
+            <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <ImageIcon className="size-5" />
@@ -684,7 +684,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 px-1 py-5">
+            <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Phone className="size-5" />
@@ -772,7 +772,7 @@ export default function AccountPage() {
 
             <PushNotificationSettings />
 
-            <section className="grid gap-3 px-1 py-5">
+            <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-base font-bold text-red-700 dark:text-red-200">حذف الحساب</h2>

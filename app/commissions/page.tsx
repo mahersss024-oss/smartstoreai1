@@ -421,11 +421,11 @@ export default function CommissionsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md bg-white/70 p-4 dark:bg-card/45">
+                <div className="rounded-md bg-white/55 p-4 dark:bg-card/35">
                   <div className="text-xs text-muted-foreground">عدد المعاملات</div>
                   <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
                 </div>
-                <div className="rounded-md bg-white/70 p-4 dark:bg-card/45">
+                <div className="rounded-md bg-white/55 p-4 dark:bg-card/35">
                   <div className="text-xs text-muted-foreground">النسبة</div>
                   <div className="mt-1 text-2xl font-bold">1%</div>
                 </div>
@@ -443,7 +443,7 @@ export default function CommissionsPage() {
               </div>
             )}
 
-            <section className="grid gap-4 p-4">
+            <section className="grid gap-4 px-1 py-4 sm:px-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -543,7 +543,7 @@ export default function CommissionsPage() {
               )}
             </section>
 
-            <section className="p-4">
+            <section className="px-1 py-4 sm:px-2">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold">
                 <Receipt className="size-4 text-blue-600" />
                 السجلات

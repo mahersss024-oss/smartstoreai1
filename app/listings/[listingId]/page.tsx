@@ -248,7 +248,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="grid items-start gap-4 rounded-md border bg-white/60 px-3 py-3 dark:bg-card/35 sm:px-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <section className="grid items-start gap-4 px-1 py-3 sm:px-2 lg:grid-cols-[minmax(0,1fr)_14rem]">
           <div className="grid min-w-0 gap-3">
             <section className="px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">
@@ -311,7 +311,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                 </div>
               </div>
 
-              <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 border-t border-slate-200/60 pt-4 dark:border-white/10 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="pt-3">
                   <div className="text-xs text-muted-foreground">السعر</div>
                   <div className="mt-1 text-lg font-bold text-blue-700">{formatPrice(listing.price)}</div>
