@@ -12,7 +12,6 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /shouldShowThumbnails = visibleImages\.length > 1/);
   assert.match(source, /\{shouldShowThumbnails && \(/);
   assert.match(source, /isLightboxOpen/);
-  assert.match(source, /openLightbox\(selectedImageIndex\)/);
   assert.match(source, /openLightbox\(index\)/);
   assert.match(source, /role="dialog"/);
   assert.match(source, /className="fixed inset-0 z-\[10000\] grid grid-rows-\[auto_1fr_auto\] bg-black text-white"/);
@@ -60,10 +59,8 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /originalUrl: string/);
   assert.match(source, /displayUrl: string/);
   assert.match(source, /thumbnailUrl: string/);
-  assert.match(source, /src=\{selectedDisplayUrl\}/);
   assert.match(source, /src=\{thumbnailUrl\}/);
   assert.match(source, /src=\{selectedOriginalUrl\}/);
-  assert.match(source, /fetchPriority="high"/);
   assert.match(source, /decoding="async"/);
   assert.match(source, /new Image\(\)/);
   assert.match(source, /image\.src = nextDisplayUrl/);
@@ -73,12 +70,12 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /translate3d\(\$\{imagePan\.x\}px, \$\{imagePan\.y\}px, 0\) scale\(\$\{imageZoom\}\)/);
   assert.doesNotMatch(source, /transition-transform duration-150/);
   assert.doesNotMatch(source, /className="max-h-full max-w-full object-contain"[\s\S]*src=\{selectedImage\}/);
-  assert.match(source, /className="grid grid-cols-4 gap-1\.5 px-2 pb-2/);
+  assert.match(source, /\{visibleImages\.length > 0 && \(/);
+  assert.match(source, /className="grid grid-cols-4 gap-1\.5 p-2 sm:p-3"/);
   assert.match(source, /className="h-full w-full object-contain"/);
-  assert.match(source, /dark:bg-slate-950/);
-  assert.match(source, /aspect-\[16\/9\] w-full overflow-hidden/);
+  assert.match(source, /bg-slate-100 transition/);
+  assert.doesNotMatch(source, /aspect-\[16\/9\] w-full overflow-hidden/);
   assert.doesNotMatch(source, /max-h-\[18rem\]/);
-  assert.doesNotMatch(source, /grid gap-2 p-2 sm:p-3/);
   assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
 });
 
@@ -112,21 +109,20 @@ test('R2 orphan image audit is dry-run only', async () => {
   assert.doesNotMatch(source, /purge_cache/);
 });
 
-test('account listing primary image does not stretch with the image manager', async () => {
+test('account listing image manager uses thumbnails without a large preview', async () => {
   const source = await readFile(
     new URL('../app/account/listings/page.tsx', import.meta.url),
     'utf8',
   );
 
-  assert.match(
-    source,
-    /md:row-start-1 md:aspect-square md:self-start/,
-  );
+  assert.doesNotMatch(source, /aspect-\[16\/10\] w-full/);
+  assert.doesNotMatch(source, /src=\{listing\.image\}/);
+  assert.doesNotMatch(source, /md:row-start-1 md:aspect-square md:self-start/);
   assert.doesNotMatch(
     source,
     /md:row-start-1 md:h-full md:min-h-40/,
   );
-  assert.match(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2/);
+  assert.match(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8/);
   assert.match(source, /className="h-full w-full object-contain"/);
   assert.doesNotMatch(source, /overflow-x-auto/);
   assert.doesNotMatch(source, /xl:grid xl:grid-cols-2 xl:overflow-visible/);

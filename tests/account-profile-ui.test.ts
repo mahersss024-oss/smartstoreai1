@@ -155,7 +155,7 @@ test('sold listings expose a platform fee action after the sale marker', () => {
   );
 
   assert.match(page, /listing\.rawStatus === 'sold'/);
-  assert.match(page, /bg-blue-700\/80/);
+  assert.match(page, /<Percent className="size-3\.5" \/>/);
   assert.match(page, /\/commissions\?listingId=\$\{listing\.id\}/);
 });
 
@@ -183,7 +183,7 @@ test('listing publish and sale amount require the commission oath agreement', ()
   assert.match(agreementDialog, /1% من قيمة البيع/);
 });
 
-test('customer listings explain drafts and use a branded sold watermark', () => {
+test('customer listings explain drafts and keep image management lightweight', () => {
   const listingsPage = readFileSync(
     join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
     'utf8',
@@ -191,12 +191,17 @@ test('customer listings explain drafts and use a branded sold watermark', () => 
 
   assert.match(listingsPage, /listing\.rawStatus === 'draft'/);
   assert.match(listingsPage, /pendingPublishListing/);
-  assert.match(listingsPage, /bg-blue-700\/80/);
-  assert.match(listingsPage, /backdrop-blur-\[1px\]/);
-  assert.match(listingsPage, /border-cyan-100\/60/);
+  assert.doesNotMatch(listingsPage, /bg-blue-700\/80/);
+  assert.doesNotMatch(listingsPage, /backdrop-blur-\[1px\]/);
+  assert.doesNotMatch(listingsPage, /border-cyan-100\/60/);
+  assert.doesNotMatch(listingsPage, /aspect-\[16\/10\] w-full/);
   assert.match(listingsPage, /loading="lazy"/);
   assert.match(listingsPage, /decoding="async"/);
   assert.match(listingsPage, /\[content-visibility:auto\]/);
+  assert.doesNotMatch(listingsPage, /stats\.published/);
+  assert.doesNotMatch(listingsPage, /stats\.drafts/);
+  assert.doesNotMatch(listingsPage, /stats\.paused/);
+  assert.doesNotMatch(listingsPage, /stats\.sold/);
 });
 
 test('account page does not flash sign-in controls while session is loading', () => {

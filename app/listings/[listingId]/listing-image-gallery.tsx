@@ -337,26 +337,8 @@ export function ListingImageGallery({
   return (
     <section className="w-full max-w-2xl overflow-hidden rounded-md bg-white dark:bg-card">
       <div className="grid gap-2">
-        <button
-          aria-label="فتح الصورة بالحجم الكامل"
-          className="aspect-[16/9] w-full overflow-hidden bg-slate-100 text-left dark:bg-slate-950"
-          onClick={() => openLightbox(selectedImageIndex)}
-          type="button"
-        >
-          <img
-            alt={title}
-            className="h-full w-full object-contain"
-            decoding="async"
-            fetchPriority="high"
-            onError={(event) => showImageFallback(event.currentTarget)}
-            src={selectedDisplayUrl}
-          />
-          <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
-            <ImageIcon className="size-8" />
-          </div>
-        </button>
-        {shouldShowThumbnails && (
-          <div className="grid grid-cols-4 gap-1.5 px-2 pb-2 sm:px-3 sm:pb-3">
+        {visibleImages.length > 0 && (
+          <div className="grid grid-cols-4 gap-1.5 p-2 sm:p-3">
             {visibleImages.map((image, index) => {
               const isSelected = index === selectedImageIndex;
               const thumbnailUrl =
@@ -369,7 +351,7 @@ export function ListingImageGallery({
                       ? `${image}-${index}`
                       : getImageKey(image, index)
                   }
-                  aria-label={`فتح الصورة ${index + 1} بالحجم الكامل`}
+                  aria-label={`${title} - فتح الصورة ${index + 1} بالحجم الكامل`}
                   aria-pressed={isSelected}
                   className={`aspect-square overflow-hidden rounded-md bg-slate-100 transition ${
                     isSelected

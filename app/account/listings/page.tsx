@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -348,14 +348,6 @@ export default function AccountListingsPage() {
   });
   const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
-  const stats = useMemo(() => {
-    return {
-      published: listings.filter((listing) => listing.status === 'منشور').length,
-      drafts: listings.filter((listing) => listing.status === 'مسودة').length,
-      paused: listings.filter((listing) => listing.status === 'موقوف').length,
-      sold: listings.filter((listing) => listing.status === 'مباع').length,
-    };
-  }, [listings]);
   const refreshSession = useCallback(() => {
     setIsSessionLoading(true);
 
@@ -1026,25 +1018,6 @@ export default function AccountListingsPage() {
               </div>
             </section>
 
-            <section className="grid gap-3 sm:grid-cols-4">
-              <div className="px-1 py-3 text-center">
-                <div className="text-2xl font-bold">{stats.published}</div>
-                <div className="text-xs text-muted-foreground">منشور</div>
-              </div>
-              <div className="px-1 py-3 text-center">
-                <div className="text-2xl font-bold">{stats.drafts}</div>
-                <div className="text-xs text-muted-foreground">مسودة</div>
-              </div>
-              <div className="px-1 py-3 text-center">
-                <div className="text-2xl font-bold">{stats.paused}</div>
-                <div className="text-xs text-muted-foreground">موقوف</div>
-              </div>
-              <div className="px-1 py-3 text-center">
-                <div className="text-2xl font-bold">{stats.sold}</div>
-                <div className="text-xs text-muted-foreground">مباع</div>
-              </div>
-            </section>
-
             <section
               className="scroll-mt-24 p-4"
               id="account-listings"
@@ -1077,50 +1050,8 @@ export default function AccountListingsPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden border-b bg-white [contain-intrinsic-size:260px] [content-visibility:auto] dark:bg-background md:grid-cols-[9.5rem_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_12rem]">
-                      {listing.image ? (
-                        <div className="relative aspect-[16/10] w-full bg-slate-100 dark:bg-slate-900 md:row-start-1 md:aspect-square md:self-start">
-                          <img
-                            alt={listing.title}
-                            className="h-full w-full object-contain"
-                            decoding="async"
-                            loading="lazy"
-                            onError={(event) => {
-                              event.currentTarget.hidden = true;
-                              event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                            }}
-                            src={listing.image}
-                          />
-                          <div hidden className="grid h-full w-full place-items-center text-center text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            <div className="grid gap-1">
-                              <ImageIcon className="mx-auto size-5" />
-                              <span>لا توجد صورة حقيقية</span>
-                            </div>
-                          </div>
-                          {listing.rawStatus === 'sold' && (
-                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-gradient-to-br from-slate-950/15 via-blue-950/20 to-cyan-950/15 backdrop-blur-[1px]">
-                              <span className="-rotate-6 rounded-lg border border-cyan-100/60 bg-blue-700/80 px-5 py-2 text-lg font-black text-white shadow-[0_12px_34px_rgba(15,23,42,0.28)] ring-1 ring-white/20">
-                                تم البيع
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="relative grid aspect-[16/10] w-full place-items-center bg-slate-100 text-center text-xs font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400 md:row-start-1 md:aspect-square md:self-start">
-                          <div className="grid gap-1">
-                            <ImageIcon className="mx-auto size-5" />
-                            <span>لا توجد صورة حقيقية</span>
-                          </div>
-                          {listing.rawStatus === 'sold' && (
-                            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-gradient-to-br from-slate-950/15 via-blue-950/20 to-cyan-950/15 backdrop-blur-[1px]">
-                              <span className="-rotate-6 rounded-lg border border-cyan-100/60 bg-blue-700/80 px-5 py-2 text-lg font-black text-white shadow-[0_12px_34px_rgba(15,23,42,0.28)] ring-1 ring-white/20">
-                                تم البيع
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="min-w-0 md:row-start-1">
+                      <article key={listing.id} className="grid min-w-0 overflow-hidden border-b bg-white [contain-intrinsic-size:220px] [content-visibility:auto] dark:bg-background">
+                      <div className="min-w-0">
                         <div className="grid gap-2 p-3">
                           <div className="flex min-w-0 items-center justify-between gap-2">
                             <h3 className="truncate text-sm font-bold">{listing.title}</h3>
@@ -1143,7 +1074,7 @@ export default function AccountListingsPage() {
                         </div>
                       </div>
                       {editingListingId === listing.id && (
-                        <div className="grid gap-2 border-t p-3 md:col-span-2 xl:col-span-3">
+                        <div className="grid gap-2 border-t p-3">
                           {editNotice?.listingId === listing.id && (
                             <div
                               className={`grid gap-1.5 rounded-md border px-3 py-2 text-xs leading-6 ${getEditNoticeClasses(
@@ -1292,11 +1223,11 @@ export default function AccountListingsPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid min-w-0 gap-2 border-t p-3 md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:max-h-44 xl:overflow-y-auto xl:border-r xl:border-t-0">
-                          <div className="text-xs font-semibold text-muted-foreground xl:sticky xl:top-0 xl:z-10 xl:bg-white xl:pb-1 dark:xl:bg-background">
+                        <div className="grid min-w-0 gap-2 border-t p-3">
+                          <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
-                          <div className="grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-2">
+                          <div className="grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
                             {listing.images.map((image) => (
                               <div
                                 key={image.id}
@@ -1362,7 +1293,7 @@ export default function AccountListingsPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 md:col-span-2 xl:col-span-3 xl:grid-cols-8">
+                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 xl:grid-cols-8">
                         {listing.status === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}`}>
