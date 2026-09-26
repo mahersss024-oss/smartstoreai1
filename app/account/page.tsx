@@ -393,7 +393,7 @@ export default function AccountPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
+      <div className="mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/">
@@ -459,7 +459,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : (
-          <>
+          <div className="rounded-md border bg-white/60 px-3 py-3 dark:bg-card/35 sm:px-4">
             <section className="grid gap-4 px-1 py-4 lg:grid-cols-[1fr_18rem]">
               <div className="flex min-w-0 items-center gap-4">
                 {visibleProfilePicture ? (
@@ -786,7 +786,7 @@ export default function AccountPage() {
               </div>
             </section>
 
-            </>
+            </div>
         )}
       </div>
     </main>
