@@ -80,6 +80,19 @@ type DatabaseListingRecord = {
 
 type Actor = AuthSessionUser | string;
 
+export type PublicSellerProfile = {
+  id: string;
+  name: string;
+  picture?: string;
+  joinedAt?: string;
+  role: string;
+  publishedListingCount: number;
+  ratingAverage: number;
+  ratingCount: number;
+  followerCount: number;
+  listings: memoryStore.ListingRecord[];
+};
+
 type DatabaseConversationRecord = {
   id: string;
   listingId: string;
@@ -100,6 +113,18 @@ type DatabaseConversationRecord = {
     createdAt: Date;
   }>;
   listing?: DatabaseListingRecord | null;
+  seller?: {
+    id: string;
+    email: string;
+    name: string | null;
+    picture: string | null;
+  } | null;
+  buyer?: {
+    id: string;
+    email: string;
+    name: string | null;
+    picture: string | null;
+  } | null;
 };
 
 type DatabaseFavoriteRecord = {
@@ -354,6 +379,16 @@ function toListingRecord(listing: DatabaseListingRecord): memoryStore.ListingRec
   };
 }
 
+function getPublicSellerName(seller: { id: string; name?: string | null }) {
+  const trimmedName = seller.name?.trim();
+
+  if (trimmedName) {
+    return trimmedName;
+  }
+
+  return 'معلن سوق حمد';
+}
+
 async function ensureUser(user: AuthSessionUser) {
   return prisma.user.upsert({
     where: { id: user.id },
@@ -422,7 +457,11 @@ async function createAdminAuditLog(
 
 function toConversationRecord(
   conversation: DatabaseConversationRecord,
-): Conversation & { listing: memoryStore.ListingRecord | null } {
+): Conversation & {
+  listing: memoryStore.ListingRecord | null;
+  seller?: { id: string; email: string; name?: string; picture?: string };
+  buyer?: { id: string; email: string; name?: string; picture?: string };
+} {
   return {
     id: conversation.id,
     listingId: conversation.listingId,
@@ -453,6 +492,22 @@ function toConversationRecord(
     createdAt: conversation.createdAt.toISOString(),
     updatedAt: conversation.updatedAt.toISOString(),
     listing: conversation.listing ? toListingRecord(conversation.listing) : null,
+    seller: conversation.seller
+      ? {
+          id: conversation.seller.id,
+          email: conversation.seller.email,
+          name: conversation.seller.name ?? undefined,
+          picture: conversation.seller.picture ?? undefined,
+        }
+      : undefined,
+    buyer: conversation.buyer
+      ? {
+          id: conversation.buyer.id,
+          email: conversation.buyer.email,
+          name: conversation.buyer.name ?? undefined,
+          picture: conversation.buyer.picture ?? undefined,
+        }
+      : undefined,
   };
 }
 
@@ -633,6 +688,82 @@ export async function getListing(listingId: string) {
   });
 
   return listing ? toListingRecord(listing) : null;
+}
+
+export async function getPublicSellerProfile(
+  sellerId: string,
+): Promise<PublicSellerProfile | null> {
+  if (!shouldUseDatabaseStore()) {
+    const publishedListings = memoryStore
+      .listSellerListings(sellerId)
+      .filter((listing) => listing.status === 'published');
+
+    if (publishedListings.length === 0) {
+      return null;
+    }
+
+    return {
+      id: sellerId,
+      name: getPublicSellerName({ id: sellerId }),
+      role: 'user',
+      publishedListingCount: publishedListings.length,
+      ratingAverage: 0,
+      ratingCount: 0,
+      followerCount: 0,
+      listings: publishedListings.slice(0, 24),
+    };
+  }
+
+  const [seller, listings, publishedListingCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: sellerId },
+      select: {
+        id: true,
+        name: true,
+        picture: true,
+        role: true,
+        createdAt: true,
+      },
+    }),
+    prisma.listing.findMany({
+      where: {
+        sellerId,
+        status: 'published',
+      },
+      include: {
+        images: {
+          where: { status: 'approved' },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 1,
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 24,
+    }),
+    prisma.listing.count({
+      where: {
+        sellerId,
+        status: 'published',
+      },
+    }),
+  ]);
+
+  if (!seller || publishedListingCount === 0) {
+    return null;
+  }
+
+  return {
+    id: seller.id,
+    name: getPublicSellerName(seller),
+    picture: seller.picture ?? undefined,
+    joinedAt: seller.createdAt.toISOString(),
+    role: seller.role,
+    publishedListingCount,
+    ratingAverage: 0,
+    ratingCount: 0,
+    followerCount: 0,
+    listings: listings.map(toListingRecord),
+  };
 }
 
 export async function listSellerListings(sellerId: string) {
@@ -1446,6 +1577,8 @@ export async function listUserConversations(userId: string) {
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
+      seller: { select: { id: true, email: true, name: true, picture: true } },
+      buyer: { select: { id: true, email: true, name: true, picture: true } },
       listing: {
         include: {
           images: {
@@ -1492,6 +1625,8 @@ export async function listUserConversationsPage(
     },
     include: {
       messages: { orderBy: { createdAt: 'desc' }, take: 10 },
+      seller: { select: { id: true, email: true, name: true, picture: true } },
+      buyer: { select: { id: true, email: true, name: true, picture: true } },
       listing: {
         include: {
           images: {
@@ -1524,6 +1659,8 @@ export async function getConversationForUser(
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
+      seller: { select: { id: true, email: true, name: true, picture: true } },
+      buyer: { select: { id: true, email: true, name: true, picture: true } },
       listing: {
         include: {
           images: {

@@ -15,7 +15,6 @@ import {
   ArrowRight,
   BadgeCheck,
   Ban,
-  Bot,
   Flag,
   MessageCircle,
   Phone,
@@ -72,6 +71,13 @@ type ConversationListing = {
   }>;
 };
 
+type ConversationParticipant = {
+  id: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
 type ConversationRecord = {
   id: string;
   listingId: string;
@@ -81,6 +87,8 @@ type ConversationRecord = {
   messages: ConversationMessage[];
   updatedAt: string;
   listing: ConversationListing | null;
+  seller?: ConversationParticipant;
+  buyer?: ConversationParticipant;
 };
 
 type ConversationBlockStatus = {
@@ -140,6 +148,30 @@ function getListingImage(listing: ConversationListing | null) {
     image?.originalUrl ??
     missingListingImageDataUrl
   );
+}
+
+function getParticipantFallbackName(participantId?: string | null) {
+  if (!participantId) {
+    return 'عميل سوق حمد';
+  }
+
+  if (participantId.startsWith('google:') || participantId.startsWith('apple:')) {
+    return 'عميل سوق حمد';
+  }
+
+  return participantId;
+}
+
+function getParticipantDisplayName(participant?: ConversationParticipant | null) {
+  return (
+    participant?.name?.trim() ||
+    participant?.email?.trim() ||
+    getParticipantFallbackName(participant?.id)
+  );
+}
+
+function getParticipantInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || 'ح';
 }
 
 function formatMessageTime(value: string) {
@@ -240,7 +272,18 @@ export default function ConversationPage() {
         ? conversation.buyerId
         : conversation.sellerId
       : null;
-  const roleLabel = isSeller ? 'أنت البائع' : 'أنت المشتري';
+  const otherParticipant =
+    conversation && session.user?.id
+      ? session.user.id === conversation.sellerId
+        ? conversation.buyer
+        : conversation.seller
+      : null;
+  const otherParticipantName =
+    getParticipantDisplayName(otherParticipant) ||
+    getParticipantFallbackName(otherParticipantId);
+  const otherParticipantRoleLabel = isSeller
+    ? 'المشتري في هذه المحادثة'
+    : 'البائع في هذه المحادثة';
   const visibleMessages = useMemo(
     () =>
       conversation?.messages.filter((message) => message.status === 'sent') ??
@@ -752,15 +795,27 @@ export default function ConversationPage() {
           <section className="flex min-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card lg:h-[calc(100vh-8.5rem)] lg:min-h-[36rem]">
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-9 place-items-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <Bot className="size-4" />
+                <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100">
+                  {otherParticipant?.picture ? (
+                    <img
+                      alt=""
+                      className="h-full w-full object-cover"
+                      decoding="async"
+                      loading="lazy"
+                      src={otherParticipant.picture}
+                    />
+                  ) : (
+                    <span>{getParticipantInitial(otherParticipantName)}</span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-bold">
-                    {conversation?.listing?.title ?? 'محادثة إعلان'}
+                    {otherParticipantName}
                   </h2>
                   <p className="truncate text-xs text-muted-foreground">
-                    {session.authenticated ? roleLabel : 'يتطلب تسجيل الدخول'}
+                    {session.authenticated
+                      ? otherParticipantRoleLabel
+                      : 'يتطلب تسجيل الدخول'}
                   </p>
                 </div>
               </div>

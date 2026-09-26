@@ -68,6 +68,21 @@ test('seller buyer conversation exposes report and block controls', () => {
   assert.match(source, /isConversationBlocked/);
 });
 
+test('seller buyer conversation header shows the other customer, not the listing title', () => {
+  const source = readConversationPage();
+  const repository = readMarketplaceRepository();
+
+  assert.match(source, /type ConversationParticipant/);
+  assert.match(source, /otherParticipantName/);
+  assert.match(source, /otherParticipantRoleLabel/);
+  assert.match(source, /otherParticipant\?\.picture/);
+  assert.match(source, /getParticipantInitial\(otherParticipantName\)/);
+  assert.doesNotMatch(source, /<Bot className="size-4" \/>/);
+  assert.doesNotMatch(source, /session\.authenticated \? roleLabel/);
+  assert.match(repository, /seller: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
+  assert.match(repository, /buyer: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
+});
+
 test('seller buyer conversation handles non-json send failures safely', () => {
   const source = readConversationPage();
 
