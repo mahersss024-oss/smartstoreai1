@@ -87,6 +87,15 @@ test('seller buyer conversation header shows the other customer, not the listing
   assert.match(repository, /buyer: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
 });
 
+test('seller buyer conversation shows a compact listing card linking to details', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /href=\{`\/listings\/\$\{conversation\.listing\.id\}`\}/);
+  assert.match(source, /className="size-20 shrink-0/);
+  assert.match(source, /className="line-clamp-2 text-sm font-bold/);
+  assert.doesNotMatch(source, /className="aspect-square w-full rounded-md object-cover"/);
+});
+
 test('seller buyer conversation handles non-json send failures safely', () => {
   const source = readConversationPage();
 

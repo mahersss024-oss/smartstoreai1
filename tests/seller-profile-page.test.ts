@@ -24,6 +24,10 @@ test('listing details links to the public seller profile without exposing privat
   assert.doesNotMatch(page, /\u0627\u0644\u062b\u0642\u0629 \u0648\u0627\u0644\u0633\u0644\u0627\u0645\u0629/u);
   assert.doesNotMatch(page, /\u0627\u0644\u0625\u0639\u0644\u0627\u0646 \u0645\u0646\u0634\u0648\u0631 \u0628\u0639\u062f \u0641\u062d\u0635 \u0627\u0644\u0633\u064a\u0627\u0633\u0629/u);
   assert.doesNotMatch(page, /\u0627\u0644\u0635\u0648\u0631 \u0627\u0644\u0623\u0635\u0644\u064a\u0629/u);
+
+  const contactActions = readSource('app/listings/[listingId]/contact-actions.tsx');
+  assert.doesNotMatch(contactActions, /ShieldCheck/);
+  assert.doesNotMatch(contactActions, /\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629 \u062a\u062a\u0645 \u062f\u0627\u062e\u0644 \u0633\u0648\u0642 \u062d\u0645\u062f/u);
 });
 
 test('public seller profile renders safe public data and published listing links', () => {

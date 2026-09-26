@@ -1005,27 +1005,53 @@ export default function ConversationPage() {
           </section>
 
           <aside className="grid h-fit gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-            <img
-              alt={conversation?.listing?.title ?? 'صورة الإعلان'}
-              className="aspect-square w-full rounded-md object-cover"
-              decoding="async"
-              loading="lazy"
-              src={getListingImage(conversation?.listing ?? null)}
-            />
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                <Store className="size-4" />
-                الإعلان
+            <div className="flex items-start gap-3">
+              {conversation?.listing ? (
+                <Link
+                  href={`/listings/${conversation.listing.id}`}
+                  className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
+                >
+                  <img
+                    alt={conversation.listing.title ?? 'صورة الإعلان'}
+                    className="size-full object-cover"
+                    decoding="async"
+                    loading="lazy"
+                    src={getListingImage(conversation.listing)}
+                  />
+                </Link>
+              ) : (
+                <img
+                  alt="صورة الإعلان"
+                  className="size-20 shrink-0 rounded-md object-cover"
+                  decoding="async"
+                  loading="lazy"
+                  src={missingListingImageDataUrl}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                  <Store className="size-4" />
+                  الإعلان
+                </div>
+                {conversation?.listing ? (
+                  <Link
+                    href={`/listings/${conversation.listing.id}`}
+                    className="line-clamp-2 text-sm font-bold leading-6 transition hover:text-blue-600"
+                  >
+                    {conversation.listing.title ?? 'إعلان غير متاح'}
+                  </Link>
+                ) : (
+                  <h2 className="line-clamp-2 text-sm font-bold leading-6">
+                    إعلان غير متاح
+                  </h2>
+                )}
+                <p className="mt-1 text-sm font-bold text-blue-700">
+                  {formatPrice(conversation?.listing?.price)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {conversation?.listing?.city ?? 'السعودية'}
+                </p>
               </div>
-              <h2 className="text-lg font-bold leading-7">
-                {conversation?.listing?.title ?? 'إعلان غير متاح'}
-              </h2>
-              <p className="mt-2 text-xl font-bold text-blue-700">
-                {formatPrice(conversation?.listing?.price)}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {conversation?.listing?.city ?? 'السعودية'}
-              </p>
             </div>
           </aside>
         </section>
