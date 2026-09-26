@@ -335,7 +335,7 @@ export function ListingImageGallery({
   }, [selectedDisplayUrl, selectedImageIndex, visibleImages]);
 
   return (
-    <section className="w-full max-w-2xl overflow-hidden rounded-md bg-white dark:bg-card">
+    <section className="w-full overflow-hidden">
       <div className="grid gap-2">
         {visibleImages.length > 0 && (
           <div className="grid grid-cols-4 gap-1.5 p-2 sm:p-3">

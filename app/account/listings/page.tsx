@@ -930,7 +930,7 @@ export default function AccountListingsPage() {
         onConfirm={confirmPublishListing}
         open={Boolean(pendingPublishListing)}
       />
-      <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
+      <div className="mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
@@ -1019,7 +1019,7 @@ export default function AccountListingsPage() {
             </section>
 
             <section
-              className="scroll-mt-24 p-4"
+              className="scroll-mt-24 px-1 py-3 sm:px-4"
               id="account-listings"
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1050,9 +1050,9 @@ export default function AccountListingsPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 overflow-hidden border-b bg-white [contain-intrinsic-size:220px] [content-visibility:auto] dark:bg-background">
+                      <article key={listing.id} className="grid min-w-0 border-b py-3 [contain-intrinsic-size:220px] [content-visibility:auto]">
                       <div className="min-w-0">
-                        <div className="grid gap-2 p-3">
+                        <div className="grid gap-2 px-2 py-1 sm:px-3">
                           <div className="flex min-w-0 items-center justify-between gap-2">
                             <h3 className="truncate text-sm font-bold">{listing.title}</h3>
                           <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -1074,7 +1074,7 @@ export default function AccountListingsPage() {
                         </div>
                       </div>
                       {editingListingId === listing.id && (
-                        <div className="grid gap-2 border-t p-3">
+                        <div className="grid gap-2 border-t px-2 py-3 sm:px-3">
                           {editNotice?.listingId === listing.id && (
                             <div
                               className={`grid gap-1.5 rounded-md border px-3 py-2 text-xs leading-6 ${getEditNoticeClasses(
@@ -1223,7 +1223,7 @@ export default function AccountListingsPage() {
                         </div>
                       )}
                       {listing.images.length > 0 && (
-                        <div className="grid min-w-0 gap-2 border-t p-3">
+                        <div className="grid min-w-0 gap-2 border-t px-2 py-3 sm:px-3">
                           <div className="text-xs font-semibold text-muted-foreground">
                             صور الإعلان
                           </div>
@@ -1293,7 +1293,7 @@ export default function AccountListingsPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t p-2 sm:grid-cols-3 xl:grid-cols-8">
+                      <div className="grid grid-cols-2 gap-1.5 border-t px-2 py-2 sm:grid-cols-3 sm:px-3 xl:grid-cols-8">
                         {listing.status === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}`}>
