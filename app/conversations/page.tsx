@@ -354,9 +354,6 @@ export default function ConversationsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">محادثاتي</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                محادثات البيع والشراء داخل سوق حمد
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -116,12 +116,17 @@ test('seller buyer conversation hides blocked messages and uses official contact
   assert.doesNotMatch(source, /محجوبة/);
 });
 
-test('seller buyer conversation does not imply سوق حمد guarantees payment transfers', () => {
+test('seller buyer conversation keeps persistent chat guidance minimal', () => {
   const source = readConversationPage();
+  const conversationsIndex = readConversationsIndexPage();
 
-  assert.match(source, /تحويل الأموال بين البائع والمشتري مسؤولية الطرفين/);
-  assert.match(source, /المنصة لا تضمنه/);
-  assert.doesNotMatch(source, /التواصل والدفع داخل سوق حمد/);
+  assert.doesNotMatch(source, /ShieldCheck/);
+  assert.doesNotMatch(source, /BadgeCheck/);
+  assert.doesNotMatch(source, /flex items-start gap-2 rounded-md border bg-blue-50/);
+  assert.doesNotMatch(source, /grid max-w-xs gap-3/);
+  assert.doesNotMatch(source, /محادثة سوق حمد/);
+  assert.doesNotMatch(source, /تواصل داخلي آمن بين البائع والمشتري/);
+  assert.doesNotMatch(conversationsIndex, /محادثات البيع والشراء داخل سوق حمد/);
 });
 test('conversations list uses compact cards with a small delete menu', () => {
   const source = readConversationsIndexPage();

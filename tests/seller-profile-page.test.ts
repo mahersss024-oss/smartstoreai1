@@ -11,12 +11,19 @@ function readSource(path: string) {
 
 test('listing details links to the public seller profile without exposing private contact data', () => {
   const page = readSource('app/listings/[listingId]/page.tsx');
+  const sellerLabelIndex = page.indexOf('المعلن');
+  const galleryIndex = page.indexOf('<ListingImageGallery');
 
   assert.match(page, /getPublicSellerProfile/);
   assert.match(page, /href=\{`\/sellers\/\$\{listing\.sellerId\}`\}/);
   assert.match(page, /\u0627\u0644\u0645\u0639\u0644\u0646/u);
+  assert.ok(sellerLabelIndex !== -1 && galleryIndex !== -1);
+  assert.ok(sellerLabelIndex < galleryIndex);
   assert.doesNotMatch(page, />\u0639\u0631\u0636 \u0627\u0644\u062d\u0633\u0627\u0628</u);
   assert.doesNotMatch(page, /sellerProfile\?\.email/);
+  assert.doesNotMatch(page, /\u0627\u0644\u062b\u0642\u0629 \u0648\u0627\u0644\u0633\u0644\u0627\u0645\u0629/u);
+  assert.doesNotMatch(page, /\u0627\u0644\u0625\u0639\u0644\u0627\u0646 \u0645\u0646\u0634\u0648\u0631 \u0628\u0639\u062f \u0641\u062d\u0635 \u0627\u0644\u0633\u064a\u0627\u0633\u0629/u);
+  assert.doesNotMatch(page, /\u0627\u0644\u0635\u0648\u0631 \u0627\u0644\u0623\u0635\u0644\u064a\u0629/u);
 });
 
 test('public seller profile renders safe public data and published listing links', () => {

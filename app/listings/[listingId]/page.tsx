@@ -7,11 +7,9 @@ import {
   BadgeCheck,
   CalendarDays,
   Eye,
-  ImageIcon,
   MapPin,
   MessageCircle,
   PackageCheck,
-  ShieldCheck,
   Star,
   Store,
   UserRound,
@@ -251,6 +249,45 @@ export default async function ListingDetailsPage({ params }: PageProps) {
 
         <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,38rem)_18rem]">
           <div className="grid min-w-0 gap-4">
+            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex items-center gap-3 rounded-md border bg-[#f8fafc] p-3 dark:bg-[#101827]">
+                <Link
+                  href={`/sellers/${listing.sellerId}`}
+                  className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
+                >
+                  {sellerProfile?.picture ? (
+                    <img
+                      alt={sellerProfile.name}
+                      className="size-full object-cover"
+                      src={sellerProfile.picture}
+                    />
+                  ) : (
+                    <UserRound className="size-6" />
+                  )}
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 text-xs font-semibold text-muted-foreground">
+                    المعلن
+                  </div>
+                  <Link
+                    href={`/sellers/${listing.sellerId}`}
+                    className="block truncate text-sm font-bold transition hover:text-blue-600"
+                  >
+                    {sellerProfile?.name ?? 'معلن سوق حمد'}
+                  </Link>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {sellerProfile?.publishedListingCount ?? 1} إعلان منشور
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="size-3.5 text-blue-500" />
+                      {sellerProfile?.ratingCount ?? 0} تقييم
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <ListingImageGallery
               images={images}
               title={listing.title ?? 'صورة الإعلان'}
@@ -301,45 +338,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             </section>
 
             <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-              <div className="flex items-center gap-3 rounded-md border bg-[#f8fafc] p-3 dark:bg-[#101827]">
-                <Link
-                  href={`/sellers/${listing.sellerId}`}
-                  className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
-                >
-                  {sellerProfile?.picture ? (
-                    <img
-                      alt={sellerProfile.name}
-                      className="size-full object-cover"
-                      src={sellerProfile.picture}
-                    />
-                  ) : (
-                    <UserRound className="size-6" />
-                  )}
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 text-xs font-semibold text-muted-foreground">
-                    المعلن
-                  </div>
-                  <Link
-                    href={`/sellers/${listing.sellerId}`}
-                    className="block truncate text-sm font-bold transition hover:text-blue-600"
-                  >
-                    {sellerProfile?.name ?? 'معلن سوق حمد'}
-                  </Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>
-                      {sellerProfile?.publishedListingCount ?? 1} إعلان منشور
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Star className="size-3.5 text-blue-500" />
-                      {sellerProfile?.ratingCount ?? 0} تقييم
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
               <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <PackageCheck className="size-4 text-blue-600" />
                 بيانات المنتج
@@ -376,27 +374,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               />
               <ListingContactActions listingId={listing.id} />
               <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
-            </section>
-
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-              <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                <ShieldCheck className="size-4 text-blue-600" />
-                الثقة والسلامة
-              </div>
-              <div className="grid gap-3 text-sm leading-7 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <BadgeCheck className="size-4 text-emerald-600" />
-                  الإعلان منشور بعد فحص السياسة.
-                </div>
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="size-4 text-blue-600" />
-                  الصور الأصلية تحفظ مع نسخ عرض مصغرة.
-                </div>
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="size-4 text-blue-600" />
-                  التواصل يتم داخل المنصة.
-                </div>
-              </div>
             </section>
 
             <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">

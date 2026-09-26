@@ -13,14 +13,12 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowRight,
-  BadgeCheck,
   Ban,
   Flag,
   MessageCircle,
   MoreVertical,
   Phone,
   Send,
-  ShieldCheck,
   Store,
   Unlock,
 } from 'lucide-react';
@@ -780,26 +778,14 @@ export default function ConversationPage() {
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">محادثة سوق حمد</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                تواصل داخلي آمن بين البائع والمشتري
-              </p>
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle language="ar" />
-            <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
-              <Link href="/conversations">
-                <MessageCircle className="size-4" />
-                محادثاتي
-              </Link>
-            </Button>
           </div>
         </header>
 
         <section className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex min-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card lg:h-[calc(100vh-8.5rem)] lg:min-h-[36rem]">
+          <section className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card lg:h-[calc(100vh-8.5rem)]">
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link
@@ -891,12 +877,9 @@ export default function ConversationPage() {
                 </div>
               ) : visibleMessages.length === 0 ? (
                 <div className="grid h-full place-items-center text-center">
-                  <div className="grid max-w-xs gap-3">
+                  <div className="grid max-w-xs gap-2">
                     <MessageCircle className="mx-auto size-10 text-blue-600" />
                     <h3 className="text-base font-bold">ابدأ المحادثة</h3>
-                    <p className="text-sm leading-7 text-muted-foreground">
-                      اكتب رسالتك داخل المنصة، وسيبقى سجل التواصل مرتبطًا بالإعلان.
-                    </p>
                   </div>
                 </div>
               ) : (
@@ -985,46 +968,38 @@ export default function ConversationPage() {
                   تذكير: مشاركة معلومات التواصل أو الدفع خارج المنصة مسؤوليتك. لا تحول مبالغ قبل التأكد.
                 </p>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="size-4 shrink-0 text-blue-600" />
-                  <span className="leading-5">
-                    التواصل داخل سوق حمد. تحويل الأموال بين البائع والمشتري مسؤولية الطرفين والمنصة لا تضمنه.
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {isSeller && (
-                    <Button
-                      className="rounded-md"
-                      disabled={
-                        isSharingContact ||
-                        !conversation ||
-                        conversation.status !== 'open' ||
-                        isConversationBlocked
-                      }
-                      onClick={shareOfficialContact}
-                      type="button"
-                      variant="outline"
-                    >
-                      <Phone className="size-4" />
-                      {isSharingContact ? 'جار المشاركة...' : 'مشاركة الرقم'}
-                    </Button>
-                  )}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {isSeller && (
                   <Button
-                    className="rounded-md bg-blue-600 hover:bg-blue-700"
+                    className="rounded-md"
                     disabled={
-                      !draft.trim() ||
-                      draftHasManualContact ||
-                      isSending ||
+                      isSharingContact ||
                       !conversation ||
+                      conversation.status !== 'open' ||
                       isConversationBlocked
                     }
-                    type="submit"
+                    onClick={shareOfficialContact}
+                    type="button"
+                    variant="outline"
                   >
-                    <Send className="size-4" />
-                    إرسال
+                    <Phone className="size-4" />
+                    {isSharingContact ? 'جار المشاركة...' : 'مشاركة الرقم'}
                   </Button>
-                </div>
+                )}
+                <Button
+                  className="rounded-md bg-blue-600 hover:bg-blue-700"
+                  disabled={
+                    !draft.trim() ||
+                    draftHasManualContact ||
+                    isSending ||
+                    !conversation ||
+                    isConversationBlocked
+                  }
+                  type="submit"
+                >
+                  <Send className="size-4" />
+                  إرسال
+                </Button>
               </div>
             </form>
           </section>
@@ -1051,12 +1026,6 @@ export default function ConversationPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {conversation?.listing?.city ?? 'السعودية'}
               </p>
-            </div>
-            <div className="flex items-start gap-2 rounded-md border bg-blue-50 p-3 text-xs leading-6 text-blue-950 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-50">
-              <BadgeCheck className="mt-1 size-4 shrink-0 text-blue-600 dark:text-blue-200" />
-              <span>
-                المحادثة مرتبطة بهذا الإعلان فقط، ولا تظهر إلا للبائع والمشتري.
-              </span>
             </div>
           </aside>
         </section>
