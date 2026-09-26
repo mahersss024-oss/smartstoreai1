@@ -113,6 +113,17 @@ test('seller buyer conversation preserves newer draft text after send', () => {
   assert.match(source, /currentDraft\.trim\(\) === messageBody/);
 });
 
+test('seller buyer conversation sends with Enter and keeps Shift Enter for new lines', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /KeyboardEvent/);
+  assert.match(source, /sendConversationMessageWithEnter/);
+  assert.match(source, /event\.key !== 'Enter' \|\| event\.shiftKey/);
+  assert.match(source, /event\.preventDefault\(\)/);
+  assert.match(source, /event\.currentTarget\.form\?\.requestSubmit\(\)/);
+  assert.match(source, /onKeyDown=\{sendConversationMessageWithEnter\}/);
+});
+
 test('seller buyer conversation hides blocked messages and uses official contact sharing', () => {
   const source = readConversationPage();
 

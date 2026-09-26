@@ -3,6 +3,7 @@
 
 import {
   FormEvent,
+  KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -449,7 +450,13 @@ export default function ConversationPage() {
 
       const messageBody = draft.trim();
 
-      if (!messageBody || isSending || isConversationBlocked) {
+      if (
+        !messageBody ||
+        draftHasManualContact ||
+        isSending ||
+        conversation?.status !== 'open' ||
+        isConversationBlocked
+      ) {
         return;
       }
 
@@ -519,11 +526,42 @@ export default function ConversationPage() {
     },
     [
       conversationId,
+      conversation?.status,
       draft,
+      draftHasManualContact,
       isConversationBlocked,
       isSending,
       refreshConversation,
       router,
+    ],
+  );
+
+  const sendConversationMessageWithEnter = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== 'Enter' || event.shiftKey) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (
+        !draft.trim() ||
+        draftHasManualContact ||
+        isSending ||
+        conversation?.status !== 'open' ||
+        isConversationBlocked
+      ) {
+        return;
+      }
+
+      event.currentTarget.form?.requestSubmit();
+    },
+    [
+      conversation?.status,
+      draft,
+      draftHasManualContact,
+      isConversationBlocked,
+      isSending,
     ],
   );
 
@@ -960,6 +998,7 @@ export default function ConversationPage() {
                 disabled={conversation?.status !== 'open' || isConversationBlocked}
                 name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={sendConversationMessageWithEnter}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}
               />
