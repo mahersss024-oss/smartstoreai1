@@ -285,3 +285,12 @@ test('platform fees page can focus the sold listing fee from the account link', 
   assert.match(page, /orderedCommissions/);
   assert.match(page, /targetCommission\?\.status === 'pending_amount'/);
 });
+
+test('platform fees summary highlights due fees and labels transactions clearly', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'commissions', 'page.tsx'), 'utf8');
+
+  assert.match(page, /الرسوم المستحقة/);
+  assert.match(page, /عدد المعاملات/);
+  assert.match(page, /rounded-md bg-blue-600/);
+  assert.doesNotMatch(page, /عدد السجلات/);
+});

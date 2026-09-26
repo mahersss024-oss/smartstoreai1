@@ -408,18 +408,27 @@ export default function CommissionsPage() {
           </section>
         ) : (
           <>
-            <section className="grid gap-3 sm:grid-cols-3">
-              <div className="p-4">
-                <div className="text-xs text-muted-foreground">رسوم مستحقة</div>
-                <div className="mt-1 text-2xl font-bold">{formatMoney(totalDue)}</div>
+            <section className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+              <div className="rounded-md bg-blue-600 p-4 text-white shadow-sm dark:bg-blue-500/90">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="grid gap-1">
+                    <div className="text-xs font-semibold text-blue-100">الرسوم المستحقة</div>
+                    <div className="text-3xl font-black">{formatMoney(totalDue)}</div>
+                  </div>
+                  <div className="grid size-11 shrink-0 place-items-center rounded-md bg-white/15">
+                    <Percent className="size-5" />
+                  </div>
+                </div>
               </div>
-              <div className="p-4">
-                <div className="text-xs text-muted-foreground">عدد السجلات</div>
-                <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
-              </div>
-              <div className="p-4">
-                <div className="text-xs text-muted-foreground">النسبة</div>
-                <div className="mt-1 text-2xl font-bold">1%</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-white/70 p-4 dark:bg-card/45">
+                  <div className="text-xs text-muted-foreground">عدد المعاملات</div>
+                  <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
+                </div>
+                <div className="rounded-md bg-white/70 p-4 dark:bg-card/45">
+                  <div className="text-xs text-muted-foreground">النسبة</div>
+                  <div className="mt-1 text-2xl font-bold">1%</div>
+                </div>
               </div>
             </section>
 
