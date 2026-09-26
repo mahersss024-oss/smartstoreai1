@@ -46,6 +46,9 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
   assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
   assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
+  assert.match(page, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
+  assert.match(page, /sm:grid-cols-\[7rem_minmax\(0,1fr\)_auto\]/);
+  assert.match(page, /className="truncate text-sm font-bold"/);
   assert.match(page, /إعلانات المعلن/);
   assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
   assert.doesNotMatch(page, /seller\.email/);

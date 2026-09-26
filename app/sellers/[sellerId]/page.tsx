@@ -161,14 +161,14 @@ export default async function SellerProfilePage({ params }: PageProps) {
           </div>
 
           {seller.listings.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2">
               {seller.listings.map((listing) => (
                 <Link
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group overflow-hidden rounded-md bg-[#f8fafc] transition hover:bg-blue-50/70 dark:bg-[#101827] dark:hover:bg-blue-400/10"
+                  className="group grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 rounded-md bg-white/65 p-2 transition hover:bg-blue-50/80 dark:bg-card/45 dark:hover:bg-blue-400/10 sm:grid-cols-[7rem_minmax(0,1fr)_auto]"
                 >
-                  <div className="aspect-[4/3] overflow-hidden bg-[#0b1220]">
+                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-[#0b1220]">
                     <img
                       alt={listing.title ?? 'صورة الإعلان'}
                       className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
@@ -176,22 +176,30 @@ export default async function SellerProfilePage({ params }: PageProps) {
                       src={getPrimaryImageUrl(listing)}
                     />
                   </div>
-                  <div className="grid gap-2 p-3">
-                    <h3 className="line-clamp-2 min-h-10 text-sm font-bold">
+                  <div className="grid min-w-0 gap-1.5">
+                    <h3 className="truncate text-sm font-bold">
                       {listing.title ?? 'إعلان بدون عنوان'}
                     </h3>
-                    <div className="flex items-center justify-between gap-2 text-sm">
+                    <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="size-3.5 text-blue-600" />
+                      <span className="truncate">{listing.city ?? 'السعودية'}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:hidden">
                       <span className="font-bold text-blue-700">
                         {formatPrice(listing.price)}
                       </span>
-                      <span className="rounded-md bg-white px-2 py-1 text-xs text-muted-foreground dark:bg-[#0b1220]">
+                      <span className="rounded-md bg-white px-2 py-1 text-muted-foreground dark:bg-[#0b1220]">
                         {formatCondition(listing.condition)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3.5 text-blue-600" />
-                      {listing.city ?? 'السعودية'}
-                    </div>
+                  </div>
+                  <div className="hidden min-w-32 justify-items-end gap-2 text-sm sm:grid">
+                    <span className="font-bold text-blue-700">
+                      {formatPrice(listing.price)}
+                    </span>
+                    <span className="rounded-md bg-white px-2 py-1 text-xs text-muted-foreground dark:bg-[#0b1220]">
+                      {formatCondition(listing.condition)}
+                    </span>
                   </div>
                 </Link>
               ))}
