@@ -30,6 +30,22 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /اتفاقية رسوم المنصة/);
 });
 
+test('admin work surfaces stay dense and operational', () => {
+  const dashboard = readProjectFile('app', 'admin', 'page.tsx');
+  const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
+
+  assert.match(dashboard, /data-testid="admin-work-queue"/);
+  assert.match(dashboard, /moderatorWorkQueue/);
+  assert.match(dashboard, /ownerWorkQueue/);
+  assert.match(dashboard, /overview\.statuses\.reports\.open/);
+  assert.match(dashboard, /overview\.statuses\.commissions\.due/);
+  assert.match(dashboard, /px-3 py-2\.5 shadow-sm/);
+  assert.match(dashboard, /sm:grid-cols-\[minmax\(0,12rem\)_minmax\(0,1fr\)\]/);
+  assert.match(usersPage, /grid gap-2 rounded-md border bg-white px-3 py-2/);
+  assert.match(usersPage, /border-b border-slate-200\/70 py-3 last:border-b-0/);
+  assert.doesNotMatch(usersPage, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
+});
+
 test('admin pages verify access before protected admin api requests', () => {
   const pages = [
     ['app', 'admin', 'page.tsx'],
@@ -60,6 +76,108 @@ test('admin pages verify access before protected admin api requests', () => {
       `${pageSegments.join('/')} must verify access before calling admin api`,
     );
   }
+});
+
+test('admin api permissions match the intended authority levels', () => {
+  const adminOnlyRoutes = [
+    ['app', 'api', 'admin', 'overview', 'route.ts'],
+    ['app', 'api', 'admin', 'users', 'route.ts'],
+    ['app', 'api', 'admin', 'users', '[userId]', 'route.ts'],
+    ['app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'],
+  ];
+  const moderatorRoutes = [
+    ['app', 'api', 'admin', 'listings', 'route.ts'],
+    ['app', 'api', 'admin', 'moderation', 'route.ts'],
+    ['app', 'api', 'admin', 'moderation', 'listings', '[listingId]', 'route.ts'],
+    ['app', 'api', 'admin', 'moderation', 'reports', '[reportId]', 'route.ts'],
+    ['app', 'api', 'admin', 'moderation', 'user-reports', '[reportId]', 'route.ts'],
+    ['app', 'api', 'moderator', 'overview', 'route.ts'],
+  ];
+  const ownerOnlyRoutes = [
+    ['app', 'api', 'admin', 'commissions', 'route.ts'],
+    ['app', 'api', 'admin', 'commissions', '[commissionId]', 'route.ts'],
+    ['app', 'api', 'admin', 'maintenance', 'route.ts'],
+  ];
+
+  for (const routeSegments of adminOnlyRoutes) {
+    const route = readProjectFile(...routeSegments);
+    assert.match(route, /hasVerifiedAdminAccess/);
+    assert.match(route, /(admin_required|auth_required)/);
+  }
+
+  for (const routeSegments of moderatorRoutes) {
+    const route = readProjectFile(...routeSegments);
+    assert.match(route, /hasVerifiedModeratorAccess/);
+    assert.match(route, /(admin_required|auth_required)/);
+  }
+
+  for (const routeSegments of ownerOnlyRoutes) {
+    const route = readProjectFile(...routeSegments);
+    assert.match(route, /hasPlatformOwnerAccess/);
+    assert.match(route, /owner_required/);
+  }
+});
+
+test('customer mutation apis are scoped to the authenticated user', () => {
+  const ownedMarketplaceRoutes = [
+    ['app', 'api', 'account', 'profile', 'route.ts'],
+    ['app', 'api', 'account', 'profile', 'picture', 'route.ts'],
+    ['app', 'api', 'marketplace', 'commissions', '[commissionId]', 'route.ts'],
+    ['app', 'api', 'marketplace', 'conversations', 'route.ts'],
+    ['app', 'api', 'marketplace', 'conversations', '[conversationId]', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', '[listingId]', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', '[listingId]', 'favorite', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', '[listingId]', 'images', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', '[listingId]', 'images', '[imageId]', 'route.ts'],
+    ['app', 'api', 'marketplace', 'listings', '[listingId]', 'reports', 'route.ts'],
+    ['app', 'api', 'marketplace', 'users', '[userId]', 'follow', 'route.ts'],
+    ['app', 'api', 'marketplace', 'users', '[userId]', 'ratings', 'route.ts'],
+    ['app', 'api', 'marketplace', 'users', '[userId]', 'reports', 'route.ts'],
+  ];
+
+  for (const routeSegments of ownedMarketplaceRoutes) {
+    const route = readProjectFile(...routeSegments);
+    assert.match(route, /getAuthSession/);
+    assert.match(route, /auth_required/);
+    assert.match(route, /session\.user\.id/);
+  }
+});
+
+test('cloud storage deletions stay behind owner or listing-owner checks', () => {
+  const adminListingRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'listings',
+    '[listingId]',
+    'route.ts',
+  );
+  const maintenanceRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'maintenance',
+    'route.ts',
+  );
+  const imageRoute = readProjectFile(
+    'app',
+    'api',
+    'marketplace',
+    'listings',
+    '[listingId]',
+    'images',
+    '[imageId]',
+    'route.ts',
+  );
+
+  assert.match(adminListingRoute, /hasVerifiedAdminAccess/);
+  assert.match(adminListingRoute, /deleteStoredListingImagesBestEffort/);
+  assert.match(maintenanceRoute, /hasPlatformOwnerAccess/);
+  assert.match(maintenanceRoute, /deleteStoredListingImagesBestEffort/);
+  assert.match(imageRoute, /getAuthSession/);
+  assert.match(imageRoute, /session\.user\.id/);
+  assert.match(imageRoute, /deleteListingImageForSeller/);
 });
 
 test('admin realtime subscriptions wait for verified access', () => {
@@ -202,6 +320,14 @@ test('admin maintenance exposes a scope that purges only soft-deleted listings',
   );
 
   assert.match(maintenanceRoute, /purge_deleted_listings/);
+  assert.match(maintenanceRoute, /closed_reports/);
+  assert.match(maintenanceRoute, /closed_user_reports/);
+  assert.match(maintenanceRoute, /seller_follows/);
+  assert.match(maintenanceRoute, /seller_ratings/);
+  assert.match(maintenanceRoute, /push_subscriptions/);
+  assert.match(maintenanceRoute, /prisma\.userReport\.deleteMany/);
+  assert.match(maintenanceRoute, /prisma\.sellerFollow\.deleteMany/);
+  assert.match(maintenanceRoute, /prisma\.sellerRating\.deleteMany/);
   assert.match(maintenanceRoute, /deleteStoredListingImagesBestEffort/);
   assert.match(maintenanceRoute, /admin_maintenance_listing_storage_delete/);
   assert.match(
@@ -215,6 +341,11 @@ test('admin maintenance page offers the deleted-listings purge option', () => {
 
   assert.match(page, /purge_deleted_listings/);
   assert.match(page, /حذف نهائي للإعلانات المحذوفة من العملاء/);
+  assert.match(page, /closed_user_reports/);
+  assert.match(page, /seller_follows/);
+  assert.match(page, /seller_ratings/);
+  assert.match(page, /push_subscriptions/);
+  assert.match(page, /countLabels/);
 });
 
 function withMaintenanceEnv(

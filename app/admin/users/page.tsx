@@ -395,21 +395,21 @@ export default function AdminUsersPage() {
         )}
 
         <section className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
             <div className="text-xs text-muted-foreground">إجمالي المستخدمين</div>
-            <div className="mt-1 text-2xl font-bold">{formatNumber(totalUsers)}</div>
+            <div className="mt-1 text-xl font-bold">{formatNumber(totalUsers)}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
             <div className="text-xs text-muted-foreground">أرقام تواصل محفوظة</div>
-            <div className="mt-1 text-2xl font-bold">{formatNumber(usersWithPhone)}</div>
+            <div className="mt-1 text-xl font-bold">{formatNumber(usersWithPhone)}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
             <div className="text-xs text-muted-foreground">المعروض حاليًا</div>
-            <div className="mt-1 text-2xl font-bold">{formatNumber(users.length)}</div>
+            <div className="mt-1 text-xl font-bold">{formatNumber(users.length)}</div>
           </div>
         </section>
 
-        <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+        <section className="rounded-md border bg-white p-3 shadow-sm dark:bg-card">
           <form
             className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
             onSubmit={(event) => {
@@ -449,7 +449,7 @@ export default function AdminUsersPage() {
           </form>
         </section>
 
-        <section className="grid gap-3">
+        <section className="grid gap-2 rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card">
           {isLoading && users.length === 0 ? (
             <div className="grid min-h-72 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
               جار تحميل المستخدمين...
@@ -475,7 +475,7 @@ export default function AdminUsersPage() {
               const isBusy = isSaving || isDeleting;
 
               return (
-                <article key={user.id} className="grid gap-4 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+                <article key={user.id} className="grid gap-3 border-b border-slate-200/70 py-3 last:border-b-0 dark:border-white/10">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -558,36 +558,36 @@ export default function AdminUsersPage() {
                   </div>
 
                   <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Store className="size-4 text-blue-600" />
                       الإعلانات: {formatNumber(user.counts.listings)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <MessageCircle className="size-4 text-blue-600" />
                       المحادثات: {formatNumber(user.counts.conversations)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Percent className="size-4 text-blue-600" />
                       رسوم المنصة: {formatNumber(user.counts.commissions)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Phone className="size-4 text-blue-600" />
                       الرقم: {user.phoneNumber ? 'محفوظ' : 'غير محفوظ'}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <BadgeCheck className="size-4 text-blue-600" />
                       اتفاقية رسوم المنصة: {user.commissionAgreementAccepted ? 'مقبولة' : 'غير مقبولة'}
                     </div>
-                    <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       الرسائل: {formatNumber(user.counts.messages)}
                     </div>
-                    <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       بلاغات المستخدم: {formatNumber(user.counts.userReportsReceived ?? 0)}
                     </div>
-                    <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       آخر تحديث: {formatDate(user.updatedAt)}
                     </div>
-                    <div className="rounded-md bg-[#f7f9fc] px-3 py-2 dark:bg-background">
+                    <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       التسجيل: {formatDate(user.createdAt)}
                     </div>
                   </div>

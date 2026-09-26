@@ -18,17 +18,34 @@ type MaintenanceCounts = {
   messages: number;
   favorites: number;
   reports: number;
+  openReports: number;
+  closedReports: number;
+  userReports: number;
+  openUserReports: number;
+  closedUserReports: number;
+  userBlocks: number;
+  sellerFollows: number;
+  sellerRatings: number;
   commissions: number;
+  pushSubscriptions: number;
   analyticsDays: number;
   analyticsVisitors: number;
   searchStates: number;
   idempotencyKeys: number;
+  adminAuditLogs: number;
 };
 
 type CleanupScope =
   | 'commissions'
   | 'conversations'
   | 'reports'
+  | 'closed_reports'
+  | 'user_reports'
+  | 'closed_user_reports'
+  | 'user_blocks'
+  | 'seller_follows'
+  | 'seller_ratings'
+  | 'push_subscriptions'
   | 'analytics'
   | 'search_state'
   | 'marketplace_without_users'
@@ -51,8 +68,44 @@ const cleanupScopes: Array<{
   },
   {
     value: 'reports',
-    label: 'حذف البلاغات',
-    description: 'يحذف بلاغات المستخدمين فقط.',
+    label: 'حذف كل بلاغات الإعلانات',
+    description: 'يحذف بلاغات الإعلانات المفتوحة والمغلقة.',
+  },
+  {
+    value: 'closed_reports',
+    label: 'حذف بلاغات الإعلانات المغلقة',
+    description: 'يحذف بلاغات الإعلانات التي تمت مراجعتها أو إغلاقها فقط.',
+  },
+  {
+    value: 'user_reports',
+    label: 'حذف كل بلاغات المستخدمين',
+    description: 'يحذف بلاغات المستخدمين والمحادثات المفتوحة والمغلقة.',
+  },
+  {
+    value: 'closed_user_reports',
+    label: 'حذف بلاغات المستخدمين المغلقة',
+    description: 'يحذف بلاغات المستخدمين التي تمت مراجعتها أو إغلاقها فقط.',
+  },
+  {
+    value: 'user_blocks',
+    label: 'حذف سجلات الحظر',
+    description: 'يحذف علاقات الحظر المسجلة بين المستخدمين.',
+  },
+  {
+    value: 'seller_follows',
+    label: 'حذف قائمة المتابعة',
+    description: 'يحذف علاقات متابعة المعلنين من جميع الحسابات.',
+  },
+  {
+    value: 'seller_ratings',
+    label: 'حذف تقييمات المعلنين',
+    description: 'يحذف تقييمات المعلنين وتعليقات التقييم من جميع الحسابات.',
+  },
+  {
+    value: 'push_subscriptions',
+    label: 'حذف اشتراكات الإشعارات',
+    description:
+      'يحذف أجهزة الإشعارات المسجلة، وسيعاد تسجيلها عند سماح المستخدم بالإشعارات مرة أخرى.',
   },
   {
     value: 'analytics',
@@ -62,20 +115,46 @@ const cleanupScopes: Array<{
   {
     value: 'search_state',
     label: 'تنظيف ذاكرة البحث والطلبات',
-    description: 'يحذف ذاكرة البحث المؤقتة ومفاتيح منع التكرار.',
+    description: 'يحذف ذاكرة البحث المؤقتة ومفاتيح منع تكرار الطلبات.',
   },
   {
     value: 'marketplace_without_users',
     label: 'تنظيف السوق مع إبقاء المستخدمين',
-    description: 'يحذف الإعلانات وما يتبعها من صور ومحادثات ومفضلات وبلاغات وعمولات.',
+    description:
+      'يحذف الإعلانات وما يتبعها، ويحذف بلاغات المستخدمين والحظر والمتابعة والتقييمات، مع إبقاء حسابات المستخدمين.',
   },
   {
     value: 'purge_deleted_listings',
     label: 'حذف نهائي للإعلانات المحذوفة من العملاء',
     description:
-      'يحذف نهائيًا الإعلانات التي حالتها «محذوف» فقط (التي حذفها العملاء)، مع صورها ومحادثاتها ومفضلاتها وبلاغاتها وعمولاتها. لا يمسّ الإعلانات الحيّة.',
+      'يحذف نهائيًا الإعلانات التي حالتها محذوفة فقط، مع صورها من التخزين وما يرتبط بها. لا يمس الإعلانات الحية.',
   },
 ];
+
+const countLabels: Record<keyof MaintenanceCounts, string> = {
+  users: 'المستخدمون',
+  listings: 'الإعلانات',
+  images: 'صور الإعلانات',
+  conversations: 'المحادثات',
+  messages: 'الرسائل',
+  favorites: 'المفضلة',
+  reports: 'بلاغات الإعلانات',
+  openReports: 'بلاغات إعلانات مفتوحة',
+  closedReports: 'بلاغات إعلانات مغلقة',
+  userReports: 'بلاغات المستخدمين',
+  openUserReports: 'بلاغات مستخدمين مفتوحة',
+  closedUserReports: 'بلاغات مستخدمين مغلقة',
+  userBlocks: 'الحظر بين المستخدمين',
+  sellerFollows: 'قائمة المتابعة',
+  sellerRatings: 'تقييمات المعلنين',
+  commissions: 'رسوم المنصة',
+  pushSubscriptions: 'اشتراكات الإشعارات',
+  analyticsDays: 'أيام التحليلات',
+  analyticsVisitors: 'زوار التحليلات',
+  searchStates: 'ذاكرة البحث',
+  idempotencyKeys: 'مفاتيح منع التكرار',
+  adminAuditLogs: 'سجل الإدارة',
+};
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ar-SA').format(value);
@@ -83,10 +162,7 @@ function formatNumber(value: number) {
 
 export default function AdminMaintenancePage() {
   const router = useRouter();
-  const {
-    adminAccessNotice,
-    verifyAdminAccess,
-  } = useAdminAccess('owner');
+  const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('owner');
   const [counts, setCounts] = useState<MaintenanceCounts | null>(null);
   const [scope, setScope] = useState<CleanupScope>('commissions');
   const [confirmation, setConfirmation] = useState('');
@@ -109,7 +185,7 @@ export default function AdminMaintenancePage() {
         return;
       }
 
-      const response = await fetch('/api/admin/maintenance');
+      const response = await fetch('/api/admin/maintenance', { cache: 'no-store' });
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -172,7 +248,7 @@ export default function AdminMaintenancePage() {
 
         if (payload?.error === 'maintenance_cleanup_disabled') {
           setNotice(
-            'التنظيف معطّل في بيئة الإنتاج. فعّل المتغير SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP=1 ثم أعد تشغيل الخادم.',
+            'التنظيف معطل في بيئة الإنتاج. فعّل المتغير SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP=1 ثم أعد تشغيل الخادم.',
           );
           return;
         }
@@ -182,19 +258,19 @@ export default function AdminMaintenancePage() {
           return;
         }
 
-        if (payload?.error === 'admin_required') {
+        if (payload?.error === 'owner_required') {
           setNotice('هذه العملية مخصصة للمالك فقط.');
           return;
         }
 
         if (response.status === 429) {
-          setNotice('طلبات كثيرة جدًا. انتظر قليلاً ثم أعد المحاولة.');
+          setNotice('طلبات كثيرة جدًا. انتظر قليلًا ثم أعد المحاولة.');
           return;
         }
 
         setNotice(
           payload?.message ??
-            'تعذّر تنفيذ عملية التنظيف. تحقق من كلمة التأكيد وحاول مجددًا.',
+            'تعذر تنفيذ عملية التنظيف. تحقق من كلمة التأكيد وحاول مجددًا.',
         );
         return;
       }
@@ -226,12 +302,16 @@ export default function AdminMaintenancePage() {
   } else {
     countsContent = (
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {Object.entries(counts).map(([key, value]) => (
-          <div key={key} className="rounded-md border p-3">
-            <div className="text-xs text-muted-foreground">{key}</div>
-            <div className="mt-1 text-xl font-bold">{formatNumber(value)}</div>
-          </div>
-        ))}
+        {(Object.entries(counts) as Array<[keyof MaintenanceCounts, number]>).map(
+          ([key, value]) => (
+            <div key={key} className="rounded-md border p-3">
+              <div className="text-xs text-muted-foreground">
+                {countLabels[key] ?? key}
+              </div>
+              <div className="mt-1 text-xl font-bold">{formatNumber(value)}</div>
+            </div>
+          ),
+        )}
       </div>
     );
   }
@@ -252,7 +332,7 @@ export default function AdminMaintenancePage() {
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">الصيانة والتنظيف</h1>
               <p className="truncate text-xs text-muted-foreground">
-                أدوات مالك المنصة لتنظيف بيانات التجربة
+                أدوات مالك المنصة لتنظيف البيانات وتشغيل الصيانة بأمان
               </p>
             </div>
           </div>

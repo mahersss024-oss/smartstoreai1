@@ -15,6 +15,13 @@ const cleanupSchema = z.object({
     'commissions',
     'conversations',
     'reports',
+    'closed_reports',
+    'user_reports',
+    'closed_user_reports',
+    'user_blocks',
+    'seller_follows',
+    'seller_ratings',
+    'push_subscriptions',
     'analytics',
     'search_state',
     'marketplace_without_users',
@@ -55,11 +62,21 @@ async function getMaintenanceCounts() {
     messages,
     favorites,
     reports,
+    openReports,
+    closedReports,
+    userReports,
+    openUserReports,
+    closedUserReports,
+    userBlocks,
+    sellerFollows,
+    sellerRatings,
     commissions,
+    pushSubscriptions,
     analyticsDays,
     analyticsVisitors,
     searchStates,
     idempotencyKeys,
+    adminAuditLogs,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.listing.count(),
@@ -68,11 +85,21 @@ async function getMaintenanceCounts() {
     prisma.conversationMessage.count(),
     prisma.favorite.count(),
     prisma.report.count(),
+    prisma.report.count({ where: { status: 'open' } }),
+    prisma.report.count({ where: { status: { in: ['reviewed', 'dismissed'] } } }),
+    prisma.userReport.count(),
+    prisma.userReport.count({ where: { status: 'open' } }),
+    prisma.userReport.count({ where: { status: { in: ['reviewed', 'dismissed'] } } }),
+    prisma.userBlock.count(),
+    prisma.sellerFollow.count(),
+    prisma.sellerRating.count(),
     prisma.commission.count(),
+    prisma.pushSubscription.count(),
     prisma.siteVisitDaily.count(),
     prisma.siteVisitUnique.count(),
     prisma.marketplaceSearchState.count(),
     prisma.apiIdempotencyKey.count(),
+    prisma.adminAuditLog.count(),
   ]);
 
   return {
@@ -83,11 +110,21 @@ async function getMaintenanceCounts() {
     messages,
     favorites,
     reports,
+    openReports,
+    closedReports,
+    userReports,
+    openUserReports,
+    closedUserReports,
+    userBlocks,
+    sellerFollows,
+    sellerRatings,
     commissions,
+    pushSubscriptions,
     analyticsDays,
     analyticsVisitors,
     searchStates,
     idempotencyKeys,
+    adminAuditLogs,
   };
 }
 
@@ -105,6 +142,45 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
   if (scope === 'reports') {
     const result = await prisma.report.deleteMany();
     return { reports: result.count };
+  }
+
+  if (scope === 'closed_reports') {
+    const result = await prisma.report.deleteMany({
+      where: { status: { in: ['reviewed', 'dismissed'] } },
+    });
+    return { closedReports: result.count };
+  }
+
+  if (scope === 'user_reports') {
+    const result = await prisma.userReport.deleteMany();
+    return { userReports: result.count };
+  }
+
+  if (scope === 'closed_user_reports') {
+    const result = await prisma.userReport.deleteMany({
+      where: { status: { in: ['reviewed', 'dismissed'] } },
+    });
+    return { closedUserReports: result.count };
+  }
+
+  if (scope === 'user_blocks') {
+    const result = await prisma.userBlock.deleteMany();
+    return { userBlocks: result.count };
+  }
+
+  if (scope === 'seller_follows') {
+    const result = await prisma.sellerFollow.deleteMany();
+    return { sellerFollows: result.count };
+  }
+
+  if (scope === 'seller_ratings') {
+    const result = await prisma.sellerRating.deleteMany();
+    return { sellerRatings: result.count };
+  }
+
+  if (scope === 'push_subscriptions') {
+    const result = await prisma.pushSubscription.deleteMany();
+    return { pushSubscriptions: result.count };
   }
 
   if (scope === 'analytics') {
@@ -156,13 +232,29 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
     return { listings: result.count };
   }
 
-  const [listings, searchStates, idempotencyKeys] = await prisma.$transaction([
+  const [
+    userReports,
+    userBlocks,
+    sellerFollows,
+    sellerRatings,
+    listings,
+    searchStates,
+    idempotencyKeys,
+  ] = await prisma.$transaction([
+    prisma.userReport.deleteMany(),
+    prisma.userBlock.deleteMany(),
+    prisma.sellerFollow.deleteMany(),
+    prisma.sellerRating.deleteMany(),
     prisma.listing.deleteMany(),
     prisma.marketplaceSearchState.deleteMany(),
     prisma.apiIdempotencyKey.deleteMany(),
   ]);
 
   return {
+    userReports: userReports.count,
+    userBlocks: userBlocks.count,
+    sellerFollows: sellerFollows.count,
+    sellerRatings: sellerRatings.count,
     listings: listings.count,
     searchStates: searchStates.count,
     idempotencyKeys: idempotencyKeys.count,

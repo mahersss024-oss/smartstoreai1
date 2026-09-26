@@ -108,14 +108,14 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+        <div className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
           {icon}
         </div>
       </div>
-      <div className="mt-2 text-2xl font-bold">{value}</div>
+      <div className="mt-1 text-xl font-bold">{value}</div>
     </div>
   );
 }
@@ -132,7 +132,7 @@ function StatusBlock({
   );
 
   return (
-    <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <section className="rounded-md border bg-white p-3 shadow-sm dark:bg-card">
       <h2 className="mb-3 text-sm font-bold">{title}</h2>
       {entries.length === 0 ? (
         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
@@ -151,6 +151,51 @@ function StatusBlock({
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+type WorkQueueItem = {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  value: number | string;
+  action: string;
+};
+
+function WorkQueue({
+  items,
+}: {
+  items: WorkQueueItem[];
+}) {
+  return (
+    <section className="grid gap-2 rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card" data-testid="admin-work-queue">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-bold">يحتاج إجراء</h2>
+        <span className="text-xs text-muted-foreground">الأولوية اليومية</span>
+      </div>
+      <div className="grid gap-1">
+        {items.map((item) => (
+          <Link
+            key={`${item.href}-${item.label}`}
+            href={item.href}
+            className="grid gap-2 rounded-md px-2 py-2 transition hover:bg-blue-50 dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+          >
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+              <span className="grid size-7 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                {item.icon}
+              </span>
+              <span className="truncate">{item.label}</span>
+            </div>
+            <span className="w-fit rounded-md bg-[#eef3fb] px-2.5 py-1 text-sm font-bold dark:bg-background">
+              {typeof item.value === 'number' ? formatNumber(item.value) : item.value}
+            </span>
+            <span className="text-xs font-semibold text-blue-700 dark:text-blue-200">
+              {item.action}
+            </span>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 }
@@ -319,6 +364,97 @@ export default function AdminHomePage() {
     return links.filter((link) => link.visible);
   }, [canManageCommissions, canManageUsers, isOwner]);
 
+  const moderatorWorkQueue = useMemo(() => {
+    if (!moderatorOverview) {
+      return [];
+    }
+
+    return [
+      {
+        href: '/admin/moderation',
+        icon: <Flag className="size-4" />,
+        label: 'بلاغات مفتوحة',
+        value: moderatorOverview.totals.openReports,
+        action: 'مراجعة',
+      },
+      {
+        href: '/admin/moderation',
+        icon: <Flag className="size-4" />,
+        label: 'بلاغات الإعلانات',
+        value: moderatorOverview.totals.openListingReports,
+        action: 'فتح',
+      },
+      {
+        href: '/admin/moderation',
+        icon: <MessageCircle className="size-4" />,
+        label: 'بلاغات المستخدمين والمحادثات',
+        value: moderatorOverview.totals.openUserReports,
+        action: 'فتح',
+      },
+      {
+        href: '/admin/moderation',
+        icon: <Megaphone className="size-4" />,
+        label: 'إعلانات تحتاج مراجعة',
+        value:
+          (moderatorOverview.statuses.listings.pending ?? 0) +
+          (moderatorOverview.statuses.listings.rejected ?? 0),
+        action: 'معالجة',
+      },
+    ];
+  }, [moderatorOverview]);
+
+  const ownerWorkQueue = useMemo(() => {
+    if (!overview) {
+      return [];
+    }
+
+    return [
+      {
+        href: '/admin/moderation',
+        icon: <Flag className="size-4" />,
+        label: 'بلاغات مفتوحة',
+        value: overview.statuses.reports.open ?? 0,
+        action: 'مراجعة',
+      },
+      {
+        href: '/admin/listings',
+        icon: <Megaphone className="size-4" />,
+        label: 'إعلانات قيد المراجعة',
+        value: overview.statuses.listings.pending ?? 0,
+        action: 'فتح',
+      },
+      {
+        href: '/admin/listings',
+        icon: <ImageIcon className="size-4" />,
+        label: 'صور قيد المراجعة',
+        value: overview.statuses.images.pending_review ?? 0,
+        action: 'فتح',
+      },
+      ...(canManageCommissions
+        ? [
+            {
+              href: '/admin/commissions',
+              icon: <Percent className="size-4" />,
+              label: 'رسوم مستحقة',
+              value: overview.statuses.commissions.due ?? 0,
+              action: 'متابعة',
+            },
+          ]
+        : []),
+      ...(isOwner
+        ? [
+            {
+              href: '/admin/maintenance',
+              icon: <Trash2 className="size-4" />,
+              label: 'الصيانة والتنظيف',
+              value: 'فحص',
+              action: 'إدارة',
+            },
+          ]
+        : []),
+    ];
+  }, [canManageCommissions, isOwner, overview]);
+
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
@@ -364,6 +500,8 @@ export default function AdminHomePage() {
           </section>
         ) : moderatorOverview ? (
           <>
+            <WorkQueue items={moderatorWorkQueue} />
+
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard icon={<Flag className="size-4" />} label="البلاغات المفتوحة" value={formatNumber(moderatorOverview.totals.openReports)} />
               <StatCard icon={<Flag className="size-4" />} label="بلاغات الإعلانات المفتوحة" value={formatNumber(moderatorOverview.totals.openListingReports)} />
@@ -377,12 +515,12 @@ export default function AdminHomePage() {
               <StatCard icon={<Flag className="size-4" />} label="إجمالي البلاغات" value={formatNumber(moderatorOverview.totals.reports)} />
             </section>
 
-            <section className="grid gap-3 lg:grid-cols-4">
+            <section className="grid gap-2">
               {quickLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="grid gap-2 rounded-md border bg-white p-4 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10"
+                  className="grid gap-1 rounded-md border bg-white px-3 py-2.5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:items-center"
                 >
                   <div className="flex items-center gap-2 text-sm font-bold">
                     {link.icon}
@@ -405,6 +543,8 @@ export default function AdminHomePage() {
           </section>
         ) : (
           <>
+            <WorkQueue items={ownerWorkQueue} />
+
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard icon={<Users className="size-4" />} label="زيارات اليوم" value={formatNumber(overview.visits.today.visits)} />
               <StatCard icon={<UserRound className="size-4" />} label="زوار اليوم الفريدون" value={formatNumber(overview.visits.today.uniqueVisitors)} />
@@ -428,12 +568,12 @@ export default function AdminHomePage() {
               <StatCard icon={<Percent className="size-4" />} label="إجمالي الرسوم المدفوعة" value={formatMoney(overview.money.paidCommissions)} />
             </section>
 
-            <section className="grid gap-3 lg:grid-cols-4">
+            <section className="grid gap-2">
               {quickLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="grid gap-2 rounded-md border bg-white p-4 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10"
+                  className="grid gap-1 rounded-md border bg-white px-3 py-2.5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:items-center"
                 >
                   <div className="flex items-center gap-2 text-sm font-bold">
                     {link.icon}
