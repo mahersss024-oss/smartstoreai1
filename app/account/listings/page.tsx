@@ -20,7 +20,6 @@ import {
   Store,
   Trash2,
   Upload,
-  User,
   X,
 } from 'lucide-react';
 
@@ -1003,12 +1002,6 @@ export default function AccountListingsPage() {
                 <p className="mt-1 text-xs leading-6 text-muted-foreground">تابع إعلاناتك وعدلها وانشرها من صفحة مستقلة عن إعدادات الحساب.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" className="rounded-md">
-                  <Link href="/account">
-                    <User className="size-4" />
-                    حسابي
-                  </Link>
-                </Button>
                 <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
                   <Link href="/">
                     <Megaphone className="size-4" />

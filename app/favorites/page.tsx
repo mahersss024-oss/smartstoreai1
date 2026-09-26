@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Heart, ImageIcon, MapPin, Store, User } from 'lucide-react';
+import { ArrowRight, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
@@ -226,12 +226,6 @@ export default function FavoritesPage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle language="ar" />
-            <Button asChild className="hidden rounded-md bg-blue-600 hover:bg-blue-700 sm:inline-flex">
-              <Link href="/account">
-                <User className="size-4" />
-                حسابي
-              </Link>
-            </Button>
           </div>
         </header>
 

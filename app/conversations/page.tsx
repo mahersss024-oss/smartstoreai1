@@ -9,7 +9,6 @@ import {
   MoreVertical,
   ShieldCheck,
   Trash2,
-  User,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -358,12 +357,6 @@ export default function ConversationsPage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle language="ar" />
-            <Button asChild className="hidden rounded-md bg-blue-600 hover:bg-blue-700 sm:inline-flex">
-              <Link href="/account">
-                <User className="size-4" />
-                حسابي
-              </Link>
-            </Button>
           </div>
         </header>
 
