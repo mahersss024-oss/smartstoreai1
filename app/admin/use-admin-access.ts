@@ -32,12 +32,12 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
 
   const verifyAdminAccess = useCallback(async () => {
     setStatus('checking');
-    setRole(null);
 
     try {
       const response = await fetch('/api/auth/session', { cache: 'no-store' });
 
       if (!response.ok) {
+        setRole(null);
         setStatus('error');
         return false;
       }
@@ -45,6 +45,7 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
       const session = (await response.json()) as AuthSessionPayload;
 
       if (!session.authenticated) {
+        setRole(null);
         setStatus('forbidden');
         window.location.assign(
           new URL('/api/auth/google/start', window.location.origin),
@@ -53,6 +54,7 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
       }
 
       if (!hasRequiredRole(session.user?.role, requiredRole)) {
+        setRole(null);
         setStatus('forbidden');
         return false;
       }
@@ -61,6 +63,7 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
       setStatus('allowed');
       return true;
     } catch {
+      setRole(null);
       setStatus('error');
       return false;
     }

@@ -100,6 +100,7 @@ export default function AdminUsersPage() {
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [isLinkedQueryReady, setIsLinkedQueryReady] = useState(false);
   const [roleFilter, setRoleFilter] = useState('all');
   const [notice, setNotice] = useState('');
@@ -135,8 +136,8 @@ export default function AdminUsersPage() {
           params.set('includeDeleted', '1');
         }
 
-        if (query.trim()) {
-          params.set('query', query.trim());
+        if (appliedQuery) {
+          params.set('query', appliedQuery);
         }
 
         const response = await fetch(`/api/admin/users?${params}`, {
@@ -185,7 +186,7 @@ export default function AdminUsersPage() {
         setIsLoading(false);
       }
     },
-    [isOwner, query, roleFilter, router, verifyAdminAccess],
+    [appliedQuery, isOwner, roleFilter, router, verifyAdminAccess],
   );
 
   useEffect(() => {
@@ -195,9 +196,10 @@ export default function AdminUsersPage() {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        setQuery(
-          new URLSearchParams(window.location.search).get('query')?.trim() ?? '',
-        );
+        const linkedQuery =
+          new URLSearchParams(window.location.search).get('query')?.trim() ?? '';
+        setQuery(linkedQuery);
+        setAppliedQuery(linkedQuery);
         setIsLinkedQueryReady(true);
       }
     });
@@ -212,6 +214,11 @@ export default function AdminUsersPage() {
       return;
     }
 
+    if (!adminAccessRole) {
+      void verifyAdminAccess();
+      return;
+    }
+
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -222,7 +229,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLinkedQueryReady, refreshUsers]);
+  }, [adminAccessRole, isLinkedQueryReady, refreshUsers, verifyAdminAccess]);
 
   const usersLoadMoreRef = useInfiniteScroll({
     enabled: Boolean(pagination?.hasMore),
@@ -414,7 +421,12 @@ export default function AdminUsersPage() {
             className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
             onSubmit={(event) => {
               event.preventDefault();
-              void refreshUsers(1);
+              const nextQuery = query.trim();
+              if (nextQuery === appliedQuery) {
+                void refreshUsers(1);
+                return;
+              }
+              setAppliedQuery(nextQuery);
             }}
           >
             <label className="grid gap-1 text-sm font-semibold">

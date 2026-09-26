@@ -204,6 +204,12 @@
     overflow-x: clip;
   }
 
+  /* Keep the operational admin surface at a stable scale on touch screens. */
+  .admin-viewport {
+    min-height: 100dvh;
+    touch-action: pan-x pan-y;
+  }
+
   /* Prevent iOS Safari from zooming when focusing form controls. */
   input,
   textarea,

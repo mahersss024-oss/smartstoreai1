@@ -10,6 +10,21 @@ function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
 
+test('admin pages use a stable touch viewport without disabling page scrolling', () => {
+  const layout = readProjectFile('app', 'admin', 'layout.tsx');
+  const globalCss = readProjectFile('app', 'globals.css');
+
+  assert.match(layout, /className="admin-viewport"/);
+  assert.match(
+    globalCss,
+    /\.admin-viewport\s*\{[^}]*touch-action:\s*pan-x pan-y;/,
+  );
+  assert.doesNotMatch(
+    globalCss,
+    /\.admin-viewport\s*\{[^}]*touch-action:\s*none;/,
+  );
+});
+
 test('admin dashboard links to user management', () => {
   const page = readProjectFile('app', 'admin', 'page.tsx');
 
@@ -28,6 +43,20 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /method: 'DELETE'/);
   assert.match(page, /حفظ التعديلات/);
   assert.match(page, /اتفاقية رسوم المنصة/);
+  assert.match(page, /appliedQuery/);
+  assert.match(page, /setAppliedQuery\(nextQuery\)/);
+});
+
+test('admin access revalidation keeps the verified role stable while loading', () => {
+  const accessHook = readProjectFile('app', 'admin', 'use-admin-access.ts');
+  const verificationStart = accessHook.indexOf(
+    'const verifyAdminAccess = useCallback',
+  );
+  const requestStart = accessHook.indexOf("fetch('/api/auth/session'", verificationStart);
+  const beforeRequest = accessHook.slice(verificationStart, requestStart);
+
+  assert.doesNotMatch(beforeRequest, /setRole\(null\)/);
+  assert.match(accessHook, /if \(!response\.ok\) \{\s*setRole\(null\)/);
 });
 
 test('admin dashboard stays focused on administrative navigation', () => {
