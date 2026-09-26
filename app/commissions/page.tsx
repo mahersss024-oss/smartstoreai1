@@ -16,21 +16,11 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type CommissionRecord = {
   id: string;
@@ -118,10 +108,7 @@ function createClientIdempotencyKey(scope: string) {
 
 export default function CommissionsPage() {
   const [targetListingId, setTargetListingId] = useState<string | null>(null);
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session } = useAuthSession();
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<
     CommissionPaymentMethod[]
@@ -177,14 +164,7 @@ export default function CommissionsPage() {
     setNotice('');
 
     try {
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-      });
-      const nextSession =
-        (await sessionResponse.json()) as AuthSessionPayload;
-      setSession(nextSession);
-
-      if (!nextSession.authenticated) {
+      if (!session.authenticated) {
         setPaymentMethods([]);
         setCommissions([]);
         setCommissionsPagination(null);
@@ -228,7 +208,7 @@ export default function CommissionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [session.authenticated]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -246,18 +226,32 @@ export default function CommissionsPage() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
     setTargetListingId(new URL(window.location.href).searchParams.get('listingId'));
+  }, []);
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return;
+    }
 
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        void refreshCommissions();
+        if (session.authenticated) {
+          void refreshCommissions();
+          return;
+        }
+
+        setPaymentMethods([]);
+        setCommissions([]);
+        setCommissionsPagination(null);
+        setIsLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshCommissions]);
+  }, [isSessionLoading, refreshCommissions, session.authenticated]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,
@@ -377,7 +371,7 @@ export default function CommissionsPage() {
           <ThemeToggle language="ar" />
         </header>
 
-        {isLoading && !session.authenticated ? (
+        {(isSessionLoading || isLoading) && !session.authenticated ? (
           <section className="grid min-h-[28rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />

@@ -76,6 +76,7 @@ import {
 } from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import {
@@ -102,18 +103,6 @@ type MarketplaceCityCoordinate = {
   city: string;
   latitude: number;
   longitude: number;
-};
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
 };
 
 type ListingCard = {
@@ -1903,10 +1892,7 @@ export default function Page() {
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: chatTransport,
   });
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session, setSession } = useAuthSession();
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
   const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
@@ -3014,30 +3000,17 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
+    if (isSessionLoading) {
+      return;
+    }
 
-    void fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthSessionPayload>)
-      .then((payload) => {
-        if (mounted) {
-          setSession(payload);
-          if (payload.authenticated) {
-            void refreshFavoriteListingIds();
-          } else {
-            setFavoriteListingIds(new Set());
-          }
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setSession({ authenticated: false, user: null });
-        }
-      });
+    if (session.authenticated) {
+      void refreshFavoriteListingIds();
+      return;
+    }
 
-    return () => {
-      mounted = false;
-    };
-  }, [refreshFavoriteListingIds]);
+    setFavoriteListingIds(new Set());
+  }, [isSessionLoading, refreshFavoriteListingIds, session.authenticated]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -3697,7 +3670,7 @@ export default function Page() {
       setSession({ authenticated: false, user: null });
       setFavoriteListingIds(new Set());
     });
-  }, []);
+  }, [setSession]);
 
   const loadMoreListings = useCallback(() => {
     if (!canLoadMoreListings || isLoadingListings) {

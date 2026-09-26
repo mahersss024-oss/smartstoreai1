@@ -27,24 +27,11 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { ListingShareButton } from '@/components/listing-share-button';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { createListingImageUploadFiles } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-  phoneNumber?: string;
-  role?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type ApiListingRecord = {
   id: string;
@@ -320,11 +307,7 @@ function createEditFormFromListing(listing: ListingCard): ListingEditForm {
 
 export default function AccountListingsPage() {
   const router = useRouter();
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const { isSessionLoading, session, setSession } = useAuthSession();
   const [listings, setListings] = useState<ListingCard[]>([]);
   const [listingsPagination, setListingsPagination] =
     useState<PaginationMeta | null>(null);
@@ -347,22 +330,6 @@ export default function AccountListingsPage() {
   });
   const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
-  const refreshSession = useCallback(() => {
-    setIsSessionLoading(true);
-
-    return fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthSessionPayload>)
-      .then((payload) => {
-        setSession(payload);
-      })
-      .catch(() => {
-        setSession({ authenticated: false, user: null });
-      })
-      .finally(() => {
-        setIsSessionLoading(false);
-      });
-  }, []);
-
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -414,18 +381,7 @@ export default function AccountListingsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        void refreshSession();
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshSession]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -503,9 +459,8 @@ export default function AccountListingsPage() {
       setListings([]);
       setListingsPagination(null);
       setSession({ authenticated: false, user: null });
-      setIsSessionLoading(false);
     });
-  }, []);
+  }, [setSession]);
 
   const controlListing = useCallback(
     (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {

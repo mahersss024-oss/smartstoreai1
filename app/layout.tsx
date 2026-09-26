@@ -16,6 +16,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
 import { NativeAppBridge } from "@/components/native-app-bridge";
+import { AuthSessionProvider } from "@/hooks/use-auth-session";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
@@ -269,10 +270,12 @@ export default function RootLayout({
         </Suspense>
         <ServiceWorkerRegistrar />
         <NativeAppBridge />
-        {children}
-        <PullToRefresh />
-        <PwaInstallPrompt />
-        <MobileBottomNavigation />
+        <AuthSessionProvider>
+          {children}
+          <PullToRefresh />
+          <PwaInstallPrompt />
+          <MobileBottomNavigation />
+        </AuthSessionProvider>
       </body>
     </html>
   );

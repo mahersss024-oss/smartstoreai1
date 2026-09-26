@@ -6,19 +6,8 @@ import Link from 'next/link';
 import { ArrowRight, User, UserPlus } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { Button } from '@ui/button';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type FollowPerson = {
   id: string;
@@ -68,10 +57,7 @@ function PersonAvatar({ person }: { person: FollowPerson }) {
 }
 
 export default function AccountFollowsPage() {
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session } = useAuthSession();
   const [follows, setFollows] = useState<FollowsPayload>({
     following: [],
     followers: [],
@@ -88,14 +74,7 @@ export default function AccountFollowsPage() {
     setIsLoading(true);
 
     try {
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-      });
-      const nextSession =
-        (await sessionResponse.json()) as AuthSessionPayload;
-      setSession(nextSession);
-
-      if (!nextSession.authenticated) {
+      if (!session.authenticated) {
         setFollows({
           following: [],
           followers: [],
@@ -117,23 +96,40 @@ export default function AccountFollowsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [session.authenticated]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+  }, []);
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return;
+    }
 
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        void refreshFollows();
+        if (session.authenticated) {
+          void refreshFollows();
+          return;
+        }
+
+        setFollows({
+          following: [],
+          followers: [],
+          followingCount: 0,
+          followerCount: 0,
+        });
+        setIsLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshFollows]);
+  }, [isSessionLoading, refreshFollows, session.authenticated]);
 
   const toggleFollow = useCallback(async (userId: string) => {
     setPendingUserId(userId);
@@ -177,7 +173,7 @@ export default function AccountFollowsPage() {
           <ThemeToggle language="ar" />
         </header>
 
-        {!isLoading && !session.authenticated ? (
+        {!isSessionLoading && !isLoading && !session.authenticated ? (
           <section className="grid min-h-[28rem] place-items-center p-6 text-center">
             <div className="grid max-w-sm gap-3">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">

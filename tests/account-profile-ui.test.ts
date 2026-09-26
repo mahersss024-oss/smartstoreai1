@@ -173,7 +173,8 @@ test('account conversations shortcut highlights new message alerts on web', () =
   assert.match(alertHook, /senderId !== currentUserId/);
   assert.match(alertHook, /syncUnreadConversations/);
   assert.match(alertHook, /const isUserIdControlled = userId !== undefined/);
-  assert.match(alertHook, /if \(currentUserId\) \{\s*setHasConversationAlert\(false\);\s*void syncUnreadConversations\(\);\s*return;\s*\}/);
+  assert.match(alertHook, /if \(currentUserId\) \{\s*void syncUnreadConversations\(\);\s*return;\s*\}/);
+  assert.doesNotMatch(alertHook, /if \(currentUserId\) \{\s*setHasConversationAlert\(false\);/);
   assert.match(alertHook, /if \(isUserIdControlled\) \{\s*setHasConversationAlert\(false\);\s*return;\s*\}/);
 });
 
@@ -235,9 +236,14 @@ test('customer listings explain drafts and keep image management lightweight', (
 
 test('account page does not flash sign-in controls while session is loading', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const sessionHook = readFileSync(
+    join(process.cwd(), 'hooks', 'use-auth-session.tsx'),
+    'utf8',
+  );
 
-  assert.match(page, /const \[isSessionLoading, setIsSessionLoading\] = useState\(true\)/);
-  assert.match(page, /setIsSessionLoading\(false\)/);
+  assert.match(page, /useAuthSession/);
+  assert.match(sessionHook, /const \[isSessionLoading, setIsSessionLoading\] = useState\(true\)/);
+  assert.match(sessionHook, /fetch\('\/api\/auth\/session'/);
   assert.match(page, /isSessionLoading \? \(/);
   assert.match(page, /: !session\.authenticated \? \(/);
 });
@@ -247,13 +253,15 @@ test('signed-in customer pages hide sign-in controls until session check finishe
     ['app', 'conversations', 'page.tsx'],
     ['app', 'favorites', 'page.tsx'],
     ['app', 'commissions', 'page.tsx'],
+    ['app', 'account', 'follows', 'page.tsx'],
   ];
 
   for (const segments of protectedPages) {
     const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
 
-    assert.match(page, /isLoading && !session\.authenticated \? \(/);
-    assert.match(page, /: !session\.authenticated \? \(/);
+    assert.match(page, /useAuthSession/);
+    assert.match(page, /isSessionLoading/);
+    assert.match(page, /!session\.authenticated/);
   }
 });
 
@@ -263,16 +271,17 @@ test('signed-in customer pages do not fetch protected account data before sessio
     ['app', 'favorites', 'page.tsx'],
     ['app', 'commissions', 'page.tsx'],
     ['app', 'conversations', '[conversationId]', 'page.tsx'],
+    ['app', 'account', 'follows', 'page.tsx'],
   ];
 
   for (const segments of protectedPages) {
     const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
 
-    assert.match(page, /const sessionResponse = await fetch\('\/api\/auth\/session'/);
-    assert.match(page, /if \(!nextSession\.authenticated\)/);
+    assert.match(page, /useAuthSession/);
+    assert.match(page, /if \(isSessionLoading\)/);
     assert.doesNotMatch(
       page,
-      /Promise\.all\(\[[\s\S]*fetch\('\/api\/auth\/session'[\s\S]*api\/marketplace/,
+      /fetch\('\/api\/auth\/session'/,
     );
   }
 });

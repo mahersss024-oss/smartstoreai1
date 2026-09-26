@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Textarea } from '@ui/textarea';
@@ -38,19 +39,6 @@ import {
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-  phoneNumber?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type ConversationMessage = {
   id: string;
@@ -252,10 +240,7 @@ export default function ConversationPage() {
   const router = useRouter();
   const params = useParams<{ conversationId: string }>();
   const conversationId = params.conversationId;
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session } = useAuthSession();
   const [conversation, setConversation] = useState<ConversationRecord | null>(
     null,
   );
@@ -317,14 +302,7 @@ export default function ConversationPage() {
     }
 
     try {
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-      });
-      const nextSession =
-        (await sessionResponse.json()) as AuthSessionPayload;
-      setSession(nextSession);
-
-      if (!nextSession.authenticated) {
+      if (!session.authenticated) {
         router.push('/api/auth/google/start');
         return;
       }
@@ -355,7 +333,7 @@ export default function ConversationPage() {
         setIsLoading(false);
       }
     }
-  }, [conversationId, router]);
+  }, [conversationId, router, session.authenticated]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -372,6 +350,12 @@ export default function ConversationPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+  }, []);
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return;
+    }
 
     let cancelled = false;
     queueMicrotask(() => {
@@ -383,7 +367,7 @@ export default function ConversationPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshConversation]);
+  }, [isSessionLoading, refreshConversation]);
 
   useEffect(() => {
     if (isLoading) {
@@ -401,7 +385,7 @@ export default function ConversationPage() {
   }, [isLoading, visibleMessages.length]);
 
   useSmartstoreRealtime({
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId) && session.authenticated,
     fallbackIntervalMs: 4000,
     eventTypes: [
       'message_created',

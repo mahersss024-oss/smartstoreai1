@@ -5,16 +5,12 @@ import { Flag, Heart, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { cn } from '@/lib/utils';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
-
-type SessionPayload = {
-  authenticated: boolean;
-  user: { id: string } | null;
-};
 
 type FavoriteStatePayload = {
   isFavorite?: boolean;
@@ -29,6 +25,7 @@ export function ListingSafetyActions({
   sellerId: string;
 }) {
   const router = useRouter();
+  const { isSessionLoading, session } = useAuthSession();
   const [notice, setNotice] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,17 +37,6 @@ export function ListingSafetyActions({
 
     async function checkFavoritePermission() {
       try {
-        const response = await fetch('/api/auth/session', { cache: 'no-store' });
-
-        if (!response.ok) {
-          if (isCurrent) {
-            setCanFavorite(true);
-          }
-          return;
-        }
-
-        const session = (await response.json()) as SessionPayload;
-
         if (!session.authenticated || !session.user) {
           if (isCurrent) {
             setCanFavorite(true);
@@ -92,12 +78,14 @@ export function ListingSafetyActions({
       }
     }
 
-    checkFavoritePermission();
+    if (!isSessionLoading) {
+      void checkFavoritePermission();
+    }
 
     return () => {
       isCurrent = false;
     };
-  }, [listingId, sellerId]);
+  }, [isSessionLoading, listingId, sellerId, session]);
 
   const saveFavorite = async () => {
     setIsSaving(true);

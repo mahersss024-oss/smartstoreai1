@@ -13,6 +13,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -22,18 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type ConversationListing = {
   id: string;
@@ -143,10 +132,7 @@ function isMessageReadBy(
 }
 
 export default function ConversationsPage() {
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session } = useAuthSession();
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [conversationsPagination, setConversationsPagination] =
     useState<PaginationMeta | null>(null);
@@ -172,14 +158,7 @@ export default function ConversationsPage() {
     }
 
     try {
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-      });
-      const nextSession =
-        (await sessionResponse.json()) as AuthSessionPayload;
-      setSession(nextSession);
-
-      if (!nextSession.authenticated) {
+      if (!session.authenticated) {
         setConversations([]);
         setConversationsPagination(null);
         return;
@@ -213,7 +192,7 @@ export default function ConversationsPage() {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [session.authenticated]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -230,18 +209,31 @@ export default function ConversationsPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+  }, []);
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return;
+    }
 
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        void refreshConversations(1);
+        if (session.authenticated) {
+          void refreshConversations(1);
+          return;
+        }
+
+        setConversations([]);
+        setConversationsPagination(null);
+        setIsLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshConversations]);
+  }, [isSessionLoading, refreshConversations, session.authenticated]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,
@@ -360,7 +352,7 @@ export default function ConversationsPage() {
           </div>
         </header>
 
-        {isLoading && !session.authenticated ? (
+        {(isSessionLoading || isLoading) && !session.authenticated ? (
           <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />

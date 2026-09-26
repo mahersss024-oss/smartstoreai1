@@ -7,21 +7,10 @@ import { ArrowRight, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type FavoriteListing = {
   id: string;
@@ -82,10 +71,7 @@ function formatPrice(price: FavoriteListing['price']) {
 }
 
 export default function FavoritesPage() {
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
+  const { isSessionLoading, session } = useAuthSession();
   const [favorites, setFavorites] = useState<FavoriteRecord[]>([]);
   const [favoritesPagination, setFavoritesPagination] =
     useState<PaginationMeta | null>(null);
@@ -99,14 +85,7 @@ export default function FavoritesPage() {
     setIsLoading(true);
 
     try {
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-      });
-      const nextSession =
-        (await sessionResponse.json()) as AuthSessionPayload;
-      setSession(nextSession);
-
-      if (!nextSession.authenticated) {
+      if (!session.authenticated) {
         setFavorites([]);
         setFavoritesPagination(null);
         return;
@@ -138,7 +117,7 @@ export default function FavoritesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [session.authenticated]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -155,18 +134,31 @@ export default function FavoritesPage() {
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+  }, []);
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return;
+    }
 
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        void refreshFavorites();
+        if (session.authenticated) {
+          void refreshFavorites();
+          return;
+        }
+
+        setFavorites([]);
+        setFavoritesPagination(null);
+        setIsLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshFavorites]);
+  }, [isSessionLoading, refreshFavorites, session.authenticated]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,
@@ -229,7 +221,7 @@ export default function FavoritesPage() {
           </div>
         </header>
 
-        {isLoading && !session.authenticated ? (
+        {(isSessionLoading || isLoading) && !session.authenticated ? (
           <section className="grid min-h-[32rem] place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <Heart className="mx-auto size-12 text-blue-600" />

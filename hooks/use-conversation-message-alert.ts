@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 
 const conversationAlertStorageKey = 'smartstore_conversation_alert';
@@ -39,10 +40,10 @@ export function useConversationMessageAlert({
   userId,
 }: UseConversationMessageAlertOptions = {}) {
   const pathname = usePathname();
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const { session } = useAuthSession();
   const [hasConversationAlert, setHasConversationAlert] = useState(false);
   const isUserIdControlled = userId !== undefined;
-  const currentUserId = userId === undefined ? sessionUserId : userId;
+  const currentUserId = userId === undefined ? (session.user?.id ?? null) : userId;
 
   const syncUnreadConversations = useCallback(async () => {
     if (!currentUserId || pathname.startsWith('/conversations')) {
@@ -87,45 +88,6 @@ export function useConversationMessageAlert({
   }, [currentUserId, pathname]);
 
   useEffect(() => {
-    if (userId !== undefined) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function syncSession() {
-      try {
-        const response = await fetch('/api/auth/session', { cache: 'no-store' });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as {
-          authenticated?: boolean;
-          user?: { id?: string } | null;
-        };
-
-        if (!cancelled) {
-          setSessionUserId(
-            payload.authenticated && payload.user?.id ? payload.user.id : null,
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setSessionUserId(null);
-        }
-      }
-    }
-
-    void syncSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  useEffect(() => {
     let cancelled = false;
 
     if (pathname.startsWith('/conversations')) {
@@ -144,7 +106,6 @@ export function useConversationMessageAlert({
     queueMicrotask(() => {
       if (!cancelled) {
         if (currentUserId) {
-          setHasConversationAlert(false);
           void syncUnreadConversations();
           return;
         }

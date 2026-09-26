@@ -28,23 +28,11 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
+import type { AuthUser } from '@/hooks/use-auth-session';
+import { useAuthSession } from '@/hooks/use-auth-session';
 import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { Button } from '@ui/button';
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-  picture?: string;
-  phoneNumber?: string;
-  role?: string;
-};
-
-type AuthSessionPayload = {
-  authenticated: boolean;
-  user: AuthUser | null;
-};
 
 type ProfileNotice = {
   tone: 'success' | 'danger' | 'info';
@@ -53,11 +41,11 @@ type ProfileNotice = {
 
 export default function AccountPage() {
   const router = useRouter();
-  const [session, setSession] = useState<AuthSessionPayload>({
-    authenticated: false,
-    user: null,
-  });
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const {
+    isSessionLoading,
+    session,
+    setSession,
+  } = useAuthSession();
   const [profileName, setProfileName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
   const [profilePicturePreview, setProfilePicturePreview] = useState('');
@@ -83,49 +71,28 @@ export default function AccountPage() {
   const hasProfileNameChanges = profileName !== savedProfileName;
   const visibleProfilePicture = profilePicturePreview || profilePicture;
 
-  const refreshSession = useCallback(() => {
-    setIsSessionLoading(true);
-
-    return fetch('/api/auth/session', { cache: 'no-store' })
-      .then((response) => response.json() as Promise<AuthSessionPayload>)
-      .then((payload) => {
-        setSession(payload);
-        setProfileName(payload.user?.name ?? '');
-        setProfilePicture(payload.user?.picture ?? '');
-        setProfilePhone(payload.user?.phoneNumber ?? '');
-        setSavedProfileName(payload.user?.name ?? '');
-        setSavedProfilePhone(payload.user?.phoneNumber ?? '');
-        setIsEditingProfilePhone(false);
-      })
-      .catch(() => {
-        setSession({ authenticated: false, user: null });
-        setProfileName('');
-        setProfilePicture('');
-        setProfilePhone('');
-        setSavedProfileName('');
-        setSavedProfilePhone('');
-        setIsEditingProfilePhone(false);
-      })
-      .finally(() => {
-        setIsSessionLoading(false);
-      });
-  }, []);
+  const syncProfileFromSession = useCallback(
+    (nextSession = session) => {
+      setProfileName(nextSession.user?.name ?? '');
+      setProfilePicture(nextSession.user?.picture ?? '');
+      setProfilePhone(nextSession.user?.phoneNumber ?? '');
+      setSavedProfileName(nextSession.user?.name ?? '');
+      setSavedProfilePhone(nextSession.user?.phoneNumber ?? '');
+      setIsEditingProfilePhone(false);
+    },
+    [session],
+  );
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
+  }, []);
 
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        void refreshSession();
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshSession]);
+  useEffect(() => {
+    if (!isSessionLoading) {
+      syncProfileFromSession(session);
+    }
+  }, [isSessionLoading, session, syncProfileFromSession]);
 
   useEffect(() => {
     return () => {
@@ -138,7 +105,6 @@ export default function AccountPage() {
   const handleLogout = useCallback(() => {
     void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
       setSession({ authenticated: false, user: null });
-      setIsSessionLoading(false);
       setProfileName('');
       setProfilePicture('');
       setProfilePicturePreview('');
@@ -148,7 +114,7 @@ export default function AccountPage() {
       setIsEditingProfilePhone(false);
       setProfileNotice(null);
     });
-  }, []);
+  }, [setSession]);
 
   const saveProfile = useCallback(async (nextPhoneNumber = profilePhone) => {
     if (countContactPhoneCandidates(nextPhoneNumber) > 1) {
@@ -218,7 +184,7 @@ export default function AccountPage() {
     } finally {
       setIsSavingProfile(false);
     }
-  }, [profileName, profilePhone, profilePicture, router]);
+  }, [profileName, profilePhone, profilePicture, router, setSession]);
 
   const editProfilePhone = useCallback(() => {
     setProfilePhone(savedProfilePhone);
@@ -334,7 +300,7 @@ export default function AccountPage() {
     } finally {
       setIsUploadingProfilePicture(false);
     }
-  }, [router]);
+  }, [router, setSession]);
 
   const deleteAccount = useCallback(async () => {
     if (
@@ -390,7 +356,7 @@ export default function AccountPage() {
     } finally {
       setIsDeletingAccount(false);
     }
-  }, [router]);
+  }, [router, setSession]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
