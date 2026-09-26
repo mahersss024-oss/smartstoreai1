@@ -52,7 +52,7 @@ export default function CommissionAgreementPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-4xl content-center gap-4 px-4 py-6 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">

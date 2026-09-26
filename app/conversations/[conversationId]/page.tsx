@@ -768,7 +768,7 @@ export default function ConversationPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid min-h-screen max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/conversations">
@@ -786,7 +786,7 @@ export default function ConversationPage() {
 
         <section className="grid min-h-0 gapx-1 py-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <section className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-md bg-white dark:bg-card lg:h-[calc(100vh-8.5rem)]">
-            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="flex items-center justify-between gap-3 px-1 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link
                   href={otherParticipantProfileHref}
@@ -1004,7 +1004,7 @@ export default function ConversationPage() {
             </form>
           </section>
 
-          <aside className="grid h-fit gap-4 border-t border-white/50 p-3 dark:border-white/10 lg:border-t-0">
+          <aside className="grid h-fit gap-4 px-1 py-3">
             <div className="flex items-start gap-3">
               {conversation?.listing ? (
                 <Link

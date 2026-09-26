@@ -61,5 +61,8 @@ test('customer market pages avoid heavy nested card styling', () => {
     assert.doesNotMatch(source, /bg-white p-[45] dark:bg-card/);
     assert.doesNotMatch(source, /bg-white\/80/);
     assert.doesNotMatch(source, /border-b border-white\/70/);
+    assert.doesNotMatch(source, /border-b border-white\/40/);
+    assert.doesNotMatch(source, /border-t border-white\/50/);
+    assert.doesNotMatch(source, /border-t border-border\/70/);
   }
 });

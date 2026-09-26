@@ -224,7 +224,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
@@ -311,26 +311,26 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               </div>
 
               <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="border-t border-border/70 pt-3">
+                <div className="pt-3">
                   <div className="text-xs text-muted-foreground">السعر</div>
                   <div className="mt-1 text-lg font-bold text-blue-700">{formatPrice(listing.price)}</div>
                 </div>
-                <div className="border-t border-border/70 pt-3">
+                <div className="pt-3">
                   <div className="text-xs text-muted-foreground">المدينة</div>
                   <div className="mt-1 flex items-center gap-1 text-sm font-bold">
                     <MapPin className="size-4 text-blue-600" />
                     {listing.city ?? 'السعودية'}
                   </div>
                 </div>
-                <div className="border-t border-border/70 pt-3">
+                <div className="pt-3">
                   <div className="text-xs text-muted-foreground">الحالة</div>
                   <div className="mt-1 text-sm font-bold">{formatCondition(listing.condition)}</div>
                 </div>
-                <div className="border-t border-border/70 pt-3">
+                <div className="pt-3">
                   <div className="text-xs text-muted-foreground">طريقة البيع</div>
                   <div className="mt-1 text-sm font-bold">{saleTerms}</div>
                 </div>
-                <div className="border-t border-border/70 pt-3">
+                <div className="pt-3">
                   <div className="text-xs text-muted-foreground">رقم الإعلان</div>
                   <div className="mt-1 truncate text-sm font-bold">{listing.id}</div>
                 </div>
@@ -345,7 +345,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               {attributes.length ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {attributes.map(([key, value]) => (
-                    <div key={key} className="border-t border-border/70 pt-3">
+                    <div key={key} className="pt-3">
                       <div className="text-xs text-muted-foreground">{formatAttributeLabel(key)}</div>
                       <div className="mt-1 break-words text-sm font-semibold">
                         {formatAttributeValue(key, value)}
@@ -354,7 +354,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   ))}
                 </div>
               ) : (
-                <p className="border-t border-dashed pt-4 text-sm leading-7 text-muted-foreground">
+                <p className="pt-4 text-sm leading-7 text-muted-foreground">
                   لا توجد بيانات إضافية محفوظة لهذا الإعلان حتى الآن.
                 </p>
               )}
@@ -379,21 +379,21 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             <section className="p-4">
               <div className="mb-3 text-sm font-bold">نشاط الإعلان</div>
               <div className="grid gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-2 border-t py-2">
+                <div className="flex items-center justify-between gap-2 py-2">
                   <span className="flex items-center gap-2">
                     <Eye className="size-4 text-blue-600" />
                     المشاهدات
                   </span>
                   <strong className="text-foreground">{listing.views}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 border-t py-2">
+                <div className="flex items-center justify-between gap-2 py-2">
                   <span className="flex items-center gap-2">
                     <MessageCircle className="size-4 text-blue-600" />
                     الرسائل
                   </span>
                   <strong className="text-foreground">{listing.messageCount}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 border-t py-2">
+                <div className="flex items-center justify-between gap-2 py-2">
                   <span className="flex items-center gap-2">
                     <CalendarDays className="size-4 text-blue-600" />
                     آخر تحديث

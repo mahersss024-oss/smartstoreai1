@@ -357,7 +357,7 @@ export default function CommissionsPage() {
         open={Boolean(pendingSaleAgreement)}
       />
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -424,7 +424,7 @@ export default function CommissionsPage() {
             </section>
 
             {notice && (
-              <div className="border-t border-white/50 px-4 py-3 text-sm text-muted-foreground dark:border-white/10">
+              <div className="px-1 py-3 text-sm text-muted-foreground">
                 {notice}
               </div>
             )}
@@ -477,7 +477,7 @@ export default function CommissionsPage() {
                     return (
                       <article
                         key={method.id}
-                        className={`grid gap-3 border-t border-border/70 pt-3 ${theme.card}`}
+                        className={`grid gap-3 pt-3 ${theme.card}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -554,7 +554,7 @@ export default function CommissionsPage() {
                     {orderedCommissions.map((commission) => (
                       <article
                         key={commission.id}
-                        className={`grid gap-3 border-t border-border/70 pt-3 ${
+                        className={`grid gap-3 pt-3 ${
                           commission.listingId === targetListingId
                             ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20 dark:bg-blue-400/10'
                             : ''

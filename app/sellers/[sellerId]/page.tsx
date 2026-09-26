@@ -92,7 +92,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/40 px-1 py-3 dark:border-white/10">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
@@ -153,7 +153,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
         </section>
 
         <section className="grid gap-3 p-4 sm:grid-cols-3">
-          <div className="border-t border-border/70 pt-3">
+          <div className="pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <Star className="size-4 text-blue-600" />
               التقييم
@@ -171,7 +171,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
               تقييم المعلن
             </Button>
           </div>
-          <div className="border-t border-border/70 pt-3">
+          <div className="pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <MessageCircle className="size-4 text-blue-600" />
               التواصل
@@ -180,7 +180,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
               يتم فتح المحادثة من داخل الإعلان لحماية سياق البيع.
             </p>
           </div>
-          <div className="border-t border-border/70 pt-3">
+          <div className="pt-3">
             <div className="flex items-center gap-2 text-sm font-bold">
               <ShieldCheck className="size-4 text-blue-600" />
               السلامة
@@ -192,9 +192,9 @@ export default async function SellerProfilePage({ params }: PageProps) {
         </section>
 
         <section className="bg-white dark:bg-card">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex items-center justify-between gap-3 px-1 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="border-b-2 border-blue-600 px-1 pb-2 text-sm font-bold text-blue-700 dark:text-blue-300">
+              <span className="px-1 pb-2 text-sm font-bold text-blue-700 dark:text-blue-300">
                 الإعلانات
               </span>
               <span className="px-1 pb-2 text-sm text-muted-foreground">

@@ -939,7 +939,7 @@ export default function AccountListingsPage() {
         open={Boolean(pendingPublishListing)}
       />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/40 px-1 py-3 dark:border-white/10 sm:gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
@@ -1027,19 +1027,19 @@ export default function AccountListingsPage() {
             </section>
 
             <section className="grid gap-3 sm:grid-cols-4">
-              <div className="border-t border-border/70 p-3 text-center">
+              <div className="px-1 py-3 text-center">
                 <div className="text-2xl font-bold">{stats.published}</div>
                 <div className="text-xs text-muted-foreground">منشور</div>
               </div>
-              <div className="border-t border-border/70 p-3 text-center">
+              <div className="px-1 py-3 text-center">
                 <div className="text-2xl font-bold">{stats.drafts}</div>
                 <div className="text-xs text-muted-foreground">مسودة</div>
               </div>
-              <div className="border-t border-border/70 p-3 text-center">
+              <div className="px-1 py-3 text-center">
                 <div className="text-2xl font-bold">{stats.paused}</div>
                 <div className="text-xs text-muted-foreground">موقوف</div>
               </div>
-              <div className="border-t border-border/70 p-3 text-center">
+              <div className="px-1 py-3 text-center">
                 <div className="text-2xl font-bold">{stats.sold}</div>
                 <div className="text-xs text-muted-foreground">مباع</div>
               </div>
