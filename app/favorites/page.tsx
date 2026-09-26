@@ -288,45 +288,50 @@ export default function FavoritesPage() {
               </div>
             ) : (
               <div className="grid gap-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-2">
                   {favorites.map((favorite) => (
                     <Link
-                    key={favorite.id}
-                    className="overflow-hidden rounded-md bg-white transition hover:bg-blue-50/70 dark:bg-card dark:hover:bg-blue-400/10"
-                    href={`/listings/${favorite.listingId}`}
-                  >
-                    <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-slate-900">
-                      <img
-                        alt={favorite.listing?.title ?? 'صورة الإعلان'}
-                        className="h-full w-full object-contain"
-                        decoding="async"
-                        loading="lazy"
-                        onError={(event) => {
-                          event.currentTarget.hidden = true;
-                          event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                        }}
-                        src={getListingImage(favorite.listing)}
-                      />
-                      <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
-                        <ImageIcon className="size-6" />
+                      key={favorite.id}
+                      className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 rounded-md bg-white/70 p-2 transition hover:bg-blue-50/80 dark:bg-card/45 dark:hover:bg-blue-400/10 sm:grid-cols-[7rem_minmax(0,1fr)_auto]"
+                      href={`/listings/${favorite.listingId}`}
+                    >
+                      <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
+                        <img
+                          alt={favorite.listing?.title ?? 'صورة الإعلان'}
+                          className="h-full w-full object-cover"
+                          decoding="async"
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                            event.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                          }}
+                          src={getListingImage(favorite.listing)}
+                        />
+                        <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                          <ImageIcon className="size-6" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid gap-2 p-3">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                        <Store className="size-4" />
-                        إعلان محفوظ
+                      <div className="grid min-w-0 gap-1.5">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                          <Store className="size-3.5 shrink-0" />
+                          <span className="truncate">إعلان محفوظ</span>
+                        </div>
+                        <h3 className="truncate text-sm font-bold">
+                          {favorite.listing?.title ?? 'إعلان غير متاح'}
+                        </h3>
+                        <div className="text-sm font-bold text-blue-700 sm:hidden">
+                          {formatPrice(favorite.listing?.price)}
+                        </div>
+                        <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin className="size-3.5 shrink-0" />
+                          <span className="truncate">{favorite.listing?.city ?? 'السعودية'}</span>
+                        </div>
                       </div>
-                      <h3 className="line-clamp-1 text-base font-bold">
-                        {favorite.listing?.title ?? 'إعلان غير متاح'}
-                      </h3>
-                      <div className="text-lg font-bold text-blue-700">
-                        {formatPrice(favorite.listing?.price)}
+                      <div className="hidden min-w-32 justify-items-end text-sm sm:grid">
+                        <span className="font-bold text-blue-700">
+                          {formatPrice(favorite.listing?.price)}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="size-3.5" />
-                        {favorite.listing?.city ?? 'السعودية'}
-                      </div>
-                    </div>
                     </Link>
                   ))}
                 </div>
