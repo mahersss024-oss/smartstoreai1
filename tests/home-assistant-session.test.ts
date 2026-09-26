@@ -105,9 +105,10 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
 
   assert.match(mobileNavigation, /href: '\/conversations'/);
   assert.match(mobileNavigation, /label: 'محادثاتي'/);
-  assert.match(mobileNavigation, /grid-cols-4/);
-  assert.match(mobileNavigation, /w-1\/4/);
+  assert.match(mobileNavigation, /grid-cols-3/);
+  assert.match(mobileNavigation, /w-1\/3/);
   assert.match(mobileNavigation, /aria-label=\{item\.label\}/);
+  assert.doesNotMatch(mobileNavigation, /المزيد/);
   assert.doesNotMatch(mobileNavigation, /iconOnly/);
   assert.doesNotMatch(mobileNavigation, /sr-only/);
   assert.match(mobileNavigation, /active[\s\S]*size-10 bg-blue-600 text-white/);

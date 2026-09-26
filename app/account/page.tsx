@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  FileText,
   Heart,
   Image as ImageIcon,
   LogOut,
@@ -17,6 +18,7 @@ import {
   Phone,
   Save,
   ShieldCheck,
+  Store,
   Trash2,
   Upload,
   User,
@@ -539,6 +541,46 @@ export default function AccountPage() {
                     </Link>
                   </Button>
                 )}
+              </div>
+            </section>
+
+            <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+              <div className="flex items-start gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <Store className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-bold">الخدمات والإعدادات</h2>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    روابط السياسات والمعلومات الأساسية في سوق حمد.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild variant="outline" className="h-auto justify-start rounded-md px-3 py-3 text-right">
+                  <Link href="/terms">
+                    <FileText className="size-4" />
+                    الشروط
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-auto justify-start rounded-md px-3 py-3 text-right">
+                  <Link href="/privacy">
+                    <ShieldCheck className="size-4" />
+                    الخصوصية
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-auto justify-start rounded-md px-3 py-3 text-right">
+                  <Link href="/listing-policy">
+                    <Store className="size-4" />
+                    سياسة الإعلانات
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-auto justify-start rounded-md px-3 py-3 text-right">
+                  <Link href="/commission-policy">
+                    <Percent className="size-4" />
+                    سياسة رسوم المنصة
+                  </Link>
+                </Button>
               </div>
             </section>
 

@@ -3649,7 +3649,7 @@ export default function Page() {
   const handleNearbyMarketplaceSearch = useCallback(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setNearbyMarketplaceNotice(
-        'البحث القريب يحتاج تفعيل خدمة الموقع في المتصفح.',
+        'بحث موقعي يحتاج تفعيل خدمة الموقع في المتصفح.',
       );
       return;
     }
@@ -3675,7 +3675,7 @@ export default function Page() {
 
         setNearbyMarketplaceCity(nearestCity.city);
         setSelectedMarketCity(nearestCity.city);
-        setNearbyMarketplaceNotice(`تم عرض الإعلانات القريبة من ${nearestCity.city}.`);
+        setNearbyMarketplaceNotice(`تم عرض إعلانات موقعي من ${nearestCity.city}.`);
       },
       () => {
         setIsLocatingNearbyListings(false);
@@ -3864,13 +3864,7 @@ export default function Page() {
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
-              <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-between md:text-right">
-                <div>
-                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 md:justify-start">
-                    <Store className="size-4" />
-                    واجهة الإعلانات
-                  </div>
-                </div>
+              <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-end md:text-right">
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
@@ -4304,14 +4298,14 @@ export default function Page() {
                     className="h-10 rounded-md"
                     disabled={isLocatingNearbyListings}
                     onClick={handleNearbyMarketplaceSearch}
-                    title="القريب يحتاج إذن الموقع الجغرافي"
+                    title={'موقعي يحتاج إذن الموقع الجغرافي'}
                   >
                     {isLocatingNearbyListings ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
                       <MapPin className="size-4" />
                     )}
-                    القريب
+                    {'موقعي'}
                   </Button>
                   <Button
                     type="button"
@@ -4320,7 +4314,7 @@ export default function Page() {
                     onClick={() => setIsMarketFilterOpen((value) => !value)}
                   >
                     <SlidersHorizontal className="size-4" />
-                    فلترة
+                    {'تصفية البحث'}
                     {activeMarketFilterCount > 0 && (
                       <span className="grid size-5 place-items-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-400/20 dark:text-blue-100">
                         {activeMarketFilterCount}
@@ -4339,7 +4333,7 @@ export default function Page() {
                   <div className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50/70 p-3 text-right text-xs text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
                     <span>
                       {hasManualMarketFilters
-                        ? 'تم تطبيق فلترة محلية على الإعلانات المعروضة فقط.'
+                        ? 'تم تطبيق تصفية البحث محليًا على الإعلانات المعروضة فقط.'
                         : 'اختر تصنيفًا أو منطقة لتصفية الإعلانات المعروضة.'}
                     </span>
                     {hasManualMarketFilters && (
