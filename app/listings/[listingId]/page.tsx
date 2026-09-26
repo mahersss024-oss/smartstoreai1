@@ -174,6 +174,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   }
 
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
+  const sellerProfileHref = `/sellers/${encodeURIComponent(listing.sellerId)}`;
 
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
@@ -252,7 +253,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             <section className="px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">
                 <Link
-                  href={`/sellers/${listing.sellerId}`}
+                  href={sellerProfileHref}
                   className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
                 >
                   {sellerProfile?.picture ? (
@@ -270,7 +271,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                     المعلن
                   </div>
                   <Link
-                    href={`/sellers/${listing.sellerId}`}
+                    href={sellerProfileHref}
                     className="block truncate text-sm font-bold transition hover:text-blue-600"
                   >
                     {sellerProfile?.name ?? 'معلن سوق حمد'}

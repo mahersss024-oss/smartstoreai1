@@ -103,6 +103,10 @@ model User {
   userReportsReceived         UserReport[]            @relation("UserReportsReceived")
   userBlocksCreated           UserBlock[]             @relation("UserBlocksCreated")
   userBlocksReceived          UserBlock[]             @relation("UserBlocksReceived")
+  sellerFollowsCreated        SellerFollow[]          @relation("SellerFollowsCreated")
+  sellerFollowsReceived       SellerFollow[]          @relation("SellerFollowsReceived")
+  sellerRatingsCreated        SellerRating[]          @relation("SellerRatingsCreated")
+  sellerRatingsReceived       SellerRating[]          @relation("SellerRatingsReceived")
   commissions                 Commission[]
   adminAuditLogs              AdminAuditLog[]
   pushSubscriptions           PushSubscription[]
@@ -339,6 +343,35 @@ model UserBlock {
   @@unique([blockerId, blockedId])
   @@index([blockedId, createdAt])
   @@index([conversationId])
+}
+
+model SellerFollow {
+  id         String   @id @default(cuid())
+  followerId String
+  sellerId   String
+  createdAt  DateTime @default(now())
+
+  follower   User     @relation("SellerFollowsCreated", fields: [followerId], references: [id], onDelete: Cascade)
+  seller     User     @relation("SellerFollowsReceived", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, sellerId])
+  @@index([sellerId, createdAt])
+}
+
+model SellerRating {
+  id        String   @id @default(cuid())
+  raterId   String
+  sellerId  String
+  rating    Int
+  comment   String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rater     User     @relation("SellerRatingsCreated", fields: [raterId], references: [id], onDelete: Cascade)
+  seller    User     @relation("SellerRatingsReceived", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([raterId, sellerId])
+  @@index([sellerId, createdAt])
 }
 
 model Commission {

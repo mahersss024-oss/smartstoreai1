@@ -16,7 +16,8 @@ test('listing details links to the public seller profile without exposing privat
   const galleryIndex = page.indexOf('<ListingImageGallery');
 
   assert.match(page, /getPublicSellerProfile/);
-  assert.match(page, /href=\{`\/sellers\/\$\{listing\.sellerId\}`\}/);
+  assert.match(page, /encodeURIComponent\(listing\.sellerId\)/);
+  assert.match(page, /href=\{sellerProfileHref\}/);
   assert.match(page, /\u0627\u0644\u0645\u0639\u0644\u0646/u);
   assert.ok(sellerLabelIndex !== -1 && galleryIndex !== -1);
   assert.ok(sellerLabelIndex < galleryIndex);
@@ -38,28 +39,29 @@ test('public seller profile renders safe public data and published listing links
   const page = readSource('app/sellers/[sellerId]/page.tsx');
 
   assert.match(page, /getPublicSellerProfile/);
+  assert.match(page, /decodeURIComponent\(rawSellerId\)/);
   assert.match(page, /notFound\(\)/);
-  assert.match(page, /الإعلانات/);
   assert.match(page, /href=\{`\/listings\/\$\{listing\.id\}`\}/);
   assert.match(page, /SellerProfileActions/);
-  assert.match(page, /تقييم المعلن/);
-  assert.match(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
+  assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
+  assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
+  assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
+  assert.match(page, /إعلانات المعلن/);
+  assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
   assert.doesNotMatch(page, /seller\.email/);
-  assert.doesNotMatch(page, /api\/marketplace\/ratings/);
 });
 
-test('public seller profile reports through the existing listing report route', () => {
+test('public seller profile exposes real trust actions without private seller APIs', () => {
   const actions = readSource('app/sellers/[sellerId]/seller-profile-actions.tsx');
 
-  assert.match(actions, /api\/marketplace\/listings\/\$\{reportListingId\}\/reports/);
+  assert.match(actions, /api\/marketplace\/users\/\$\{encodedSellerId\}\/follow/);
+  assert.match(actions, /api\/marketplace\/users\/\$\{encodedSellerId\}\/ratings/);
+  assert.match(actions, /api\/marketplace\/users\/\$\{encodedSellerId\}\/reports/);
   assert.match(actions, /seller-profile-report/);
   assert.match(actions, /بلاغ من صفحة المعلن العامة/);
-  assert.match(actions, /متابعة/);
-  assert.match(actions, /سيتم تفعيل المتابعة في مرحلة لاحقة/);
+  assert.doesNotMatch(actions, /سيتم تفعيل المتابعة في مرحلة لاحقة/);
   assert.doesNotMatch(actions, /MoreVertical/);
-  assert.doesNotMatch(actions, /follow/i);
   assert.doesNotMatch(actions, /api\/marketplace\/sellers/);
-  assert.doesNotMatch(actions, /api\/marketplace\/users/);
 });
 
 test('repository public seller profile reads published listings only', () => {
@@ -69,5 +71,31 @@ test('repository public seller profile reads published listings only', () => {
   assert.match(repository, /getPublicSellerProfile/);
   assert.match(repository, /publishedListingCount/);
   assert.match(repository, /status: 'published'/);
+  assert.match(repository, /prisma\.sellerFollow\.count/);
+  assert.match(repository, /prisma\.sellerRating\.aggregate/);
+  assert.doesNotMatch(repository, /take: 24/);
+  assert.doesNotMatch(repository, /slice\(0, 24\)/);
   assert.doesNotMatch(repository, /email: seller\.email/);
+});
+
+test('seller trust routes reuse marketplace user paths and existing user reports', () => {
+  const followRoute = readSource('app/api/marketplace/users/[userId]/follow/route.ts');
+  const ratingRoute = readSource('app/api/marketplace/users/[userId]/ratings/route.ts');
+  const reportRoute = readSource('app/api/marketplace/users/[userId]/reports/route.ts');
+  const schema = readSource('prisma/schema.prisma');
+  const migration = readSource(
+    'prisma/migrations/20260926090000_seller_trust_features/migration.sql',
+  );
+
+  assert.match(followRoute, /toggleSellerFollow/);
+  assert.match(followRoute, /self_follow_blocked/);
+  assert.match(ratingRoute, /rateSeller/);
+  assert.match(ratingRoute, /self_rating_blocked/);
+  assert.match(reportRoute, /reportUserDirect/);
+  assert.match(reportRoute, /already_reported/);
+  assert.match(migration, /UserReport_unique_open_direct_user_report/);
+  assert.match(migration, /"conversationId" IS NULL/);
+  assert.match(schema, /model SellerFollow/);
+  assert.match(schema, /model SellerRating/);
+  assert.match(schema, /model UserReport/);
 });

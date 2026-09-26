@@ -80,6 +80,26 @@ type DatabaseListingRecord = {
 
 type Actor = AuthSessionUser | string;
 
+type SellerFollowRecord = {
+  id: string;
+  followerId: string;
+  sellerId: string;
+  createdAt: string;
+};
+
+type SellerRatingRecord = {
+  id: string;
+  raterId: string;
+  sellerId: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const memorySellerFollows = new Map<string, SellerFollowRecord>();
+const memorySellerRatings = new Map<string, SellerRatingRecord>();
+
 export type PublicSellerProfile = {
   id: string;
   name: string;
@@ -312,6 +332,36 @@ function waitForSerializableRetry(attempt: number) {
 
 function getActorId(actor: Actor) {
   return typeof actor === 'string' ? actor : actor.id;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function getSellerFollowKey(followerId: string, sellerId: string) {
+  return `${followerId}:${sellerId}`;
+}
+
+function getSellerRatingKey(raterId: string, sellerId: string) {
+  return `${raterId}:${sellerId}`;
+}
+
+function getMemorySellerFollowerCount(sellerId: string) {
+  return [...memorySellerFollows.values()].filter(
+    (follow) => follow.sellerId === sellerId,
+  ).length;
+}
+
+function getMemorySellerRatingStats(sellerId: string) {
+  const ratings = [...memorySellerRatings.values()].filter(
+    (rating) => rating.sellerId === sellerId,
+  );
+  const total = ratings.reduce((sum, rating) => sum + rating.rating, 0);
+
+  return {
+    ratingCount: ratings.length,
+    ratingAverage: ratings.length ? total / ratings.length : 0,
+  };
 }
 
 function getPlaceholderEmail(userId: string) {
@@ -702,19 +752,27 @@ export async function getPublicSellerProfile(
       return null;
     }
 
+    const ratingStats = getMemorySellerRatingStats(sellerId);
+
     return {
       id: sellerId,
       name: getPublicSellerName({ id: sellerId }),
       role: 'user',
       publishedListingCount: publishedListings.length,
-      ratingAverage: 0,
-      ratingCount: 0,
-      followerCount: 0,
-      listings: publishedListings.slice(0, 24),
+      ratingAverage: ratingStats.ratingAverage,
+      ratingCount: ratingStats.ratingCount,
+      followerCount: getMemorySellerFollowerCount(sellerId),
+      listings: publishedListings,
     };
   }
 
-  const [seller, listings, publishedListingCount] = await Promise.all([
+  const [
+    seller,
+    listings,
+    publishedListingCount,
+    followerCount,
+    ratingAggregate,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: sellerId },
       select: {
@@ -738,13 +796,20 @@ export async function getPublicSellerProfile(
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 24,
     }),
     prisma.listing.count({
       where: {
         sellerId,
         status: 'published',
       },
+    }),
+    prisma.sellerFollow.count({
+      where: { sellerId },
+    }),
+    prisma.sellerRating.aggregate({
+      where: { sellerId },
+      _avg: { rating: true },
+      _count: { rating: true },
     }),
   ]);
 
@@ -759,9 +824,9 @@ export async function getPublicSellerProfile(
     joinedAt: seller.createdAt.toISOString(),
     role: seller.role,
     publishedListingCount,
-    ratingAverage: 0,
-    ratingCount: 0,
-    followerCount: 0,
+    ratingAverage: ratingAggregate._avg.rating ?? 0,
+    ratingCount: ratingAggregate._count.rating,
+    followerCount,
     listings: listings.map(toListingRecord),
   };
 }
@@ -785,6 +850,423 @@ export async function listSellerListings(sellerId: string) {
   });
 
   return listings.map(toListingRecord);
+}
+
+export async function getSellerFollowState(sellerId: string, follower: Actor) {
+  const followerId = getActorId(follower);
+
+  if (followerId === sellerId) {
+    return {
+      status: 'self_follow_blocked' as const,
+      isFollowing: false,
+      followerCount: 0,
+      canFollow: false,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    return {
+      status: 'ok' as const,
+      isFollowing: memorySellerFollows.has(
+        getSellerFollowKey(followerId, sellerId),
+      ),
+      followerCount: getMemorySellerFollowerCount(sellerId),
+      canFollow: true,
+    };
+  }
+
+  const [seller, existingFollow, followerCount] = await Promise.all([
+    prisma.user.findUnique({ where: { id: sellerId }, select: { id: true } }),
+    prisma.sellerFollow.findUnique({
+      where: {
+        followerId_sellerId: {
+          followerId,
+          sellerId,
+        },
+      },
+    }),
+    prisma.sellerFollow.count({ where: { sellerId } }),
+  ]);
+
+  if (!seller) {
+    return {
+      status: 'not_found' as const,
+      isFollowing: false,
+      followerCount: 0,
+      canFollow: false,
+    };
+  }
+
+  return {
+    status: 'ok' as const,
+    isFollowing: Boolean(existingFollow),
+    followerCount,
+    canFollow: true,
+  };
+}
+
+export async function toggleSellerFollow(sellerId: string, follower: Actor) {
+  const followerId = getActorId(follower);
+
+  if (followerId === sellerId) {
+    return {
+      status: 'self_follow_blocked' as const,
+      isFollowing: false,
+      followerCount: 0,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    const key = getSellerFollowKey(followerId, sellerId);
+
+    if (memorySellerFollows.has(key)) {
+      memorySellerFollows.delete(key);
+
+      return {
+        status: 'unfollowed' as const,
+        isFollowing: false,
+        followerCount: getMemorySellerFollowerCount(sellerId),
+      };
+    }
+
+    memorySellerFollows.set(key, {
+      id: `follow:${key}`,
+      followerId,
+      sellerId,
+      createdAt: nowIso(),
+    });
+
+    return {
+      status: 'followed' as const,
+      isFollowing: true,
+      followerCount: getMemorySellerFollowerCount(sellerId),
+    };
+  }
+
+  const seller = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { id: true },
+  });
+
+  if (!seller) {
+    return {
+      status: 'not_found' as const,
+      isFollowing: false,
+      followerCount: 0,
+    };
+  }
+
+  await ensureActorUser(follower);
+
+  const existingFollow = await prisma.sellerFollow.findUnique({
+    where: {
+      followerId_sellerId: {
+        followerId,
+        sellerId,
+      },
+    },
+  });
+
+  if (existingFollow) {
+    await prisma.sellerFollow.delete({ where: { id: existingFollow.id } });
+
+    return {
+      status: 'unfollowed' as const,
+      isFollowing: false,
+      followerCount: await prisma.sellerFollow.count({ where: { sellerId } }),
+    };
+  }
+
+  await prisma.sellerFollow.create({
+    data: {
+      followerId,
+      sellerId,
+    },
+  });
+
+  return {
+    status: 'followed' as const,
+    isFollowing: true,
+    followerCount: await prisma.sellerFollow.count({ where: { sellerId } }),
+  };
+}
+
+export async function getSellerRatingState(sellerId: string, rater: Actor) {
+  const raterId = getActorId(rater);
+
+  if (raterId === sellerId) {
+    return {
+      status: 'self_rating_blocked' as const,
+      ratingAverage: 0,
+      ratingCount: 0,
+      myRating: null,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    const stats = getMemorySellerRatingStats(sellerId);
+    const rating = memorySellerRatings.get(getSellerRatingKey(raterId, sellerId));
+
+    return {
+      status: 'ok' as const,
+      ...stats,
+      myRating: rating
+        ? { rating: rating.rating, comment: rating.comment }
+        : null,
+    };
+  }
+
+  const [seller, rating, aggregate] = await Promise.all([
+    prisma.user.findUnique({ where: { id: sellerId }, select: { id: true } }),
+    prisma.sellerRating.findUnique({
+      where: {
+        raterId_sellerId: {
+          raterId,
+          sellerId,
+        },
+      },
+    }),
+    prisma.sellerRating.aggregate({
+      where: { sellerId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
+  ]);
+
+  if (!seller) {
+    return {
+      status: 'not_found' as const,
+      ratingAverage: 0,
+      ratingCount: 0,
+      myRating: null,
+    };
+  }
+
+  return {
+    status: 'ok' as const,
+    ratingAverage: aggregate._avg.rating ?? 0,
+    ratingCount: aggregate._count.rating,
+    myRating: rating
+      ? { rating: rating.rating, comment: rating.comment ?? undefined }
+      : null,
+  };
+}
+
+export async function rateSeller(
+  sellerId: string,
+  rater: Actor,
+  input: { rating: number; comment?: string },
+) {
+  const raterId = getActorId(rater);
+  const rating = Math.trunc(input.rating);
+  const comment = input.comment?.trim() || undefined;
+
+  if (raterId === sellerId) {
+    return {
+      status: 'self_rating_blocked' as const,
+      ratingAverage: 0,
+      ratingCount: 0,
+      myRating: null,
+    };
+  }
+
+  if (rating < 1 || rating > 5) {
+    return {
+      status: 'invalid_rating' as const,
+      ratingAverage: 0,
+      ratingCount: 0,
+      myRating: null,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    const key = getSellerRatingKey(raterId, sellerId);
+    const existing = memorySellerRatings.get(key);
+    const timestamp = nowIso();
+
+    memorySellerRatings.set(key, {
+      id: existing?.id ?? `rating:${key}`,
+      raterId,
+      sellerId,
+      rating,
+      comment,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    });
+
+    const stats = getMemorySellerRatingStats(sellerId);
+
+    return {
+      status: existing ? 'updated' as const : 'created' as const,
+      ...stats,
+      myRating: { rating, comment },
+    };
+  }
+
+  const seller = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { id: true },
+  });
+
+  if (!seller) {
+    return {
+      status: 'not_found' as const,
+      ratingAverage: 0,
+      ratingCount: 0,
+      myRating: null,
+    };
+  }
+
+  await ensureActorUser(rater);
+
+  const savedRating = await prisma.sellerRating.upsert({
+    where: {
+      raterId_sellerId: {
+        raterId,
+        sellerId,
+      },
+    },
+    create: {
+      raterId,
+      sellerId,
+      rating,
+      comment,
+    },
+    update: {
+      rating,
+      comment,
+    },
+  });
+  const aggregate = await prisma.sellerRating.aggregate({
+    where: { sellerId },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  return {
+    status:
+      savedRating.createdAt.getTime() === savedRating.updatedAt.getTime()
+        ? 'created' as const
+        : 'updated' as const,
+    ratingAverage: aggregate._avg.rating ?? 0,
+    ratingCount: aggregate._count.rating,
+    myRating: {
+      rating: savedRating.rating,
+      comment: savedRating.comment ?? undefined,
+    },
+  };
+}
+
+export async function reportUserDirect(
+  targetUserId: string,
+  reporter: Actor,
+  input: { reason: string; details?: string },
+) {
+  const reporterId = getActorId(reporter);
+
+  if (reporterId === targetUserId) {
+    return {
+      status: 'self_report_blocked' as const,
+      report: null,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    return {
+      status: 'reported' as const,
+      report: {
+        id: `user-report:${reporterId}:${targetUserId}`,
+        reporterId,
+        targetUserId,
+        reason: input.reason,
+        details: input.details,
+        status: 'open' as const,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      },
+    };
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true },
+  });
+
+  if (!targetUser) {
+    return {
+      status: 'not_found' as const,
+      report: null,
+    };
+  }
+
+  const existingOpenReport = await prisma.userReport.findFirst({
+    where: {
+      reporterId,
+      targetUserId,
+      conversationId: null,
+      status: 'open',
+    },
+  });
+
+  if (existingOpenReport) {
+    return {
+      status: 'already_reported' as const,
+      report: {
+        id: existingOpenReport.id,
+        reporterId: existingOpenReport.reporterId,
+        targetUserId: existingOpenReport.targetUserId,
+        reason: existingOpenReport.reason,
+        details: existingOpenReport.details ?? undefined,
+        status: existingOpenReport.status,
+        createdAt: existingOpenReport.createdAt.toISOString(),
+        updatedAt: existingOpenReport.updatedAt.toISOString(),
+      },
+    };
+  }
+
+  await ensureActorUser(reporter);
+
+  const report = await prisma.userReport
+    .create({
+      data: {
+        reporterId,
+        targetUserId,
+        reason: input.reason,
+        details: input.details,
+        status: 'open',
+      },
+    })
+    .catch(async (error) => {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      ) {
+        throw error;
+      }
+
+      return prisma.userReport.findFirstOrThrow({
+        where: {
+          reporterId,
+          targetUserId,
+          conversationId: null,
+          status: 'open',
+        },
+      });
+    });
+
+  return {
+    status: 'reported' as const,
+    report: {
+      id: report.id,
+      reporterId: report.reporterId,
+      targetUserId: report.targetUserId,
+      reason: report.reason,
+      details: report.details ?? undefined,
+      status: report.status,
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString(),
+    },
+  };
 }
 
 export async function listSellerListingsPage(

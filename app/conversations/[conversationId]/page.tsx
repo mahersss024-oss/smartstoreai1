@@ -288,7 +288,7 @@ export default function ConversationPage() {
     getParticipantDisplayName(otherParticipant) ||
     getParticipantFallbackName(otherParticipantId);
   const otherParticipantProfileHref = otherParticipantId
-    ? `/sellers/${otherParticipantId}`
+    ? `/sellers/${encodeURIComponent(otherParticipantId)}`
     : '/conversations';
   const visibleMessages = useMemo(
     () =>

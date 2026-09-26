@@ -6,9 +6,6 @@ import {
   ArrowRight,
   BadgeCheck,
   MapPin,
-  MessageCircle,
-  ShieldCheck,
-  Star,
   Store,
   UserRound,
 } from 'lucide-react';
@@ -82,7 +79,8 @@ function formatJoinDate(value: string | undefined) {
 }
 
 export default async function SellerProfilePage({ params }: PageProps) {
-  const { sellerId } = await params;
+  const { sellerId: rawSellerId } = await params;
+  const sellerId = decodeURIComponent(rawSellerId);
   const seller = await getPublicSellerProfile(sellerId);
 
   if (!seller) {
@@ -141,73 +139,29 @@ export default async function SellerProfilePage({ params }: PageProps) {
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <span>{formatJoinDate(seller.joinedAt)}</span>
                 <span>{seller.publishedListingCount} إعلان منشور</span>
-                <span>{seller.followerCount} متابع</span>
               </div>
             </div>
 
             <SellerProfileActions
-              reportListingId={seller.listings[0]?.id}
+              sellerId={seller.id}
               sellerName={seller.name}
+              initialFollowerCount={seller.followerCount}
+              initialRatingAverage={seller.ratingAverage}
+              initialRatingCount={seller.ratingCount}
             />
           </div>
         </section>
 
-        <section className="grid gap-3 p-4 sm:grid-cols-3">
-          <div className="pt-3">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Star className="size-4 text-blue-600" />
-              التقييم
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {seller.ratingCount} تقييم، متوسط {seller.ratingAverage.toFixed(1)}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3 rounded-md"
-              disabled
-              title="سيتم تفعيل التقييم في مرحلة لاحقة"
-            >
-              تقييم المعلن
-            </Button>
-          </div>
-          <div className="pt-3">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <MessageCircle className="size-4 text-blue-600" />
-              التواصل
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              يتم فتح المحادثة من داخل الإعلان لحماية سياق البيع.
-            </p>
-          </div>
-          <div className="pt-3">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <ShieldCheck className="size-4 text-blue-600" />
-              السلامة
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              الإبلاغ والحظر متاحان من المحادثة عند وجود تعامل مباشر.
-            </p>
-          </div>
-        </section>
-
-        <section className="bg-white dark:bg-card">
-          <div className="flex items-center justify-between gap-3 px-1 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="px-1 pb-2 text-sm font-bold text-blue-700 dark:text-blue-300">
-                الإعلانات
-              </span>
-              <span className="px-1 pb-2 text-sm text-muted-foreground">
-                التقييمات
-              </span>
-              <span className="px-1 pb-2 text-sm text-muted-foreground">
-                عن المعلن
-              </span>
-            </div>
+        <section className="grid gap-3">
+          <div className="flex items-center justify-between gap-3 px-1 py-2">
+            <h2 className="text-base font-bold">إعلانات المعلن</h2>
+            <span className="text-xs font-semibold text-muted-foreground">
+              {seller.publishedListingCount} إعلان منشور
+            </span>
           </div>
 
           {seller.listings.length ? (
-            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {seller.listings.map((listing) => (
                 <Link
                   key={listing.id}
