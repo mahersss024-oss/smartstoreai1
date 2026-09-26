@@ -813,7 +813,7 @@ export async function getPublicSellerProfile(
     }),
   ]);
 
-  if (!seller || publishedListingCount === 0) {
+  if (!seller) {
     return null;
   }
 

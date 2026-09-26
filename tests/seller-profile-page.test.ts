@@ -67,7 +67,7 @@ test('public seller profile exposes real trust actions without private seller AP
   assert.doesNotMatch(actions, /api\/marketplace\/sellers/);
 });
 
-test('repository public seller profile reads published listings only', () => {
+test('repository public seller profile reads public accounts and published listings only', () => {
   const repository = readSource('agent/marketplace/repository.ts');
 
   assert.match(repository, /export type PublicSellerProfile/);
@@ -76,6 +76,8 @@ test('repository public seller profile reads published listings only', () => {
   assert.match(repository, /status: 'published'/);
   assert.match(repository, /prisma\.sellerFollow\.count/);
   assert.match(repository, /prisma\.sellerRating\.aggregate/);
+  assert.match(repository, /if \(!seller\) \{/);
+  assert.doesNotMatch(repository, /publishedListingCount === 0/);
   assert.doesNotMatch(repository, /take: 24/);
   assert.doesNotMatch(repository, /slice\(0, 24\)/);
   assert.doesNotMatch(repository, /email: seller\.email/);

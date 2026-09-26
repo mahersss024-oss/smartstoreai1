@@ -75,6 +75,7 @@ test('seller buyer conversation header shows the other customer, not the listing
   assert.match(source, /type ConversationParticipant/);
   assert.match(source, /otherParticipantName/);
   assert.match(source, /otherParticipantProfileHref/);
+  assert.match(source, /encodeURIComponent\(otherParticipantId\)/);
   assert.match(source, /otherParticipant\?\.picture/);
   assert.match(source, /getParticipantInitial\(otherParticipantName\)/);
   assert.match(source, /href=\{otherParticipantProfileHref\}/);
