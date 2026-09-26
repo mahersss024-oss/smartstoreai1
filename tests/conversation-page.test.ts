@@ -74,11 +74,15 @@ test('seller buyer conversation header shows the other customer, not the listing
 
   assert.match(source, /type ConversationParticipant/);
   assert.match(source, /otherParticipantName/);
-  assert.match(source, /otherParticipantRoleLabel/);
+  assert.match(source, /otherParticipantProfileHref/);
   assert.match(source, /otherParticipant\?\.picture/);
   assert.match(source, /getParticipantInitial\(otherParticipantName\)/);
+  assert.match(source, /href=\{otherParticipantProfileHref\}/);
+  assert.match(source, /DropdownMenuTrigger/);
+  assert.match(source, /MoreVertical/);
   assert.doesNotMatch(source, /<Bot className="size-4" \/>/);
   assert.doesNotMatch(source, /session\.authenticated \? roleLabel/);
+  assert.doesNotMatch(source, /conversation\?\.status === 'open'/);
   assert.match(repository, /seller: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
   assert.match(repository, /buyer: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
 });
@@ -128,13 +132,16 @@ test('conversations list uses compact cards with a small delete menu', () => {
   assert.match(source, /هل أنت متأكد من حذف هذه المحادثة؟/);
   assert.match(source, /تم حذف المحادثة بنجاح/);
   assert.match(source, /تعذر حذف المحادثة\. حاول مرة أخرى/);
-  assert.match(source, /grid-cols-\[3\.75rem_minmax\(0,1fr\)_auto\]/);
+  assert.match(source, /grid-cols-\[3\.25rem_minmax\(0,1fr\)_auto\]/);
+  assert.match(source, /otherParticipantName/);
+  assert.match(source, /otherParticipant\?\.picture/);
+  assert.doesNotMatch(source, /formatPrice\(conversation\.listing\?\.price\)/);
 });
 
 test('conversations list keeps each conversation card horizontal on every viewport', () => {
   const source = readConversationsIndexPage();
   const cardLinkMatch = source.match(
-    /className="([^"]*grid min-w-0 grid-cols-\[3\.75rem_minmax\(0,1fr\)_auto\][^"]*)"/,
+    /className="([^"]*grid min-w-0 grid-cols-\[3\.25rem_minmax\(0,1fr\)_auto\][^"]*)"/,
   );
 
   assert.ok(cardLinkMatch, 'conversation card link should use a fixed horizontal grid');
@@ -167,7 +174,7 @@ test('conversation read state is marked by the server and shown quietly in UI', 
   assert.match(repository, /senderId: \{ not: userId \}/);
   assert.match(conversationPage, /تمت القراءة/);
   assert.match(conversationPage, /غير مقروءة/);
-  assert.match(conversationsPage, /غير مقروءة/);
+  assert.match(conversationsPage, /hasUnreadMessages/);
   assert.match(conversationsPage, /hasUnreadMessages/);
 });
 

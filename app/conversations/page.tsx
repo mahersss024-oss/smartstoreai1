@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
-  BadgeCheck,
   MessageCircle,
   MoreVertical,
   ShieldCheck,
@@ -65,6 +64,15 @@ type ConversationRecord = {
   }>;
   updatedAt: string;
   listing: ConversationListing | null;
+  seller?: ConversationParticipant;
+  buyer?: ConversationParticipant;
+};
+
+type ConversationParticipant = {
+  id: string;
+  email?: string;
+  name?: string;
+  picture?: string;
 };
 
 type PaginationMeta = {
@@ -74,41 +82,47 @@ type PaginationMeta = {
   nextPage: number | null;
 };
 
-const missingListingImageDataUrl =
-  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22900%22 height=%22675%22 viewBox=%220 0 900 675%22%3E%3Crect width=%22900%22 height=%22675%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M382 291h136a28 28 0 0 1 28 28v95a28 28 0 0 1-28 28H382a28 28 0 0 1-28-28v-95a28 28 0 0 1 28-28z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22/%3E%3Ccircle cx=%22417%22 cy=%22342%22 r=%2220%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m382 414 53-55 43 43 25-27 43 39%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22450%22 y=%22492%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
+function formatUpdatedAt(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
 
-function getListingImage(listing: ConversationListing | null) {
-  const image = listing?.images?.[0];
+  return new Intl.DateTimeFormat('ar-SA', sameDay
+    ? {
+        hour: '2-digit',
+        minute: '2-digit',
+      }
+    : {
+        day: 'numeric',
+        month: 'short',
+      }).format(date);
+}
 
+function getParticipantFallbackName(participantId?: string | null) {
+  if (!participantId) {
+    return 'عميل سوق حمد';
+  }
+
+  if (participantId.startsWith('google:') || participantId.startsWith('apple:')) {
+    return 'عميل سوق حمد';
+  }
+
+  return participantId;
+}
+
+function getParticipantDisplayName(participant?: ConversationParticipant | null) {
   return (
-    image?.thumbnailUrl ??
-    image?.displayUrl ??
-    image?.originalUrl ??
-    missingListingImageDataUrl
+    participant?.name?.trim() ||
+    participant?.email?.trim() ||
+    getParticipantFallbackName(participant?.id)
   );
 }
 
-function formatPrice(price: ConversationListing['price']) {
-  if (typeof price === 'number') {
-    return `${new Intl.NumberFormat('ar-SA').format(price)} ر.س`;
-  }
-
-  if (price === 'bid') {
-    return 'على السوم';
-  }
-
-  if (price === 'negotiable') {
-    return 'قابل للتفاوض';
-  }
-
-  return 'السعر غير محدد';
-}
-
-function formatUpdatedAt(value: string) {
-  return new Intl.DateTimeFormat('ar-SA', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+function getParticipantInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || 'ح';
 }
 
 function isMessageReadBy(
@@ -143,14 +157,6 @@ export default function ConversationsPage() {
     tone: 'success' | 'danger';
     message: string;
   } | null>(null);
-
-  const conversationsCount = conversations.length;
-  const openConversationsCount = useMemo(
-    () =>
-      conversations.filter((conversation) => conversation.status === 'open')
-        .length,
-    [conversations],
-  );
   const trackedListingIds = useMemo(
     () => new Set(conversations.map((conversation) => conversation.listingId)),
     [conversations],
@@ -402,23 +408,8 @@ export default function ConversationsPage() {
           </section>
         ) : (
           <>
-            <section className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-                <div className="text-xs text-muted-foreground">إجمالي المحادثات</div>
-                <div className="mt-1 text-2xl font-bold">{conversationsCount}</div>
-              </div>
-              <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-                <div className="text-xs text-muted-foreground">المحادثات المفتوحة</div>
-                <div className="mt-1 text-2xl font-bold">{openConversationsCount}</div>
-              </div>
-            </section>
-
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold">
-                <MessageCircle className="size-4 text-blue-600" />
-                قائمة المحادثات
-              </div>
-              {conversationNotice && (
+<section className="rounded-md border bg-white p-2 shadow-sm dark:bg-card sm:p-3">
+{conversationNotice && (
                 <div
                   className={`mb-3 rounded-md border px-3 py-2 text-xs font-semibold ${
                     conversationNotice.tone === 'success'
@@ -451,7 +442,17 @@ export default function ConversationsPage() {
                     const lastMessage = [...conversation.messages]
                       .reverse()
                       .find((message) => message.status === 'sent');
-                    const isSeller = session.user?.id === conversation.sellerId;
+                    const otherParticipant =
+                      session.user?.id === conversation.sellerId
+                        ? conversation.buyer
+                        : conversation.seller;
+                    const otherParticipantId =
+                      session.user?.id === conversation.sellerId
+                        ? conversation.buyerId
+                        : conversation.sellerId;
+                    const otherParticipantName =
+                      getParticipantDisplayName(otherParticipant) ||
+                      getParticipantFallbackName(otherParticipantId);
                     const hasUnreadMessages = conversation.messages.some(
                       (message) =>
                         message.status === 'sent' &&
@@ -469,42 +470,39 @@ export default function ConversationsPage() {
                         }`}
                       >
                         <Link
-                          className="grid min-w-0 grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2"
+                          className="grid min-w-0 grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
                           href={`/conversations/${conversation.id}`}
                         >
-                          <img
-                            alt={conversation.listing?.title ?? 'صورة الإعلان'}
-                            className="size-14 rounded-md object-cover"
-                            decoding="async"
-                            loading="lazy"
-                            src={getListingImage(conversation.listing)}
-                          />
+                          <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100">
+                            {otherParticipant?.picture ? (
+                              <img
+                                alt=""
+                                className="h-full w-full object-cover"
+                                decoding="async"
+                                loading="lazy"
+                                src={otherParticipant.picture}
+                              />
+                            ) : (
+                              <span>{getParticipantInitial(otherParticipantName)}</span>
+                            )}
+                          </div>
                           <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
                               <h3 className="truncate text-sm font-bold">
-                                {conversation.listing?.title ?? 'إعلان غير متاح'}
+                                {otherParticipantName}
                               </h3>
-                              <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                                {isSeller ? 'بائع' : 'مشتري'}
-                              </span>
-                              {hasUnreadMessages && (
-                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-400/15 dark:text-rose-100">
-                                  <span className="size-1.5 rounded-full bg-rose-500" />
-                                  غير مقروءة
-                                </span>
-                              )}
                             </div>
                             <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                               {lastMessage?.body ?? 'لم تبدأ الرسائل بعد'}
                             </p>
-                            <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="truncate">{formatPrice(conversation.listing?.price)}</span>
-                              <span className="shrink-0">{formatUpdatedAt(conversation.updatedAt)}</span>
-                            </div>
                           </div>
-                          <div className="hidden items-center gap-1 text-xs text-emerald-700 dark:text-emerald-200 sm:flex">
-                            <BadgeCheck className="size-4" />
-                            {conversation.status === 'open' ? 'مفتوحة' : 'مغلقة'}
+                          <div className="grid justify-items-end gap-2 text-left">
+                            <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                              {formatUpdatedAt(conversation.updatedAt)}
+                            </span>
+                            {hasUnreadMessages && (
+                              <span className="size-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.65)]" />
+                            )}
                           </div>
                         </Link>
                         <div className="grid place-items-center border-r">

@@ -17,6 +17,7 @@ import {
   Ban,
   Flag,
   MessageCircle,
+  MoreVertical,
   Phone,
   Send,
   ShieldCheck,
@@ -28,6 +29,12 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { Textarea } from '@ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -281,9 +288,9 @@ export default function ConversationPage() {
   const otherParticipantName =
     getParticipantDisplayName(otherParticipant) ||
     getParticipantFallbackName(otherParticipantId);
-  const otherParticipantRoleLabel = isSeller
-    ? 'المشتري في هذه المحادثة'
-    : 'البائع في هذه المحادثة';
+  const otherParticipantProfileHref = otherParticipantId
+    ? `/sellers/${otherParticipantId}`
+    : '/conversations';
   const visibleMessages = useMemo(
     () =>
       conversation?.messages.filter((message) => message.status === 'sent') ??
@@ -795,7 +802,10 @@ export default function ConversationPage() {
           <section className="flex min-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card lg:h-[calc(100vh-8.5rem)] lg:min-h-[36rem]">
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100">
+                <Link
+                  href={otherParticipantProfileHref}
+                  className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm transition hover:opacity-85 active:scale-95 dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100"
+                >
                   {otherParticipant?.picture ? (
                     <img
                       alt=""
@@ -807,58 +817,70 @@ export default function ConversationPage() {
                   ) : (
                     <span>{getParticipantInitial(otherParticipantName)}</span>
                   )}
-                </div>
+                </Link>
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold">
+                  <Link
+                    href={otherParticipantProfileHref}
+                    className="block truncate text-sm font-bold transition hover:opacity-85"
+                  >
                     {otherParticipantName}
-                  </h2>
+                  </Link>
                   <p className="truncate text-xs text-muted-foreground">
-                    {session.authenticated
-                      ? otherParticipantRoleLabel
-                      : 'يتطلب تسجيل الدخول'}
+                    {conversation?.listing?.title ?? 'سوق حمد'}
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <Button
-                  className="rounded-md"
-                  disabled={!conversation || isReportingUser}
-                  onClick={() => void reportConversationUser()}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Flag className="size-3.5" />
-                  {isReportingUser ? 'جار الإبلاغ...' : 'إبلاغ'}
-                </Button>
-                {canUnblockConversation ? (
-                  <Button
-                    className="rounded-md border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-200"
-                    disabled={!conversation || isUnblockingUser}
-                    onClick={() => void unblockConversationParticipant()}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Unlock className="size-3.5" />
-                    {isUnblockingUser ? 'جار إزالة الحظر...' : 'إزالة الحظر'}
-                  </Button>
-                ) : (
-                  <Button
-                    className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
-                    disabled={!conversation || isBlockingUser || isConversationBlocked}
-                    onClick={() => void blockConversationParticipant()}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Ban className="size-3.5" />
-                    {isConversationBlocked ? 'محظورة' : isBlockingUser ? 'جار الحظر...' : 'حظر'}
-                  </Button>
-                )}
-                <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  {conversation?.status === 'open' ? 'مفتوحة' : 'مغلقة'}
-                </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label="خيارات المحادثة"
+                      className="size-9 rounded-md"
+                      disabled={!conversation}
+                      size="icon-sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-40">
+                    <DropdownMenuItem
+                      disabled={!conversation || isReportingUser}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void reportConversationUser();
+                      }}
+                    >
+                      <Flag className="size-4" />
+                      {isReportingUser ? 'جار الإبلاغ...' : 'إبلاغ'}
+                    </DropdownMenuItem>
+                    {canUnblockConversation ? (
+                      <DropdownMenuItem
+                        disabled={!conversation || isUnblockingUser}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          void unblockConversationParticipant();
+                        }}
+                      >
+                        <Unlock className="size-4" />
+                        {isUnblockingUser ? 'جار إزالة الحظر...' : 'إزالة الحظر'}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        className="text-red-700 focus:text-red-700 dark:text-red-200 dark:focus:text-red-200"
+                        disabled={!conversation || isBlockingUser || isConversationBlocked}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          void blockConversationParticipant();
+                        }}
+                      >
+                        <Ban className="size-4" />
+                        {isConversationBlocked ? 'محظورة' : isBlockingUser ? 'جار الحظر...' : 'حظر'}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
