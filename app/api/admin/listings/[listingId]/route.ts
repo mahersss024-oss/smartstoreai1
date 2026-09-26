@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -40,6 +41,29 @@ async function enforceAdminListingMutationRateLimit(
     maxRequests: 60,
     windowMs: 60_000,
   });
+}
+
+async function deleteStoredListingImagesBestEffort(
+  images: Array<{
+    id: string;
+    originalUrl: string;
+    displayUrl: string;
+    thumbnailUrl: string;
+  }>,
+) {
+  await Promise.all(
+    images.map(async (image) => {
+      try {
+        await deleteListingObject({
+          imageId: image.id,
+          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
+        });
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[admin_listing_storage_delete] failure=${errorName}`);
+      }
+    }),
+  );
 }
 
 function buildSearchText(input: {
@@ -274,8 +298,13 @@ export async function DELETE(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-      const { listingId } = await context.params;
-  const existing = await prisma.listing.findUnique({ where: { id: listingId } });
+  const { listingId } = await context.params;
+  const existing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    include: {
+      images: true,
+    },
+  });
 
   if (!existing) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
@@ -302,6 +331,8 @@ export async function DELETE(request: Request, context: RouteContext) {
       },
     }),
   ]);
+
+  await deleteStoredListingImagesBestEffort(existing.images);
 
   try {
     publishRealtimeEvent({

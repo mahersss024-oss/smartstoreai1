@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { createPersistentProfileImageUrl } from '@/agent/marketplace/profile-image-storage';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -23,6 +24,25 @@ const maxProfileImageRequestBytes = maxProfileImageBytes + 256 * 1024;
 
 function shouldPersistUserProfile() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
+}
+
+async function deletePreviousProfilePictureBestEffort(
+  userId: string,
+  picture: string | null | undefined,
+) {
+  if (!picture) {
+    return;
+  }
+
+  try {
+    await deleteListingObject({
+      imageId: `profile:${userId}`,
+      urls: [picture],
+    });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[profile_picture_storage_delete] failure=${errorName}`);
+  }
 }
 
 export async function POST(request: Request) {
@@ -132,6 +152,7 @@ export async function POST(request: Request) {
   const existingUserByEmail = await prisma.user.findUnique({
     where: { email: session.user.email },
   });
+  const previousPicture = existingUserByEmail?.picture;
   const user =
     existingUserByEmail && existingUserByEmail.id !== session.user.id
       ? await prisma.user.update({
@@ -151,6 +172,10 @@ export async function POST(request: Request) {
           },
           update: { picture },
         });
+
+  if (previousPicture && previousPicture !== picture) {
+    await deletePreviousProfilePictureBestEffort(user.id, previousPicture);
+  }
 
   return Response.json(
     {

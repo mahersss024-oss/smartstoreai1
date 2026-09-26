@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasPlatformOwnerAccess } from '@/lib/auth/authorization';
@@ -21,6 +22,29 @@ const cleanupSchema = z.object({
   ]),
   confirmation: z.string(),
 });
+
+type StoredListingImage = {
+  id: string;
+  originalUrl: string;
+  displayUrl: string;
+  thumbnailUrl: string;
+};
+
+async function deleteStoredListingImagesBestEffort(images: StoredListingImage[]) {
+  await Promise.all(
+    images.map(async (image) => {
+      try {
+        await deleteListingObject({
+          imageId: image.id,
+          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
+        });
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[admin_maintenance_listing_storage_delete] failure=${errorName}`);
+      }
+    }),
+  );
+}
 
 async function getMaintenanceCounts() {
   const [
@@ -108,9 +132,26 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
   }
 
   if (scope === 'purge_deleted_listings') {
+    const deletedListings = await prisma.listing.findMany({
+      where: { status: 'deleted' },
+      select: {
+        images: {
+          select: {
+            id: true,
+            originalUrl: true,
+            displayUrl: true,
+            thumbnailUrl: true,
+          },
+        },
+      },
+    });
     const result = await prisma.listing.deleteMany({
       where: { status: 'deleted' },
     });
+
+    await deleteStoredListingImagesBestEffort(
+      deletedListings.flatMap((listing) => listing.images),
+    );
 
     return { listings: result.count };
   }

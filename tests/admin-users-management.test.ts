@@ -117,6 +117,9 @@ test('admin listing mutations are server-side protected and rate limited', () =>
   assert.match(listingRoute, /admin_listing_mutation/);
   assert.match(listingRoute, /adminAuditLog\.create/);
   assert.match(listingRoute, /listing_must_be_deleted_first/);
+  assert.match(listingRoute, /include:\s*\{\s*images:\s*true,?\s*\}/);
+  assert.match(listingRoute, /deleteStoredListingImagesBestEffort\(existing\.images\)/);
+  assert.match(listingRoute, /admin_listing_storage_delete/);
 });
 
 test('moderators can view admin listings without listing mutation controls', () => {
@@ -199,6 +202,8 @@ test('admin maintenance exposes a scope that purges only soft-deleted listings',
   );
 
   assert.match(maintenanceRoute, /purge_deleted_listings/);
+  assert.match(maintenanceRoute, /deleteStoredListingImagesBestEffort/);
+  assert.match(maintenanceRoute, /admin_maintenance_listing_storage_delete/);
   assert.match(
     maintenanceRoute,
     /prisma\.listing\.deleteMany\(\{\s*where:\s*\{\s*status:\s*'deleted'\s*\}/,

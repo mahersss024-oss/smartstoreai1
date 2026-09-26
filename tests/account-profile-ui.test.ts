@@ -82,6 +82,26 @@ test('account profile picture upload stores a persistent display image for the a
   assert.match(objectStorage, /objectPrefix\?: 'listings' \| 'profiles'/);
 });
 
+test('account profile picture replacement removes the previous stored profile image', () => {
+  const route = readFileSync(
+    join(
+      process.cwd(),
+      'app',
+      'api',
+      'account',
+      'profile',
+      'picture',
+      'route.ts',
+    ),
+    'utf8',
+  );
+
+  assert.match(route, /previousPicture/);
+  assert.match(route, /deletePreviousProfilePictureBestEffort/);
+  assert.match(route, /deleteListingObject/);
+  assert.match(route, /profile_picture_storage_delete/);
+});
+
 test('account page keeps listing management free of chat listing shortcuts', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 
