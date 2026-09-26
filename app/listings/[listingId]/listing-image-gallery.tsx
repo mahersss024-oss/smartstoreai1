@@ -335,7 +335,7 @@ export function ListingImageGallery({
   }, [selectedDisplayUrl, selectedImageIndex, visibleImages]);
 
   return (
-    <section className="w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-sm dark:bg-card">
+    <section className="w-full max-w-2xl overflow-hidden rounded-md bg-white dark:bg-card">
       <div className="grid gap-2">
         <button
           aria-label="فتح الصورة بالحجم الكامل"
@@ -371,7 +371,7 @@ export function ListingImageGallery({
                   }
                   aria-label={`فتح الصورة ${index + 1} بالحجم الكامل`}
                   aria-pressed={isSelected}
-                  className={`aspect-square overflow-hidden rounded-md border bg-slate-100 transition ${
+                  className={`aspect-square overflow-hidden rounded-md bg-slate-100 transition ${
                     isSelected
                       ? 'border-blue-600 ring-2 ring-blue-600/30'
                       : 'hover:border-blue-400'

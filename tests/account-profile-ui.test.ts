@@ -33,6 +33,9 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /deleteProfilePhone/);
   assert.match(page, /deleteAccount/);
   assert.match(page, /countContactPhoneCandidates/);
+  assert.doesNotMatch(page, /grid gap-3 rounded-md border bg-white p-4 shadow-sm/);
+  assert.doesNotMatch(page, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
+  assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
 });
 
 test('account profile api accepts editable display name and secure profile picture URL', () => {

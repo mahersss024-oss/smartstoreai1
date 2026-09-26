@@ -11,6 +11,7 @@ function readSource(path: string) {
 
 test('listing details links to the public seller profile without exposing private contact data', () => {
   const page = readSource('app/listings/[listingId]/page.tsx');
+  const gallery = readSource('app/listings/[listingId]/listing-image-gallery.tsx');
   const sellerLabelIndex = page.indexOf('المعلن');
   const galleryIndex = page.indexOf('<ListingImageGallery');
 
@@ -28,6 +29,9 @@ test('listing details links to the public seller profile without exposing privat
   const contactActions = readSource('app/listings/[listingId]/contact-actions.tsx');
   assert.doesNotMatch(contactActions, /ShieldCheck/);
   assert.doesNotMatch(contactActions, /\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629 \u062a\u062a\u0645 \u062f\u0627\u062e\u0644 \u0633\u0648\u0642 \u062d\u0645\u062f/u);
+  assert.doesNotMatch(page, /rounded-md border bg-white p-4 shadow-sm/);
+  assert.doesNotMatch(page, /rounded-md border p-3/);
+  assert.doesNotMatch(gallery, /rounded-md border bg-white shadow-sm/);
 });
 
 test('public seller profile renders safe public data and published listing links', () => {

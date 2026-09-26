@@ -94,6 +94,7 @@ test('seller buyer conversation shows a compact listing card linking to details'
   assert.match(source, /className="size-20 shrink-0/);
   assert.match(source, /className="line-clamp-2 text-sm font-bold/);
   assert.doesNotMatch(source, /className="aspect-square w-full rounded-md object-cover"/);
+  assert.doesNotMatch(source, /grid h-fit gap-4 rounded-md border bg-white p-4 shadow-sm/);
 });
 
 test('seller buyer conversation handles non-json send failures safely', () => {
@@ -149,6 +150,8 @@ test('conversations list uses compact cards with a small delete menu', () => {
   assert.match(source, /grid-cols-\[3\.25rem_minmax\(0,1fr\)_auto\]/);
   assert.match(source, /otherParticipantName/);
   assert.match(source, /otherParticipant\?\.picture/);
+  assert.doesNotMatch(source, /rounded-md border bg-white p-2 shadow-sm/);
+  assert.doesNotMatch(source, /rounded-md border bg-white p-6 text-center shadow-sm/);
   assert.doesNotMatch(source, /formatPrice\(conversation\.listing\?\.price\)/);
 });
 

@@ -224,14 +224,14 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-1 py-3 dark:border-white/10 dark:bg-transparent">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -249,11 +249,11 @@ export default async function ListingDetailsPage({ params }: PageProps) {
 
         <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,38rem)_18rem]">
           <div className="grid min-w-0 gap-4">
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-              <div className="flex items-center gap-3 rounded-md border bg-[#f8fafc] p-3 dark:bg-[#101827]">
+            <section className="bg-white p-4 dark:bg-card">
+              <div className="flex items-center gap-3">
                 <Link
                   href={`/sellers/${listing.sellerId}`}
-                  className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
+                  className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
                 >
                   {sellerProfile?.picture ? (
                     <img
@@ -293,7 +293,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               title={listing.title ?? 'صورة الإعلان'}
             />
 
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="bg-white p-4 dark:bg-card">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -311,33 +311,33 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               </div>
 
               <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border p-3">
+                <div className="border-t border-border/70 pt-3">
                   <div className="text-xs text-muted-foreground">السعر</div>
                   <div className="mt-1 text-lg font-bold text-blue-700">{formatPrice(listing.price)}</div>
                 </div>
-                <div className="rounded-md border p-3">
+                <div className="border-t border-border/70 pt-3">
                   <div className="text-xs text-muted-foreground">المدينة</div>
                   <div className="mt-1 flex items-center gap-1 text-sm font-bold">
                     <MapPin className="size-4 text-blue-600" />
                     {listing.city ?? 'السعودية'}
                   </div>
                 </div>
-                <div className="rounded-md border p-3">
+                <div className="border-t border-border/70 pt-3">
                   <div className="text-xs text-muted-foreground">الحالة</div>
                   <div className="mt-1 text-sm font-bold">{formatCondition(listing.condition)}</div>
                 </div>
-                <div className="rounded-md border p-3">
+                <div className="border-t border-border/70 pt-3">
                   <div className="text-xs text-muted-foreground">طريقة البيع</div>
                   <div className="mt-1 text-sm font-bold">{saleTerms}</div>
                 </div>
-                <div className="rounded-md border p-3">
+                <div className="border-t border-border/70 pt-3">
                   <div className="text-xs text-muted-foreground">رقم الإعلان</div>
                   <div className="mt-1 truncate text-sm font-bold">{listing.id}</div>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="bg-white p-4 dark:bg-card">
               <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <PackageCheck className="size-4 text-blue-600" />
                 بيانات المنتج
@@ -345,7 +345,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               {attributes.length ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {attributes.map(([key, value]) => (
-                    <div key={key} className="rounded-md border p-3">
+                    <div key={key} className="border-t border-border/70 pt-3">
                       <div className="text-xs text-muted-foreground">{formatAttributeLabel(key)}</div>
                       <div className="mt-1 break-words text-sm font-semibold">
                         {formatAttributeValue(key, value)}
@@ -354,7 +354,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   ))}
                 </div>
               ) : (
-                <p className="rounded-md border border-dashed p-4 text-sm leading-7 text-muted-foreground">
+                <p className="border-t border-dashed pt-4 text-sm leading-7 text-muted-foreground">
                   لا توجد بيانات إضافية محفوظة لهذا الإعلان حتى الآن.
                 </p>
               )}
@@ -362,7 +362,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </div>
 
           <aside className="grid h-fit gap-4">
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="bg-white p-4 dark:bg-card">
               <div className="mb-4">
                 <div className="text-xs text-muted-foreground">السعر المطلوب</div>
                 <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
@@ -376,24 +376,24 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
             </section>
 
-            <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+            <section className="bg-white p-4 dark:bg-card">
               <div className="mb-3 text-sm font-bold">نشاط الإعلان</div>
               <div className="grid gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-2 rounded-md border p-2">
+                <div className="flex items-center justify-between gap-2 border-t py-2">
                   <span className="flex items-center gap-2">
                     <Eye className="size-4 text-blue-600" />
                     المشاهدات
                   </span>
                   <strong className="text-foreground">{listing.views}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 rounded-md border p-2">
+                <div className="flex items-center justify-between gap-2 border-t py-2">
                   <span className="flex items-center gap-2">
                     <MessageCircle className="size-4 text-blue-600" />
                     الرسائل
                   </span>
                   <strong className="text-foreground">{listing.messageCount}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 rounded-md border p-2">
+                <div className="flex items-center justify-between gap-2 border-t py-2">
                   <span className="flex items-center gap-2">
                     <CalendarDays className="size-4 text-blue-600" />
                     آخر تحديث

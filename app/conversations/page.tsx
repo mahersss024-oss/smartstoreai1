@@ -342,14 +342,14 @@ export default function ConversationsPage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-1 py-3 dark:border-white/10 dark:bg-transparent">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
             <div className="min-w-0">
@@ -368,7 +368,7 @@ export default function ConversationsPage() {
         </header>
 
         {isLoading && !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
@@ -380,7 +380,7 @@ export default function ConversationsPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center rounded-md border bg-white p-6 text-center shadow-sm dark:bg-card">
+          <section className="grid min-h-[32rem] place-items-center bg-white p-6 text-center dark:bg-card">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
@@ -405,7 +405,7 @@ export default function ConversationsPage() {
           </section>
         ) : (
           <>
-<section className="rounded-md border bg-white p-2 shadow-sm dark:bg-card sm:p-3">
+<section className="bg-white p-1 dark:bg-card sm:p-2">
 {conversationNotice && (
                 <div
                   className={`mb-3 rounded-md border px-3 py-2 text-xs font-semibold ${
@@ -460,7 +460,7 @@ export default function ConversationsPage() {
                     return (
                       <div
                         key={conversation.id}
-                        className={`grid grid-cols-[minmax(0,1fr)_2.25rem] overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:bg-blue-50/60 dark:bg-card dark:hover:bg-blue-400/10 ${
+                        className={`grid grid-cols-[minmax(0,1fr)_2.25rem] overflow-hidden border-b bg-white transition hover:bg-blue-50/60 dark:bg-card dark:hover:bg-blue-400/10 ${
                           hasUnreadMessages
                             ? 'border-rose-300 shadow-rose-950/10 dark:border-rose-400/40'
                             : ''
