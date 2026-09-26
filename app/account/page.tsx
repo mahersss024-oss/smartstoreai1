@@ -61,10 +61,15 @@ export default function AccountPage() {
     userId: session.user?.id ?? null,
   });
 
-  const isAdmin =
-    session.user?.role === 'owner' ||
-    session.user?.role === 'admin' ||
-    session.user?.role === 'moderator';
+  const administrativeRoleLabel =
+    session.user?.role === 'owner'
+      ? 'مالك المنصة'
+      : session.user?.role === 'admin'
+        ? 'مدير'
+        : session.user?.role === 'moderator'
+          ? 'مشرف'
+          : null;
+  const isAdmin = Boolean(administrativeRoleLabel);
   const hasSavedProfilePhone = Boolean(savedProfilePhone);
   const isProfilePhoneInputLocked =
     hasSavedProfilePhone && !isEditingProfilePhone;
@@ -448,9 +453,7 @@ export default function AccountPage() {
                     {isAdmin && (
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                         <ShieldCheck className="size-3.5" />
-                        {session.user?.role === 'moderator'
-                          ? 'مشرف'
-                          : 'مالك المنصة'}
+                        {administrativeRoleLabel}
                       </span>
                     )}
                   </div>

@@ -38,6 +38,22 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
 });
 
+test('account page labels each administrative role accurately', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /session\.user\?\.role === 'owner'/);
+  assert.match(page, /\? 'مالك المنصة'/);
+  assert.match(page, /session\.user\?\.role === 'admin'/);
+  assert.match(page, /\? 'مدير'/);
+  assert.match(page, /session\.user\?\.role === 'moderator'/);
+  assert.match(page, /\? 'مشرف'/);
+  assert.match(page, /\{administrativeRoleLabel\}/);
+  assert.doesNotMatch(
+    page,
+    /session\.user\?\.role === 'moderator'[\s\S]{0,80}: 'مالك المنصة'/,
+  );
+});
+
 test('account profile api accepts editable display name and secure profile picture URL', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'account', 'profile', 'route.ts'),

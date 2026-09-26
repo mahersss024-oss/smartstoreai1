@@ -350,7 +350,7 @@ test('conversation reports stay compact until an administrator opens details', (
   assert.match(page, /method: 'DELETE'/);
 });
 
-test('admin maintenance exposes a scope that purges only soft-deleted listings', () => {
+test('admin maintenance keeps routine cleanup away from customer and financial data', () => {
   const maintenanceRoute = readProjectFile(
     'app',
     'api',
@@ -362,12 +362,18 @@ test('admin maintenance exposes a scope that purges only soft-deleted listings',
   assert.match(maintenanceRoute, /purge_deleted_listings/);
   assert.match(maintenanceRoute, /closed_reports/);
   assert.match(maintenanceRoute, /closed_user_reports/);
-  assert.match(maintenanceRoute, /seller_follows/);
-  assert.match(maintenanceRoute, /seller_ratings/);
-  assert.match(maintenanceRoute, /push_subscriptions/);
-  assert.match(maintenanceRoute, /prisma\.userReport\.deleteMany/);
-  assert.match(maintenanceRoute, /prisma\.sellerFollow\.deleteMany/);
-  assert.match(maintenanceRoute, /prisma\.sellerRating\.deleteMany/);
+  assert.match(maintenanceRoute, /search_state/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.commission\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.conversation\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.userBlock\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.sellerFollow\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.sellerRating\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.pushSubscription\.deleteMany/);
+  assert.doesNotMatch(maintenanceRoute, /prisma\.siteVisitDaily\.deleteMany/);
+  assert.doesNotMatch(
+    maintenanceRoute,
+    /prisma\.listing\.deleteMany\(\s*\)/,
+  );
   assert.match(maintenanceRoute, /deleteStoredListingImagesBestEffort/);
   assert.match(maintenanceRoute, /admin_maintenance_listing_storage_delete/);
   assert.match(
@@ -382,10 +388,22 @@ test('admin maintenance page offers the deleted-listings purge option', () => {
   assert.match(page, /purge_deleted_listings/);
   assert.match(page, /حذف نهائي للإعلانات المحذوفة من العملاء/);
   assert.match(page, /closed_user_reports/);
-  assert.match(page, /seller_follows/);
-  assert.match(page, /seller_ratings/);
-  assert.match(page, /push_subscriptions/);
-  assert.match(page, /countLabels/);
+  assert.doesNotMatch(page, /value: 'commissions'/);
+  assert.doesNotMatch(page, /value: 'conversations'/);
+  assert.doesNotMatch(page, /value: 'reports'/);
+  assert.doesNotMatch(page, /value: 'user_reports'/);
+  assert.doesNotMatch(page, /value: 'user_blocks'/);
+  assert.doesNotMatch(page, /value: 'seller_follows'/);
+  assert.doesNotMatch(page, /value: 'seller_ratings'/);
+  assert.doesNotMatch(page, /value: 'push_subscriptions'/);
+  assert.doesNotMatch(page, /value: 'analytics'/);
+  assert.doesNotMatch(page, /marketplace_without_users/);
+  assert.match(page, /getCleanupPreview/);
+  assert.match(page, /deletedListings/);
+  assert.match(page, /deletedListingImages/);
+  assert.match(page, /تحديث المعاينة/);
+  assert.doesNotMatch(page, /معاينة الأعداد الحالية/);
+  assert.doesNotMatch(page, /Object\.entries\(counts\)/);
 });
 
 function withMaintenanceEnv(
@@ -428,7 +446,7 @@ function maintenanceCleanupRequest(email: string, role = 'admin') {
       }),
     },
     body: JSON.stringify({
-      scope: 'marketplace_without_users',
+      scope: 'purge_deleted_listings',
       confirmation: 'confirm',
     }),
   });

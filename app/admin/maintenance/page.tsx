@@ -11,44 +11,18 @@ import { Input } from '@ui/input';
 import { useAdminAccess } from '../use-admin-access';
 
 type MaintenanceCounts = {
-  users: number;
-  listings: number;
-  images: number;
-  conversations: number;
-  messages: number;
-  favorites: number;
-  reports: number;
-  openReports: number;
+  deletedListings: number;
+  deletedListingImages: number;
   closedReports: number;
-  userReports: number;
-  openUserReports: number;
   closedUserReports: number;
-  userBlocks: number;
-  sellerFollows: number;
-  sellerRatings: number;
-  commissions: number;
-  pushSubscriptions: number;
-  analyticsDays: number;
-  analyticsVisitors: number;
   searchStates: number;
   idempotencyKeys: number;
-  adminAuditLogs: number;
 };
 
 type CleanupScope =
-  | 'commissions'
-  | 'conversations'
-  | 'reports'
   | 'closed_reports'
-  | 'user_reports'
   | 'closed_user_reports'
-  | 'user_blocks'
-  | 'seller_follows'
-  | 'seller_ratings'
-  | 'push_subscriptions'
-  | 'analytics'
   | 'search_state'
-  | 'marketplace_without_users'
   | 'purge_deleted_listings';
 
 const cleanupScopes: Array<{
@@ -57,29 +31,9 @@ const cleanupScopes: Array<{
   description: string;
 }> = [
   {
-    value: 'commissions',
-    label: 'حذف رسوم المنصة',
-    description: 'يحذف سجلات رسوم المنصة فقط.',
-  },
-  {
-    value: 'conversations',
-    label: 'حذف المحادثات',
-    description: 'يحذف المحادثات والرسائل المرتبطة بها.',
-  },
-  {
-    value: 'reports',
-    label: 'حذف كل بلاغات الإعلانات',
-    description: 'يحذف بلاغات الإعلانات المفتوحة والمغلقة.',
-  },
-  {
     value: 'closed_reports',
     label: 'حذف بلاغات الإعلانات المغلقة',
     description: 'يحذف بلاغات الإعلانات التي تمت مراجعتها أو إغلاقها فقط.',
-  },
-  {
-    value: 'user_reports',
-    label: 'حذف كل بلاغات المستخدمين',
-    description: 'يحذف بلاغات المستخدمين والمحادثات المفتوحة والمغلقة.',
   },
   {
     value: 'closed_user_reports',
@@ -87,41 +41,9 @@ const cleanupScopes: Array<{
     description: 'يحذف بلاغات المستخدمين التي تمت مراجعتها أو إغلاقها فقط.',
   },
   {
-    value: 'user_blocks',
-    label: 'حذف سجلات الحظر',
-    description: 'يحذف علاقات الحظر المسجلة بين المستخدمين.',
-  },
-  {
-    value: 'seller_follows',
-    label: 'حذف قائمة المتابعة',
-    description: 'يحذف علاقات متابعة المعلنين من جميع الحسابات.',
-  },
-  {
-    value: 'seller_ratings',
-    label: 'حذف تقييمات المعلنين',
-    description: 'يحذف تقييمات المعلنين وتعليقات التقييم من جميع الحسابات.',
-  },
-  {
-    value: 'push_subscriptions',
-    label: 'حذف اشتراكات الإشعارات',
-    description:
-      'يحذف أجهزة الإشعارات المسجلة، وسيعاد تسجيلها عند سماح المستخدم بالإشعارات مرة أخرى.',
-  },
-  {
-    value: 'analytics',
-    label: 'حذف إحصائيات الزوار',
-    description: 'يحذف عدادات الزيارات والزوار الفريدين.',
-  },
-  {
     value: 'search_state',
     label: 'تنظيف ذاكرة البحث والطلبات',
     description: 'يحذف ذاكرة البحث المؤقتة ومفاتيح منع تكرار الطلبات.',
-  },
-  {
-    value: 'marketplace_without_users',
-    label: 'تنظيف السوق مع إبقاء المستخدمين',
-    description:
-      'يحذف الإعلانات وما يتبعها، ويحذف بلاغات المستخدمين والحظر والمتابعة والتقييمات، مع إبقاء حسابات المستخدمين.',
   },
   {
     value: 'purge_deleted_listings',
@@ -131,40 +53,36 @@ const cleanupScopes: Array<{
   },
 ];
 
-const countLabels: Record<keyof MaintenanceCounts, string> = {
-  users: 'المستخدمون',
-  listings: 'الإعلانات',
-  images: 'صور الإعلانات',
-  conversations: 'المحادثات',
-  messages: 'الرسائل',
-  favorites: 'المفضلة',
-  reports: 'بلاغات الإعلانات',
-  openReports: 'بلاغات إعلانات مفتوحة',
-  closedReports: 'بلاغات إعلانات مغلقة',
-  userReports: 'بلاغات المستخدمين',
-  openUserReports: 'بلاغات مستخدمين مفتوحة',
-  closedUserReports: 'بلاغات مستخدمين مغلقة',
-  userBlocks: 'الحظر بين المستخدمين',
-  sellerFollows: 'قائمة المتابعة',
-  sellerRatings: 'تقييمات المعلنين',
-  commissions: 'رسوم المنصة',
-  pushSubscriptions: 'اشتراكات الإشعارات',
-  analyticsDays: 'أيام التحليلات',
-  analyticsVisitors: 'زوار التحليلات',
-  searchStates: 'ذاكرة البحث',
-  idempotencyKeys: 'مفاتيح منع التكرار',
-  adminAuditLogs: 'سجل الإدارة',
-};
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ar-SA').format(value);
+}
+
+function getCleanupPreview(scope: CleanupScope, counts: MaintenanceCounts) {
+  const previews: Record<CleanupScope, Array<[string, number]>> = {
+    closed_reports: [
+      ['بلاغات الإعلانات المغلقة التي ستُحذف', counts.closedReports],
+    ],
+    closed_user_reports: [
+      ['بلاغات المحادثات المغلقة التي ستُحذف', counts.closedUserReports],
+    ],
+    search_state: [
+      ['سجلات البحث المؤقتة', counts.searchStates],
+      ['مفاتيح الطلبات القديمة', counts.idempotencyKeys],
+    ],
+    purge_deleted_listings: [
+      ['الإعلانات المحذوفة نهائيًا', counts.deletedListings],
+      ['الصور التي ستُراجع للحذف', counts.deletedListingImages],
+    ],
+  };
+
+  return previews[scope];
 }
 
 export default function AdminMaintenancePage() {
   const router = useRouter();
   const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('owner');
   const [counts, setCounts] = useState<MaintenanceCounts | null>(null);
-  const [scope, setScope] = useState<CleanupScope>('commissions');
+  const [scope, setScope] = useState<CleanupScope>('closed_reports');
   const [confirmation, setConfirmation] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -173,6 +91,10 @@ export default function AdminMaintenancePage() {
   const selectedScope = useMemo(
     () => cleanupScopes.find((option) => option.value === scope),
     [scope],
+  );
+  const cleanupPreview = useMemo(
+    () => (counts ? getCleanupPreview(scope, counts) : []),
+    [counts, scope],
   );
 
   const loadCounts = useCallback(async () => {
@@ -285,37 +207,6 @@ export default function AdminMaintenancePage() {
     }
   }, [confirmation, scope, router]);
 
-  let countsContent;
-
-  if (isLoading || (!counts && !adminAccessNotice && !notice)) {
-    countsContent = (
-      <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
-        جار تحميل الأعداد...
-      </div>
-    );
-  } else if (!counts) {
-    countsContent = (
-      <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
-        {adminAccessNotice || notice}
-      </div>
-    );
-  } else {
-    countsContent = (
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {(Object.entries(counts) as Array<[keyof MaintenanceCounts, number]>).map(
-          ([key, value]) => (
-            <div key={key} className="rounded-md border p-3">
-              <div className="text-xs text-muted-foreground">
-                {countLabels[key] ?? key}
-              </div>
-              <div className="mt-1 text-xl font-bold">{formatNumber(value)}</div>
-            </div>
-          ),
-        )}
-      </div>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
@@ -345,24 +236,24 @@ export default function AdminMaintenancePage() {
           </div>
         )}
 
-        <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-bold">معاينة الأعداد الحالية</h2>
-            <Button variant="outline" className="rounded-md" onClick={() => void loadCounts()}>
-              <RefreshCw className="size-4" />
-              تحديث
-            </Button>
-          </div>
-
-          {countsContent}
-        </section>
-
         <section className="grid gap-4 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
-          <div>
-            <h2 className="text-sm font-bold">تنفيذ تنظيف</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              اختر العملية، ثم اكتب كلمة التأكيد بالضبط: تنظيف
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold">تنفيذ تنظيف</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                اختر العملية، ثم راجع أثرها واكتب كلمة التأكيد: تنظيف
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-md"
+              disabled={isLoading}
+              onClick={() => void loadCounts()}
+            >
+              <RefreshCw className="size-4" />
+              تحديث المعاينة
+            </Button>
           </div>
 
           <select
@@ -378,8 +269,20 @@ export default function AdminMaintenancePage() {
             ))}
           </select>
 
-          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-            {selectedScope?.description}
+          <div className="grid gap-2 text-sm">
+            <p className="text-muted-foreground">{selectedScope?.description}</p>
+            {isLoading ? (
+              <p className="text-xs text-muted-foreground">جار حساب أثر العملية...</p>
+            ) : counts ? (
+              <div className="grid gap-1.5 border-r-2 border-red-500/40 pr-3">
+                {cleanupPreview.map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span>{label}</span>
+                    <strong>{formatNumber(value)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
