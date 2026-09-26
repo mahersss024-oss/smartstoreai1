@@ -247,7 +247,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
           </Button>
         </header>
 
-        <section className="grid items-start gap-4 py-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <section className="grid items-start gap-4 rounded-md border bg-white/60 px-3 py-3 dark:bg-card/35 sm:px-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
           <div className="grid min-w-0 gap-3">
             <section className="px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">

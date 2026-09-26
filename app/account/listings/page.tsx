@@ -1050,7 +1050,7 @@ export default function AccountListingsPage() {
                 <div className="grid gap-4">
                   <div className="grid gap-3">
                     {listings.map((listing) => (
-                      <article key={listing.id} className="grid min-w-0 border-b py-3 [contain-intrinsic-size:220px] [content-visibility:auto]">
+                      <article key={listing.id} className="grid min-w-0 rounded-md border bg-white/60 py-3 [contain-intrinsic-size:220px] [content-visibility:auto] dark:bg-card/35">
                       <div className="min-w-0">
                         <div className="grid gap-2 px-2 py-1 sm:px-3">
                           <div className="flex min-w-0 items-center justify-between gap-2">
