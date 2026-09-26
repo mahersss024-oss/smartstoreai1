@@ -291,12 +291,16 @@ function ListingReportsSection({
   reports,
   isLoading,
   processingReportId,
+  canDeleteReports,
   onResolve,
+  onDelete,
 }: Readonly<{
   reports: ReportRecord[];
   isLoading: boolean;
   processingReportId: string | null;
+  canDeleteReports: boolean;
   onResolve: (report: ReportRecord, action: ListingReportAction) => void;
+  onDelete: (reportId: string) => void;
 }>) {
   let content;
 
@@ -385,6 +389,19 @@ function ListingReportsSection({
                   )}
                 </div>
               )}
+              {canDeleteReports && report.status !== 'open' && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    className="rounded-md text-red-600 hover:text-red-700"
+                    disabled={processingReportId === report.id}
+                    onClick={() => onDelete(report.id)}
+                  >
+                    <Trash2 className="size-4" />
+                    حذف البلاغ
+                  </Button>
+                </div>
+              )}
             </article>
           );
         })}
@@ -407,13 +424,18 @@ function UserReportsSection({
   userReports,
   processingReportId,
   canViewAccounts,
+  canDeleteReports,
   onModerate,
+  onDelete,
 }: Readonly<{
   userReports: UserReportRecord[];
   processingReportId: string | null;
   canViewAccounts: boolean;
+  canDeleteReports: boolean;
   onModerate: (reportId: string, action: UserReportResolution) => void;
+  onDelete: (reportId: string) => void;
 }>) {
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
   let content;
 
   if (userReports.length === 0) {
@@ -425,7 +447,11 @@ function UserReportsSection({
   } else {
     content = (
       <div className="grid gap-3">
-        {userReports.map((report) => (
+        {userReports.map((report) => {
+          const isExpanded = expandedReportId === report.id;
+          const messagePreview = report.conversation?.messages.at(0);
+
+          return (
           <article key={report.id} className="grid gap-3 rounded-md border p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -446,6 +472,43 @@ function UserReportsSection({
                 {report.details}
               </p>
             )}
+            {messagePreview && !isExpanded && (
+              <p className="line-clamp-2 text-xs leading-6 text-muted-foreground">
+                <span className="font-semibold text-foreground">معاينة: </span>
+                {messagePreview.body}
+              </p>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-md"
+                onClick={() =>
+                  setExpandedReportId((currentId) =>
+                    currentId === report.id ? null : report.id,
+                  )
+                }
+              >
+                <MessageCircle className="size-3.5" />
+                {isExpanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+              </Button>
+              {canDeleteReports && report.status !== 'open' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="rounded-md text-red-600 hover:text-red-700"
+                  disabled={processingReportId === report.id}
+                  onClick={() => onDelete(report.id)}
+                >
+                  <Trash2 className="size-3.5" />
+                  حذف البلاغ
+                </Button>
+              )}
+            </div>
+            {isExpanded && (
+              <>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border p-2 text-xs leading-6">
                 <div className="font-bold">المبلّغ</div>
@@ -489,6 +552,8 @@ function UserReportsSection({
                 ))}
               </div>
             ) : null}
+              </>
+            )}
             {report.status === 'open' && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Button
@@ -539,7 +604,8 @@ function UserReportsSection({
               </div>
             )}
           </article>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -583,6 +649,8 @@ export default function AdminModerationPage() {
     Boolean(queue.pagination?.listings.hasMore) ||
     Boolean(queue.pagination?.reports.hasMore) ||
     Boolean(queue.pagination?.userReports.hasMore);
+  const canDeleteReports =
+    adminAccessRole === 'owner' || adminAccessRole === 'admin';
 
   const refreshQueue = useCallback(async (page = 1) => {
     setIsLoading(true);
@@ -754,6 +822,40 @@ export default function AdminModerationPage() {
     [refreshQueue],
   );
 
+  const deleteClosedReport = useCallback(
+    async (reportId: string, reportType: 'listing' | 'conversation') => {
+      if (!window.confirm('حذف البلاغ المغلق نهائيًا؟')) {
+        return;
+      }
+
+      setProcessingReportId(reportId);
+      setNotice('');
+      try {
+        const reportPath =
+          reportType === 'conversation' ? 'user-reports' : 'reports';
+        const response = await fetch(
+          `/api/admin/moderation/${reportPath}/${reportId}`,
+          { method: 'DELETE' },
+        );
+
+        if (response.status === 409) {
+          setNotice('لا يمكن حذف البلاغ قبل إغلاقه.');
+          return;
+        }
+
+        if (!response.ok) {
+          setNotice('تعذر حذف البلاغ. تحقق من الصلاحية وحالة البلاغ.');
+          return;
+        }
+
+        void refreshQueue(1);
+      } finally {
+        setProcessingReportId(null);
+      }
+    },
+    [refreshQueue],
+  );
+
   const resolveReport = useCallback(
     async (report: ReportRecord, action: ListingReportAction) => {
       if (action !== 'dismiss' && !report.listing) {
@@ -865,7 +967,11 @@ export default function AdminModerationPage() {
             reports={queue.reports}
             isLoading={isLoading}
             processingReportId={processingReportId}
+            canDeleteReports={canDeleteReports}
             onResolve={(report, action) => void resolveReport(report, action)}
+            onDelete={(reportId) =>
+              void deleteClosedReport(reportId, 'listing')
+            }
           />
         </section>
         <UserReportsSection
@@ -874,7 +980,11 @@ export default function AdminModerationPage() {
           canViewAccounts={
             adminAccessRole === 'owner' || adminAccessRole === 'admin'
           }
+          canDeleteReports={canDeleteReports}
           onModerate={(reportId, action) => void moderateUserReport(reportId, action)}
+          onDelete={(reportId) =>
+            void deleteClosedReport(reportId, 'conversation')
+          }
         />
         <div ref={queueLoadMoreRef} className="h-px" />
         {hasMoreQueue && (

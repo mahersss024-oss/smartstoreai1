@@ -3,8 +3,12 @@ import { z } from 'zod';
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
+import {
+  hasVerifiedAdminAccess,
+  hasVerifiedModeratorAccess,
+} from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
+import { prisma } from '@/lib/db/prisma';
 
 const maxReportModerationActionRequestBytes = 4 * 1024;
 
@@ -92,4 +96,57 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   return Response.json(result);
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return Response.json({ error: 'auth_required' }, { status: 401 });
+  }
+
+  if (!(await hasVerifiedAdminAccess(session))) {
+    return Response.json({ error: 'admin_required' }, { status: 403 });
+  }
+
+  const rateLimitResponse = await enforceModerationReportMutationRateLimit(
+    request,
+    session.user.id,
+  );
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  const { reportId } = await context.params;
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    select: { id: true, status: true },
+  });
+
+  if (!report) {
+    return Response.json({ error: 'report_not_found' }, { status: 404 });
+  }
+
+  if (report.status === 'open') {
+    return Response.json({ error: 'report_must_be_closed' }, { status: 409 });
+  }
+
+  await prisma.$transaction([
+    prisma.report.delete({ where: { id: reportId } }),
+    prisma.adminAuditLog.create({
+      data: {
+        adminId: session.user.id,
+        action: 'dismiss_report',
+        targetType: 'report',
+        targetId: reportId,
+        metadata: {
+          operation: 'moderation_report_delete',
+          status: report.status,
+        },
+      },
+    }),
+  ]);
+
+  return Response.json({ status: 'deleted', reportId });
 }

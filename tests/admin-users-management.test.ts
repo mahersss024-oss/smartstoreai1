@@ -310,6 +310,50 @@ test('admin commission, moderation, and maintenance mutations are rate limited',
   assert.match(maintenanceRoute, /admin_maintenance_cleanup/);
 });
 
+test('closed moderation reports can be deleted only through admin-protected routes', () => {
+  const listingReportRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'moderation',
+    'reports',
+    '[reportId]',
+    'route.ts',
+  );
+  const conversationReportRoute = readProjectFile(
+    'app',
+    'api',
+    'admin',
+    'moderation',
+    'user-reports',
+    '[reportId]',
+    'route.ts',
+  );
+
+  for (const route of [listingReportRoute, conversationReportRoute]) {
+    assert.match(route, /export async function DELETE/);
+    assert.match(route, /hasVerifiedAdminAccess/);
+    assert.match(route, /report\.status === 'open'/);
+    assert.match(route, /report_must_be_closed/);
+    assert.match(route, /adminAuditLog\.create/);
+  }
+
+  assert.match(listingReportRoute, /prisma\.report\.delete/);
+  assert.match(conversationReportRoute, /prisma\.userReport\.delete/);
+});
+
+test('conversation reports stay compact until an administrator opens details', () => {
+  const page = readProjectFile('app', 'admin', 'moderation', 'page.tsx');
+
+  assert.match(page, /expandedReportId/);
+  assert.match(page, /isExpanded &&/);
+  assert.match(page, /عرض التفاصيل/);
+  assert.match(page, /إخفاء التفاصيل/);
+  assert.match(page, /messagePreview/);
+  assert.match(page, /canDeleteReports && report\.status !== 'open'/);
+  assert.match(page, /method: 'DELETE'/);
+});
+
 test('admin maintenance exposes a scope that purges only soft-deleted listings', () => {
   const maintenanceRoute = readProjectFile(
     'app',
