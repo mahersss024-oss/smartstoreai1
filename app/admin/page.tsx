@@ -1,596 +1,145 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
+  ArrowLeft,
   ArrowRight,
-  BarChart3,
-  Flag,
-  ImageIcon,
   Megaphone,
-  MessageCircle,
   Percent,
   ShieldCheck,
   Store,
   Trash2,
-  UserRound,
   Users,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { useAdminAccess } from './use-admin-access';
 
-type OverviewPayload = {
-  totals: {
-    users: number;
-    listings: number;
-    images: number;
-    conversations: number;
-    messages: number;
-    favorites: number;
-    reports: number;
-    commissions: number;
-    adminActions: number;
-  };
-  statuses: {
-    listings: Record<string, number>;
-    images: Record<string, number>;
-    reports: Record<string, number>;
-    commissions: Record<string, number>;
-  };
-  money: {
-    dueCommissions: number;
-    paidCommissions: number;
-  };
-  visits: {
-    today: { visits: number; uniqueVisitors: number };
-    last7Days: { visits: number; uniqueVisitors: number };
-    last30Days: { visits: number; uniqueVisitors: number };
-  };
-};
-
-type ModeratorOverviewPayload = {
-  totals: {
-    listings: number;
-    images: number;
-    reports: number;
-    openReports: number;
-    openListingReports: number;
-    openUserReports: number;
-  };
-  statuses: {
-    listings: Record<string, number>;
-    images: Record<string, number>;
-    reports: Record<string, number>;
-  };
-};
-
-const statusLabels: Record<string, string> = {
-  approved: 'معتمدة',
-  deleted: 'محذوفة',
-  draft: 'مسودة',
-  due: 'مستحقة',
-  dismissed: 'مغلقة',
-  disputed: 'متنازع عليها',
-  needs_retake: 'تحتاج إعادة تصوير',
-  open: 'مفتوحة',
-  paid: 'مدفوعة',
-  paused: 'موقوفة',
-  pending: 'قيد المراجعة',
-  pending_amount: 'بانتظار قيمة البيع',
-  pending_review: 'قيد مراجعة الصورة',
-  published: 'منشورة',
-  rejected: 'مرفوضة',
-  reviewed: 'مراجعة',
-  sold: 'مباعة',
-  waived: 'معفاة',
-};
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('ar-SA').format(value);
-}
-
-function formatMoney(value: number) {
-  return `${formatNumber(value)} ر.س`;
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-1 text-xl font-bold">{value}</div>
-    </div>
-  );
-}
-
-function StatusBlock({
-  title,
-  statuses,
-}: {
-  title: string;
-  statuses: Record<string, number>;
-}) {
-  const entries = Object.entries(statuses).sort((left, right) =>
-    left[0].localeCompare(right[0]),
-  );
-
-  return (
-    <section className="rounded-md border bg-white p-3 shadow-sm dark:bg-card">
-      <h2 className="mb-3 text-sm font-bold">{title}</h2>
-      {entries.length === 0 ? (
-        <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          لا توجد بيانات.
-        </div>
-      ) : (
-        <div className="grid gap-2">
-          {entries.map(([status, count]) => (
-            <div
-              key={status}
-              className="flex items-center justify-between gap-3 rounded-md bg-[#f7f9fc] px-3 py-2 text-sm dark:bg-background"
-            >
-              <span>{statusLabels[status] ?? status}</span>
-              <span className="font-bold">{formatNumber(count)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-type WorkQueueItem = {
-  href: string;
-  icon: ReactNode;
-  label: string;
-  value: number | string;
-  action: string;
-};
-
-function WorkQueue({
-  items,
-}: {
-  items: WorkQueueItem[];
-}) {
-  return (
-    <section className="grid gap-2 rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card" data-testid="admin-work-queue">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">يحتاج إجراء</h2>
-        <span className="text-xs text-muted-foreground">الأولوية اليومية</span>
-      </div>
-      <div className="grid gap-1">
-        {items.map((item) => (
-          <Link
-            key={`${item.href}-${item.label}`}
-            href={item.href}
-            className="grid gap-2 rounded-md px-2 py-2 transition hover:bg-blue-50 dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
-          >
-            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-              <span className="grid size-7 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                {item.icon}
-              </span>
-              <span className="truncate">{item.label}</span>
-            </div>
-            <span className="w-fit rounded-md bg-[#eef3fb] px-2.5 py-1 text-sm font-bold dark:bg-background">
-              {typeof item.value === 'number' ? formatNumber(item.value) : item.value}
-            </span>
-            <span className="text-xs font-semibold text-blue-700 dark:text-blue-200">
-              {item.action}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default function AdminHomePage() {
-  const router = useRouter();
   const {
     adminAccessNotice,
     adminAccessRole,
     isAdminAccessAllowed,
+    isAdminAccessChecking,
     verifyAdminAccess,
   } = useAdminAccess('moderator');
-  const [overview, setOverview] = useState<OverviewPayload | null>(null);
-  const [moderatorOverview, setModeratorOverview] =
-    useState<ModeratorOverviewPayload | null>(null);
-  const [notice, setNotice] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadOverview = useCallback(async () => {
-    setIsLoading(true);
-    setNotice('');
-
-    try {
-      if (!(await verifyAdminAccess())) {
-        setOverview(null);
-        setModeratorOverview(null);
-        return;
-      }
-    } catch {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/admin/overview', {
-        cache: 'no-store',
-      });
-
-      if (response.status === 401) {
-        router.push('/api/auth/google/start');
-        return;
-      }
-
-      if (response.status === 403) {
-        // Appointed moderators cannot read the full admin overview; fall back
-        // to the scoped moderator overview they are allowed to see.
-        const moderatorResponse = await fetch('/api/moderator/overview', {
-          cache: 'no-store',
-        });
-
-        if (moderatorResponse.status === 401) {
-          router.push('/api/auth/google/start');
-          return;
-        }
-
-        if (moderatorResponse.ok) {
-          setOverview(null);
-          setModeratorOverview(
-            (await moderatorResponse.json()) as ModeratorOverviewPayload,
-          );
-          return;
-        }
-
-        setNotice('هذه الصفحة مخصصة للفريق الإداري فقط.');
-        return;
-      }
-
-      if (!response.ok) {
-        setNotice('تعذر تحميل لوحة الإدارة.');
-        return;
-      }
-
-      setModeratorOverview(null);
-      setOverview((await response.json()) as OverviewPayload);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [router, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        void loadOverview();
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadOverview]);
-
-  useSmartstoreRealtime({
-    enabled: isAdminAccessAllowed,
-    fallbackIntervalMs: 4000,
-    eventTypes: [
-      'ad_created',
-      'ad_updated',
-      'ad_deleted',
-      'ad_status_changed',
-      'message_created',
-      'conversation_updated',
-      'commission_updated',
-      'moderation_updated',
-      'maintenance_cleanup',
-    ],
-    onEvent: () => {
-      void loadOverview();
-    },
-    onResync: ({ reason }) => {
-      if (reason === 'event') {
-        return;
-      }
-
-      return loadOverview();
-    },
-  });
+    void verifyAdminAccess();
+  }, [verifyAdminAccess]);
 
   const isOwner = adminAccessRole === 'owner';
   const isModeratorOnly = adminAccessRole === 'moderator';
-  const canManageUsers = adminAccessRole === 'owner' || adminAccessRole === 'admin';
-  const canManageCommissions = isOwner;
+  const canManageUsers =
+    adminAccessRole === 'owner' || adminAccessRole === 'admin';
 
-  const quickLinks = useMemo(() => {
-    const links = [
-      {
-        href: '/admin/listings',
-        icon: <Megaphone className="size-4" />,
-        label: 'إدارة الإعلانات',
-        text: 'تعديل، إيقاف، نشر، بيع، أو حذف الإعلانات.',
-        visible: true,
-      },
-      {
-        href: '/admin/moderation',
-        icon: <ShieldCheck className="size-4" />,
-        label: 'المراجعة والبلاغات',
-        text: 'اعتماد الإعلانات الحساسة ومراجعة البلاغات.',
-        visible: true,
-      },
-      {
-        href: '/admin/users',
-        icon: <Users className="size-4" />,
-        label: 'إدارة المستخدمين',
-        text: 'عرض العملاء، بيانات التواصل الرسمية، الأدوار، ونشاط الحسابات.',
-        visible: canManageUsers,
-      },
-      {
-        href: '/admin/commissions',
-        icon: <Percent className="size-4" />,
-        label: 'إدارة رسوم المنصة',
-        text: 'تحديث حالة الرسوم أو حذف سجل رسوم.',
-        visible: canManageCommissions,
-      },
-      {
-        href: '/admin/maintenance',
-        icon: <Trash2 className="size-4" />,
-        label: 'الصيانة والتنظيف',
-        text: 'تنظيف بيانات التجربة بعد معاينة الأعداد.',
-        visible: isOwner,
-      },
-    ];
-
-    return links.filter((link) => link.visible);
-  }, [canManageCommissions, canManageUsers, isOwner]);
-
-  const moderatorWorkQueue = useMemo(() => {
-    if (!moderatorOverview) {
-      return [];
-    }
-
-    return [
-      {
-        href: '/admin/moderation',
-        icon: <Flag className="size-4" />,
-        label: 'بلاغات مفتوحة',
-        value: moderatorOverview.totals.openReports,
-        action: 'مراجعة',
-      },
-      {
-        href: '/admin/moderation',
-        icon: <Flag className="size-4" />,
-        label: 'بلاغات الإعلانات',
-        value: moderatorOverview.totals.openListingReports,
-        action: 'فتح',
-      },
-      {
-        href: '/admin/moderation',
-        icon: <MessageCircle className="size-4" />,
-        label: 'بلاغات المستخدمين والمحادثات',
-        value: moderatorOverview.totals.openUserReports,
-        action: 'فتح',
-      },
-      {
-        href: '/admin/moderation',
-        icon: <Megaphone className="size-4" />,
-        label: 'إعلانات تحتاج مراجعة',
-        value:
-          (moderatorOverview.statuses.listings.pending ?? 0) +
-          (moderatorOverview.statuses.listings.rejected ?? 0),
-        action: 'معالجة',
-      },
-    ];
-  }, [moderatorOverview]);
-
-  const ownerWorkQueue = useMemo(() => {
-    if (!overview) {
-      return [];
-    }
-
-    return [
-      {
-        href: '/admin/moderation',
-        icon: <Flag className="size-4" />,
-        label: 'بلاغات مفتوحة',
-        value: overview.statuses.reports.open ?? 0,
-        action: 'مراجعة',
-      },
-      {
-        href: '/admin/listings',
-        icon: <Megaphone className="size-4" />,
-        label: 'إعلانات قيد المراجعة',
-        value: overview.statuses.listings.pending ?? 0,
-        action: 'فتح',
-      },
-      {
-        href: '/admin/listings',
-        icon: <ImageIcon className="size-4" />,
-        label: 'صور قيد المراجعة',
-        value: overview.statuses.images.pending_review ?? 0,
-        action: 'فتح',
-      },
-      ...(canManageCommissions
-        ? [
-            {
-              href: '/admin/commissions',
-              icon: <Percent className="size-4" />,
-              label: 'رسوم مستحقة',
-              value: overview.statuses.commissions.due ?? 0,
-              action: 'متابعة',
-            },
-          ]
-        : []),
-      ...(isOwner
-        ? [
-            {
-              href: '/admin/maintenance',
-              icon: <Trash2 className="size-4" />,
-              label: 'الصيانة والتنظيف',
-              value: 'فحص',
-              action: 'إدارة',
-            },
-          ]
-        : []),
-    ];
-  }, [canManageCommissions, isOwner, overview]);
+  const adminSections = useMemo(
+    () =>
+      [
+        {
+          href: '/admin/moderation',
+          icon: <ShieldCheck className="size-5" />,
+          label: 'المراجعة والبلاغات',
+          text: 'مراجعة الإعلانات وبلاغات الإعلانات والمحادثات.',
+          visible: true,
+        },
+        {
+          href: '/admin/listings',
+          icon: <Megaphone className="size-5" />,
+          label: 'إدارة الإعلانات',
+          text: 'إدارة حالة الإعلان وتعديله أو إيقافه أو حذفه.',
+          visible: true,
+        },
+        {
+          href: '/admin/users',
+          icon: <Users className="size-5" />,
+          label: 'إدارة المستخدمين',
+          text: 'إدارة الحسابات والصلاحيات وحالة المستخدم.',
+          visible: canManageUsers,
+        },
+        {
+          href: '/admin/commissions',
+          icon: <Percent className="size-5" />,
+          label: 'رسوم المنصة',
+          text: 'متابعة الرسوم المستحقة وإدارة حالاتها.',
+          visible: isOwner,
+        },
+        {
+          href: '/admin/maintenance',
+          icon: <Trash2 className="size-5" />,
+          label: 'الصيانة والتنظيف',
+          text: 'معاينة البيانات وتنفيذ عمليات التنظيف الآمنة.',
+          visible: isOwner,
+        },
+      ].filter((section) => section.visible),
+    [canManageUsers, isOwner],
+  );
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
+    <main
+      className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground"
+      dir="rtl"
+    >
+      <div className="mx-auto grid max-w-5xl gap-5 px-4 py-5 sm:px-6">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300/70 pb-4 dark:border-slate-700/70">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/account">
+              <Link href="/account" aria-label="العودة إلى حسابي">
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-600 text-white">
               <Store className="size-5" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">
-                {isModeratorOnly ? 'لوحة المشرف' : 'لوحة المالك'}
+                {isModeratorOnly ? 'لوحة المشرف' : 'لوحة الإدارة'}
               </h1>
               <p className="truncate text-xs text-muted-foreground">
-                {isModeratorOnly
-                  ? 'مراجعة الإعلانات والبلاغات حسب صلاحياتك'
-                  : 'إحصائيات وصلاحيات إدارة سوق حمد'}
+                إدارة أقسام سوق حمد
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="rounded-md" onClick={() => void loadOverview()}>
-              تحديث
-            </Button>
-            <ThemeToggle language="ar" />
-          </div>
+          <ThemeToggle language="ar" />
         </header>
 
-        {(adminAccessNotice || notice) && (
-          <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {adminAccessNotice || notice}
+        {adminAccessNotice && (
+          <p className="py-3 text-sm text-muted-foreground">
+            {adminAccessNotice}
+          </p>
+        )}
+
+        {isAdminAccessChecking && (
+          <div className="grid min-h-52 place-items-center text-sm text-muted-foreground">
+            جار التحقق من الصلاحية...
           </div>
         )}
 
-        {isLoading ||
-        (!overview && !moderatorOverview && !adminAccessNotice && !notice) ? (
-          <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {isModeratorOnly ? 'جار تحميل لوحة المشرف...' : 'جار تحميل لوحة المالك...'}
-          </section>
-        ) : moderatorOverview ? (
-          <>
-            <WorkQueue items={moderatorWorkQueue} />
-
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={<Flag className="size-4" />} label="البلاغات المفتوحة" value={formatNumber(moderatorOverview.totals.openReports)} />
-              <StatCard icon={<Flag className="size-4" />} label="بلاغات الإعلانات المفتوحة" value={formatNumber(moderatorOverview.totals.openListingReports)} />
-              <StatCard icon={<MessageCircle className="size-4" />} label="بلاغات المحادثات المفتوحة" value={formatNumber(moderatorOverview.totals.openUserReports)} />
-              <StatCard icon={<Megaphone className="size-4" />} label="قيد المراجعة (إعلانات)" value={formatNumber((moderatorOverview.statuses.listings.pending ?? 0) + (moderatorOverview.statuses.listings.rejected ?? 0))} />
-            </section>
-
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <StatCard icon={<Megaphone className="size-4" />} label="كل الإعلانات" value={formatNumber(moderatorOverview.totals.listings)} />
-              <StatCard icon={<ImageIcon className="size-4" />} label="صور الإعلانات" value={formatNumber(moderatorOverview.totals.images)} />
-              <StatCard icon={<Flag className="size-4" />} label="إجمالي البلاغات" value={formatNumber(moderatorOverview.totals.reports)} />
-            </section>
-
-            <section className="grid gap-2">
-              {quickLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="grid gap-1 rounded-md border bg-white px-3 py-2.5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:items-center"
-                >
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    {link.icon}
-                    {link.label}
-                  </div>
-                  <p className="text-xs leading-6 text-muted-foreground">{link.text}</p>
-                </Link>
-              ))}
-            </section>
-
-            <section className="grid gap-3 lg:grid-cols-3">
-              <StatusBlock title="حالات الإعلانات" statuses={moderatorOverview.statuses.listings} />
-              <StatusBlock title="حالات الصور" statuses={moderatorOverview.statuses.images} />
-              <StatusBlock title="حالات البلاغات" statuses={moderatorOverview.statuses.reports} />
-            </section>
-          </>
-        ) : !overview ? (
-          <section className="grid min-h-80 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
-            {adminAccessNotice || notice}
-          </section>
-        ) : (
-          <>
-            <WorkQueue items={ownerWorkQueue} />
-
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={<Users className="size-4" />} label="زيارات اليوم" value={formatNumber(overview.visits.today.visits)} />
-              <StatCard icon={<UserRound className="size-4" />} label="زوار اليوم الفريدون" value={formatNumber(overview.visits.today.uniqueVisitors)} />
-              <StatCard icon={<BarChart3 className="size-4" />} label="زيارات آخر 7 أيام" value={formatNumber(overview.visits.last7Days.visits)} />
-              <StatCard icon={<Users className="size-4" />} label="زوار آخر 30 يوم" value={formatNumber(overview.visits.last30Days.uniqueVisitors)} />
-            </section>
-
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={<UserRound className="size-4" />} label="المستخدمون المسجلون" value={formatNumber(overview.totals.users)} />
-              <StatCard icon={<Megaphone className="size-4" />} label="كل الإعلانات" value={formatNumber(overview.totals.listings)} />
-              <StatCard icon={<ImageIcon className="size-4" />} label="صور الإعلانات" value={formatNumber(overview.totals.images)} />
-              <StatCard icon={<MessageCircle className="size-4" />} label="المحادثات" value={formatNumber(overview.totals.conversations)} />
-              <StatCard icon={<MessageCircle className="size-4" />} label="الرسائل" value={formatNumber(overview.totals.messages)} />
-              <StatCard icon={<Flag className="size-4" />} label="البلاغات" value={formatNumber(overview.totals.reports)} />
-              <StatCard icon={<Percent className="size-4" />} label="رسوم المنصة" value={formatNumber(overview.totals.commissions)} />
-              <StatCard icon={<ShieldCheck className="size-4" />} label="إجراءات الإدارة" value={formatNumber(overview.totals.adminActions)} />
-            </section>
-
-            <section className="grid gap-3 sm:grid-cols-2">
-              <StatCard icon={<Percent className="size-4" />} label="إجمالي الرسوم المستحقة" value={formatMoney(overview.money.dueCommissions)} />
-              <StatCard icon={<Percent className="size-4" />} label="إجمالي الرسوم المدفوعة" value={formatMoney(overview.money.paidCommissions)} />
-            </section>
-
-            <section className="grid gap-2">
-              {quickLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="grid gap-1 rounded-md border bg-white px-3 py-2.5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:items-center"
-                >
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    {link.icon}
-                    {link.label}
-                  </div>
-                  <p className="text-xs leading-6 text-muted-foreground">{link.text}</p>
-                </Link>
-              ))}
-            </section>
-
-            <section className="grid gap-3 lg:grid-cols-4">
-              <StatusBlock title="حالات الإعلانات" statuses={overview.statuses.listings} />
-              <StatusBlock title="حالات الصور" statuses={overview.statuses.images} />
-              <StatusBlock title="حالات البلاغات" statuses={overview.statuses.reports} />
-              <StatusBlock title="حالات رسوم المنصة" statuses={overview.statuses.commissions} />
-            </section>
-          </>
+        {isAdminAccessAllowed && (
+          <nav aria-label="أقسام الإدارة" className="grid">
+            {adminSections.map((section) => (
+              <Link
+                key={section.href}
+                href={section.href}
+                className="group flex items-center gap-3 border-b border-slate-300/70 py-4 transition-colors last:border-b-0 hover:text-blue-700 dark:border-slate-700/70 dark:hover:text-blue-300"
+              >
+                <span className="grid size-10 shrink-0 place-items-center text-blue-700 dark:text-blue-300">
+                  {section.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">{section.label}</span>
+                  <span className="mt-1 block text-xs leading-6 text-muted-foreground">
+                    {section.text}
+                  </span>
+                </span>
+                <ArrowLeft className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-1" />
+              </Link>
+            ))}
+          </nav>
         )}
       </div>
     </main>

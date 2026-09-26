@@ -30,17 +30,17 @@ test('admin users page exposes searchable account control', () => {
   assert.match(page, /اتفاقية رسوم المنصة/);
 });
 
-test('admin work surfaces stay dense and operational', () => {
+test('admin dashboard stays focused on administrative navigation', () => {
   const dashboard = readProjectFile('app', 'admin', 'page.tsx');
   const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
 
-  assert.match(dashboard, /data-testid="admin-work-queue"/);
-  assert.match(dashboard, /moderatorWorkQueue/);
-  assert.match(dashboard, /ownerWorkQueue/);
-  assert.match(dashboard, /overview\.statuses\.reports\.open/);
-  assert.match(dashboard, /overview\.statuses\.commissions\.due/);
-  assert.match(dashboard, /px-3 py-2\.5 shadow-sm/);
-  assert.match(dashboard, /sm:grid-cols-\[minmax\(0,12rem\)_minmax\(0,1fr\)\]/);
+  assert.match(dashboard, /aria-label="أقسام الإدارة"/);
+  assert.match(dashboard, /المراجعة والبلاغات/);
+  assert.match(dashboard, /الصيانة والتنظيف/);
+  assert.doesNotMatch(dashboard, /admin-work-queue/);
+  assert.doesNotMatch(dashboard, /StatCard/);
+  assert.doesNotMatch(dashboard, /StatusBlock/);
+  assert.doesNotMatch(dashboard, /\/api\/(admin|moderator)\/overview/);
   assert.match(usersPage, /grid gap-2 rounded-md border bg-white px-3 py-2/);
   assert.match(usersPage, /border-b border-slate-200\/70 py-3 last:border-b-0/);
   assert.doesNotMatch(usersPage, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
@@ -66,15 +66,12 @@ test('admin pages verify access before protected admin api requests', () => {
       -1,
       `${pageSegments.join('/')} must use the admin access guard`,
     );
-    assert.notEqual(
-      firstAdminApiIndex,
-      -1,
-      `${pageSegments.join('/')} must call an admin api`,
-    );
-    assert.ok(
-      guardIndex < firstAdminApiIndex,
-      `${pageSegments.join('/')} must verify access before calling admin api`,
-    );
+    if (firstAdminApiIndex !== -1) {
+      assert.ok(
+        guardIndex < firstAdminApiIndex,
+        `${pageSegments.join('/')} must verify access before calling admin api`,
+      );
+    }
   }
 });
 
@@ -182,7 +179,6 @@ test('cloud storage deletions stay behind owner or listing-owner checks', () => 
 
 test('admin realtime subscriptions wait for verified access', () => {
   const pages = [
-    ['app', 'admin', 'page.tsx'],
     ['app', 'admin', 'listings', 'page.tsx'],
     ['app', 'admin', 'commissions', 'page.tsx'],
     ['app', 'admin', 'moderation', 'page.tsx'],
@@ -542,7 +538,8 @@ test('scoped admin roles are enforced consistently by pages and APIs', () => {
   );
 
   assert.match(dashboard, /useAdminAccess\('moderator'\)/);
-  assert.match(dashboard, /const canManageCommissions = isOwner/);
+  assert.match(dashboard, /href: '\/admin\/commissions'/);
+  assert.match(dashboard, /visible: isOwner/);
   assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
   assert.match(commissionsRoute, /hasPlatformOwnerAccess/);
   assert.match(commissionRoute, /hasPlatformOwnerAccess/);
@@ -574,7 +571,7 @@ test('admin dashboard admits moderators and renders a scoped moderator view', ()
   assert.match(dashboard, /useAdminAccess\('moderator'\)/);
   assert.match(dashboard, /isModeratorOnly/);
   assert.match(dashboard, /لوحة المشرف/);
-  assert.match(dashboard, /\/api\/moderator\/overview/);
+  assert.doesNotMatch(dashboard, /\/api\/moderator\/overview/);
 });
 
 test('moderator overview api is server-side moderator protected and scoped', () => {
