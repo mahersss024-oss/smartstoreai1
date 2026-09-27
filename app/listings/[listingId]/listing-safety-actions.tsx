@@ -20,11 +20,13 @@ type FavoriteStatePayload = {
 export function ListingSafetyActions({
   listingId,
   sellerId,
+  isOwnListing = false,
   showFavorite = true,
   showReport = true,
 }: {
   listingId: string;
   sellerId: string;
+  isOwnListing?: boolean;
   showFavorite?: boolean;
   showReport?: boolean;
 }) {
@@ -35,6 +37,8 @@ export function ListingSafetyActions({
   const [isSaving, setIsSaving] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [canFavorite, setCanFavorite] = useState(false);
+  const canShowFavorite = showFavorite && canFavorite && !isOwnListing;
+  const canShowReport = showReport && !isOwnListing;
 
   useEffect(() => {
     let isCurrent = true;
@@ -183,12 +187,12 @@ export function ListingSafetyActions({
       <div
         className={cn(
           'grid gap-2',
-          showFavorite && showReport && canFavorite
+          canShowFavorite && canShowReport
             ? 'grid-cols-2'
             : 'grid-cols-1',
         )}
       >
-        {showFavorite && canFavorite && (
+        {canShowFavorite && (
         <Button
           variant="outline"
           className={cn(
@@ -204,7 +208,7 @@ export function ListingSafetyActions({
           حفظ
         </Button>
         )}
-        {showReport && (
+        {canShowReport && (
         <Button
           variant="outline"
           className="rounded-md"

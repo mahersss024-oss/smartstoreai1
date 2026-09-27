@@ -5,6 +5,7 @@ import {
   CSSProperties,
   FormEvent,
   KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -72,6 +73,7 @@ type ConversationParticipant = {
   email?: string;
   name?: string;
   picture?: string;
+  lastActiveAt?: string;
 };
 
 type ConversationRecord = {
@@ -96,6 +98,7 @@ type ConversationBlockStatus = {
 
 const missingListingImageDataUrl =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22900%22 height=%22675%22 viewBox=%220 0 900 675%22%3E%3Crect width=%22900%22 height=%22675%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M382 291h136a28 28 0 0 1 28 28v95a28 28 0 0 1-28 28H382a28 28 0 0 1-28-28v-95a28 28 0 0 1 28-28z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22/%3E%3Ccircle cx=%22417%22 cy=%22342%22 r=%2220%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m382 414 53-55 43 43 25-27 43 39%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2214%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22450%22 y=%22492%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
+const conversationOnlineWindowMs = 6 * 60 * 1000;
 
 function pickLatestConversation(
   current: ConversationRecord | null,
@@ -174,9 +177,101 @@ function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat('ar-SA', {
     hour: '2-digit',
     minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatMessageDate(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const sameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+
+  if (sameDay(date, now)) {
+    return 'اليوم';
+  }
+
+  if (sameDay(date, yesterday)) {
+    return 'أمس';
+  }
+
+  return new Intl.DateTimeFormat('ar-SA', {
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
   }).format(new Date(value));
+}
+
+function formatLastSeen(value: string) {
+  const date = new Date(value);
+  const timestamp = date.getTime();
+
+  if (!Number.isFinite(timestamp)) {
+    return 'آخر ظهور غير متاح';
+  }
+
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const sameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+  const time = new Intl.DateTimeFormat('ar-SA', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+  if (sameDay(date, now)) {
+    return `آخر ظهور اليوم ${time}`;
+  }
+
+  if (sameDay(date, yesterday)) {
+    return `آخر ظهور أمس ${time}`;
+  }
+
+  return `آخر ظهور ${new Intl.DateTimeFormat('ar-SA', {
+    day: 'numeric',
+    month: 'short',
+  }).format(date)}`;
+}
+
+function getParticipantPresence(participant?: ConversationParticipant | null) {
+  if (!participant?.lastActiveAt) {
+    return { label: 'آخر ظهور غير متاح', online: false };
+  }
+
+  const lastActiveTimestamp = Date.parse(participant.lastActiveAt);
+
+  if (!Number.isFinite(lastActiveTimestamp)) {
+    return { label: 'آخر ظهور غير متاح', online: false };
+  }
+
+  const elapsed = Date.now() - lastActiveTimestamp;
+
+  if (elapsed >= 0 && elapsed <= conversationOnlineWindowMs) {
+    return { label: 'متصل الآن', online: true };
+  }
+
+  return { label: formatLastSeen(participant.lastActiveAt), online: false };
+}
+
+function isSameMessageDay(left: string, right?: string) {
+  if (!right) {
+    return false;
+  }
+
+  const leftDate = new Date(left);
+  const rightDate = new Date(right);
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear() &&
+    leftDate.getMonth() === rightDate.getMonth() &&
+    leftDate.getDate() === rightDate.getDate()
+  );
 }
 
 function normalizeContactDigits(value: string) {
@@ -238,6 +333,55 @@ function isMessageReadBy(message: ConversationMessage, userId?: string | null) {
   );
 }
 
+function isMessageDeliveredTo(
+  message: ConversationMessage,
+  userId?: string | null,
+) {
+  if (!userId) {
+    return false;
+  }
+
+  const deliveredTo = message.metadata?.deliveredTo;
+
+  return (
+    typeof deliveredTo === 'object' &&
+    deliveredTo !== null &&
+    !Array.isArray(deliveredTo) &&
+    typeof (deliveredTo as Record<string, unknown>)[userId] === 'string'
+  );
+}
+
+function isKeyboardDismissIgnoredTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        'a, button, input, textarea, select, [role="button"], [contenteditable="true"]',
+      ),
+    )
+  );
+}
+
+type ChatTapTracker = {
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  startAt: number;
+  moved: boolean;
+  lastTapAt: number;
+};
+
+function createEmptyChatTapTracker(): ChatTapTracker {
+  return {
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startAt: 0,
+    moved: false,
+    lastTapAt: 0,
+  };
+}
+
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams<{ conversationId: string }>();
@@ -263,6 +407,9 @@ export default function ConversationPage() {
   } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatTapTrackerRef = useRef<ChatTapTracker>(
+    createEmptyChatTapTracker(),
+  );
 
   const scrollConversationToLatest = useCallback(() => {
     const messagesContainer = messagesContainerRef.current;
@@ -306,6 +453,7 @@ export default function ConversationPage() {
   const otherParticipantName =
     getParticipantDisplayName(otherParticipant) ||
     getParticipantFallbackName(otherParticipantId);
+  const otherParticipantPresence = getParticipantPresence(otherParticipant);
   const otherParticipantProfileHref = otherParticipantId
     ? `/sellers/${encodeURIComponent(otherParticipantId)}`
     : '/conversations';
@@ -326,6 +474,86 @@ export default function ConversationPage() {
     window.requestAnimationFrame(scrollConversationToLatest);
     window.setTimeout(scrollConversationToLatest, 180);
   }, [scrollConversationToLatest]);
+
+  const handleMessagesPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!isMessageInputFocused || isKeyboardDismissIgnoredTarget(event.target)) {
+        chatTapTrackerRef.current.pointerId = null;
+        return;
+      }
+
+      chatTapTrackerRef.current = {
+        ...chatTapTrackerRef.current,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startAt: Date.now(),
+        moved: false,
+      };
+    },
+    [isMessageInputFocused],
+  );
+
+  const handleMessagesPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const tracker = chatTapTrackerRef.current;
+
+      if (tracker.pointerId !== event.pointerId) {
+        return;
+      }
+
+      if (
+        Math.hypot(event.clientX - tracker.startX, event.clientY - tracker.startY) >
+        12
+      ) {
+        tracker.moved = true;
+      }
+    },
+    [],
+  );
+
+  const handleMessagesPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const tracker = chatTapTrackerRef.current;
+
+      if (
+        !isMessageInputFocused ||
+        tracker.pointerId !== event.pointerId ||
+        tracker.moved ||
+        isKeyboardDismissIgnoredTarget(event.target)
+      ) {
+        chatTapTrackerRef.current.pointerId = null;
+        return;
+      }
+
+      const now = Date.now();
+      const duration = now - tracker.startAt;
+      const distance = Math.hypot(
+        event.clientX - tracker.startX,
+        event.clientY - tracker.startY,
+      );
+      const isTap = duration < 450 && distance <= 12;
+      const isRepeatedTap =
+        isTap && now - tracker.lastTapAt >= 180 && now - tracker.lastTapAt <= 900;
+
+      if (isRepeatedTap) {
+        messageInputRef.current?.blur();
+        chatTapTrackerRef.current = createEmptyChatTapTracker();
+        return;
+      }
+
+      chatTapTrackerRef.current = {
+        ...tracker,
+        pointerId: null,
+        lastTapAt: isTap ? now : 0,
+      };
+    },
+    [isMessageInputFocused],
+  );
+
+  const handleMessagesPointerCancel = useCallback(() => {
+    chatTapTrackerRef.current.pointerId = null;
+  }, []);
 
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
@@ -922,6 +1150,24 @@ export default function ConversationPage() {
                   >
                     {otherParticipantName}
                   </Link>
+                  <p
+                    className={`mt-0.5 flex items-center gap-1 truncate text-xs ${
+                      otherParticipantPresence.online
+                        ? 'text-emerald-600 dark:text-emerald-300'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 shrink-0 rounded-full ${
+                        otherParticipantPresence.online
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                    />
+                    <span className="truncate">
+                      {otherParticipantPresence.label}
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -980,8 +1226,11 @@ export default function ConversationPage() {
 
             <div
               ref={messagesContainerRef}
-              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] p-3 dark:bg-background sm:p-4"
-              onPointerDown={() => messageInputRef.current?.blur()}
+              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] px-3 py-4 dark:bg-background sm:px-4"
+              onPointerCancel={handleMessagesPointerCancel}
+              onPointerDown={handleMessagesPointerDown}
+              onPointerMove={handleMessagesPointerMove}
+              onPointerUp={handleMessagesPointerUp}
             >
               {isLoading ? (
                 <div className="grid h-full place-items-center text-sm text-muted-foreground">
@@ -995,58 +1244,105 @@ export default function ConversationPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-full flex-col justify-end gap-3">
-                  {visibleMessages.map((message) => {
+                <div className="flex min-h-full flex-col justify-end gap-1.5">
+                  {visibleMessages.map((message, index) => {
                     const mine = message.senderId === session.user?.id;
                     const sharedPhoneNumber = getSharedPhoneNumber(message);
+                    const previousMessage = visibleMessages[index - 1];
+                    const shouldShowDateSeparator = !isSameMessageDay(
+                      message.createdAt,
+                      previousMessage?.createdAt,
+                    );
+                    const isReadByOther =
+                      mine &&
+                      Boolean(otherParticipantId) &&
+                      isMessageReadBy(message, otherParticipantId);
+                    const isDeliveredToOther =
+                      mine &&
+                      Boolean(otherParticipantId) &&
+                      isMessageDeliveredTo(message, otherParticipantId);
+                    const deliveryLabel = isReadByOther
+                      ? 'تمت القراءة'
+                      : isDeliveredToOther
+                        ? 'تم التسليم'
+                        : 'تم الإرسال';
 
                     return (
-                      <div
-                        key={message.id}
-                        className={`grid max-w-[78%] gap-1 ${mine ? 'justify-self-start text-right' : 'justify-self-end text-right'}`}
-                      >
-                        {message.type === 'contact_share' ? (
-                          <div className="grid gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-7 text-emerald-950 shadow-sm dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-50">
-                            <div className="flex items-center gap-2 font-bold">
-                              <Phone className="size-4" />
-                              رقم التواصل الرسمي من المعلن
-                            </div>
-                            {sharedPhoneNumber ? (
-                              <a
-                                className="w-fit rounded-md bg-white px-3 py-1 font-semibold text-emerald-800 underline-offset-4 hover:underline dark:bg-background dark:text-emerald-100"
-                                dir="ltr"
-                                href={`tel:${sharedPhoneNumber}`}
-                              >
-                                {sharedPhoneNumber}
-                              </a>
-                            ) : (
-                              <span className="text-xs text-emerald-800 dark:text-emerald-100">
-                                تمت مشاركة رقم التواصل الرسمي.
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            className={`rounded-md border px-3 py-2 text-sm leading-7 shadow-sm ${
-                              mine
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-foreground dark:bg-card'
-                            }`}
-                          >
-                            {message.body}
+                      <div key={message.id} className="contents">
+                        {shouldShowDateSeparator && (
+                          <div className="my-3 flex justify-center">
+                            <span className="rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-sm ring-1 ring-slate-200/70 dark:bg-card/80 dark:ring-white/10">
+                              {formatMessageDate(message.createdAt)}
+                            </span>
                           </div>
                         )}
-                        <span className="text-[11px] text-muted-foreground">
-                          {formatMessageTime(message.createdAt)}
-                          {mine && otherParticipantId && (
-                            <>
-                              {' · '}
-                              {isMessageReadBy(message, otherParticipantId)
-                                ? 'تمت القراءة'
-                                : 'غير مقروءة'}
-                            </>
-                          )}
-                        </span>
+                        <div
+                          className={`grid w-fit max-w-[min(82%,34rem)] gap-1 ${
+                            mine
+                              ? 'self-start text-right'
+                              : 'self-end text-right'
+                          }`}
+                        >
+                          <div
+                            className={`grid gap-1 rounded-2xl border px-3 py-2 text-[0.95rem] leading-7 shadow-sm ${
+                              mine
+                                ? 'rounded-br-md border-blue-600 bg-blue-600 text-white'
+                                : 'rounded-bl-md border-slate-200 bg-white text-foreground dark:border-white/10 dark:bg-card'
+                            }`}
+                          >
+                            {message.type === 'contact_share' ? (
+                              <div className="grid gap-2">
+                                <div className="flex items-center gap-2 font-bold">
+                                  <Phone className="size-4" />
+                                  رقم التواصل الرسمي من المعلن
+                                </div>
+                                {sharedPhoneNumber ? (
+                                  <a
+                                    className={`w-fit rounded-md px-3 py-1 font-semibold underline-offset-4 hover:underline ${
+                                      mine
+                                        ? 'bg-white/15 text-white'
+                                        : 'bg-emerald-50 text-emerald-800 dark:bg-background dark:text-emerald-100'
+                                    }`}
+                                    dir="ltr"
+                                    href={`tel:${sharedPhoneNumber}`}
+                                  >
+                                    {sharedPhoneNumber}
+                                  </a>
+                                ) : (
+                                  <span className="text-xs">
+                                    تمت مشاركة رقم التواصل الرسمي.
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="whitespace-pre-wrap break-words">
+                                {message.body}
+                              </p>
+                            )}
+                            <span
+                              className={`flex items-center justify-end gap-1 text-[10px] leading-none ${
+                                mine
+                                  ? 'text-white/75'
+                                  : 'text-muted-foreground'
+                              }`}
+                            >
+                              <span>{formatMessageTime(message.createdAt)}</span>
+                              {mine && (
+                                <span
+                                  aria-label={deliveryLabel}
+                                  className={`tracking-[-0.18em] ${
+                                    isReadByOther ? 'text-sky-200' : ''
+                                  }`}
+                                  title={deliveryLabel}
+                                >
+                                  {isReadByOther || isDeliveredToOther
+                                    ? '✓✓'
+                                    : '✓'}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}

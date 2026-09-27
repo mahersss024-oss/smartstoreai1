@@ -30,6 +30,27 @@ test('published listings expose share controls in seller account and details pag
   assert.match(listingPage, /<ListingShareButton/);
 });
 
+test('listing owner details page keeps only share action visible', () => {
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const safetyActions = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'listing-safety-actions.tsx',
+  );
+
+  assert.match(listingPage, /getAuthSession/);
+  assert.match(listingPage, /const isOwnListing = session\?\.user\.id === listing\.sellerId/);
+  assert.match(listingPage, /!\s*isOwnListing && <ListingContactActions/);
+  assert.match(listingPage, /!\s*isOwnListing && \(/);
+  assert.match(listingPage, /isOwnListing \? 'col-span-2' : ''/);
+  assert.match(listingPage, /isOwnListing=\{isOwnListing\}/);
+  assert.match(safetyActions, /isOwnListing = false/);
+  assert.match(safetyActions, /canShowReport = showReport && !isOwnListing/);
+  assert.match(safetyActions, /canShowFavorite = showFavorite && canFavorite && !isOwnListing/);
+}
+);
+
 test('home listing contact button opens listing details instead of asking chat to open a conversation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

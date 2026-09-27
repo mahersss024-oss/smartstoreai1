@@ -6,6 +6,7 @@ import {
   deleteConversationForUser,
   getConversationBlockStatus,
   getConversationForUser,
+  markConversationsDeliveredForUser,
   markConversationReadForUser,
   reportConversationUser,
   shareSellerContact,
@@ -67,6 +68,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { conversationId } = await context.params;
+  await markConversationsDeliveredForUser([conversationId], session.user.id);
   await markConversationReadForUser(conversationId, session.user.id);
   const conversation = await getConversationForUser(conversationId, session.user.id);
 

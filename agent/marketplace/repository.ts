@@ -138,12 +138,14 @@ type DatabaseConversationRecord = {
     email: string;
     name: string | null;
     picture: string | null;
+    lastActiveAt: Date | null;
   } | null;
   buyer?: {
     id: string;
     email: string;
     name: string | null;
     picture: string | null;
+    lastActiveAt: Date | null;
   } | null;
 };
 
@@ -509,8 +511,20 @@ function toConversationRecord(
   conversation: DatabaseConversationRecord,
 ): Conversation & {
   listing: memoryStore.ListingRecord | null;
-  seller?: { id: string; email: string; name?: string; picture?: string };
-  buyer?: { id: string; email: string; name?: string; picture?: string };
+  seller?: {
+    id: string;
+    email: string;
+    name?: string;
+    picture?: string;
+    lastActiveAt?: string;
+  };
+  buyer?: {
+    id: string;
+    email: string;
+    name?: string;
+    picture?: string;
+    lastActiveAt?: string;
+  };
 } {
   return {
     id: conversation.id,
@@ -548,6 +562,8 @@ function toConversationRecord(
           email: conversation.seller.email,
           name: conversation.seller.name ?? undefined,
           picture: conversation.seller.picture ?? undefined,
+          lastActiveAt:
+            conversation.seller.lastActiveAt?.toISOString() ?? undefined,
         }
       : undefined,
     buyer: conversation.buyer
@@ -556,6 +572,8 @@ function toConversationRecord(
           email: conversation.buyer.email,
           name: conversation.buyer.name ?? undefined,
           picture: conversation.buyer.picture ?? undefined,
+          lastActiveAt:
+            conversation.buyer.lastActiveAt?.toISOString() ?? undefined,
         }
       : undefined,
   };
@@ -2186,8 +2204,24 @@ export async function listUserConversations(userId: string) {
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
-      seller: { select: { id: true, email: true, name: true, picture: true } },
-      buyer: { select: { id: true, email: true, name: true, picture: true } },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
+      buyer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
       listing: {
         include: {
           images: {
@@ -2234,8 +2268,24 @@ export async function listUserConversationsPage(
     },
     include: {
       messages: { orderBy: { createdAt: 'desc' }, take: 10 },
-      seller: { select: { id: true, email: true, name: true, picture: true } },
-      buyer: { select: { id: true, email: true, name: true, picture: true } },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
+      buyer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
       listing: {
         include: {
           images: {
@@ -2268,8 +2318,24 @@ export async function getConversationForUser(
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
-      seller: { select: { id: true, email: true, name: true, picture: true } },
-      buyer: { select: { id: true, email: true, name: true, picture: true } },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
+      buyer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          picture: true,
+          lastActiveAt: true,
+        },
+      },
       listing: {
         include: {
           images: {
@@ -2439,6 +2505,92 @@ export async function markConversationReadForUser(
   }
 
   return { status: 'read' as const, conversation };
+}
+
+export async function markConversationsDeliveredForUser(
+  conversationIds: string[],
+  userId: string,
+) {
+  const uniqueConversationIds = [...new Set(conversationIds.filter(Boolean))];
+
+  if (uniqueConversationIds.length === 0) {
+    return { status: 'delivered' as const, updatedCount: 0 };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    return { status: 'delivered' as const, updatedCount: 0 };
+  }
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      id: { in: uniqueConversationIds },
+      OR: [{ buyerId: userId }, { sellerId: userId }],
+    },
+    include: {
+      messages: {
+        where: {
+          status: 'sent',
+          senderId: { not: userId },
+        },
+      },
+    },
+  });
+
+  const deliveredAt = new Date().toISOString();
+  const updates = conversations.flatMap((conversation) =>
+    conversation.messages
+      .map((message) => {
+        const metadata = asRecord(message.metadata);
+        const deliveredTo =
+          typeof metadata.deliveredTo === 'object' &&
+          metadata.deliveredTo !== null &&
+          !Array.isArray(metadata.deliveredTo)
+            ? (metadata.deliveredTo as Record<string, unknown>)
+            : {};
+
+        if (typeof deliveredTo[userId] === 'string') {
+          return null;
+        }
+
+        return prisma.conversationMessage.update({
+          where: { id: message.id },
+          data: {
+            metadata: toPrismaJsonObject({
+              ...metadata,
+              deliveredTo: {
+                ...deliveredTo,
+                [userId]: deliveredAt,
+              },
+            }),
+          },
+        });
+      })
+      .filter((update): update is NonNullable<typeof update> =>
+        Boolean(update),
+      ),
+  );
+
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
+
+    for (const conversation of conversations) {
+      safelyPublishRealtimeEvent({
+        type: 'conversation_updated',
+        payload: {
+          conversationId: conversation.id,
+          listingId: conversation.listingId,
+          sellerId: conversation.sellerId,
+          buyerId: conversation.buyerId,
+          status: conversation.status,
+        },
+        visibility: {
+          userIds: [conversation.sellerId, conversation.buyerId],
+        },
+      });
+    }
+  }
+
+  return { status: 'delivered' as const, updatedCount: updates.length };
 }
 
 function getOtherConversationUserId(conversation: Conversation, userId: string) {

@@ -246,6 +246,37 @@ const chatAttachmentControlsStyle: CSSProperties = {
   gridRow: '2',
 };
 
+type ChatTapTracker = {
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  startAt: number;
+  moved: boolean;
+  lastTapAt: number;
+};
+
+function createEmptyChatTapTracker(): ChatTapTracker {
+  return {
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startAt: 0,
+    moved: false,
+    lastTapAt: 0,
+  };
+}
+
+function isKeyboardDismissIgnoredTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        'a, button, input, textarea, select, [role="button"], [contenteditable="true"]',
+      ),
+    )
+  );
+}
+
 type PendingChatAttachment = FileUIPart & { id: string };
 
 type AssistantBubblePosition = {
@@ -1808,6 +1839,9 @@ export default function Page() {
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const chatInputContainerRef = useRef<HTMLDivElement | null>(null);
+  const assistantChatTapTrackerRef = useRef<ChatTapTracker>(
+    createEmptyChatTapTracker(),
+  );
   const listingsRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
@@ -2143,6 +2177,92 @@ export default function Page() {
     },
     [],
   );
+
+  const handleAssistantChatPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!isChatInputFocused || isKeyboardDismissIgnoredTarget(event.target)) {
+        assistantChatTapTrackerRef.current.pointerId = null;
+        return;
+      }
+
+      assistantChatTapTrackerRef.current = {
+        ...assistantChatTapTrackerRef.current,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startAt: Date.now(),
+        moved: false,
+      };
+    },
+    [isChatInputFocused],
+  );
+
+  const handleAssistantChatPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const tracker = assistantChatTapTrackerRef.current;
+
+      if (tracker.pointerId !== event.pointerId) {
+        return;
+      }
+
+      if (
+        Math.hypot(event.clientX - tracker.startX, event.clientY - tracker.startY) >
+        12
+      ) {
+        tracker.moved = true;
+      }
+    },
+    [],
+  );
+
+  const handleAssistantChatPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const tracker = assistantChatTapTrackerRef.current;
+
+      if (
+        !isChatInputFocused ||
+        tracker.pointerId !== event.pointerId ||
+        tracker.moved ||
+        isKeyboardDismissIgnoredTarget(event.target)
+      ) {
+        assistantChatTapTrackerRef.current.pointerId = null;
+        return;
+      }
+
+      const now = Date.now();
+      const duration = now - tracker.startAt;
+      const distance = Math.hypot(
+        event.clientX - tracker.startX,
+        event.clientY - tracker.startY,
+      );
+      const isTap = duration < 450 && distance <= 12;
+      const isRepeatedTap =
+        isTap && now - tracker.lastTapAt >= 180 && now - tracker.lastTapAt <= 900;
+
+      if (isRepeatedTap) {
+        const textarea =
+          chatInputContainerRef.current?.querySelector('textarea');
+
+        if (textarea instanceof HTMLTextAreaElement) {
+          textarea.blur();
+        }
+
+        assistantChatTapTrackerRef.current = createEmptyChatTapTracker();
+        return;
+      }
+
+      assistantChatTapTrackerRef.current = {
+        ...tracker,
+        pointerId: null,
+        lastTapAt: isTap ? now : 0,
+      };
+    },
+    [isChatInputFocused],
+  );
+
+  const handleAssistantChatPointerCancel = useCallback(() => {
+    assistantChatTapTrackerRef.current.pointerId = null;
+  }, []);
 
   useEffect(() => {
     if (!isCompactViewport || !isChatInputFocused) {
@@ -4368,13 +4488,10 @@ export default function Page() {
               }`}>
                 <Conversation
                   className="min-h-0 flex-1"
-                  onPointerDown={() => {
-                    const activeElement = document.activeElement;
-
-                    if (activeElement instanceof HTMLTextAreaElement) {
-                      activeElement.blur();
-                    }
-                  }}
+                  onPointerCancel={handleAssistantChatPointerCancel}
+                  onPointerDown={handleAssistantChatPointerDown}
+                  onPointerMove={handleAssistantChatPointerMove}
+                  onPointerUp={handleAssistantChatPointerUp}
                 >
                   <ConversationContent className="gap-4 px-4 py-5">
                     <ConversationAutoScroll

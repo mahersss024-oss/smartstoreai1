@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   ArrowRight,
@@ -18,6 +19,7 @@ import {
   getPublicSellerProfile,
 } from '@/agent/marketplace/repository';
 import type { ListingCondition } from '@/agent/marketplace/types';
+import { getAuthSession } from '@/lib/auth/session';
 import { Button } from '@ui/button';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { SellerAvatar } from '@/components/seller-avatar';
@@ -174,6 +176,13 @@ export default async function ListingDetailsPage({ params }: PageProps) {
     notFound();
   }
 
+  const requestHeaders = await headers();
+  const session = getAuthSession(
+    new Request('https://souqhamad.local/listing-details', {
+      headers: requestHeaders,
+    }),
+  );
+  const isOwnListing = session?.user.id === listing.sellerId;
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
   const sellerProfileHref = `/sellers/${encodeURIComponent(listing.sellerId)}`;
 
@@ -285,15 +294,19 @@ export default async function ListingDetailsPage({ params }: PageProps) {
             />
 
             <section className="grid gap-2 px-1 py-2 sm:px-2">
-              <ListingContactActions listingId={listing.id} />
+              {!isOwnListing && <ListingContactActions listingId={listing.id} />}
               <div className="grid grid-cols-2 gap-2">
-                <ListingSafetyActions
-                  listingId={listing.id}
-                  sellerId={listing.sellerId}
-                  showReport={false}
-                />
+                {!isOwnListing && (
+                  <ListingSafetyActions
+                    listingId={listing.id}
+                    sellerId={listing.sellerId}
+                    showReport={false}
+                  />
+                )}
                 <ListingShareButton
-                  className="h-10 w-full rounded-md"
+                  className={`h-10 w-full rounded-md ${
+                    isOwnListing ? 'col-span-2' : ''
+                  }`}
                   listingId={listing.id}
                   title={listing.title ?? 'إعلان سوق حمد'}
                 />
@@ -382,6 +395,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               <ListingSafetyActions
                 listingId={listing.id}
                 sellerId={listing.sellerId}
+                isOwnListing={isOwnListing}
                 showFavorite={false}
               />
             </section>

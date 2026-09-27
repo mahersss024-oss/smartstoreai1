@@ -62,6 +62,7 @@ type ConversationParticipant = {
   email?: string;
   name?: string;
   picture?: string;
+  lastActiveAt?: string;
 };
 
 type PaginationMeta = {

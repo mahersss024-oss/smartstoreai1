@@ -1,4 +1,7 @@
-import { listUserConversationsPage } from '@/agent/marketplace/repository';
+import {
+  listUserConversationsPage,
+  markConversationsDeliveredForUser,
+} from '@/agent/marketplace/repository';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
@@ -21,6 +24,10 @@ export async function GET(request: Request) {
   const conversationsPage = await listUserConversationsPage(
     session.user.id,
     parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 }),
+  );
+  await markConversationsDeliveredForUser(
+    conversationsPage.items.map((conversation) => conversation.id),
+    session.user.id,
   );
 
   return Response.json({

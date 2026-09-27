@@ -32,6 +32,21 @@ function readConversationRoute() {
   );
 }
 
+function readConversationsRoute() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      'app',
+      'api',
+      'marketplace',
+      'me',
+      'conversations',
+      'route.ts',
+    ),
+    'utf8',
+  );
+}
+
 function readConversationAlertHook() {
   return readFileSync(
     join(process.cwd(), 'hooks', 'use-conversation-message-alert.ts'),
@@ -55,7 +70,9 @@ test('seller buyer conversation scrolls to the latest message', () => {
   assert.match(source, /messagesContainer\.scrollHeight/);
   assert.doesNotMatch(source, /scrollIntoView/);
   assert.match(source, /visibleMessages\.length/);
-  assert.match(source, /flex min-h-full flex-col justify-end gap-3/);
+  assert.match(source, /flex min-h-full flex-col justify-end gap-1\.5/);
+  assert.match(source, /formatMessageDate/);
+  assert.match(source, /isSameMessageDay/);
 });
 
 test('seller buyer conversation fills the mobile viewport and keeps the keyboard open after send', () => {
@@ -63,7 +80,12 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
 
   assert.match(source, /h-dvh overflow-hidden/);
   assert.match(source, /min-h-0 flex-1 overscroll-contain overflow-y-auto/);
-  assert.match(source, /onPointerDown=\{\(\) => messageInputRef\.current\?\.blur\(\)\}/);
+  assert.doesNotMatch(source, /onPointerDown=\{\(\) => messageInputRef\.current\?\.blur\(\)\}/);
+  assert.match(source, /handleMessagesPointerDown/);
+  assert.match(source, /handleMessagesPointerMove/);
+  assert.match(source, /handleMessagesPointerUp/);
+  assert.match(source, /isKeyboardDismissIgnoredTarget/);
+  assert.match(source, /isRepeatedTap/);
   assert.match(source, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
   assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
   assert.match(source, /window\.visualViewport/);
@@ -114,8 +136,11 @@ test('seller buyer conversation header shows the other customer, not the listing
   assert.doesNotMatch(source, /session\.authenticated \? roleLabel/);
   assert.doesNotMatch(source, /conversation\?\.status === 'open'/);
   assert.doesNotMatch(source, /conversation\?\.listing\?\.title \?\? 'سوق حمد'/);
-  assert.match(repository, /seller: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
-  assert.match(repository, /buyer: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
+  assert.match(repository, /seller: \{/);
+  assert.match(repository, /buyer: \{/);
+  assert.match(repository, /lastActiveAt: true/);
+  assert.match(source, /getParticipantPresence/);
+  assert.match(source, /conversationOnlineWindowMs/);
 });
 
 test('seller buyer conversation shows a compact listing card linking to details', () => {
@@ -225,15 +250,22 @@ test('conversation deletion is enforced by the server route', () => {
 
 test('conversation read state is marked by the server and shown quietly in UI', () => {
   const route = readConversationRoute();
+  const conversationsRoute = readConversationsRoute();
   const repository = readMarketplaceRepository();
   const conversationPage = readConversationPage();
   const conversationsPage = readConversationsIndexPage();
 
   assert.match(route, /markConversationReadForUser/);
+  assert.match(route, /markConversationsDeliveredForUser/);
+  assert.match(conversationsRoute, /markConversationsDeliveredForUser/);
   assert.match(repository, /readBy/);
+  assert.match(repository, /deliveredTo/);
   assert.match(repository, /senderId: \{ not: userId \}/);
   assert.match(conversationPage, /تمت القراءة/);
-  assert.match(conversationPage, /غير مقروءة/);
+  assert.match(conversationPage, /تم التسليم/);
+  assert.doesNotMatch(conversationPage, /غير مقروءة/);
+  assert.match(conversationPage, /تم الإرسال/);
+  assert.match(conversationPage, /✓✓/);
   assert.match(conversationsPage, /hasUnreadMessages/);
   assert.match(conversationsPage, /hasUnreadMessages/);
 });

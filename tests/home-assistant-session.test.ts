@@ -96,7 +96,13 @@ test('mobile chat submit keeps the keyboard open until the user dismisses it', (
   assert.doesNotMatch(submitHandler, /activeElement\.blur\(\)/);
   assert.doesNotMatch(submitHandler, /resetChatKeyboardState\(\)/);
   assert.match(homePage, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
-  assert.match(homePage, /activeElement instanceof HTMLTextAreaElement/);
+  assert.doesNotMatch(homePage, /onPointerDown=\{\(\) => \{\s*const activeElement = document\.activeElement/);
+  assert.match(homePage, /handleAssistantChatPointerDown/);
+  assert.match(homePage, /handleAssistantChatPointerMove/);
+  assert.match(homePage, /handleAssistantChatPointerUp/);
+  assert.match(homePage, /handleAssistantChatPointerCancel/);
+  assert.match(homePage, /isKeyboardDismissIgnoredTarget/);
+  assert.match(homePage, /isRepeatedTap/);
 });
 
 test('mobile bottom navigation is hidden while assistant chat view is open', () => {
