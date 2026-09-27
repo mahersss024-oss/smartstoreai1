@@ -70,7 +70,8 @@ test('mobile chat view keeps input attached to the keyboard while focused', () =
   assert.match(homePage, /type VisualViewportFrame/);
   assert.match(homePage, /const \[visualViewportFrame, setVisualViewportFrame\]/);
   assert.match(homePage, /if \(!isCompactViewport \|\| !isMobileChatViewOpen\)/);
-  assert.match(homePage, /insetInline: '0\.5rem'/);
+  assert.match(homePage, /width: 'calc\(100% - 2rem\)'/);
+  assert.match(homePage, /maxWidth: '40rem'/);
   assert.match(homePage, /position: 'fixed'/);
   assert.match(homePage, /top: `\$\{visualViewportFrame\.offsetTop \+ 8\}px`/);
   assert.match(homePage, /height: `\$\{focusedPanelHeight\}px`/);

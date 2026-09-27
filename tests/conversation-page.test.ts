@@ -67,6 +67,18 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
 });
 
+test('mobile navigation remains visible without covering the conversation composer', () => {
+  const source = readConversationPage();
+  const mobileNavigation = readFileSync(
+    join(process.cwd(), 'components', 'mobile-bottom-navigation.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(mobileNavigation, /\^\\\/conversations\\\/\[\^\/\]\+\$/);
+  assert.match(source, /pb-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(source, /focus-within:pb-0/);
+});
+
 test('seller buyer conversation exposes report and block controls', () => {
   const source = readConversationPage();
 

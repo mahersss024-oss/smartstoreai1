@@ -1999,22 +1999,28 @@ export default function Page() {
       return {
         blockSize: 'auto',
         bottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
-        insetInline: '0.5rem',
+        insetInline: '0',
+        marginInline: 'auto',
+        maxWidth: '40rem',
         minHeight: '0',
         position: 'fixed',
         top: 'calc(env(safe-area-inset-top) + 0.5rem)',
+        width: 'calc(100% - 2rem)',
       };
     }
 
     const focusedPanelHeight = Math.max(0, visualViewportFrame.height - 8);
 
     return {
-      insetInline: '0.5rem',
+      insetInline: '0',
+      marginInline: 'auto',
+      maxWidth: '40rem',
       position: 'fixed',
       top: `${visualViewportFrame.offsetTop + 8}px`,
       height: `${focusedPanelHeight}px`,
       maxHeight: `${focusedPanelHeight}px`,
       minHeight: '0',
+      width: 'calc(100% - 2rem)',
     };
   }, [
     isChatInputFocused,
