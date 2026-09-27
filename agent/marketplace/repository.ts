@@ -3897,7 +3897,14 @@ export async function setUserReportModerationStatus(
       action: auditAction,
       targetType: 'user_report',
       targetId: reportId,
-      metadata: { resolution, conversationId: existing.conversationId },
+      metadata: {
+        resolution,
+        previousStatus: existing.status,
+        nextStatus: status,
+        conversationId: existing.conversationId,
+        reporterId: existing.reporterId,
+        targetUserId: existing.targetUserId,
+      },
     });
     return tx.userReport.findUniqueOrThrow({ where: { id: reportId } });
   });
@@ -4030,6 +4037,7 @@ export async function setListingModerationStatus(
       metadata: {
         previousStatus: existing.status,
         nextStatus: status,
+        sellerId: existing.sellerId,
       },
     });
 
@@ -4132,7 +4140,12 @@ export async function setReportModerationStatus(
       action: status === 'reviewed' ? 'review_report' : 'dismiss_report',
       targetType: 'report',
       targetId: reportId,
-      metadata: { nextStatus: status },
+      metadata: {
+        previousStatus: 'open',
+        nextStatus: status,
+        listingId: updatedReport.listingId,
+        reporterId: updatedReport.reporterId,
+      },
     });
 
     return updatedReport;
@@ -4415,6 +4428,12 @@ export async function setCommissionStatusForAdmin(
 
   const adminId = await getAdminAuditActorId(admin);
   const updated = await prisma.$transaction(async (tx) => {
+    const existing = await tx.commission.findUnique({
+      where: { id: commissionId },
+      select: { status: true },
+    });
+    if (!existing) throw new Error('commission_not_found');
+
     const commission = await tx.commission.update({
       where: { id: commissionId },
       data: {
@@ -4437,7 +4456,12 @@ export async function setCommissionStatusForAdmin(
       action: 'update_commission',
       targetType: 'commission',
       targetId: commissionId,
-      metadata: { nextStatus: status },
+      metadata: {
+        previousStatus: existing.status,
+        nextStatus: status,
+        sellerId: commission.sellerId,
+        listingId: commission.listingId,
+      },
     });
 
     return commission;

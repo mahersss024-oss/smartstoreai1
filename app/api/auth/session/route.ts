@@ -4,6 +4,7 @@ import {
   shouldVerifyRoleFromDatabase,
 } from '@/lib/auth/authorization';
 import {
+  authenticatedUserActiveWindowMs,
   clearSessionCookie,
   getAuthSession,
   getCommissionAgreement,
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
           picture: true,
           role: true,
           deletedAt: true,
+          lastActiveAt: true,
         },
       });
 
@@ -69,6 +71,27 @@ export async function GET(request: Request) {
         user.role = isConfiguredAdminEmail(session.user.email)
           ? 'owner'
           : profile.role;
+
+        const activityWriteIntervalMs = Math.min(
+          authenticatedUserActiveWindowMs,
+          5 * 60 * 1000,
+        );
+        if (
+          !profile.lastActiveAt ||
+          profile.lastActiveAt.getTime() < Date.now() - activityWriteIntervalMs
+        ) {
+          await prisma.user.updateMany({
+            where: {
+              id: user.id,
+              deletedAt: null,
+              OR: [
+                { lastActiveAt: null },
+                { lastActiveAt: { lt: new Date(Date.now() - activityWriteIntervalMs) } },
+              ],
+            },
+            data: { lastActiveAt: new Date() },
+          });
+        }
       }
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';

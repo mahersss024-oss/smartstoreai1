@@ -107,7 +107,7 @@ test('welcome component uses the market logo as a single foreground brand layer'
     'utf8',
   );
 
-  assert.match(component, /\/hamad-market-wordmark\.png/);
+  assert.match(component, /\/hamad-market-wordmark\.webp/);
   assert.doesNotMatch(component, /\/hamad-market-logo\.jpeg/);
   assert.doesNotMatch(component, /--app-welcome-bg/);
   assert.match(component, /سوقك الذكي للبيع والشراء/);

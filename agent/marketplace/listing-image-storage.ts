@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { ModelMessage } from 'ai';
 
 import { analyzeImageQuality } from './image-quality';
+import { createListingImageVariants } from './listing-image-variants';
 import { createListingImageDeliveryUrls } from './listing-image-delivery';
 import {
   defaultMaxListingImages,
@@ -191,23 +192,47 @@ export async function saveUploadedListingImagesForSeller({
     if (!imageUrl) {
       continue;
     }
+    let displayData = uploadedImage.displayData;
+    let displayMediaType = uploadedImage.displayMediaType;
+    let displayFileName = uploadedImage.displayFileName;
+    let thumbnailData = uploadedImage.thumbnailData;
+    let thumbnailMediaType = uploadedImage.thumbnailMediaType;
+    let thumbnailFileName = uploadedImage.thumbnailFileName;
+
+    if (!displayData || !displayMediaType || !thumbnailData || !thumbnailMediaType) {
+      try {
+        const generated = await createListingImageVariants(uploadedImage);
+        if (generated) {
+          displayData = generated.display.data;
+          displayMediaType = generated.display.mediaType;
+          displayFileName = generated.display.fileName;
+          thumbnailData = generated.thumbnail.data;
+          thumbnailMediaType = generated.thumbnail.mediaType;
+          thumbnailFileName = generated.thumbnail.fileName;
+        }
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[listing_image_variant_generation] failure=${errorName}`);
+      }
+    }
+
     const displayUrl =
-      uploadedImage.displayData && uploadedImage.displayMediaType
+      displayData && displayMediaType
         ? await createPersistentListingImageUrl({
-            data: uploadedImage.displayData,
-            mediaType: uploadedImage.displayMediaType,
+            data: displayData,
+            mediaType: displayMediaType,
             imageId,
-            fileName: uploadedImage.displayFileName,
+            fileName: displayFileName,
             variant: 'display',
           })
         : imageUrl;
     const thumbnailUrl =
-      uploadedImage.thumbnailData && uploadedImage.thumbnailMediaType
+      thumbnailData && thumbnailMediaType
         ? await createPersistentListingImageUrl({
-            data: uploadedImage.thumbnailData,
-            mediaType: uploadedImage.thumbnailMediaType,
+            data: thumbnailData,
+            mediaType: thumbnailMediaType,
             imageId,
-            fileName: uploadedImage.thumbnailFileName,
+            fileName: thumbnailFileName,
             variant: 'thumbnail',
           })
         : displayUrl;

@@ -59,7 +59,7 @@ test('admin access revalidation keeps the verified role stable while loading', (
   assert.match(accessHook, /if \(!response\.ok\) \{\s*setRole\(null\)/);
 });
 
-test('admin dashboard stays focused on administrative navigation', () => {
+test('admin dashboard stays focused on required statistics and administrative navigation', () => {
   const dashboard = readProjectFile('app', 'admin', 'page.tsx');
   const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
 
@@ -69,7 +69,12 @@ test('admin dashboard stays focused on administrative navigation', () => {
   assert.doesNotMatch(dashboard, /admin-work-queue/);
   assert.doesNotMatch(dashboard, /StatCard/);
   assert.doesNotMatch(dashboard, /StatusBlock/);
-  assert.doesNotMatch(dashboard, /\/api\/(admin|moderator)\/overview/);
+  assert.match(dashboard, /\/api\/admin\/overview/);
+  assert.match(dashboard, /إجمالي المستخدمين/);
+  assert.match(dashboard, /المستخدمون النشطون/);
+  assert.match(dashboard, /الإعلانات المنشورة/);
+  assert.match(dashboard, /البلاغات المفتوحة/);
+  assert.match(dashboard, /سجل الإدارة/);
   assert.match(usersPage, /grid gap-2 rounded-md border bg-white px-3 py-2/);
   assert.match(usersPage, /border-b border-slate-200\/70 py-3 last:border-b-0/);
   assert.doesNotMatch(usersPage, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
@@ -83,6 +88,7 @@ test('admin pages verify access before protected admin api requests', () => {
     ['app', 'admin', 'commissions', 'page.tsx'],
     ['app', 'admin', 'moderation', 'page.tsx'],
     ['app', 'admin', 'maintenance', 'page.tsx'],
+    ['app', 'admin', 'audit-log', 'page.tsx'],
   ];
 
   for (const pageSegments of pages) {
@@ -110,6 +116,7 @@ test('admin api permissions match the intended authority levels', () => {
     ['app', 'api', 'admin', 'users', 'route.ts'],
     ['app', 'api', 'admin', 'users', '[userId]', 'route.ts'],
     ['app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'],
+    ['app', 'api', 'admin', 'audit-log', 'route.ts'],
   ];
   const moderatorRoutes = [
     ['app', 'api', 'admin', 'listings', 'route.ts'],
@@ -123,6 +130,7 @@ test('admin api permissions match the intended authority levels', () => {
     ['app', 'api', 'admin', 'commissions', 'route.ts'],
     ['app', 'api', 'admin', 'commissions', '[commissionId]', 'route.ts'],
     ['app', 'api', 'admin', 'maintenance', 'route.ts'],
+    ['app', 'api', 'admin', 'site-message', 'route.ts'],
   ];
 
   for (const routeSegments of adminOnlyRoutes) {
@@ -407,8 +415,9 @@ test('admin maintenance keeps routine cleanup away from customer and financial d
   assert.match(maintenanceRoute, /admin_maintenance_listing_storage_delete/);
   assert.match(
     maintenanceRoute,
-    /prisma\.listing\.deleteMany\(\{\s*where:\s*\{\s*status:\s*'deleted'\s*\}/,
+    /database\.listing\.deleteMany\(\{\s*where:\s*\{\s*status:\s*'deleted'\s*\}/,
   );
+  assert.match(maintenanceRoute, /prisma\.\$transaction\(async \(tx\)/);
 });
 
 test('admin maintenance page offers the deleted-listings purge option', () => {

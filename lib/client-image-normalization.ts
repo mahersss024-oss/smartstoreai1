@@ -2,9 +2,8 @@ const normalizedImageMimeType = "image/jpeg";
 const normalizedImageQuality = 0.88;
 const normalizedImageMaxDimension = 1800;
 const displayImageQuality = 0.84;
-const displayImageMaxDimension = 1200;
 const thumbnailImageQuality = 0.78;
-const thumbnailImageMaxDimension = 480;
+const derivedImageMimeType = "image/webp";
 const uploadSafeImageMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -166,20 +165,38 @@ export async function createNormalizedImageFile(
     maxDimension?: number;
     quality?: number;
     suffix?: string;
+    mediaType?: "image/jpeg" | "image/webp";
   } = {}
 ) {
   if (!isProbablyImageFile(file, file.type, file.name)) {
     return file;
   }
 
-  const dataUrl = await convertImageBlobToJpegDataUrl(file, options);
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
+  const mediaType = options.mediaType ?? normalizedImageMimeType;
+  const image = await loadDrawableImage(file);
+  const sourceWidth = "width" in image && typeof image.width === "number" ? image.width : 0;
+  const sourceHeight = "height" in image && typeof image.height === "number" ? image.height : 0;
+  const size = getNormalizedImageSize(sourceWidth, sourceHeight, options.maxDimension);
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Image attachment could not be prepared.");
+  if (mediaType === normalizedImageMimeType) {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, size.width, size.height);
+  }
+  context.drawImage(image, 0, 0, size.width, size.height);
+  if ("close" in image && typeof image.close === "function") image.close();
+  const outputBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Image attachment could not be converted.")), mediaType, options.quality ?? normalizedImageQuality);
+  });
   const normalizedName = file.name.replace(/\.[^.]+$/, "") || "image";
   const suffix = options.suffix ? `-${options.suffix}` : "";
+  const extension = mediaType === derivedImageMimeType ? "webp" : "jpg";
 
-  return new File([blob], `${normalizedName}${suffix}.jpg`, {
-    type: normalizedImageMimeType,
+  return new File([outputBlob], `${normalizedName}${suffix}.${extension}`, {
+    type: mediaType,
     lastModified: Date.now(),
   });
 }
@@ -217,14 +234,16 @@ export async function createListingImageUploadFiles(
     const [original, display, thumbnail] = await Promise.all([
       createNormalizedImageFile(file),
       createNormalizedImageFile(file, {
-        maxDimension: displayImageMaxDimension,
+        maxDimension: 900,
         quality: displayImageQuality,
         suffix: "display",
+        mediaType: derivedImageMimeType,
       }),
       createNormalizedImageFile(file, {
-        maxDimension: thumbnailImageMaxDimension,
+        maxDimension: 400,
         quality: thumbnailImageQuality,
         suffix: "thumbnail",
+        mediaType: derivedImageMimeType,
       }),
     ]);
 

@@ -4501,7 +4501,7 @@ export default function Page() {
                       </Button>
                     )}
                     <div className="grid size-8 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
-                      <img alt="" className="size-7 rounded-full object-cover" src="/hamad-assistant-bubble.png?v=ask-hamad-20260925" />
+                      <img alt="" className="size-7 rounded-full object-cover" src="/hamad-assistant-bubble.webp?v=ask-hamad-20260927" />
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -4681,7 +4681,7 @@ export default function Page() {
         >
           <span className="smartstore-ai-bubble__halo" aria-hidden="true" />
           <span className="smartstore-ai-bubble__core" aria-hidden="true">
-            <img alt="" src="/hamad-assistant-bubble.png?v=ask-hamad-20260925" />
+            <img alt="" src="/hamad-assistant-bubble.webp?v=ask-hamad-20260927" />
           </span>
           <span className="smartstore-ai-bubble__glint" aria-hidden="true" />
         </button>

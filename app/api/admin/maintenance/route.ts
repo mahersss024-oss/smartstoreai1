@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
@@ -72,35 +73,41 @@ async function getMaintenanceCounts() {
   };
 }
 
-async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
+async function runCleanup(
+  scope: z.infer<typeof cleanupSchema>['scope'],
+  database: Prisma.TransactionClient,
+) {
   if (scope === 'closed_reports') {
-    const result = await prisma.report.deleteMany({
+    const result = await database.report.deleteMany({
       where: { status: { in: ['reviewed', 'dismissed'] } },
     });
-    return { closedReports: result.count };
+    return { deleted: { closedReports: result.count }, images: [] };
   }
 
   if (scope === 'closed_user_reports') {
-    const result = await prisma.userReport.deleteMany({
+    const result = await database.userReport.deleteMany({
       where: { status: { in: ['reviewed', 'dismissed'] } },
     });
-    return { closedUserReports: result.count };
+    return { deleted: { closedUserReports: result.count }, images: [] };
   }
 
   if (scope === 'search_state') {
-    const [searchStates, idempotencyKeys] = await prisma.$transaction([
-      prisma.marketplaceSearchState.deleteMany(),
-      prisma.apiIdempotencyKey.deleteMany(),
+    const [searchStates, idempotencyKeys] = await Promise.all([
+      database.marketplaceSearchState.deleteMany(),
+      database.apiIdempotencyKey.deleteMany(),
     ]);
 
     return {
-      searchStates: searchStates.count,
-      idempotencyKeys: idempotencyKeys.count,
+      deleted: {
+        searchStates: searchStates.count,
+        idempotencyKeys: idempotencyKeys.count,
+      },
+      images: [],
     };
   }
 
   if (scope === 'purge_deleted_listings') {
-    const deletedListings = await prisma.listing.findMany({
+    const deletedListings = await database.listing.findMany({
       where: { status: 'deleted' },
       select: {
         images: {
@@ -113,15 +120,14 @@ async function runCleanup(scope: z.infer<typeof cleanupSchema>['scope']) {
         },
       },
     });
-    const result = await prisma.listing.deleteMany({
+    const result = await database.listing.deleteMany({
       where: { status: 'deleted' },
     });
 
-    await deleteStoredListingImagesBestEffort(
-      deletedListings.flatMap((listing) => listing.images),
-    );
-
-    return { listings: result.count };
+    return {
+      deleted: { listings: result.count },
+      images: deletedListings.flatMap((listing) => listing.images),
+    };
   }
 
   throw new Error('unsupported_cleanup_scope');
@@ -219,20 +225,24 @@ export async function POST(request: Request) {
     return Response.json({ error: 'confirmation_required' }, { status: 400 });
   }
 
-  const deleted = await runCleanup(parsed.data.scope);
-
-  await prisma.adminAuditLog.create({
-    data: {
-      adminId: admin.session.user.id,
-      action: 'delete_listing',
-      targetType: 'maintenance',
-      targetId: parsed.data.scope,
-      metadata: {
-        operation: 'admin_cleanup',
-        deleted,
+  const cleanup = await prisma.$transaction(async (tx) => {
+    const result = await runCleanup(parsed.data.scope, tx);
+    await tx.adminAuditLog.create({
+      data: {
+        adminId: admin.session.user.id,
+        action: 'maintenance_cleanup',
+        targetType: 'maintenance',
+        targetId: parsed.data.scope,
+        metadata: {
+          operation: 'admin_cleanup',
+          deleted: result.deleted,
+        },
       },
-    },
+    });
+    return result;
   });
+
+  await deleteStoredListingImagesBestEffort(cleanup.images);
 
   try {
     publishRealtimeEvent({
@@ -251,7 +261,7 @@ export async function POST(request: Request) {
 
   return Response.json({
     status: 'completed',
-    deleted,
+    deleted: cleanup.deleted,
     counts: await getMaintenanceCounts(),
   });
 }

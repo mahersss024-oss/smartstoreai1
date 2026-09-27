@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
+import { ArrowRight, Megaphone, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
 
 type MaintenanceCounts = {
@@ -24,6 +25,13 @@ type CleanupScope =
   | 'closed_user_reports'
   | 'search_state'
   | 'purge_deleted_listings';
+
+type SiteMessageDraft = {
+  message: string;
+  type: 'info' | 'warning' | 'maintenance';
+  isEnabled: boolean;
+  expiresAt: string;
+};
 
 const cleanupScopes: Array<{
   value: CleanupScope;
@@ -87,6 +95,10 @@ export default function AdminMaintenancePage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [siteMessage, setSiteMessage] = useState<SiteMessageDraft>({
+    message: '', type: 'info', isEnabled: false, expiresAt: '',
+  });
+  const [isSavingMessage, setIsSavingMessage] = useState(false);
 
   const selectedScope = useMemo(
     () => cleanupScopes.find((option) => option.value === scope),
@@ -131,6 +143,23 @@ export default function AdminMaintenancePage() {
     }
   }, [router, verifyAdminAccess]);
 
+  const loadSiteMessage = useCallback(async () => {
+    const response = await fetch('/api/admin/site-message', { cache: 'no-store' });
+    if (!response.ok) return;
+    const payload = await response.json() as {
+      siteMessage: { message: string; type: SiteMessageDraft['type']; isEnabled: boolean; expiresAt: string | null } | null;
+    };
+    if (!payload.siteMessage) return;
+    setSiteMessage({
+      message: payload.siteMessage.message,
+      type: payload.siteMessage.type,
+      isEnabled: payload.siteMessage.isEnabled,
+      expiresAt: payload.siteMessage.expiresAt
+        ? new Date(payload.siteMessage.expiresAt).toISOString().slice(0, 16)
+        : '',
+    });
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
@@ -139,13 +168,42 @@ export default function AdminMaintenancePage() {
     queueMicrotask(() => {
       if (!cancelled) {
         void loadCounts();
+        void loadSiteMessage();
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [loadCounts]);
+  }, [loadCounts, loadSiteMessage]);
+
+  const saveSiteMessage = useCallback(async () => {
+    setIsSavingMessage(true);
+    setNotice('');
+    try {
+      const response = await fetch('/api/admin/site-message', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...siteMessage,
+          expiresAt: siteMessage.expiresAt
+            ? new Date(siteMessage.expiresAt).toISOString()
+            : null,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) {
+        setNotice(payload?.error === 'expiration_must_be_future'
+          ? 'وقت انتهاء الرسالة يجب أن يكون في المستقبل.'
+          : 'تعذر حفظ رسالة الموقع.');
+        return;
+      }
+      setNotice(siteMessage.isEnabled ? 'تم حفظ رسالة الموقع وتفعيلها.' : 'تم حفظ رسالة الموقع وإيقافها.');
+      await loadSiteMessage();
+    } finally {
+      setIsSavingMessage(false);
+    }
+  }, [loadSiteMessage, siteMessage]);
 
   const runCleanup = useCallback(async () => {
     setIsRunning(true);
@@ -235,6 +293,43 @@ export default function AdminMaintenancePage() {
             {adminAccessNotice || notice}
           </div>
         )}
+
+        <section className="grid gap-4 border-b border-slate-300/70 pb-5 dark:border-slate-700/70">
+          <div className="flex items-start gap-3">
+            <Megaphone className="mt-0.5 size-5 text-blue-700 dark:text-blue-300" />
+            <div>
+              <h2 className="text-sm font-bold">رسالة الموقع</h2>
+              <p className="mt-1 text-xs text-muted-foreground">شريط عام أعلى الموقع دون إيقاف عمل المنصة.</p>
+            </div>
+          </div>
+          <Textarea
+            value={siteMessage.message}
+            onChange={(event) => setSiteMessage((current) => ({ ...current, message: event.target.value }))}
+            maxLength={500}
+            placeholder="اكتب رسالة واضحة ومختصرة"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs">
+              نوع الرسالة
+              <select className="h-10 rounded-md border bg-background px-3 text-sm" value={siteMessage.type} onChange={(event) => setSiteMessage((current) => ({ ...current, type: event.target.value as SiteMessageDraft['type'] }))}>
+                <option value="info">معلومة</option>
+                <option value="warning">تنبيه</option>
+                <option value="maintenance">صيانة</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs">
+              وقت الانتهاء الاختياري
+              <Input type="datetime-local" value={siteMessage.expiresAt} onChange={(event) => setSiteMessage((current) => ({ ...current, expiresAt: event.target.value }))} />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={siteMessage.isEnabled} onChange={(event) => setSiteMessage((current) => ({ ...current, isEnabled: event.target.checked }))} />
+            تفعيل الرسالة على الموقع
+          </label>
+          <Button className="w-fit" disabled={isSavingMessage || !siteMessage.message.trim()} onClick={() => void saveSiteMessage()}>
+            حفظ رسالة الموقع
+          </Button>
+        </section>
 
         <section className="grid gap-4 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
           <div className="flex flex-wrap items-start justify-between gap-3">

@@ -14,7 +14,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from '@/lib/welcome/config';
 
-const WELCOME_WORDMARK_SRC = '/hamad-market-wordmark.png';
+const WELCOME_WORDMARK_SRC = '/hamad-market-wordmark.webp';
 
 /**
  * First-visit welcome overlay. The markup is rendered on the server so it is

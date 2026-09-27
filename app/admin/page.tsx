@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
+  Activity,
+  ClipboardList,
+  FileCheck2,
+  Flag,
   Megaphone,
   Percent,
   ShieldCheck,
@@ -18,6 +22,13 @@ import { Button } from '@ui/button';
 import { useAdminAccess } from './use-admin-access';
 
 export default function AdminHomePage() {
+  const [overview, setOverview] = useState<{
+    totalUsers: number;
+    activeUsers: number;
+    publishedListings: number;
+    openReports: number;
+  } | null>(null);
+  const [overviewNotice, setOverviewNotice] = useState('');
   const {
     adminAccessNotice,
     adminAccessRole,
@@ -36,6 +47,23 @@ export default function AdminHomePage() {
   const isModeratorOnly = adminAccessRole === 'moderator';
   const canManageUsers =
     adminAccessRole === 'owner' || adminAccessRole === 'admin';
+
+  useEffect(() => {
+    if (!canManageUsers) return;
+    let cancelled = false;
+    fetch('/api/admin/overview', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('overview_failed');
+        return response.json();
+      })
+      .then((payload) => {
+        if (!cancelled) setOverview(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setOverviewNotice('تعذر تحميل الإحصائيات الآن.');
+      });
+    return () => { cancelled = true; };
+  }, [canManageUsers]);
 
   const adminSections = useMemo(
     () =>
@@ -69,6 +97,13 @@ export default function AdminHomePage() {
           visible: isOwner,
         },
         {
+          href: '/admin/audit-log',
+          icon: <ClipboardList className="size-5" />,
+          label: 'سجل الإدارة',
+          text: 'مراجعة العمليات الإدارية الحساسة وسياق تنفيذها.',
+          visible: canManageUsers,
+        },
+        {
           href: '/admin/maintenance',
           icon: <Trash2 className="size-5" />,
           label: 'الصيانة والتنظيف',
@@ -78,6 +113,15 @@ export default function AdminHomePage() {
       ].filter((section) => section.visible),
     [canManageUsers, isOwner],
   );
+
+  const statisticCards = overview
+    ? [
+        { label: 'إجمالي المستخدمين', value: overview.totalUsers, icon: Users },
+        { label: 'المستخدمون النشطون', value: overview.activeUsers, icon: Activity },
+        { label: 'الإعلانات المنشورة', value: overview.publishedListings, icon: FileCheck2 },
+        { label: 'البلاغات المفتوحة', value: overview.openReports, icon: Flag },
+      ]
+    : [];
 
   return (
     <main
@@ -120,6 +164,22 @@ export default function AdminHomePage() {
         )}
 
         {isAdminAccessAllowed && (
+          <>
+          {canManageUsers && (
+            <section aria-label="إحصائيات الإدارة" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {statisticCards.map((statistic) => {
+                const Icon = statistic.icon;
+                return (
+                  <div key={statistic.label} className="min-w-0 border-b border-slate-300/70 px-1 py-4 dark:border-slate-700/70">
+                    <div className="flex items-center gap-2 text-muted-foreground"><Icon className="size-4" /><span className="truncate text-xs">{statistic.label}</span></div>
+                    <div className="mt-2 text-2xl font-bold">{new Intl.NumberFormat('ar-SA').format(statistic.value)}</div>
+                  </div>
+                );
+              })}
+              {!overview && !overviewNotice && <p className="col-span-full py-4 text-sm text-muted-foreground">جار تحميل الإحصائيات...</p>}
+              {overviewNotice && <p className="col-span-full py-4 text-sm text-red-700 dark:text-red-300">{overviewNotice}</p>}
+            </section>
+          )}
           <nav aria-label="أقسام الإدارة" className="grid">
             {adminSections.map((section) => (
               <Link
@@ -140,6 +200,7 @@ export default function AdminHomePage() {
               </Link>
             ))}
           </nav>
+          </>
         )}
       </div>
     </main>

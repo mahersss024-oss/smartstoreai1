@@ -11,6 +11,7 @@ import {
   WELCOME_VISIBLE_MS,
 } from "@/lib/welcome/config";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
+import { SiteMessageBanner } from "@/components/site-message-banner";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
@@ -265,6 +266,7 @@ export default function RootLayout({
       </head>
       <body className="overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <AppWelcomeSplash />
+        <SiteMessageBanner />
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>

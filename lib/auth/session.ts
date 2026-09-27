@@ -24,7 +24,8 @@ export const privacyPolicyVersion = 'privacy-2026-09-16-v1';
 export const listingPolicyVersion = 'listing-policy-2026-09-16-v1';
 export const commissionPolicyVersion = 'commission-policy-2026-09-16-v1';
 export const commissionAgreementVersion = platformAgreementVersion;
-const sessionMaxAgeSeconds = 60 * 60 * 24 * 14;
+export const sessionMaxAgeSeconds = 60 * 60 * 24 * 14;
+export const authenticatedUserActiveWindowMs = sessionMaxAgeSeconds * 1000;
 const commissionAgreementMaxAgeSeconds = 60 * 60 * 24 * 365;
 
 export type CommissionAgreement = {

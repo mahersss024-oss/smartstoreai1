@@ -7,6 +7,7 @@ import {
   hasReachedListingImageLimit,
 } from '@/agent/marketplace/listing-image-limits';
 import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
+import { createListingImageVariants } from '@/agent/marketplace/listing-image-variants';
 import {
   checkImageMarketplaceCompliance,
   type ImageComplianceDecision,
@@ -318,6 +319,20 @@ export async function POST(request: Request, context: RouteContext) {
 
   let displayUrl = imageUrl;
   let thumbnailUrl = imageUrl;
+  let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>> = null;
+
+  if (!displayFile || !thumbnailFile) {
+    try {
+      generatedVariants = await createListingImageVariants({
+        data: new Uint8Array(fileBuffer),
+        mediaType: file.type,
+        fileName: file.name,
+      });
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_variant_generation] failure=${errorName}`);
+    }
+  }
 
   if (displayFile && displayFileBuffer) {
     try {
@@ -333,6 +348,14 @@ export async function POST(request: Request, context: RouteContext) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[listing_image_display_storage] failure=${errorName}`);
     }
+  }
+  else if (generatedVariants) {
+    displayUrl =
+      (await createPersistentListingImageUrl({
+        ...generatedVariants.display,
+        imageId,
+        variant: 'display',
+      })) ?? imageUrl;
   }
 
   if (thumbnailFile && thumbnailFileBuffer) {
@@ -350,6 +373,14 @@ export async function POST(request: Request, context: RouteContext) {
       console.warn(`[listing_image_thumbnail_storage] failure=${errorName}`);
       thumbnailUrl = displayUrl;
     }
+  }
+  else if (generatedVariants) {
+    thumbnailUrl =
+      (await createPersistentListingImageUrl({
+        ...generatedVariants.thumbnail,
+        imageId,
+        variant: 'thumbnail',
+      })) ?? displayUrl;
   }
 
   const quality = analyzeImageQuality({

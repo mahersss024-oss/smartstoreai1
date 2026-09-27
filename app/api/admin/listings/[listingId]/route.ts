@@ -202,11 +202,21 @@ export async function PATCH(request: Request, context: RouteContext) {
       data: {
         adminId: session.user.id,
         action:
-          parsed.data.status === 'deleted' ? 'delete_listing' : 'approve_listing',
+          parsed.data.status === 'deleted' ? 'delete_listing' : 'update_listing',
         targetType: 'listing',
         targetId: listingId,
         metadata: {
           operation: 'admin_listing_update',
+          previous: {
+            category: existing.category,
+            title: existing.title,
+            description: existing.description,
+            city: existing.city,
+            condition: existing.condition,
+            price: existing.price?.toString() ?? null,
+            priceMode: existing.priceMode,
+            status: existing.status,
+          },
           updates: parsed.data,
         },
       },

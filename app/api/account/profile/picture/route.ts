@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { createPersistentProfileImageUrl } from '@/agent/marketplace/profile-image-storage';
+import { createListingImageVariants } from '@/agent/marketplace/listing-image-variants';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -126,11 +127,20 @@ export async function POST(request: Request) {
   let picture: string | null;
 
   try {
-    picture = await createPersistentProfileImageUrl({
-      data: new Uint8Array(await file.arrayBuffer()),
+    const originalData = new Uint8Array(await file.arrayBuffer());
+    const variants = await createListingImageVariants({
+      data: originalData,
       mediaType: file.type,
-      imageId: randomUUID(),
       fileName: file.name,
+    });
+    const profileData = variants?.thumbnail.data ?? originalData;
+    const profileMediaType = variants?.thumbnail.mediaType ?? file.type;
+    const profileFileName = variants?.thumbnail.fileName ?? file.name;
+    picture = await createPersistentProfileImageUrl({
+      data: profileData,
+      mediaType: profileMediaType,
+      imageId: randomUUID(),
+      fileName: profileFileName,
     });
   } catch {
     return Response.json(

@@ -31,3 +31,15 @@ export function normalizeListingImageDeliveryUrls<T extends ListingImageUrls>(
     ...urls,
   };
 }
+
+export function getListingThumbnailUrl(image?: Partial<ListingImageUrls> | null) {
+  return image?.thumbnailUrl || image?.displayUrl || image?.originalUrl || null;
+}
+
+export function getListingDisplayUrl(image?: Partial<ListingImageUrls> | null) {
+  return image?.displayUrl || image?.originalUrl || image?.thumbnailUrl || null;
+}
+
+export function getListingFullUrl(image?: Partial<ListingImageUrls> | null) {
+  return image?.originalUrl || image?.displayUrl || image?.thumbnailUrl || null;
+}
