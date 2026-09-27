@@ -192,28 +192,26 @@ export async function saveUploadedListingImagesForSeller({
     if (!imageUrl) {
       continue;
     }
-    let displayData = uploadedImage.displayData;
-    let displayMediaType = uploadedImage.displayMediaType;
-    let displayFileName = uploadedImage.displayFileName;
-    let thumbnailData = uploadedImage.thumbnailData;
-    let thumbnailMediaType = uploadedImage.thumbnailMediaType;
-    let thumbnailFileName = uploadedImage.thumbnailFileName;
+    let displayData: Uint8Array | undefined;
+    let displayMediaType: string | undefined;
+    let displayFileName: string | undefined;
+    let thumbnailData: Uint8Array | undefined;
+    let thumbnailMediaType: string | undefined;
+    let thumbnailFileName: string | undefined;
 
-    if (!displayData || !displayMediaType || !thumbnailData || !thumbnailMediaType) {
-      try {
-        const generated = await createListingImageVariants(uploadedImage);
-        if (generated) {
-          displayData = generated.display.data;
-          displayMediaType = generated.display.mediaType;
-          displayFileName = generated.display.fileName;
-          thumbnailData = generated.thumbnail.data;
-          thumbnailMediaType = generated.thumbnail.mediaType;
-          thumbnailFileName = generated.thumbnail.fileName;
-        }
-      } catch (error) {
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        console.warn(`[listing_image_variant_generation] failure=${errorName}`);
+    try {
+      const generated = await createListingImageVariants(uploadedImage);
+      if (generated) {
+        displayData = generated.display.data;
+        displayMediaType = generated.display.mediaType;
+        displayFileName = generated.display.fileName;
+        thumbnailData = generated.thumbnail.data;
+        thumbnailMediaType = generated.thumbnail.mediaType;
+        thumbnailFileName = generated.thumbnail.fileName;
       }
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_variant_generation] failure=${errorName}`);
     }
 
     const displayUrl =

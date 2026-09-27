@@ -1,8 +1,8 @@
 const normalizedImageMimeType = "image/jpeg";
 const normalizedImageQuality = 0.88;
 const normalizedImageMaxDimension = 1800;
-const displayImageQuality = 0.84;
-const thumbnailImageQuality = 0.78;
+const displayImageQuality = 0.78;
+const thumbnailImageQuality = 0.68;
 const derivedImageMimeType = "image/webp";
 const uploadSafeImageMimeTypes = new Set([
   "image/jpeg",
@@ -240,7 +240,7 @@ export async function createListingImageUploadFiles(
         mediaType: derivedImageMimeType,
       }),
       createNormalizedImageFile(file, {
-        maxDimension: 400,
+        maxDimension: 360,
         quality: thumbnailImageQuality,
         suffix: "thumbnail",
         mediaType: derivedImageMimeType,

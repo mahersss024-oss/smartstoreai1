@@ -35,20 +35,6 @@ const supportedMimeTypes = new Set([
 const maxImageBytes = 12 * 1024 * 1024;
 const maxImageUploadRequestBytes = maxImageBytes + 1024 * 1024;
 
-function getOptionalImageFile(formData: FormData, key: string) {
-  const file = formData.get(key);
-
-  if (!(file instanceof File) || file.size === 0) {
-    return null;
-  }
-
-  if (!supportedMimeTypes.has(file.type) || file.size > maxImageBytes) {
-    return null;
-  }
-
-  return file;
-}
-
 function createTrustedSecondaryImageComplianceDecision(
   expectedCategory?: string,
 ): ImageComplianceDecision {
@@ -186,14 +172,6 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
-  const displayFile = getOptionalImageFile(formData, 'displayImage');
-  const thumbnailFile = getOptionalImageFile(formData, 'thumbnailImage');
-  const displayFileBuffer = displayFile
-    ? Buffer.from(await displayFile.arrayBuffer())
-    : null;
-  const thumbnailFileBuffer = thumbnailFile
-    ? Buffer.from(await thumbnailFile.arrayBuffer())
-    : null;
   const listingText = [
     existingListing.title,
     existingListing.description,
@@ -319,68 +297,32 @@ export async function POST(request: Request, context: RouteContext) {
 
   let displayUrl = imageUrl;
   let thumbnailUrl = imageUrl;
-  let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>> = null;
+  try {
+    // The server is the canonical image processor. Browser encoders vary widely
+    // and can produce deceptively large files despite a .webp extension.
+    const generatedVariants = await createListingImageVariants({
+      data: new Uint8Array(fileBuffer),
+      mediaType: file.type,
+      fileName: file.name,
+    });
 
-  if (!displayFile || !thumbnailFile) {
-    try {
-      generatedVariants = await createListingImageVariants({
-        data: new Uint8Array(fileBuffer),
-        mediaType: file.type,
-        fileName: file.name,
-      });
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[listing_image_variant_generation] failure=${errorName}`);
-    }
-  }
-
-  if (displayFile && displayFileBuffer) {
-    try {
+    if (generatedVariants) {
       displayUrl =
         (await createPersistentListingImageUrl({
-          data: new Uint8Array(displayFileBuffer),
-          mediaType: displayFile.type,
+          ...generatedVariants.display,
           imageId,
-          fileName: displayFile.name,
           variant: 'display',
         })) ?? imageUrl;
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[listing_image_display_storage] failure=${errorName}`);
-    }
-  }
-  else if (generatedVariants) {
-    displayUrl =
-      (await createPersistentListingImageUrl({
-        ...generatedVariants.display,
-        imageId,
-        variant: 'display',
-      })) ?? imageUrl;
-  }
-
-  if (thumbnailFile && thumbnailFileBuffer) {
-    try {
       thumbnailUrl =
         (await createPersistentListingImageUrl({
-          data: new Uint8Array(thumbnailFileBuffer),
-          mediaType: thumbnailFile.type,
+          ...generatedVariants.thumbnail,
           imageId,
-          fileName: thumbnailFile.name,
           variant: 'thumbnail',
         })) ?? displayUrl;
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[listing_image_thumbnail_storage] failure=${errorName}`);
-      thumbnailUrl = displayUrl;
     }
-  }
-  else if (generatedVariants) {
-    thumbnailUrl =
-      (await createPersistentListingImageUrl({
-        ...generatedVariants.thumbnail,
-        imageId,
-        variant: 'thumbnail',
-      })) ?? displayUrl;
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[listing_image_variant_generation] failure=${errorName}`);
   }
 
   const quality = analyzeImageQuality({

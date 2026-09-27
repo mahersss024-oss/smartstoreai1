@@ -29,7 +29,7 @@ import { CommissionAgreementDialog } from '@/components/commission-agreement-dia
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import { createListingImageUploadFiles } from '@/lib/client-image-normalization';
+import { createUploadableImageFile } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -736,17 +736,8 @@ export default function AccountListingsPage() {
       setUploadingListingId(listing.id);
 
       try {
-        const uploadFiles = await createListingImageUploadFiles(file);
         const formData = new FormData();
-        formData.append('image', uploadFiles.original);
-
-        if (uploadFiles.display) {
-          formData.append('displayImage', uploadFiles.display);
-        }
-
-        if (uploadFiles.thumbnail) {
-          formData.append('thumbnailImage', uploadFiles.thumbnail);
-        }
+        formData.append('image', await createUploadableImageFile(file));
 
         const response = await fetch(
           `/api/marketplace/listings/${listing.id}/images`,

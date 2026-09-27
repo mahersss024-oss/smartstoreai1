@@ -121,9 +121,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
-    assert.match(homePage, /createListingImageUploadFiles\(image\)/);
-    assert.match(homePage, /formData\.append\('displayImage', uploadFiles\.display\)/);
-    assert.match(homePage, /formData\.append\('thumbnailImage', uploadFiles\.thumbnail\)/);
+    assert.match(homePage, /createUploadableImageFile\(image\)/);
+    assert.doesNotMatch(homePage, /formData\.append\('thumbnailImage'/);
+    assert.doesNotMatch(homePage, /formData\.append\('displayImage'/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
   assert.match(homePage, /relative aspect-square self-start bg-slate-100/);

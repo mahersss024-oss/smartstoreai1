@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 
 export const listingDisplayMaxDimension = 900;
-export const listingThumbnailMaxDimension = 400;
+export const listingThumbnailMaxDimension = 360;
 
 export type GeneratedListingImageVariant = {
   data: Uint8Array;
@@ -54,8 +54,8 @@ export async function createListingImageVariants(input: {
   }
 
   const [display, thumbnail] = await Promise.all([
-    createVariant(listingDisplayMaxDimension, 82, 'display'),
-    createVariant(listingThumbnailMaxDimension, 76, 'thumbnail'),
+    createVariant(listingDisplayMaxDimension, 78, 'display'),
+    createVariant(listingThumbnailMaxDimension, 68, 'thumbnail'),
   ]);
 
   return { display, thumbnail };
