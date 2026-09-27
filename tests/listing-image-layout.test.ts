@@ -60,11 +60,11 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /displayUrl: string/);
   assert.match(source, /thumbnailUrl: string/);
   assert.match(source, /src=\{thumbnailUrl\}/);
-  assert.match(source, /src=\{selectedOriginalUrl\}/);
+  assert.match(source, /src=\{selectedLightboxUrl\}/);
   assert.match(source, /decoding="async"/);
   assert.match(source, /new Image\(\)/);
   assert.match(source, /image\.src = nextDisplayUrl/);
-  assert.match(source, /className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-\[68dvh\] sm:w-auto sm:max-w-\[min\(88vw,44rem\)\]"[\s\S]*src=\{selectedOriginalUrl\}/);
+  assert.match(source, /className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-\[68dvh\] sm:w-auto sm:max-w-\[min\(88vw,44rem\)\]"[\s\S]*src=\{selectedLightboxUrl\}/);
   assert.match(source, /className="hidden max-w-\[min\(88vw,44rem\)\] grid-cols-8 gap-2 sm:grid"/);
   assert.match(source, /onClick=\{\(\) => selectLightboxImage\(index\)\}/);
   assert.match(source, /translate3d\(\$\{imagePan\.x\}px, \$\{imagePan\.y\}px, 0\) scale\(\$\{imageZoom\}\)/);

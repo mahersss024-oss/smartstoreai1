@@ -140,7 +140,6 @@ export default function AccountPage() {
         body: JSON.stringify({
           displayName: profileName,
           phoneNumber: nextPhoneNumber,
-          picture: profilePicture,
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
@@ -189,7 +188,7 @@ export default function AccountPage() {
     } finally {
       setIsSavingProfile(false);
     }
-  }, [profileName, profilePhone, profilePicture, router, setSession]);
+  }, [profileName, profilePhone, router, setSession]);
 
   const editProfilePhone = useCallback(() => {
     setProfilePhone(savedProfilePhone);

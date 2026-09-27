@@ -12,7 +12,6 @@ import {
   PackageCheck,
   Star,
   Store,
-  UserRound,
 } from 'lucide-react';
 
 import {
@@ -22,6 +21,7 @@ import {
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
 import { ListingShareButton } from '@/components/listing-share-button';
+import { SellerAvatar } from '@/components/seller-avatar';
 import { ListingContactActions } from './contact-actions';
 import {
   ListingImageGallery,
@@ -256,15 +256,10 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   href={sellerProfileHref}
                   className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-[#0f766e] text-lg font-bold text-white transition hover:opacity-85 active:scale-95"
                 >
-                  {sellerProfile?.picture ? (
-                    <img
-                      alt={sellerProfile.name}
-                      className="size-full object-cover"
-                      src={sellerProfile.picture}
-                    />
-                  ) : (
-                    <UserRound className="size-6" />
-                  )}
+                  <SellerAvatar
+                    alt={sellerProfile?.name ?? 'معلن سوق حمد'}
+                    picture={sellerProfile?.picture}
+                  />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 text-xs font-semibold text-muted-foreground">
