@@ -21,13 +21,13 @@ import {
   Store,
   Trash2,
   Upload,
-  User,
   UserPlus,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
+import { SellerAvatar } from '@/components/seller-avatar';
 import type { AuthUser } from '@/hooks/use-auth-session';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
@@ -433,18 +433,12 @@ export default function AccountPage() {
           <div className="grid gap-2 px-1 py-3 sm:px-2">
             <section className="grid gap-4 px-1 py-4 lg:grid-cols-[1fr_18rem]">
               <div className="flex min-w-0 items-center gap-4">
-                {visibleProfilePicture ? (
-                  <img
-                    alt=""
-                    className="size-16 rounded-md object-cover"
-                    decoding="async"
-                    src={visibleProfilePicture}
+                <div className="grid size-16 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <SellerAvatar
+                    alt={session.user?.name ?? 'حساب سوق حمد'}
+                    picture={visibleProfilePicture}
                   />
-                ) : (
-                  <div className="grid size-16 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                    <User className="size-8" />
-                  </div>
-                )}
+                </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-xl font-bold">{session.user?.name ?? 'عميل سوق حمد'}</h2>
@@ -573,18 +567,12 @@ export default function AccountPage() {
               </div>
               <div className="grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
                 <div className="grid place-items-start">
-                  {visibleProfilePicture ? (
-                    <img
+                  <div className="grid size-24 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <SellerAvatar
                       alt="صورة الحساب"
-                      className="size-24 rounded-md object-cover"
-                      decoding="async"
-                      src={visibleProfilePicture}
+                      picture={visibleProfilePicture}
                     />
-                  ) : (
-                    <div className="grid size-24 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                      <User className="size-10" />
-                    </div>
-                  )}
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   <div className="flex flex-wrap items-center gap-2">

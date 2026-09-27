@@ -18,7 +18,7 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /profilePicturePreview/);
   assert.match(page, /URL\.createObjectURL\(file\)/);
   assert.match(page, /visibleProfilePicture/);
-  assert.match(page, /decoding="async"/);
+  assert.match(page, /SellerAvatar/);
   assert.match(page, /رفع صورة عرض الحساب/);
   assert.doesNotMatch(page, /profilePictureUrl/);
   assert.doesNotMatch(page, /رابط صورة الحساب/);

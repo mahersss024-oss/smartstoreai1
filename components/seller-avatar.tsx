@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { UserRound } from 'lucide-react';
 
 type SellerAvatarProps = {
@@ -11,12 +11,13 @@ type SellerAvatarProps = {
   picture?: string;
 };
 
-export function SellerAvatar({ alt, className = 'size-full object-cover', picture }: SellerAvatarProps) {
-  const [canShowPicture, setCanShowPicture] = useState(Boolean(picture));
+const brokenProfilePictures = new Set<string>();
 
-  useEffect(() => {
-    setCanShowPicture(Boolean(picture));
-  }, [picture]);
+export function SellerAvatar({ alt, className = 'size-full object-cover', picture }: SellerAvatarProps) {
+  const [failedPicture, setFailedPicture] = useState<string | null>(null);
+  const canShowPicture = Boolean(
+    picture && failedPicture !== picture && !brokenProfilePictures.has(picture),
+  );
 
   if (!picture || !canShowPicture) {
     return <UserRound aria-hidden="true" className="size-6" />;
@@ -27,7 +28,10 @@ export function SellerAvatar({ alt, className = 'size-full object-cover', pictur
       alt={alt}
       className={className}
       decoding="async"
-      onError={() => setCanShowPicture(false)}
+      onError={() => {
+        brokenProfilePictures.add(picture);
+        setFailedPicture(picture);
+      }}
       src={picture}
     />
   );

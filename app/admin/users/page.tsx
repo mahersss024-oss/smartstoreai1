@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -15,11 +14,11 @@ import {
   ShieldCheck,
   Store,
   Trash2,
-  UserRound,
   Users,
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { SellerAvatar } from '@/components/seller-avatar';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { useAdminAccess } from '../use-admin-access';
@@ -491,11 +490,11 @@ export default function AdminUsersPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                        {user.picture ? (
-                          <img alt={user.name ?? user.email} className="size-11 object-cover" src={user.picture} />
-                        ) : (
-                          <UserRound className="size-5" />
-                        )}
+                        <SellerAvatar
+                          alt={user.name ?? user.email}
+                          className="size-11 object-cover"
+                          picture={user.picture}
+                        />
                       </div>
                       <div className="min-w-0">
                         <h2 className="truncate text-sm font-bold">{user.name ?? 'مستخدم سوق حمد'}</h2>

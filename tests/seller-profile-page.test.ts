@@ -16,6 +16,7 @@ test('listing details links to the public seller profile without exposing privat
   const galleryIndex = page.indexOf('<ListingImageGallery');
 
   assert.match(page, /getPublicSellerProfile/);
+  assert.match(page, /export const dynamic = 'force-dynamic'/);
   assert.match(page, /encodeURIComponent\(listing\.sellerId\)/);
   assert.match(page, /href=\{sellerProfileHref\}/);
   assert.match(page, /\u0627\u0644\u0645\u0639\u0644\u0646/u);
@@ -39,6 +40,7 @@ test('public seller profile renders safe public data and published listing links
   const page = readSource('app/sellers/[sellerId]/page.tsx');
 
   assert.match(page, /getPublicSellerProfile/);
+  assert.match(page, /export const dynamic = 'force-dynamic'/);
   assert.match(page, /decodeURIComponent\(rawSellerId\)/);
   assert.match(page, /notFound\(\)/);
   assert.match(page, /href=\{`\/listings\/\$\{listing\.id\}`\}/);
