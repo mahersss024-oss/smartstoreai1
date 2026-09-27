@@ -59,7 +59,7 @@ test('backfill is batched, dry-run by default, idempotent by database state and 
   assert.doesNotMatch(script, /deleteListingObject/);
 });
 
-test('listing surfaces retain thumbnail, display and on-demand original behavior', async () => {
+test('listing surfaces retain thumbnail, display and zoom-only original behavior', async () => {
   const files = await Promise.all([
     'app/page.tsx', 'app/account/listings/page.tsx', 'app/favorites/page.tsx',
     'app/conversations/[conversationId]/page.tsx', 'app/admin/listings/page.tsx',
@@ -71,6 +71,7 @@ test('listing surfaces retain thumbnail, display and on-demand original behavior
   assert.match(gallery, /selectedDisplayUrl/);
   assert.match(gallery, /new Image\(\)/);
   assert.match(gallery, /image\.src = nextDisplayUrl/);
-  assert.match(gallery, /isLightboxOpen && selectedOriginalUrl/);
-  assert.match(gallery, /src=\{selectedOriginalUrl\}/);
+  assert.match(gallery, /imageZoom > 1 \? selectedOriginalUrl : selectedDisplayUrl/);
+  assert.match(gallery, /isLightboxOpen && selectedLightboxUrl/);
+  assert.match(gallery, /src=\{selectedLightboxUrl\}/);
 });

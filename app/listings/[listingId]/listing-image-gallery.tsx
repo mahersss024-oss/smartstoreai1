@@ -110,6 +110,8 @@ export function ListingImageGallery({
     typeof selectedImage === 'string'
       ? selectedImage
       : selectedImage?.originalUrl ?? selectedDisplayUrl;
+  const selectedLightboxUrl =
+    imageZoom > 1 ? selectedOriginalUrl : selectedDisplayUrl;
   const selectedThumbnailUrl =
     typeof selectedImage === 'string'
       ? selectedImage
@@ -378,7 +380,7 @@ export function ListingImageGallery({
           </div>
         )}
       </div>
-      {isLightboxOpen && selectedOriginalUrl && (
+      {isLightboxOpen && selectedLightboxUrl && (
         <div
           aria-label="عارض صور الإعلان"
           aria-modal="true"
@@ -464,7 +466,7 @@ export function ListingImageGallery({
 
                 updateImageZoom(() => 2);
               }}
-              src={selectedOriginalUrl}
+              src={selectedLightboxUrl}
               style={{
                 transform: `translate3d(${imagePan.x}px, ${imagePan.y}px, 0) scale(${imageZoom})`,
               }}
