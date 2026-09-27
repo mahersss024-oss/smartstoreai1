@@ -74,4 +74,10 @@ test('listing surfaces retain thumbnail, display and zoom-only original behavior
   assert.match(gallery, /imageZoom > 1 \? selectedOriginalUrl : selectedDisplayUrl/);
   assert.match(gallery, /isLightboxOpen && selectedLightboxUrl/);
   assert.match(gallery, /src=\{selectedLightboxUrl\}/);
+  assert.match(gallery, /ResilientImage/);
+
+  const resilientImage = await readFile(new URL('../components/resilient-image.tsx', import.meta.url), 'utf8');
+  assert.match(resilientImage, /maxRetries = 2/);
+  assert.match(resilientImage, /imageRetry/);
+  assert.match(resilientImage, /500 \* \(attempt \+ 1\)/);
 });

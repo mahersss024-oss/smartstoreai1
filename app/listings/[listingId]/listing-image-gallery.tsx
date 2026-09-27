@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, TouchEvent, WheelEvent } from 'react';
@@ -12,6 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { ResilientImage } from '@/components/resilient-image';
 
 type ListingImageGalleryProps = {
   images: ListingGalleryImage[];
@@ -118,10 +118,6 @@ export function ListingImageGallery({
       : selectedImage?.thumbnailUrl ?? selectedDisplayUrl;
   const shouldShowThumbnails = visibleImages.length > 1;
   const selectedImageLabel = `${selectedImageIndex + 1} / ${visibleImages.length}`;
-  const showImageFallback = (image: HTMLImageElement) => {
-    image.hidden = true;
-    image.nextElementSibling?.removeAttribute('hidden');
-  };
   const openLightbox = (index: number) => {
     setSelectedImageIndex(index);
     setImageZoom(1);
@@ -363,17 +359,14 @@ export function ListingImageGallery({
                   onClick={() => openLightbox(index)}
                   type="button"
                 >
-                  <img
+                  <ResilientImage
                     alt=""
                     className="h-full w-full object-contain"
                     decoding="async"
+                    fallback={<ImageIcon className="size-4 text-slate-500 dark:text-slate-400" />}
                     loading={index === 0 ? 'eager' : 'lazy'}
-                    onError={(event) => showImageFallback(event.currentTarget)}
                     src={thumbnailUrl}
                   />
-                  <span hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
-                    <ImageIcon className="size-4" />
-                  </span>
                 </button>
               );
             })}
@@ -445,7 +438,8 @@ export function ListingImageGallery({
             onTouchStart={handleLightboxTouchStart}
             onWheel={handleLightboxWheel}
           >
-            <img
+            <ResilientImage
+              key={`backdrop-${selectedThumbnailUrl || selectedDisplayUrl}`}
               alt=""
               aria-hidden="true"
               className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
@@ -453,11 +447,12 @@ export function ListingImageGallery({
               src={selectedThumbnailUrl || selectedDisplayUrl}
             />
             <div className="absolute inset-0 bg-black/55" />
-            <img
+            <ResilientImage
+              key={`lightbox-${selectedLightboxUrl}`}
               alt={title}
               className="relative z-10 h-full w-full max-w-6xl select-none object-contain will-change-transform sm:h-auto sm:max-h-[68dvh] sm:w-auto sm:max-w-[min(88vw,44rem)]"
               decoding="async"
-              onError={(event) => showImageFallback(event.currentTarget)}
+              fallback={<ImageIcon className="relative z-10 size-10 text-slate-300" />}
               onDoubleClick={() => {
                 if (imageZoom > 1) {
                   resetZoom();
@@ -471,9 +466,6 @@ export function ListingImageGallery({
                 transform: `translate3d(${imagePan.x}px, ${imagePan.y}px, 0) scale(${imageZoom})`,
               }}
             />
-            <div hidden className="relative z-10 grid h-full w-full place-items-center text-slate-300">
-              <ImageIcon className="size-10" />
-            </div>
             {shouldShowThumbnails && (
               <>
                 <button
@@ -520,10 +512,11 @@ export function ListingImageGallery({
                       onClick={() => selectLightboxImage(index)}
                       type="button"
                     >
-                      <img
+                      <ResilientImage
                         alt=""
                         className="h-full w-full object-cover"
                         decoding="async"
+                        fallback={<ImageIcon className="m-auto size-4 text-slate-400" />}
                         loading="lazy"
                         src={thumbnailUrl}
                       />
