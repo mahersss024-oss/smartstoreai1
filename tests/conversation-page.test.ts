@@ -65,6 +65,9 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /onPointerDown=\{\(\) => messageInputRef\.current\?\.blur\(\)\}/);
   assert.match(source, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
   assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
+  assert.match(source, /window\.visualViewport/);
+  assert.match(source, /height: `\$\{visualViewportFrame\.height\}px`/);
+  assert.match(source, /onFocus=\{\(\) => setIsMessageInputFocused\(true\)\}/);
 });
 
 test('mobile navigation remains visible without covering the conversation composer', () => {

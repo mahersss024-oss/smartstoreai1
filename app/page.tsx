@@ -226,20 +226,20 @@ const assistantBubbleDragThreshold = 8;
 const chatMaxAttachments = 8;
 const chatInputGroupStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '3.35rem minmax(0, 1fr) 3.35rem',
+  gridTemplateColumns: '3rem minmax(0, 1fr) 3rem',
   height: 'auto',
-  minHeight: '4.75rem',
+  minHeight: '3.5rem',
 };
 const chatInputTextAreaStyle: CSSProperties = {
   gridColumn: '2',
   gridRow: '2',
-  minHeight: '3.5rem',
+  minHeight: '2.75rem',
 };
 const chatSubmitButtonStyle: CSSProperties = {
   gridColumn: '1',
   gridRow: '2',
-  height: '2.75rem',
-  width: '2.75rem',
+  height: '2.5rem',
+  width: '2.5rem',
 };
 const chatAttachmentControlsStyle: CSSProperties = {
   gridColumn: '3',
@@ -530,7 +530,7 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
   return (
     <Button
       aria-label={isBusy ? 'جار الإرسال' : 'إرسال'}
-      className="col-start-1 row-start-2 m-2 size-11 self-end rounded-2xl bg-sky-400 text-slate-950 shadow-lg shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
+      className="col-start-1 row-start-2 m-1.5 size-10 self-end rounded-xl bg-sky-400 text-slate-950 shadow-md shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
       disabled={isBusy}
       onPointerDown={(event) => event.preventDefault()}
       size="icon-sm"
@@ -4465,7 +4465,7 @@ export default function Page() {
               <div
                 ref={chatInputContainerRef}
                 data-testid="assistant-chat-input-container"
-                className="shrink-0 border-t p-3"
+                className="shrink-0 border-t p-2"
                 onBlur={handleChatInputBlur}
                 onFocus={handleChatInputFocus}
                 onPointerDown={handleChatInputPointerDown}
@@ -4486,7 +4486,7 @@ export default function Page() {
                   <ChatSubmitButton status={status} />
                   <PromptInputBody>
                     <PromptInputTextarea
-                      className="col-start-2 row-start-2 max-h-36 min-h-14 resize-none px-1 py-4 text-right text-base leading-7 text-foreground placeholder:text-muted-foreground sm:min-h-16 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      className="col-start-2 row-start-2 max-h-24 min-h-11 resize-none px-1 py-2 text-right text-base leading-7 text-foreground placeholder:text-muted-foreground dark:text-slate-100 dark:placeholder:text-slate-400"
                       dir="rtl"
                       placeholder="اكتب طلبك أو أرفق صور المنتج..."
                       style={chatInputTextAreaStyle}

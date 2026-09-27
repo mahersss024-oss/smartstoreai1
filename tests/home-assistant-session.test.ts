@@ -78,6 +78,9 @@ test('mobile chat view keeps input attached to the keyboard while focused', () =
   assert.match(homePage, /isCompactChatView && isChatInputFocused && 'transition-none'/);
   assert.match(homePage, /style=\{isCompactChatView \? compactChatViewStyle : assistantPanelStyle\}/);
   assert.doesNotMatch(homePage, /height: `calc\(100dvh - \$\{keyboardOffset\}px\)`/);
+  assert.match(homePage, /minHeight: '3\.5rem'/);
+  assert.match(homePage, /max-h-24 min-h-11 resize-none/);
+  assert.match(homePage, /className="shrink-0 border-t p-2"/);
 });
 
 test('mobile chat submit keeps the keyboard open until the user dismisses it', () => {

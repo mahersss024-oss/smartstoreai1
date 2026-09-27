@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import {
+  CSSProperties,
   FormEvent,
   KeyboardEvent,
   useCallback,
@@ -255,8 +256,26 @@ export default function ConversationPage() {
   const [isUnblockingUser, setIsUnblockingUser] = useState(false);
   const [blockStatus, setBlockStatus] =
     useState<ConversationBlockStatus | null>(null);
+  const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
+  const [visualViewportFrame, setVisualViewportFrame] = useState<{
+    height: number;
+    offsetTop: number;
+  } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const mobileConversationStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!isMessageInputFocused || !visualViewportFrame) {
+      return undefined;
+    }
+
+    return {
+      height: `${visualViewportFrame.height}px`,
+      insetInline: '0',
+      position: 'fixed',
+      top: `${visualViewportFrame.offsetTop}px`,
+    };
+  }, [isMessageInputFocused, visualViewportFrame]);
 
   const isSeller = session.user?.id === conversation?.sellerId;
   const otherParticipantId =
@@ -353,6 +372,33 @@ export default function ConversationPage() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
   }, []);
+
+  useEffect(() => {
+    if (!isMessageInputFocused) {
+      setVisualViewportFrame(null);
+      return;
+    }
+
+    const syncVisualViewport = () => {
+      const viewport = window.visualViewport;
+
+      setVisualViewportFrame({
+        height: Math.round(viewport?.height ?? window.innerHeight),
+        offsetTop: Math.round(viewport?.offsetTop ?? 0),
+      });
+    };
+
+    syncVisualViewport();
+    window.visualViewport?.addEventListener('resize', syncVisualViewport);
+    window.visualViewport?.addEventListener('scroll', syncVisualViewport);
+    window.addEventListener('resize', syncVisualViewport);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncVisualViewport);
+      window.visualViewport?.removeEventListener('scroll', syncVisualViewport);
+      window.removeEventListener('resize', syncVisualViewport);
+    };
+  }, [isMessageInputFocused]);
 
   useEffect(() => {
     if (isSessionLoading) {
@@ -794,7 +840,11 @@ export default function ConversationPage() {
   ]);
 
   return (
-    <main className="h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-auto lg:min-h-screen lg:overflow-visible" dir="rtl">
+    <main
+      className="h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-auto lg:min-h-screen lg:overflow-visible"
+      dir="rtl"
+      style={mobileConversationStyle}
+    >
       <div className="mx-auto flex h-full max-w-6xl flex-col gap-2 px-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-2 focus-within:pb-0 sm:px-4 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5">
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -986,6 +1036,8 @@ export default function ConversationPage() {
                 disabled={conversation?.status !== 'open' || isConversationBlocked}
                 name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
+                onBlur={() => setIsMessageInputFocused(false)}
+                onFocus={() => setIsMessageInputFocused(true)}
                 onKeyDown={sendConversationMessageWithEnter}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}
