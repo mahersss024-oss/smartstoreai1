@@ -247,6 +247,10 @@ test('listing publish requires the commission oath agreement without repeating i
   assert.match(agreementDialog, /أو بسببها/);
   assert.match(agreementDialog, /رسوم المنصة حق على المعلن/);
   assert.match(agreementDialog, /1% من قيمة البيع/);
+  assert.match(
+    agreementDialog,
+    /وَأَوْفُوا بِعَهْدِ الله إِذَا عَاهَدْتُمْ وَلَا تَنْقُضُوا الْأَيْمَانَ بَعْدَ تَوْكِيدِهَا وَقَدْ جَعَلْتُمُ الله عَلَيْكُمْ كَفِيلًا إِنَّ الله يَعْلَمُ مَا تَفْعَلُونَ/,
+  );
 });
 
 test('customer listings explain drafts and keep image management lightweight', () => {
