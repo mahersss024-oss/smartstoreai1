@@ -69,7 +69,7 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
-import { createUploadableImageFile } from '@/lib/client-image-normalization';
+import { prepareUploadableImageFiles } from '@/lib/client-image-normalization';
 import {
   getAssistantResultListings,
   getCanLoadMoreExploreListings,
@@ -1764,6 +1764,8 @@ export default function Page() {
   const [manualListingForm, setManualListingForm] =
     useState<ManualListingForm>(defaultManualListingForm);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
+  const [isPreparingManualListingImages, setIsPreparingManualListingImages] =
+    useState(false);
   const [manualListingNotice, setManualListingNotice] =
     useState<ManualListingNotice | null>(null);
   const [isSubmittingManualListing, setIsSubmittingManualListing] =
@@ -1808,6 +1810,10 @@ export default function Page() {
   const listingsRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
+  const manualListingImagePreparationRef = useRef<{
+    source: File[];
+    promise: Promise<File[]>;
+  } | null>(null);
   const shouldResetSearchStateRef = useRef(true);
   const [clientIntent, setClientIntent] =
     useState<ClientIntentState>(defaultClientIntent);
@@ -3209,6 +3215,13 @@ export default function Page() {
     setIsSubmittingManualListing(true);
     setManualListingNotice(null);
 
+    const selectedImages = manualListingImages.slice(0, 8);
+    const existingPreparation = manualListingImagePreparationRef.current;
+    const preparedImagesPromise =
+      existingPreparation && existingPreparation.source === manualListingImages
+        ? existingPreparation.promise
+        : prepareUploadableImageFiles(selectedImages);
+
     try {
       const response = await fetch('/api/marketplace/listings', {
         method: 'POST',
@@ -3242,14 +3255,15 @@ export default function Page() {
       }
 
       const createdListing = responsePayload.listing;
+      const preparedImages = await preparedImagesPromise.catch(() => []);
       let uploadedImages = 0;
       let publishStatus: 'not_requested' | 'published' | 'blocked' = 'not_requested';
       let publishMessage = '';
 
-      for (const image of manualListingImages.slice(0, 8)) {
+      for (const image of preparedImages) {
         try {
           const formData = new FormData();
-          formData.append('image', await createUploadableImageFile(image));
+          formData.append('image', image);
 
           const uploadResponse = await fetch(
             `/api/marketplace/listings/${createdListing.id}/images`,
@@ -3330,6 +3344,7 @@ export default function Page() {
 
       setManualListingForm(defaultManualListingForm);
       setManualListingImages([]);
+      manualListingImagePreparationRef.current = null;
       setManualListingNotice(nextManualListingNotice);
       setIsManualListingOpen(false);
       setIsManualListingFallbackDismissed(true);
@@ -3906,13 +3921,37 @@ export default function Page() {
                       multiple
                       type="file"
                       onChange={(event) => {
-                        setManualListingImages(
-                          Array.from(event.target.files ?? []).slice(0, 8),
+                        const selectedImages = Array.from(
+                          event.target.files ?? [],
+                        ).slice(0, 8);
+                        setManualListingImages(selectedImages);
+                        setIsPreparingManualListingImages(selectedImages.length > 0);
+
+                        const preparation = {
+                          source: selectedImages,
+                          promise: prepareUploadableImageFiles(selectedImages),
+                        };
+                        manualListingImagePreparationRef.current = preparation;
+                        void preparation.promise.then(
+                          () => {
+                            if (manualListingImagePreparationRef.current === preparation) {
+                              setIsPreparingManualListingImages(false);
+                            }
+                          },
+                          () => {
+                            if (manualListingImagePreparationRef.current === preparation) {
+                              setIsPreparingManualListingImages(false);
+                            }
+                          },
                         );
                       }}
                     />
                     <span className="text-[11px] font-normal text-muted-foreground">
-                      يمكنك رفع حتى 8 صور، ويمكن إكمال إدارة الصور من حسابي.
+                      {isPreparingManualListingImages
+                        ? `جاري تجهيز ${manualListingImages.length} صور للرفع...`
+                        : manualListingImages.length > 0
+                          ? `تم تجهيز ${manualListingImages.length} صور للرفع.`
+                          : 'يمكنك رفع حتى 8 صور، ويمكن إكمال إدارة الصور من حسابي.'}
                     </span>
                   </label>
 

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
   createListingImageUploadFiles,
   createUploadableImageFile,
+  prepareUploadableImageFiles,
 } from '@/lib/client-image-normalization';
 
 test('falls back to the original upload file when browser-side image normalization is unavailable', async () => {
@@ -26,4 +29,25 @@ test('falls back to a single original file for listing image variants in node', 
   assert.equal(uploadFiles.original, file);
   assert.equal(uploadFiles.display, null);
   assert.equal(uploadFiles.thumbnail, null);
+});
+
+test('prepares multiple listing images while preserving their selected order', async () => {
+  const files = ['one', 'two', 'three'].map(
+    (name) => new File([name], `${name}.jpg`, { type: 'image/jpeg' }),
+  );
+
+  const preparedFiles = await prepareUploadableImageFiles(files, 2);
+
+  assert.deepEqual(preparedFiles, files);
+});
+
+test('chat image preparation starts when mobile files are selected, before submit', () => {
+  const promptInput = readFileSync(
+    join(process.cwd(), 'components', 'chat-elements', 'prompt-input.tsx'),
+    'utf8',
+  );
+
+  assert.match(promptInput, /createPromptInputAttachments\(capped\)/);
+  assert.match(promptInput, /preparation\?: Promise/);
+  assert.match(promptInput, /\(await item\.preparation\) \?\?/);
 });

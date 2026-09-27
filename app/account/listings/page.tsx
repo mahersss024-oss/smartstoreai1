@@ -30,7 +30,7 @@ import { CitySelector } from '@/components/city-selector';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import { createUploadableImageFile } from '@/lib/client-image-normalization';
+import { queueUploadableImagePreparation } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -316,6 +316,11 @@ export default function AccountListingsPage() {
   const [uploadingListingId, setUploadingListingId] = useState<string | null>(
     null,
   );
+  const [imageUploadProgress, setImageUploadProgress] = useState<{
+    listingId: string;
+    current: number;
+    total: number;
+  } | null>(null);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [pendingPublishListing, setPendingPublishListing] =
     useState<ListingCard | null>(null);
@@ -756,11 +761,24 @@ export default function AccountListingsPage() {
       }
 
       setUploadingListingId(listing.id);
+      setImageUploadProgress({
+        listingId: listing.id,
+        current: 0,
+        total: filesToUpload.length,
+      });
 
       try {
-        for (const file of filesToUpload) {
+        const imagePreparations = queueUploadableImagePreparation(filesToUpload);
+
+        for (const [index, preparation] of imagePreparations.entries()) {
+          const file = await preparation;
+          setImageUploadProgress({
+            listingId: listing.id,
+            current: index + 1,
+            total: imagePreparations.length,
+          });
           const formData = new FormData();
-          formData.append('image', await createUploadableImageFile(file));
+          formData.append('image', file);
 
           const response = await fetch(
             `/api/marketplace/listings/${listing.id}/images`,
@@ -814,6 +832,7 @@ export default function AccountListingsPage() {
         );
       } finally {
         setUploadingListingId(null);
+        setImageUploadProgress(null);
       }
     },
     [refreshListings, router],
@@ -1278,7 +1297,11 @@ export default function AccountListingsPage() {
                         <Button asChild size="sm" variant="outline" className="rounded-md">
                           <label>
                             <Upload className="size-3.5" />
-                            {uploadingListingId === listing.id ? 'جاري التحميل...' : 'تحميل الصور'}
+                            {uploadingListingId === listing.id
+                              ? imageUploadProgress?.current
+                                ? `جاري تحميل ${imageUploadProgress.current} من ${imageUploadProgress.total}`
+                                : 'جاري تجهيز الصور...'
+                              : 'تحميل الصور'}
                             <input
                               accept="image/*"
                               className="sr-only"

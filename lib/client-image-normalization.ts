@@ -213,6 +213,35 @@ export async function createUploadableImageFile(file: File) {
   }
 }
 
+export async function prepareUploadableImageFiles(
+  files: File[],
+  maxConcurrency = 2
+) {
+  return Promise.all(queueUploadableImagePreparation(files, maxConcurrency));
+}
+
+export function queueUploadableImagePreparation(
+  files: File[],
+  maxConcurrency = 2
+) {
+  const workerCount = Math.min(Math.max(1, maxConcurrency), files.length || 1);
+  const workers = Array.from({ length: workerCount }, () =>
+    Promise.resolve()
+  );
+
+  return files.map((file, index) => {
+    const workerIndex = index % workerCount;
+    const preparation = workers[workerIndex].then(() =>
+      createUploadableImageFile(file)
+    );
+    workers[workerIndex] = preparation.then(
+      () => undefined,
+      () => undefined
+    );
+    return preparation;
+  });
+}
+
 export type ListingImageUploadFiles = {
   original: File;
   display: File | null;

@@ -284,7 +284,8 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /Array\.from\(event\.currentTarget\.files \?\? \[\]\)/);
   assert.match(listingsPage, /Math\.max\(8 - listing\.images\.length, 0\)/);
   assert.match(listingsPage, /files\.slice\(0, remainingImageSlots\)/);
-  assert.match(listingsPage, /for \(const file of filesToUpload\)/);
+  assert.match(listingsPage, /queueUploadableImagePreparation\(filesToUpload\)/);
+  assert.match(listingsPage, /جاري تحميل \$\{imageUploadProgress\.current\} من/);
   assert.match(listingsPage, /تحميل الصور/);
   assert.match(listingsPage, /إيقاف النشر/);
   assert.match(listingsPage, /تم البيع/);

@@ -92,7 +92,33 @@ export type AttachmentsContext = {
 type PromptInputAttachment = FileUIPart & {
   id: string;
   file?: File;
+  preparation?: Promise<{ mediaType: string; url: string } | null>;
 };
+
+function createPromptInputAttachments(files: File[], maxConcurrency = 2) {
+  const workerCount = Math.min(Math.max(1, maxConcurrency), files.length || 1);
+  const workers = Array.from({ length: workerCount }, () =>
+    Promise.resolve()
+  );
+
+  return files.map((file, index): PromptInputAttachment => {
+    const workerIndex = index % workerCount;
+    const preparation = workers[workerIndex]
+      .then(() => convertAttachmentBlobToDataUrl(file, file.type, file.name))
+      .catch(() => null);
+    workers[workerIndex] = preparation.then(() => undefined);
+
+    return {
+      id: nanoid(),
+      type: "file",
+      file,
+      preparation,
+      url: URL.createObjectURL(file),
+      mediaType: file.type,
+      filename: file.name,
+    };
+  });
+}
 
 export type TextInputContext = {
   value: string;
@@ -174,16 +200,7 @@ export function PromptInputProvider({
     }
 
     setAttachements((prev) =>
-      prev.concat(
-        incoming.map((file) => ({
-          id: nanoid(),
-          type: "file" as const,
-          file,
-          url: URL.createObjectURL(file),
-          mediaType: file.type,
-          filename: file.name,
-        }))
-      )
+      prev.concat(createPromptInputAttachments(incoming))
     );
   }, []);
 
@@ -562,17 +579,7 @@ export const PromptInput = ({
             message: "Too many files. Some were not added.",
           });
         }
-        const next: PromptInputAttachment[] = [];
-        for (const file of capped) {
-          next.push({
-            id: nanoid(),
-            type: "file",
-            file,
-            url: URL.createObjectURL(file),
-            mediaType: file.type,
-            filename: file.name,
-          });
-        }
+        const next = createPromptInputAttachments(capped);
         return prev.concat(next);
       });
     },
@@ -780,11 +787,13 @@ export const PromptInput = ({
         };
 
         if (item.file) {
-          const convertedFile = await convertAttachmentBlobToDataUrl(
-            item.file,
-            item.mediaType,
-            item.filename
-          );
+          const convertedFile =
+            (await item.preparation) ??
+            (await convertAttachmentBlobToDataUrl(
+              item.file,
+              item.mediaType,
+              item.filename
+            ));
 
           return {
             ...filePart,
