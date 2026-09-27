@@ -224,7 +224,7 @@ export function PushNotificationSettings({
     return (
       <Button
         aria-label={iconLabel}
-        className="hidden sm:inline-flex"
+        className="shrink-0"
         disabled={disabled}
         onClick={() =>
           void (isActive ? disableNotifications() : enableNotifications())

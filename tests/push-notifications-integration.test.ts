@@ -37,10 +37,16 @@ test('account page exposes push notifications as an opt-in setting', () => {
 
 test('home notification bell is shown only to signed-in users and toggles directly', () => {
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
+  const settings = readFileSync(
+    join(process.cwd(), 'components', 'push-notification-settings.tsx'),
+    'utf8',
+  );
 
   assert.match(homePage, /session\.authenticated \? \(/);
   assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
   assert.doesNotMatch(homePage, /href="\/account#notifications"/);
+  assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
+  assert.match(settings, /className="shrink-0"/);
 });
 
 test('conversation messages trigger push notifications after successful send', () => {
