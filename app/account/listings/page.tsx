@@ -728,62 +728,85 @@ export default function AccountListingsPage() {
   );
 
   const uploadListingImage = useCallback(
-    async (listing: ListingCard, file: File | null) => {
-      if (!file) {
+    async (listing: ListingCard, files: File[]) => {
+      if (files.length === 0) {
         return;
+      }
+
+      const remainingImageSlots = Math.max(8 - listing.images.length, 0);
+      if (remainingImageSlots === 0) {
+        setEditingListingId(listing.id);
+        setEditForm(createEditFormFromListing(listing));
+        setEditNotice({
+          listingId: listing.id,
+          tone: 'warning',
+          message: 'وصل الإعلان إلى الحد الأقصى (8 صور). احذف صورة قبل تحميل صورة جديدة.',
+        });
+        return;
+      }
+
+      const filesToUpload = files.slice(0, remainingImageSlots);
+      if (files.length > remainingImageSlots) {
+        setEditNotice({
+          listingId: listing.id,
+          tone: 'warning',
+          message: `سيتم تحميل ${remainingImageSlots} صورة فقط لإكمال الحد الأقصى البالغ 8 صور.`,
+        });
       }
 
       setUploadingListingId(listing.id);
 
       try {
-        const formData = new FormData();
-        formData.append('image', await createUploadableImageFile(file));
+        for (const file of filesToUpload) {
+          const formData = new FormData();
+          formData.append('image', await createUploadableImageFile(file));
 
-        const response = await fetch(
-          `/api/marketplace/listings/${listing.id}/images`,
-          {
-            method: 'POST',
-            headers: {
-              'Idempotency-Key': createClientIdempotencyKey('listing-image-upload'),
+          const response = await fetch(
+            `/api/marketplace/listings/${listing.id}/images`,
+            {
+              method: 'POST',
+              headers: {
+                'Idempotency-Key': createClientIdempotencyKey('listing-image-upload'),
+              },
+              body: formData,
             },
-            body: formData,
-          },
-        );
+          );
 
-        if (response.status === 401) {
-          router.push('/api/auth/google/start');
-          return;
-        }
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            message?: string;
-            maxImages?: number;
-          } | null;
-
-          if (payload?.error === 'listing_image_limit_reached') {
-            setEditingListingId(listing.id);
-            setEditForm(createEditFormFromListing(listing));
-            setEditNotice({
-              listingId: listing.id,
-              tone: 'warning',
-              message:
-                payload.message ??
-                `وصل الإعلان إلى الحد الأقصى (${payload.maxImages ?? 8}) من الصور. احذف صورة قديمة قبل رفع صورة جديدة.`,
-            });
+          if (response.status === 401) {
+            router.push('/api/auth/google/start');
             return;
           }
 
-          window.alert(
-            payload?.message ??
-              payload?.error ??
-              'تعذر رفع الصورة. تأكد من إعداد تخزين الصور ثم حاول مرة أخرى.',
-          );
-          return;
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => null)) as {
+              error?: string;
+              message?: string;
+              maxImages?: number;
+            } | null;
+
+            if (payload?.error === 'listing_image_limit_reached') {
+              setEditingListingId(listing.id);
+              setEditForm(createEditFormFromListing(listing));
+              setEditNotice({
+                listingId: listing.id,
+                tone: 'warning',
+                message:
+                  payload.message ??
+                  `وصل الإعلان إلى الحد الأقصى (${payload.maxImages ?? 8}) من الصور. احذف صورة قديمة قبل رفع صورة جديدة.`,
+              });
+              return;
+            }
+
+            window.alert(
+              payload?.message ??
+                payload?.error ??
+                'تعذر رفع الصورة. تأكد من إعداد تخزين الصور ثم حاول مرة أخرى.',
+            );
+            return;
+          }
         }
 
-        void refreshListings(1);
+        await refreshListings(1);
       } catch {
         window.alert(
           'تعذر تجهيز الصورة. جرّب صورة JPG أو PNG أو WEBP أو GIF واضحة، أو أعد التقاطها من الكاميرا.',
@@ -1255,15 +1278,16 @@ export default function AccountListingsPage() {
                         <Button asChild size="sm" variant="outline" className="rounded-md">
                           <label>
                             <Upload className="size-3.5" />
-                            {uploadingListingId === listing.id ? 'رفع...' : 'صورة'}
+                            {uploadingListingId === listing.id ? 'جاري التحميل...' : 'تحميل الصور'}
                             <input
                               accept="image/*"
                               className="sr-only"
                               disabled={uploadingListingId === listing.id}
+                              multiple
                               name={`listing-${listing.id}-image`}
                               onChange={(event) => {
-                                const file = event.currentTarget.files?.[0] ?? null;
-                                void uploadListingImage(listing, file);
+                                const files = Array.from(event.currentTarget.files ?? []);
+                                void uploadListingImage(listing, files);
                                 event.currentTarget.value = '';
                               }}
                               type="file"
@@ -1276,11 +1300,11 @@ export default function AccountListingsPage() {
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'pause')}>
                           <Pause className="size-3.5" />
-                          إيقاف
+                          إيقاف النشر
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'mark_sold')}>
                           <CheckCircle2 className="size-3.5" />
-                          بيع
+                          تم البيع
                         </Button>
                         {listing.rawStatus === 'sold' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md border-blue-500/40 text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-400/10">
@@ -1292,7 +1316,7 @@ export default function AccountListingsPage() {
                         )}
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'delete')}>
                           <Trash2 className="size-3.5" />
-                          حذف
+                          حذف الإعلان
                         </Button>
                       </div>
                       </article>

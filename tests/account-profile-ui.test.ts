@@ -250,6 +250,23 @@ test('customer listings explain drafts and keep image management lightweight', (
   assert.doesNotMatch(listingsPage, /stats\.sold/);
 });
 
+test('customer listings support an eight-image batch and use explicit action labels', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /multiple/);
+  assert.match(listingsPage, /Array\.from\(event\.currentTarget\.files \?\? \[\]\)/);
+  assert.match(listingsPage, /Math\.max\(8 - listing\.images\.length, 0\)/);
+  assert.match(listingsPage, /files\.slice\(0, remainingImageSlots\)/);
+  assert.match(listingsPage, /for \(const file of filesToUpload\)/);
+  assert.match(listingsPage, /تحميل الصور/);
+  assert.match(listingsPage, /إيقاف النشر/);
+  assert.match(listingsPage, /تم البيع/);
+  assert.match(listingsPage, /حذف الإعلان/);
+});
+
 test('account page does not flash sign-in controls while session is loading', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const sessionHook = readFileSync(
