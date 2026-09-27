@@ -22,7 +22,6 @@ import {
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
-  Bell,
   Bot,
   Heart,
   ImageIcon,
@@ -65,6 +64,7 @@ import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
+import { PushNotificationSettings } from '@/components/push-notification-settings';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -88,7 +88,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 import { cn } from '@/lib/utils';
 import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
@@ -3628,20 +3627,9 @@ export default function Page() {
             </nav>
 
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button asChild size="icon-sm" variant="ghost" className="hidden sm:inline-flex">
-                    <Link
-                      aria-label="الإشعارات"
-                      href="/account#notifications"
-                      onClick={closeAssistantForNavigation}
-                    >
-                      <Bell className="size-4" />
-                    </Link>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>الإشعارات</TooltipContent>
-              </Tooltip>
+              {session.authenticated ? (
+                <PushNotificationSettings variant="icon" />
+              ) : null}
               <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <>

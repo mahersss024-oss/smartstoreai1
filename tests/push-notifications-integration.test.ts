@@ -28,7 +28,19 @@ test('account page exposes push notifications as an opt-in setting', () => {
   assert.match(settings, /Notification\.requestPermission/);
   assert.match(settings, /pushManager\.subscribe/);
   assert.match(settings, /\/api\/push\/subscribe/);
+  assert.match(settings, /variant\?: 'panel' \| 'icon'/);
+  assert.match(settings, /variant === 'icon'/);
+  assert.match(settings, /isActive \? disableNotifications\(\) : enableNotifications\(\)/);
+  assert.match(accountPage, /<PushNotificationSettings \/>/);
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
+});
+
+test('home notification bell is shown only to signed-in users and toggles directly', () => {
+  const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
+
+  assert.match(homePage, /session\.authenticated \? \(/);
+  assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
+  assert.doesNotMatch(homePage, /href="\/account#notifications"/);
 });
 
 test('conversation messages trigger push notifications after successful send', () => {

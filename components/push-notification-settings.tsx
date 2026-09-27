@@ -46,7 +46,11 @@ function detectPushPlatform() {
   return 'web';
 }
 
-export function PushNotificationSettings() {
+export function PushNotificationSettings({
+  variant = 'panel',
+}: {
+  variant?: 'panel' | 'icon';
+}) {
   const [state, setState] = useState<PushState>('checking');
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -206,6 +210,34 @@ export function PushNotificationSettings() {
         : state === 'blocked'
           ? 'الإشعارات محظورة من إعدادات المتصفح.'
           : 'تصل الإشعارات عند وصول رسالة جديدة في محادثاتك.';
+
+  if (variant === 'icon') {
+    const iconLabel =
+      state === 'checking'
+        ? 'جار التحقق من الإشعارات'
+        : state === 'working'
+          ? 'جار تحديث الإشعارات'
+          : isActive
+            ? 'إيقاف إشعارات الرسائل'
+            : 'تفعيل إشعارات الرسائل';
+
+    return (
+      <Button
+        aria-label={iconLabel}
+        className="hidden sm:inline-flex"
+        disabled={disabled}
+        onClick={() =>
+          void (isActive ? disableNotifications() : enableNotifications())
+        }
+        size="icon-sm"
+        title={notice ?? iconLabel}
+        type="button"
+        variant="ghost"
+      >
+        {isActive ? <Bell className="size-4 text-blue-600" /> : <BellOff className="size-4" />}
+      </Button>
+    );
+  }
 
   return (
     <section
