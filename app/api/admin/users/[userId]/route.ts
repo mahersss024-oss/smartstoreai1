@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -17,7 +18,42 @@ const maxAdminUserUpdateBytes = 2 * 1024;
 const adminUserUpdateSchema = z.object({
   role: z.enum(['user', 'moderator', 'admin']).optional(),
   phoneNumber: z.unknown().optional(),
+  accountStatus: z.literal('active').optional(),
 });
+
+type StoredUserImage = {
+  id: string;
+  originalUrl: string;
+  displayUrl: string;
+  thumbnailUrl: string;
+};
+
+async function deleteUserImagesBestEffort(
+  userId: string,
+  profilePicture: string | null,
+  listingImages: StoredUserImage[],
+) {
+  const objects = [
+    ...(profilePicture
+      ? [{ imageId: `profile:${userId}`, urls: [profilePicture] }]
+      : []),
+    ...listingImages.map((image) => ({
+      imageId: image.id,
+      urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
+    })),
+  ];
+
+  await Promise.all(
+    objects.map(async (object) => {
+      try {
+        await deleteListingObject(object);
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[admin_user_image_storage_delete] failure=${errorName}`);
+      }
+    }),
+  );
+}
 
 type RouteContext = {
   params: Promise<{
@@ -139,7 +175,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (
     parsed.data.role === undefined &&
-    !Object.hasOwn(parsed.data, 'phoneNumber')
+    !Object.hasOwn(parsed.data, 'phoneNumber') &&
+    parsed.data.accountStatus === undefined
   ) {
     return Response.json({ error: 'empty_update' }, { status: 400 });
   }
@@ -154,13 +191,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-    const isOwner = isPlatformOwner(session);
+  const isOwner = isPlatformOwner(session);
 
   if (parsed.data.role !== undefined && !isOwner) {
     return Response.json(
       {
         error: 'owner_required',
         message: 'Only the platform owner can change user roles.',
+      },
+      { status: 403, headers: noStoreHeaders },
+    );
+  }
+
+  if (parsed.data.accountStatus !== undefined && !isOwner) {
+    return Response.json(
+      {
+        error: 'owner_required',
+        message: 'Only the platform owner can reactivate accounts.',
       },
       { status: 403, headers: noStoreHeaders },
     );
@@ -231,6 +278,8 @@ export async function PATCH(request: Request, context: RouteContext) {
             ? now
             : null
           : undefined,
+        deletedAt:
+          parsed.data.accountStatus === 'active' ? null : undefined,
       },
     });
 
@@ -249,6 +298,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           updates: {
             role: parsed.data.role,
             phoneNumber: phoneValidation?.phoneNumber,
+            accountStatus: parsed.data.accountStatus,
           },
         },
       },
@@ -321,14 +371,36 @@ export async function DELETE(request: Request, context: RouteContext) {
     );
   }
 
+  const requestedMode = new URL(request.url).searchParams.get('mode') ?? 'soft';
+
+  if (requestedMode !== 'soft' && requestedMode !== 'permanent') {
+    return Response.json(
+      { error: 'invalid_delete_mode' },
+      { status: 400, headers: noStoreHeaders },
+    );
+  }
+
   const existing = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       email: true,
+      picture: true,
       role: true,
       phoneNumber: true,
       deletedAt: true,
+      listings: {
+        select: {
+          images: {
+            select: {
+              id: true,
+              originalUrl: true,
+              displayUrl: true,
+              thumbnailUrl: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -361,7 +433,31 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const isOwner = isPlatformOwner(session);
-  const deleteMode = isOwner ? 'permanent' : 'soft';
+
+  if (requestedMode === 'permanent' && !isOwner) {
+    return Response.json(
+      {
+        error: 'owner_required',
+        message: 'Only the platform owner can permanently delete accounts.',
+      },
+      { status: 403, headers: noStoreHeaders },
+    );
+  }
+
+  if (requestedMode === 'permanent' && !existing.deletedAt) {
+    return Response.json(
+      {
+        error: 'account_must_be_disabled_first',
+        message: 'The account must be disabled before permanent deletion.',
+      },
+      { status: 409, headers: noStoreHeaders },
+    );
+  }
+
+  const deleteMode = requestedMode;
+  const storedListingImages = existing.listings.flatMap(
+    (listing) => listing.images,
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.adminAuditLog.create({
@@ -392,6 +488,14 @@ export async function DELETE(request: Request, context: RouteContext) {
       data: { deletedAt: existing.deletedAt ?? new Date() },
     });
   });
+
+  if (deleteMode === 'permanent') {
+    await deleteUserImagesBestEffort(
+      existing.id,
+      existing.picture,
+      storedListingImages,
+    );
+  }
 
   return Response.json(
     {

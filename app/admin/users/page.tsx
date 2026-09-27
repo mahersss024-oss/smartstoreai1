@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  ExternalLink,
   MessageCircle,
   Percent,
   Phone,
@@ -106,6 +107,7 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [userAction, setUserAction] = useState<'disable' | 'restore' | 'permanent' | null>(null);
 
   const totalUsers = pagination?.total ?? users.length;
   const usersWithPhone = useMemo(
@@ -315,20 +317,24 @@ export default function AdminUsersPage() {
   );
 
   const deleteUser = useCallback(
-    async (user: AdminUserRecord) => {
+    async (user: AdminUserRecord, mode: 'soft' | 'permanent') => {
+      const isPermanent = mode === 'permanent';
       if (
         !window.confirm(
-          `هل تؤكد حذف المستخدم ${user.email}؟ سيتم حذف بياناته المرتبطة بالحساب من المنصة.`,
+          isPermanent
+            ? `هل تؤكد الحذف النهائي للمستخدم ${user.email}؟ سيتم حذف الحساب وبياناته وصور إعلاناته نهائيًا ولا يمكن التراجع.`
+            : `هل تؤكد تعطيل حساب ${user.email}؟ سيفقد المستخدم الوصول مع الاحتفاظ ببياناته للمراجعة ويمكن إعادة تفعيله لاحقًا.`,
         )
       ) {
         return;
       }
 
       setDeletingUserId(user.id);
+      setUserAction(isPermanent ? 'permanent' : 'disable');
       setNotice('');
 
       try {
-        const response = await fetch(`/api/admin/users/${user.id}`, {
+        const response = await fetch(`/api/admin/users/${user.id}?mode=${mode}`, {
           method: 'DELETE',
         });
         const payload = (await response.json().catch(() => null)) as {
@@ -345,25 +351,79 @@ export default function AdminUsersPage() {
           setNotice(
             payload?.message ??
               payload?.error ??
-              'تعذر حذف المستخدم الآن.',
+              isPermanent
+                ? 'تعذر حذف المستخدم نهائيًا.'
+                : 'تعذر تعطيل الحساب الآن.',
           );
           return;
         }
 
         setUsers((currentUsers) =>
-          currentUsers.filter((currentUser) => currentUser.id !== user.id),
+          mode === 'soft' && isOwner
+            ? currentUsers.map((currentUser) =>
+                currentUser.id === user.id
+                  ? { ...currentUser, deletedAt: new Date().toISOString() }
+                  : currentUser,
+              )
+            : currentUsers.filter((currentUser) => currentUser.id !== user.id),
         );
         setDrafts((currentDrafts) => {
           const nextDrafts = { ...currentDrafts };
           delete nextDrafts[user.id];
           return nextDrafts;
         });
-        setNotice('تم حذف المستخدم من المنصة.');
+        setNotice(
+          isPermanent
+            ? 'تم حذف المستخدم وبياناته نهائيًا.'
+            : 'تم تعطيل حساب المستخدم مع الاحتفاظ ببياناته.',
+        );
       } finally {
         setDeletingUserId(null);
+        setUserAction(null);
       }
     },
-    [router],
+    [isOwner, router],
+  );
+
+  const restoreUser = useCallback(
+    async (user: AdminUserRecord) => {
+      if (!window.confirm(`هل تريد إعادة تفعيل حساب ${user.email}؟`)) {
+        return;
+      }
+
+      setDeletingUserId(user.id);
+      setUserAction('restore');
+      setNotice('');
+
+      try {
+        const response = await fetch(`/api/admin/users/${user.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountStatus: 'active' }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          user?: AdminUserRecord;
+          message?: string;
+          error?: string;
+        } | null;
+
+        if (!response.ok || !payload?.user) {
+          setNotice(payload?.message ?? payload?.error ?? 'تعذر إعادة تفعيل الحساب.');
+          return;
+        }
+
+        setUsers((currentUsers) =>
+          currentUsers.map((currentUser) =>
+            currentUser.id === user.id ? payload.user! : currentUser,
+          ),
+        );
+        setNotice('تمت إعادة تفعيل حساب المستخدم.');
+      } finally {
+        setDeletingUserId(null);
+        setUserAction(null);
+      }
+    },
+    [],
   );
 
   return (
@@ -480,15 +540,19 @@ export default function AdminUsersPage() {
               const isOwnerAccount = user.role === 'owner';
               const isSoftDeleted = Boolean(user.deletedAt);
               const canChangeRole = isOwner && !isOwnerAccount;
-              const canDelete =
+              const canDisable =
                 !isOwnerAccount &&
+                !isSoftDeleted &&
                 (isOwner || user.role !== 'admin');
               const isBusy = isSaving || isDeleting;
 
               return (
                 <article key={user.id} className="grid gap-3 border-b border-slate-200/70 py-3 last:border-b-0 dark:border-white/10">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
+                    <Link
+                      className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                      href={`/sellers/${encodeURIComponent(user.id)}`}
+                    >
                       <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                         <SellerAvatar
                           alt={user.name ?? user.email}
@@ -503,7 +567,7 @@ export default function AdminUsersPage() {
                           {user.id}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                     <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                       {isSoftDeleted
                         ? 'حساب معطّل'
@@ -604,22 +668,52 @@ export default function AdminUsersPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <ShieldCheck className="size-4 text-blue-600" />
-                      أي تعديل إداري يتم تسجيله في سجل الإدارة.
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <ShieldCheck className="size-4 text-blue-600" />
+                        أي تعديل إداري يتم تسجيله في سجل الإدارة.
+                      </div>
+                      <Button asChild className="rounded-md" size="sm" variant="outline">
+                        <Link href={`/sellers/${encodeURIComponent(user.id)}`}>
+                          <ExternalLink className="size-4" />
+                          عرض صفحة المعلن
+                        </Link>
+                      </Button>
                     </div>
-                    {canDelete && (
+                    {canDisable && (
                       <Button
                         className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
                         disabled={isBusy}
-                        onClick={() => void deleteUser(user)}
+                        onClick={() => void deleteUser(user, 'soft')}
                         type="button"
                         variant="outline"
                       >
                         <Trash2 className="size-4" />
-                        {isDeleting ? 'جار الحذف...' : 'حذف المستخدم'}
+                        {isDeleting && userAction === 'disable' ? 'جار التعطيل...' : 'تعطيل الحساب'}
                       </Button>
                     )}
+                    {isOwner && isSoftDeleted && !isOwnerAccount ? (
+                      <Button
+                        className="rounded-md"
+                        disabled={isBusy}
+                        onClick={() => void restoreUser(user)}
+                        type="button"
+                        variant="outline"
+                      >
+                        {isDeleting && userAction === 'restore' ? 'جار التفعيل...' : 'إعادة تفعيل الحساب'}
+                      </Button>
+                    ) : null}
+                    {isOwner && isSoftDeleted && !isOwnerAccount ? (
+                      <Button
+                        className="rounded-md border-red-600 bg-red-600 text-white hover:bg-red-700"
+                        disabled={isBusy}
+                        onClick={() => void deleteUser(user, 'permanent')}
+                        type="button"
+                      >
+                        <Trash2 className="size-4" />
+                        {isDeleting && userAction === 'permanent' ? 'جار الحذف النهائي...' : 'حذف نهائي'}
+                      </Button>
+                    ) : null}
                     <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
                       disabled={isBusy || isOwnerAccount}

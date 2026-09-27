@@ -251,6 +251,10 @@ test('admin users api is server-side admin protected and audited', () => {
   assert.match(updateRoute, /update_user/);
   assert.match(updateRoute, /delete_user/);
   assert.match(updateRoute, /adminAuditLog\.create/);
+  assert.match(updateRoute, /requestedMode === 'permanent' && !isOwner/);
+  assert.match(updateRoute, /account_must_be_disabled_first/);
+  assert.match(updateRoute, /deleteUserImagesBestEffort/);
+  assert.match(updateRoute, /deleteListingObject/);
 });
 
 test('admin listing mutations are server-side protected and rate limited', () => {
@@ -568,6 +572,8 @@ test('the users page hides role changes and protects the owner account', () => {
   assert.match(page, /canChangeRole/);
   assert.match(page, /isOwnerAccount/);
   assert.match(page, /حساب مالك المنصة محميّ/);
+  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(user\.id\)\}`\}/);
+  assert.match(page, /عرض صفحة المعلن/);
 });
 
 test('scoped admin roles are enforced consistently by pages and APIs', () => {
@@ -629,6 +635,10 @@ test('soft-deleted accounts remain visible to the owner and lose API access', ()
   assert.match(proxy, /select: \{ deletedAt: true \}/);
   assert.match(proxy, /clearSessionCookie/);
   assert.match(sessionRoute, /profile\.deletedAt/);
+  assert.match(usersPage, /تعطيل الحساب/);
+  assert.match(usersPage, /إعادة تفعيل الحساب/);
+  assert.match(usersPage, /حذف نهائي/);
+  assert.match(usersPage, /accountStatus: 'active'/);
 });
 
 test('admin dashboard admits moderators and renders a scoped moderator view', () => {
