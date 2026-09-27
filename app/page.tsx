@@ -64,6 +64,7 @@ import {
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
+import { CitySelector } from '@/components/city-selector';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -84,14 +85,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/tooltip';
 import { cn } from '@/lib/utils';
 import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
+import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
 
 type LocationSettings = {
   country: 'SA';
@@ -861,154 +861,7 @@ const defaultManualListingForm: ManualListingForm = {
   condition: 'used',
 };
 
-const saudiMarketplaceCities = [
-  'الرياض',
-  'الدرعية',
-  'الخرج',
-  'الدوادمي',
-  'المجمعة',
-  'القويعية',
-  'الأفلاج',
-  'وادي الدواسر',
-  'الزلفي',
-  'شقراء',
-  'حوطة بني تميم',
-  'عفيف',
-  'السليل',
-  'ضرما',
-  'المزاحمية',
-  'رماح',
-  'ثادق',
-  'حريملاء',
-  'الحريق',
-  'الغاط',
-  'مكة المكرمة',
-  'جدة',
-  'الطائف',
-  'القنفذة',
-  'الليث',
-  'رابغ',
-  'الجموم',
-  'خليص',
-  'الكامل',
-  'الخرمة',
-  'رنية',
-  'تربة',
-  'المويه',
-  'ميسان',
-  'أضم',
-  'العرضيات',
-  'بحرة',
-  'المدينة المنورة',
-  'ينبع',
-  'العلا',
-  'المهد',
-  'الحناكية',
-  'بدر',
-  'خيبر',
-  'العيص',
-  'وادي الفرع',
-  'الدمام',
-  'الخبر',
-  'الظهران',
-  'الأحساء',
-  'القطيف',
-  'الجبيل',
-  'حفر الباطن',
-  'الخفجي',
-  'رأس تنورة',
-  'بقيق',
-  'النعيرية',
-  'قرية العليا',
-  'العديد',
-  'بريدة',
-  'عنيزة',
-  'الرس',
-  'المذنب',
-  'البكيرية',
-  'البدائع',
-  'الأسياح',
-  'النبهانية',
-  'عيون الجواء',
-  'رياض الخبراء',
-  'الشماسية',
-  'عقلة الصقور',
-  'ضرية',
-  'أبها',
-  'خميس مشيط',
-  'بيشة',
-  'النماص',
-  'محايل عسير',
-  'ظهران الجنوب',
-  'تثليث',
-  'سراة عبيدة',
-  'رجال ألمع',
-  'بلقرن',
-  'أحد رفيدة',
-  'المجاردة',
-  'البرك',
-  'بارق',
-  'تنومة',
-  'طريب',
-  'حائل',
-  'بقعاء',
-  'الغزالة',
-  'الشنان',
-  'الحائط',
-  'السليمي',
-  'الشملي',
-  'موقق',
-  'سميراء',
-  'تبوك',
-  'الوجه',
-  'ضباء',
-  'تيماء',
-  'أملج',
-  'حقل',
-  'البدع',
-  'جازان',
-  'صبيا',
-  'أبو عريش',
-  'صامطة',
-  'بيش',
-  'الدرب',
-  'الحرث',
-  'ضمد',
-  'الريث',
-  'فرسان',
-  'الدائر',
-  'العارضة',
-  'أحد المسارحة',
-  'العيدابي',
-  'فيفاء',
-  'الطوال',
-  'هروب',
-  'نجران',
-  'شرورة',
-  'حبونا',
-  'بدر الجنوب',
-  'يدمة',
-  'ثار',
-  'خباش',
-  'الباحة',
-  'بلجرشي',
-  'المندق',
-  'المخواة',
-  'قلوة',
-  'العقيق',
-  'القرى',
-  'غامد الزناد',
-  'الحجرة',
-  'بني حسن',
-  'سكاكا',
-  'القريات',
-  'دومة الجندل',
-  'طبرجل',
-  'عرعر',
-  'رفحاء',
-  'طريف',
-  'العويقيلة',
-] satisfies string[];
+// Shared with every city selector so listing creation, editing, and search stay aligned.
 
 function marketplaceCityCoordinate(
   city: string,
@@ -3951,26 +3804,20 @@ export default function Page() {
                         }
                       />
                     </label>
-                    <label className="grid gap-1 text-xs font-semibold">
+                    <div className="grid gap-1 text-xs font-semibold">
                       المدينة
-                      <select
-                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                      <CitySelector
+                        className="font-normal"
+                        name="manual-listing-city"
                         value={manualListingForm.city}
-                        onChange={(event) =>
+                        onValueChange={(city) =>
                           setManualListingForm((form) => ({
                             ...form,
-                            city: event.target.value,
+                            city,
                           }))
                         }
-                      >
-                        <option value="">اختر المدينة</option>
-                        {saudiMarketplaceCities.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      />
+                    </div>
                     <label className="grid gap-1 text-xs font-semibold">
                       التصنيف
                       <select
@@ -4210,47 +4057,15 @@ export default function Page() {
                       </Button>
                     )}
                   </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 justify-between rounded-md bg-background px-3 text-right font-normal"
-                      >
-                        <MapPin className="size-4 shrink-0 text-blue-600" />
-                        <span className="min-w-0 flex-1 truncate">
-                          {activeMarketCity === 'all'
-                            ? 'كل المناطق'
-                            : activeMarketCity}
-                        </span>
-                        <ChevronLeft className="size-4 shrink-0 text-muted-foreground" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="max-h-80 w-[min(20rem,calc(100vw-2rem))] overflow-y-auto text-right"
-                    >
-                      <DropdownMenuLabel>المناطق</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup
-                        value={activeMarketCity}
-                        onValueChange={(value) => {
-                          setSelectedMarketCity(value);
-                          setNearbyMarketplaceCity(null);
-                          setNearbyMarketplaceNotice('');
-                        }}
-                      >
-                        <DropdownMenuRadioItem value="all">
-                          كل المناطق
-                        </DropdownMenuRadioItem>
-                        {saudiMarketplaceCities.map((city) => (
-                          <DropdownMenuRadioItem key={city} value={city}>
-                            {city}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <CitySelector
+                    allValue="all"
+                    value={activeMarketCity}
+                    onValueChange={(value) => {
+                      setSelectedMarketCity(value);
+                      setNearbyMarketplaceCity(null);
+                      setNearbyMarketplaceNotice('');
+                    }}
+                  />
                   <Button
                     type="button"
                     variant={

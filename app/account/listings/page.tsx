@@ -26,6 +26,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
+import { CitySelector } from '@/components/city-selector';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -1083,16 +1084,15 @@ export default function AccountListingsPage() {
                             value={editForm.description}
                           />
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <input
-                              className="h-10 rounded-md border bg-white px-3 text-sm outline-none focus:border-blue-500 dark:bg-card"
+                            <CitySelector
+                              className="[&_button]:bg-white dark:[&_button]:bg-card"
                               name={`listing-${listing.id}-city`}
-                              onChange={(event) =>
+                              onValueChange={(city) =>
                                 setEditForm((current) => ({
                                   ...current,
-                                  city: event.target.value,
+                                  city,
                                 }))
                               }
-                              placeholder="المدينة"
                               value={editForm.city}
                             />
                             <select

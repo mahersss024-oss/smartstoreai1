@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { CitySelector } from '@/components/city-selector';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -193,7 +194,7 @@ function AdminListingCard({
       <div className="grid gap-2 lg:grid-cols-4">
         <Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
         <Input disabled={!canManageListings} name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
-        <Input disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onChange={(event) => onUpdateDraft(listing.id, { city: event.target.value })} placeholder="المدينة" />
+        <CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} />
         <Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
       </div>
 

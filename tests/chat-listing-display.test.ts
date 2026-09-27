@@ -96,8 +96,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /marketplaceSearchQuery/);
   assert.match(homePage, /params\.set\('q', effectiveQuery\.trim\(\)\)/);
   assert.match(homePage, /placeholder="ابحث في كل السوق"/);
-  assert.match(homePage, /DropdownMenuRadioGroup/);
-  assert.match(homePage, /DropdownMenuRadioItem value="all"/);
+  assert.match(homePage, /<CitySelector/);
+  assert.match(homePage, /allValue="all"/);
   assert.match(homePage, /selectedMarketSubcategory/);
   assert.match(homePage, /manuallyFilteredMarketplaceListings/);
   assert.match(homePage, /isManualListingVisible/);
@@ -134,6 +134,20 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(globalCss, /smart-assistant-results-panel-in/);
   assert.match(globalCss, /smart-assistant-result-card-in/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);
+});
+
+test('city selection supports search after opening everywhere it is used', () => {
+  const selector = readProjectFile('components', 'city-selector.tsx');
+  const accountListings = readProjectFile('app', 'account', 'listings', 'page.tsx');
+  const adminListings = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(selector, /\{isOpen \? \(/);
+  assert.match(selector, /placeholder="ابحث عن مدينة"/);
+  assert.match(selector, /max-h-64 overflow-y-auto/);
+  assert.match(selector, /normalizeArabicSearch/);
+  assert.match(selector, /saudiMarketplaceCities/);
+  assert.match(accountListings, /<CitySelector/);
+  assert.match(adminListings, /<CitySelector/);
 });
 
 test('prevents page-level horizontal panning on all viewports', () => {
