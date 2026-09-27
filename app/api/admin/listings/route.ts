@@ -106,7 +106,6 @@ export async function GET(request: Request) {
         seller: { select: { email: true, name: true } },
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 3,
           select: { id: true, thumbnailUrl: true, isPrimary: true },
         },
       },

@@ -284,6 +284,16 @@ test('moderators can view admin listings without listing mutation controls', () 
   assert.match(page, /\{canManageListings && \(/);
 });
 
+test('admin listings return every listing image instead of a partial preview', () => {
+  const route = readProjectFile('app', 'api', 'admin', 'listings', 'route.ts');
+  const page = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(route, /images:\s*\{[\s\S]*orderBy: \[\{ isPrimary: 'desc' \}, \{ createdAt: 'asc' \}\]/);
+  assert.doesNotMatch(route, /images:\s*\{[\s\S]{0,160}take: 3/);
+  assert.match(page, /listing\.images\.map\(\(image\) =>/);
+  assert.match(page, /overflow-x-auto/);
+});
+
 test('account page shows the admin dashboard to the owner and appointed admins', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 
