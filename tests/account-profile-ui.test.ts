@@ -19,7 +19,10 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /URL\.createObjectURL\(file\)/);
   assert.match(page, /visibleProfilePicture/);
   assert.match(page, /SellerAvatar/);
-  assert.match(page, /رفع صورة عرض الحساب/);
+  assert.match(page, /رفع صورة العرض/);
+  assert.match(page, /تغيير صورة العرض/);
+  assert.match(page, /إزالة صورة العرض/);
+  assert.match(page, /removeProfilePicture/);
   assert.doesNotMatch(page, /profilePictureUrl/);
   assert.doesNotMatch(page, /رابط صورة الحساب/);
   assert.doesNotMatch(page, /JPG أو PNG أو WEBP حتى 4MB/);
@@ -119,6 +122,22 @@ test('account profile picture replacement removes the previous stored profile im
   assert.match(route, /deletePreviousProfilePictureBestEffort/);
   assert.match(route, /deleteListingObject/);
   assert.match(route, /profile_picture_storage_delete/);
+});
+
+test('account profile picture removal clears the database and stored object', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'account', 'profile', 'picture', 'route.ts'),
+    'utf8',
+  );
+
+  assert.match(page, /fetch\('\/api\/account\/profile\/picture'/);
+  assert.match(page, /method: 'DELETE'/);
+  assert.match(page, /هل تريد إزالة صورة العرض من حسابك؟/);
+  assert.match(route, /export async function DELETE/);
+  assert.match(route, /account_profile_picture_delete/);
+  assert.match(route, /data: \{ picture: null \}/);
+  assert.match(route, /deletePreviousProfilePictureBestEffort\(user\.id, previousPicture\)/);
 });
 
 test('account page keeps listing management free of chat listing shortcuts', () => {

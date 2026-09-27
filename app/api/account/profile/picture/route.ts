@@ -201,3 +201,73 @@ export async function POST(request: Request) {
     { status: 201, headers: noStoreHeaders },
   );
 }
+
+export async function DELETE(request: Request) {
+  const session = getAuthSession(request);
+
+  if (!session) {
+    return Response.json(
+      {
+        error: 'auth_required',
+        message: 'Sign-in is required to remove account picture.',
+      },
+      { status: 401, headers: noStoreHeaders },
+    );
+  }
+
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'account_profile_picture_delete',
+    actorId: session.user.id,
+    maxRequests: 10,
+    windowMs: 60_000,
+  });
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  if (!shouldPersistUserProfile()) {
+    return Response.json(
+      {
+        error: 'profile_storage_unavailable',
+        message: 'Account profile storage is not configured.',
+      },
+      { status: 503, headers: noStoreHeaders },
+    );
+  }
+
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: session.user.id }, { email: session.user.email }],
+    },
+  });
+
+  if (!existingUser) {
+    return Response.json(
+      { error: 'account_not_found' },
+      { status: 404, headers: noStoreHeaders },
+    );
+  }
+
+  const previousPicture = existingUser.picture;
+  const user = await prisma.user.update({
+    where: { id: existingUser.id },
+    data: { picture: null },
+  });
+
+  await deletePreviousProfilePictureBestEffort(user.id, previousPicture);
+
+  return Response.json(
+    {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? undefined,
+        picture: undefined,
+        role: user.role,
+        phoneNumber: user.phoneNumber ?? undefined,
+      },
+    },
+    { headers: noStoreHeaders },
+  );
+}

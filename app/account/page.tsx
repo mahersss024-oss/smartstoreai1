@@ -56,6 +56,7 @@ export default function AccountPage() {
   const [profileNotice, setProfileNotice] = useState<ProfileNotice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  const [isRemovingProfilePicture, setIsRemovingProfilePicture] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const { hasConversationAlert } = useConversationMessageAlert({
     userId: session.user?.id ?? null,
@@ -303,6 +304,68 @@ export default function AccountPage() {
       });
     } finally {
       setIsUploadingProfilePicture(false);
+    }
+  }, [router, setSession]);
+
+  const removeProfilePicture = useCallback(async () => {
+    if (!window.confirm('هل تريد إزالة صورة العرض من حسابك؟')) {
+      return;
+    }
+
+    setIsRemovingProfilePicture(true);
+    setProfileNotice(null);
+
+    try {
+      const response = await fetch('/api/account/profile/picture', {
+        method: 'DELETE',
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        user?: AuthUser;
+        message?: string;
+        error?: string;
+      } | null;
+
+      if (response.status === 401) {
+        router.push('/api/auth/google/start');
+        return;
+      }
+
+      if (!response.ok || !payload?.user) {
+        setProfileNotice({
+          tone: 'danger',
+          message:
+            payload?.message ??
+            payload?.error ??
+            'تعذر إزالة صورة الحساب الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setProfilePicturePreview((currentPreview) => {
+        if (currentPreview) {
+          URL.revokeObjectURL(currentPreview);
+        }
+
+        return '';
+      });
+      setProfilePicture('');
+      setSession((currentSession) => ({
+        ...currentSession,
+        user: currentSession.user
+          ? { ...currentSession.user, ...payload.user, picture: undefined }
+          : payload.user ?? null,
+      }));
+      setProfileNotice({
+        tone: 'success',
+        message: 'تمت إزالة صورة الحساب بنجاح.',
+      });
+    } catch {
+      setProfileNotice({
+        tone: 'danger',
+        message: 'تعذر إزالة صورة الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
+      });
+    } finally {
+      setIsRemovingProfilePicture(false);
     }
   }, [router, setSession]);
 
@@ -576,13 +639,17 @@ export default function AccountPage() {
                 </div>
                 <div className="grid gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-semibold transition hover:bg-accent">
+                    <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-semibold transition hover:bg-accent has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
                       <Upload className="size-4" />
-                      {isUploadingProfilePicture ? 'جار رفع الصورة...' : 'رفع صورة عرض الحساب'}
+                      {isUploadingProfilePicture
+                        ? 'جار رفع الصورة...'
+                        : profilePicture
+                          ? 'تغيير صورة العرض'
+                          : 'رفع صورة العرض'}
                       <input
                         accept="image/jpeg,image/png,image/webp,image/gif"
                         className="sr-only"
-                        disabled={isUploadingProfilePicture}
+                        disabled={isUploadingProfilePicture || isRemovingProfilePicture}
                         name="profilePictureFile"
                         type="file"
                         onChange={(event) => {
@@ -592,12 +659,24 @@ export default function AccountPage() {
                         }}
                       />
                     </label>
+                    {profilePicture ? (
+                      <Button
+                        className="rounded-md"
+                        disabled={isUploadingProfilePicture || isRemovingProfilePicture}
+                        onClick={() => void removeProfilePicture()}
+                        type="button"
+                        variant="outline"
+                      >
+                        <Trash2 className="size-4 text-red-600" />
+                        {isRemovingProfilePicture ? 'جار إزالة الصورة...' : 'إزالة صورة العرض'}
+                      </Button>
+                    ) : null}
                   </div>
                   <label className="grid gap-1 text-sm font-semibold">
                     الاسم الظاهر
                     <input
                       className="h-11 rounded-md border bg-background px-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      disabled={isSavingProfile || isUploadingProfilePicture}
+                      disabled={isSavingProfile || isUploadingProfilePicture || isRemovingProfilePicture}
                       maxLength={80}
                       name="profileDisplayName"
                       placeholder="اسمك في سوق حمد"
@@ -612,6 +691,7 @@ export default function AccountPage() {
                       disabled={
                         isSavingProfile ||
                         isUploadingProfilePicture ||
+                        isRemovingProfilePicture ||
                         !hasProfileNameChanges
                       }
                       onClick={() => void saveProfile()}
@@ -625,6 +705,7 @@ export default function AccountPage() {
                       disabled={
                         isSavingProfile ||
                         isUploadingProfilePicture ||
+                        isRemovingProfilePicture ||
                         !hasProfileNameChanges
                       }
                       onClick={() => {
