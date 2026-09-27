@@ -224,7 +224,7 @@ test('sold listings expose a platform fee action after the sale marker', () => {
   assert.match(page, /\/commissions\?listingId=\$\{listing\.id\}/);
 });
 
-test('listing publish and sale amount require the commission oath agreement', () => {
+test('listing publish requires the commission oath agreement without repeating it for fee calculation', () => {
   const listingsPage = readFileSync(
     join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
     'utf8',
@@ -240,8 +240,9 @@ test('listing publish and sale amount require the commission oath agreement', ()
 
   assert.match(listingsPage, /pendingPublishListing/);
   assert.match(listingsPage, /mode="publish"/);
-  assert.match(commissionsPage, /pendingSaleAgreement/);
-  assert.match(commissionsPage, /mode="saleAmount"/);
+  assert.doesNotMatch(commissionsPage, /pendingSaleAgreement/);
+  assert.doesNotMatch(commissionsPage, /mode="saleAmount"/);
+  assert.doesNotMatch(commissionsPage, /CommissionAgreementDialog/);
   assert.match(agreementDialog, /أقسم بالله/);
   assert.match(agreementDialog, /أو بسببها/);
   assert.match(agreementDialog, /رسوم المنصة حق على المعلن/);
