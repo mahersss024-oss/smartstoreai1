@@ -1557,7 +1557,7 @@ function ListingCardView({
     return (
       <article
         className={cn(
-          'group grid w-full min-w-0 cursor-pointer grid-cols-[5.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[7.25rem_minmax(0,1fr)]',
+          'marketplace-listing-card group relative grid w-full min-w-0 cursor-pointer grid-cols-[5.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[7.25rem_minmax(0,1fr)]',
           '[contain-intrinsic-size:160px] [content-visibility:auto]',
           className,
         )}
@@ -1663,7 +1663,7 @@ function ListingCardView({
   return (
     <article
       className={cn(
-        'w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]',
+        'marketplace-listing-card relative w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]',
         '[contain-intrinsic-size:320px] [content-visibility:auto]',
         className,
       )}
@@ -3728,7 +3728,7 @@ export default function Page() {
   return (
     <main
       className={cn(
-        'min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden',
+        'marketplace-shell min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden',
         isCompactChatView && 'h-dvh overflow-hidden',
       )}
       dir="rtl"
@@ -3747,7 +3747,7 @@ export default function Page() {
       >
         <section
           className={cn(
-            'flex min-h-0 flex-col bg-white dark:bg-card',
+            'marketplace-panel flex min-h-0 flex-col bg-white dark:bg-card',
             isCompactChatView
               ? 'h-full rounded-none border-0 bg-transparent shadow-none dark:bg-transparent'
               : 'rounded-md border shadow-2xl shadow-slate-950/10 lg:overflow-hidden',
@@ -3829,7 +3829,7 @@ export default function Page() {
           >
             {!isCompactChatView && (
             <section
-              className={`min-w-0 border-b bg-[#eef4fb] p-3 dark:bg-background sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
+              className={`min-w-0 border-b bg-white/45 p-3 dark:bg-background/55 sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
                 isCompactViewport
                   ? 'pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))]'
                   : ''
@@ -3839,7 +3839,7 @@ export default function Page() {
             >
               <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-end md:text-right">
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
+                  <Button className="marketplace-primary-cta rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
                   أنشئ إعلانك مع حمد
                   </Button>
@@ -4191,7 +4191,7 @@ export default function Page() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="marketplace-filter-panel grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm sm:col-span-3">
                     <Search className="size-4 shrink-0 text-blue-600" />
                     <input
@@ -4394,7 +4394,7 @@ export default function Page() {
                 </div>
               )}
 
-              <div className="mb-3 flex items-center justify-end gap-3">
+              <div className="marketplace-section-title mb-3 flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2 text-base font-bold">
                   <Sparkles className="size-4 text-blue-600" />
                   {hasActiveAssistantSearch

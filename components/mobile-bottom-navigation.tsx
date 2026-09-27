@@ -159,7 +159,7 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all duration-200 dark:bg-card/95 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all duration-200 dark:bg-card/95 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
