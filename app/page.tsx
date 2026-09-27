@@ -226,20 +226,20 @@ const assistantBubbleDragThreshold = 8;
 const chatMaxAttachments = 8;
 const chatInputGroupStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '3rem minmax(0, 1fr) 3rem',
+  gridTemplateColumns: '2.75rem minmax(0, 1fr) 2.75rem',
   height: 'auto',
-  minHeight: '3.5rem',
+  minHeight: '3rem',
 };
 const chatInputTextAreaStyle: CSSProperties = {
   gridColumn: '2',
   gridRow: '2',
-  minHeight: '2.75rem',
+  minHeight: '2.5rem',
 };
 const chatSubmitButtonStyle: CSSProperties = {
   gridColumn: '1',
   gridRow: '2',
-  height: '2.5rem',
-  width: '2.5rem',
+  height: '2.25rem',
+  width: '2.25rem',
 };
 const chatAttachmentControlsStyle: CSSProperties = {
   gridColumn: '3',
@@ -506,13 +506,13 @@ function ChatAttachmentControls() {
 
   return (
     <div
-      className="m-2 flex h-11 items-center justify-end gap-1 self-end"
+      className="m-1 flex h-10 items-center justify-end gap-1 self-end"
       dir="ltr"
       style={chatAttachmentControlsStyle}
     >
       <Button
         aria-label="إرفاق صور المنتج"
-        className="size-10 rounded-2xl border border-border/80 bg-card text-primary shadow-sm hover:bg-accent hover:text-primary dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+        className="size-9 rounded-xl border border-border/80 bg-card text-primary shadow-sm hover:bg-accent hover:text-primary dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
         onClick={attachments.openFileDialog}
         size="icon-sm"
         type="button"
@@ -530,7 +530,7 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
   return (
     <Button
       aria-label={isBusy ? 'جار الإرسال' : 'إرسال'}
-      className="col-start-1 row-start-2 m-1.5 size-10 self-end rounded-xl bg-sky-400 text-slate-950 shadow-md shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
+      className="col-start-1 row-start-2 m-1 size-9 self-end rounded-xl bg-sky-400 text-slate-950 shadow-md shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
       disabled={isBusy}
       onPointerDown={(event) => event.preventDefault()}
       size="icon-sm"
@@ -538,11 +538,11 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
       type="submit"
     >
       {status === 'submitted' ? (
-        <Loader2 className="size-5 animate-spin" />
+        <Loader2 className="size-4 animate-spin" />
       ) : status === 'streaming' ? (
-        <Square className="size-4" />
+        <Square className="size-3.5" />
       ) : (
-        <SendHorizontal className="size-5" />
+        <SendHorizontal className="size-4" />
       )}
     </Button>
   );
@@ -1840,6 +1840,21 @@ export default function Page() {
 
     return `${status}-${filteredMessages.length}-${lastMessage?.id ?? 'empty'}-${lastTextLength}`;
   }, [filteredMessages, status]);
+  const assistantScrollWatchKey = useMemo(() => {
+    return [
+      scrollWatchKey,
+      isChatInputFocused ? 'focused' : 'blurred',
+      visualViewportFrame?.height ?? 'full',
+      visualViewportFrame?.offsetTop ?? 0,
+      isMobileChatViewOpen ? 'chat' : 'sheet',
+    ].join('-');
+  }, [
+    isChatInputFocused,
+    isMobileChatViewOpen,
+    scrollWatchKey,
+    visualViewportFrame?.height,
+    visualViewportFrame?.offsetTop,
+  ]);
   const latestSearchToolOutput = useMemo(
     () => getLatestSearchToolOutput(filteredMessages),
     [filteredMessages],
@@ -4362,7 +4377,10 @@ export default function Page() {
                   }}
                 >
                   <ConversationContent className="gap-4 px-4 py-5">
-                    <ConversationAutoScroll watchKey={scrollWatchKey} enabled />
+                    <ConversationAutoScroll
+                      watchKey={assistantScrollWatchKey}
+                      enabled
+                    />
                     {filteredMessages.length === 0 ? (
                       <div className="grid h-full place-items-center text-center">
                         <div className="grid max-w-xs gap-4">
@@ -4465,7 +4483,7 @@ export default function Page() {
               <div
                 ref={chatInputContainerRef}
                 data-testid="assistant-chat-input-container"
-                className="shrink-0 border-t p-2"
+                className="shrink-0 border-t p-1.5"
                 onBlur={handleChatInputBlur}
                 onFocus={handleChatInputFocus}
                 onPointerDown={handleChatInputPointerDown}
@@ -4475,7 +4493,7 @@ export default function Page() {
                   allowAttachments
                   className="mx-auto max-w-[52rem]"
                   dir="ltr"
-                  inputGroupClassName="items-end rounded-[1.65rem] border border-border/80 bg-card shadow-lg shadow-slate-200/70 transition-[border-color,box-shadow] duration-200 focus-within:border-primary/70 focus-within:shadow-primary/15 dark:border-slate-700/80 dark:bg-slate-950/50 dark:shadow-slate-950/10 dark:focus-within:border-blue-400/70 dark:focus-within:shadow-blue-950/20"
+                  inputGroupClassName="items-end rounded-[1.35rem] border border-border/80 bg-card shadow-lg shadow-slate-200/70 transition-[border-color,box-shadow] duration-200 focus-within:border-primary/70 focus-within:shadow-primary/15 dark:border-slate-700/80 dark:bg-slate-950/50 dark:shadow-slate-950/10 dark:focus-within:border-blue-400/70 dark:focus-within:shadow-blue-950/20"
                   inputGroupStyle={chatInputGroupStyle}
                   maxFileSize={12 * 1024 * 1024}
                   maxFiles={chatMaxAttachments}
@@ -4486,7 +4504,7 @@ export default function Page() {
                   <ChatSubmitButton status={status} />
                   <PromptInputBody>
                     <PromptInputTextarea
-                      className="col-start-2 row-start-2 max-h-24 min-h-11 resize-none px-1 py-2 text-right text-base leading-7 text-foreground placeholder:text-muted-foreground dark:text-slate-100 dark:placeholder:text-slate-400"
+                      className="col-start-2 row-start-2 max-h-20 min-h-10 resize-none px-1 py-1.5 text-right text-base leading-6 text-foreground placeholder:text-muted-foreground dark:text-slate-100 dark:placeholder:text-slate-400"
                       dir="rtl"
                       placeholder="اكتب طلبك أو أرفق صور المنتج..."
                       style={chatInputTextAreaStyle}

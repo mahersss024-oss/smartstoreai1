@@ -264,6 +264,19 @@ export default function ConversationPage() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const scrollConversationToLatest = useCallback(() => {
+    const messagesContainer = messagesContainerRef.current;
+
+    if (!messagesContainer) {
+      return;
+    }
+
+    messagesContainer.scrollTo({
+      top: messagesContainer.scrollHeight,
+      behavior: 'auto',
+    });
+  }, []);
+
   const mobileConversationStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isMessageInputFocused || !visualViewportFrame) {
       return undefined;
@@ -307,6 +320,12 @@ export default function ConversationPage() {
   const canUnblockConversation = Boolean(
     isConversationBlocked && blockStatus?.blockedByMe,
   );
+
+  const handleMessageInputFocus = useCallback(() => {
+    setIsMessageInputFocused(true);
+    window.requestAnimationFrame(scrollConversationToLatest);
+    window.setTimeout(scrollConversationToLatest, 180);
+  }, [scrollConversationToLatest]);
 
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
@@ -422,19 +441,36 @@ export default function ConversationPage() {
       return;
     }
 
-    const animationFrame = window.requestAnimationFrame(() => {
-      const messagesContainer = messagesContainerRef.current;
-
-      if (messagesContainer) {
-        messagesContainer.scrollTo({
-          top: messagesContainer.scrollHeight,
-          behavior: 'auto',
-        });
-      }
-    });
+    const animationFrame = window.requestAnimationFrame(
+      scrollConversationToLatest,
+    );
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [isLoading, visibleMessages.length]);
+  }, [isLoading, scrollConversationToLatest, visibleMessages.length]);
+
+  useEffect(() => {
+    if (!isMessageInputFocused) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(
+      scrollConversationToLatest,
+    );
+    const keyboardAnimationTimer = window.setTimeout(
+      scrollConversationToLatest,
+      180,
+    );
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(keyboardAnimationTimer);
+    };
+  }, [
+    isMessageInputFocused,
+    scrollConversationToLatest,
+    visualViewportFrame?.height,
+    visualViewportFrame?.offsetTop,
+  ]);
 
   useSmartstoreRealtime({
     enabled: Boolean(conversationId) && session.authenticated,
@@ -1037,7 +1073,7 @@ export default function ConversationPage() {
                 name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
                 onBlur={() => setIsMessageInputFocused(false)}
-                onFocus={() => setIsMessageInputFocused(true)}
+                onFocus={handleMessageInputFocus}
                 onKeyDown={sendConversationMessageWithEnter}
                 placeholder="اكتب رسالتك هنا..."
                 value={draft}

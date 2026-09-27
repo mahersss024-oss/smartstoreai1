@@ -50,6 +50,7 @@ test('seller buyer conversation scrolls to the latest message', () => {
   const source = readConversationPage();
 
   assert.match(source, /messagesContainerRef/);
+  assert.match(source, /scrollConversationToLatest/);
   assert.match(source, /messagesContainer\.scrollTo/);
   assert.match(source, /messagesContainer\.scrollHeight/);
   assert.doesNotMatch(source, /scrollIntoView/);
@@ -67,7 +68,8 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
   assert.match(source, /window\.visualViewport/);
   assert.match(source, /height: `\$\{visualViewportFrame\.height\}px`/);
-  assert.match(source, /onFocus=\{\(\) => setIsMessageInputFocused\(true\)\}/);
+  assert.match(source, /handleMessageInputFocus/);
+  assert.match(source, /window\.setTimeout\(scrollConversationToLatest, 180\)/);
 });
 
 test('mobile navigation remains visible without covering the conversation composer', () => {

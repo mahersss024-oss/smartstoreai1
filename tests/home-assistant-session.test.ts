@@ -67,6 +67,7 @@ test('mobile chat view keeps input attached to the keyboard while focused', () =
   const homePage = readProjectFile('app', 'page.tsx');
 
   assert.match(homePage, /const compactChatViewStyle = useMemo/);
+  assert.match(homePage, /const assistantScrollWatchKey = useMemo/);
   assert.match(homePage, /type VisualViewportFrame/);
   assert.match(homePage, /const \[visualViewportFrame, setVisualViewportFrame\]/);
   assert.match(homePage, /if \(!isCompactViewport \|\| !isMobileChatViewOpen\)/);
@@ -77,10 +78,12 @@ test('mobile chat view keeps input attached to the keyboard while focused', () =
   assert.match(homePage, /height: `\$\{focusedPanelHeight\}px`/);
   assert.match(homePage, /isCompactChatView && isChatInputFocused && 'transition-none'/);
   assert.match(homePage, /style=\{isCompactChatView \? compactChatViewStyle : assistantPanelStyle\}/);
+  assert.match(homePage, /watchKey=\{assistantScrollWatchKey\}/);
   assert.doesNotMatch(homePage, /height: `calc\(100dvh - \$\{keyboardOffset\}px\)`/);
-  assert.match(homePage, /minHeight: '3\.5rem'/);
-  assert.match(homePage, /max-h-24 min-h-11 resize-none/);
-  assert.match(homePage, /className="shrink-0 border-t p-2"/);
+  assert.match(homePage, /minHeight: '3rem'/);
+  assert.match(homePage, /gridTemplateColumns: '2\.75rem minmax\(0, 1fr\) 2\.75rem'/);
+  assert.match(homePage, /max-h-20 min-h-10 resize-none/);
+  assert.match(homePage, /className="shrink-0 border-t p-1\.5"/);
 });
 
 test('mobile chat submit keeps the keyboard open until the user dismisses it', () => {
