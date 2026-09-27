@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   addConversationMessage,
   blockConversationUser,
+  deleteConversationMessageForUser,
   deleteConversationForUser,
   getConversationBlockStatus,
   getConversationForUser,
@@ -39,12 +40,18 @@ const blockUserSchema = z.object({
 const unblockUserSchema = z.object({
   action: z.literal('unblock_user'),
 });
+const deleteMessageSchema = z.object({
+  action: z.literal('delete_message'),
+  messageId: z.string().min(1),
+  mode: z.enum(['for_me', 'for_everyone']),
+});
 const conversationPostSchema = z.union([
   sendMessageSchema,
   shareContactSchema,
   reportUserSchema,
   blockUserSchema,
   unblockUserSchema,
+  deleteMessageSchema,
 ]);
 const maxConversationMessageRequestBytes = 8 * 1024;
 
@@ -180,6 +187,8 @@ export async function POST(request: Request, context: RouteContext) {
             ? 'conversation_user_block'
             : action === 'unblock_user'
               ? 'conversation_user_unblock'
+              : action === 'delete_message'
+                ? 'conversation_message_delete'
               : 'message_send',
     actorKey: `${session.user.id}:${conversationId}`,
   });
@@ -193,6 +202,7 @@ export async function POST(request: Request, context: RouteContext) {
     | Awaited<ReturnType<typeof reportConversationUser>>
     | Awaited<ReturnType<typeof blockConversationUser>>
     | Awaited<ReturnType<typeof unblockConversationUser>>
+    | Awaited<ReturnType<typeof deleteConversationMessageForUser>>
     | Awaited<ReturnType<typeof addConversationMessage>>;
 
   if ('body' in parsed.data) {
@@ -213,6 +223,13 @@ export async function POST(request: Request, context: RouteContext) {
       conversationId,
       session.user,
       parsed.data.reason,
+    );
+  } else if (parsed.data.action === 'delete_message') {
+    result = await deleteConversationMessageForUser(
+      conversationId,
+      parsed.data.messageId,
+      session.user.id,
+      parsed.data.mode,
     );
   } else {
     result = await unblockConversationUser(conversationId, session.user);
@@ -254,6 +271,17 @@ export async function POST(request: Request, context: RouteContext) {
     const responseBody = {
       error: 'seller_only',
       message: 'Only the seller can share official contact information.',
+      conversation: result.conversation,
+    };
+
+    return idempotency
+      ? idempotency.complete(responseBody, 403)
+      : Response.json(responseBody, { status: 403 });
+  }
+
+  if (result.status === 'not_allowed') {
+    const responseBody = {
+      error: 'message_delete_not_allowed',
       conversation: result.conversation,
     };
 

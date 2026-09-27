@@ -105,6 +105,16 @@ test('mobile chat submit keeps the keyboard open until the user dismisses it', (
   assert.match(homePage, /isRepeatedTap/);
 });
 
+test('home assistant keeps only user messages in compact bubbles', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.match(homePage, /message\.role === 'assistant'/);
+  assert.match(homePage, /<AssistantMessageFrame>/);
+  assert.match(homePage, /max-w-\[min\(74%,28rem\)\]/);
+  assert.match(homePage, /text-\[0\.86rem\]/);
+  assert.match(homePage, /rounded-br-md border border-blue-600 bg-blue-600/);
+});
+
 test('mobile bottom navigation is hidden while assistant chat view is open', () => {
   const homePage = readProjectFile('app', 'page.tsx');
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');

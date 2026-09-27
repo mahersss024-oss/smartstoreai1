@@ -70,7 +70,7 @@ test('seller buyer conversation scrolls to the latest message', () => {
   assert.match(source, /messagesContainer\.scrollHeight/);
   assert.doesNotMatch(source, /scrollIntoView/);
   assert.match(source, /visibleMessages\.length/);
-  assert.match(source, /flex min-h-full flex-col justify-end gap-1\.5/);
+  assert.match(source, /flex min-h-full flex-col justify-end gap-1/);
   assert.match(source, /formatMessageDate/);
   assert.match(source, /isSameMessageDay/);
 });
@@ -87,7 +87,9 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /isKeyboardDismissIgnoredTarget/);
   assert.match(source, /isRepeatedTap/);
   assert.match(source, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
-  assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
+  assert.match(source, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.match(source, /max-h-20 min-h-10/);
+  assert.match(source, /text-\[0px\]/);
   assert.match(source, /window\.visualViewport/);
   assert.match(source, /height: `\$\{visualViewportFrame\.height\}px`/);
   assert.match(source, /handleMessageInputFocus/);
@@ -246,6 +248,36 @@ test('conversation deletion is enforced by the server route', () => {
   assert.match(repository, /prisma\.conversationMessage\.upsert/);
   assert.doesNotMatch(repository, /prisma\.conversation\.delete\(/);
   assert.match(repository, /userIds: \[userId\]/);
+});
+
+test('conversation messages support long press deletion without removing the thread', () => {
+  const route = readConversationRoute();
+  const repository = readMarketplaceRepository();
+  const memoryStore = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'store.ts'),
+    'utf8',
+  );
+  const types = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'types.ts'),
+    'utf8',
+  );
+  const page = readConversationPage();
+
+  assert.match(route, /action: z\.literal\('delete_message'\)/);
+  assert.match(route, /deleteConversationMessageForUser/);
+  assert.match(route, /message_delete_not_allowed/);
+  assert.match(repository, /deletedFor/);
+  assert.match(repository, /deletedForEveryone/);
+  assert.match(repository, /type: 'message_deleted'/);
+  assert.match(memoryStore, /deleteConversationMessageForUser/);
+  assert.match(types, /'message_deleted'/);
+  assert.match(page, /handleMessageLongPressStart/);
+  assert.match(page, /onContextMenu/);
+  assert.match(page, /deleteConversationMessage\('for_me'\)/);
+  assert.match(page, /deleteConversationMessage\('for_everyone'\)/);
+  assert.match(page, /isMessageDeletedFor/);
+  assert.match(page, /isMessageDeletedForEveryone/);
+  assert.match(page, /تم حذف هذه الرسالة/);
 });
 
 test('conversation read state is marked by the server and shown quietly in UI', () => {

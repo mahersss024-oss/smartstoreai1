@@ -49,7 +49,7 @@ type ConversationMessage = {
   senderId: string;
   body: string;
   status: 'sent' | 'blocked';
-  type?: 'text' | 'contact_share';
+  type?: 'text' | 'contact_share' | 'message_deleted';
   reasons: string[];
   metadata?: Record<string, unknown>;
   createdAt: string;
@@ -351,6 +351,31 @@ function isMessageDeliveredTo(
   );
 }
 
+function isMessageDeletedFor(
+  message: ConversationMessage,
+  userId?: string | null,
+) {
+  if (!userId) {
+    return false;
+  }
+
+  const deletedFor = message.metadata?.deletedFor;
+
+  return (
+    typeof deletedFor === 'object' &&
+    deletedFor !== null &&
+    !Array.isArray(deletedFor) &&
+    typeof (deletedFor as Record<string, unknown>)[userId] === 'string'
+  );
+}
+
+function isMessageDeletedForEveryone(message: ConversationMessage) {
+  return (
+    message.type === 'message_deleted' ||
+    Boolean(message.metadata?.deletedForEveryone)
+  );
+}
+
 function isKeyboardDismissIgnoredTarget(target: EventTarget | null) {
   return (
     target instanceof Element &&
@@ -398,6 +423,9 @@ export default function ConversationPage() {
   const [isReportingUser, setIsReportingUser] = useState(false);
   const [isBlockingUser, setIsBlockingUser] = useState(false);
   const [isUnblockingUser, setIsUnblockingUser] = useState(false);
+  const [messageActionTarget, setMessageActionTarget] =
+    useState<ConversationMessage | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [blockStatus, setBlockStatus] =
     useState<ConversationBlockStatus | null>(null);
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
@@ -407,6 +435,7 @@ export default function ConversationPage() {
   } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const messageLongPressTimerRef = useRef<number | null>(null);
   const chatTapTrackerRef = useRef<ChatTapTracker>(
     createEmptyChatTapTracker(),
   );
@@ -459,9 +488,12 @@ export default function ConversationPage() {
     : '/conversations';
   const visibleMessages = useMemo(
     () =>
-      conversation?.messages.filter((message) => message.status === 'sent') ??
-      [],
-    [conversation?.messages],
+      conversation?.messages.filter(
+        (message) =>
+          message.status === 'sent' &&
+          !isMessageDeletedFor(message, session.user?.id),
+      ) ?? [],
+    [conversation?.messages, session.user?.id],
   );
   const draftHasManualContact = containsManualContactDetails(draft);
   const isConversationBlocked = Boolean(blockStatus?.blocked);
@@ -555,6 +587,100 @@ export default function ConversationPage() {
     chatTapTrackerRef.current.pointerId = null;
   }, []);
 
+  const clearMessageLongPressTimer = useCallback(() => {
+    if (messageLongPressTimerRef.current) {
+      window.clearTimeout(messageLongPressTimerRef.current);
+      messageLongPressTimerRef.current = null;
+    }
+  }, []);
+
+  const openMessageActions = useCallback((message: ConversationMessage) => {
+    if (isMessageDeletedForEveryone(message)) {
+      return;
+    }
+
+    setMessageActionTarget(message);
+  }, []);
+
+  const handleMessageLongPressStart = useCallback(
+    (message: ConversationMessage) => {
+      clearMessageLongPressTimer();
+      messageLongPressTimerRef.current = window.setTimeout(() => {
+        openMessageActions(message);
+      }, 520);
+    },
+    [clearMessageLongPressTimer, openMessageActions],
+  );
+
+  const deleteConversationMessage = useCallback(
+    async (mode: 'for_me' | 'for_everyone') => {
+      if (!messageActionTarget || deletingMessageId) {
+        return;
+      }
+
+      const targetMessage = messageActionTarget;
+      setDeletingMessageId(targetMessage.id);
+      setNotice('');
+
+      try {
+        const response = await fetch(
+          `/api/marketplace/conversations/${conversationId}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': createClientIdempotencyKey(
+                `message-delete-${mode}`,
+              ),
+            },
+            body: JSON.stringify({
+              action: 'delete_message',
+              messageId: targetMessage.id,
+              mode,
+            }),
+          },
+        );
+        let payload: {
+          conversation?: ConversationRecord | null;
+          error?: string;
+        } = {};
+
+        try {
+          payload = (await response.json()) as typeof payload;
+        } catch {
+          payload = {};
+        }
+
+        if (response.status === 401) {
+          router.push('/api/auth/google/start');
+          return;
+        }
+
+        if (!response.ok || !payload.conversation) {
+          setNotice(
+            response.status === 403
+              ? 'لا يمكنك حذف هذه الرسالة لدى الجميع.'
+              : 'تعذر حذف الرسالة الآن.',
+          );
+          return;
+        }
+
+        setMessageActionTarget(null);
+        setConversation((currentConversation) =>
+          pickLatestConversation(currentConversation, payload.conversation!),
+        );
+      } finally {
+        setDeletingMessageId(null);
+      }
+    },
+    [
+      conversationId,
+      deletingMessageId,
+      messageActionTarget,
+      router,
+    ],
+  );
+
   const refreshConversation = useCallback(async (
     options?: { showLoading?: boolean; clearNotice?: boolean },
   ) => {
@@ -619,6 +745,12 @@ export default function ConversationPage() {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
   }, []);
+
+  useEffect(() => {
+    return () => {
+      clearMessageLongPressTimer();
+    };
+  }, [clearMessageLongPressTimer]);
 
   useEffect(() => {
     if (!isMessageInputFocused) {
@@ -1244,10 +1376,12 @@ export default function ConversationPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-full flex-col justify-end gap-1.5">
+                <div className="flex min-h-full flex-col justify-end gap-1">
                   {visibleMessages.map((message, index) => {
                     const mine = message.senderId === session.user?.id;
                     const sharedPhoneNumber = getSharedPhoneNumber(message);
+                    const isDeletedForEveryone =
+                      isMessageDeletedForEveryone(message);
                     const previousMessage = visibleMessages[index - 1];
                     const shouldShowDateSeparator = !isSameMessageDay(
                       message.createdAt,
@@ -1277,20 +1411,34 @@ export default function ConversationPage() {
                           </div>
                         )}
                         <div
-                          className={`grid w-fit max-w-[min(82%,34rem)] gap-1 ${
+                          className={`grid w-fit max-w-[min(74%,30rem)] gap-0.5 ${
                             mine
                               ? 'self-start text-right'
                               : 'self-end text-right'
                           }`}
                         >
                           <div
-                            className={`grid gap-1 rounded-2xl border px-3 py-2 text-[0.95rem] leading-7 shadow-sm ${
+                            className={`grid gap-0.5 rounded-2xl border px-2.5 py-1.5 text-[0.86rem] leading-6 shadow-sm ${
                               mine
                                 ? 'rounded-br-md border-blue-600 bg-blue-600 text-white'
                                 : 'rounded-bl-md border-slate-200 bg-white text-foreground dark:border-white/10 dark:bg-card'
                             }`}
+                            onContextMenu={(event) => {
+                              event.preventDefault();
+                              openMessageActions(message);
+                            }}
+                            onPointerCancel={clearMessageLongPressTimer}
+                            onPointerDown={() =>
+                              handleMessageLongPressStart(message)
+                            }
+                            onPointerLeave={clearMessageLongPressTimer}
+                            onPointerUp={clearMessageLongPressTimer}
                           >
-                            {message.type === 'contact_share' ? (
+                            {isDeletedForEveryone ? (
+                              <p className="text-xs italic opacity-75">
+                                تم حذف هذه الرسالة
+                              </p>
+                            ) : message.type === 'contact_share' ? (
                               <div className="grid gap-2">
                                 <div className="flex items-center gap-2 font-bold">
                                   <Phone className="size-4" />
@@ -1361,10 +1509,50 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="grid shrink-0 gap-2 border-t bg-white p-2 dark:bg-card sm:p-3" onSubmit={sendConversationMessage}>
+            {messageActionTarget && (
+              <div
+                className="fixed inset-0 z-50 grid place-items-end bg-black/20 p-3 backdrop-blur-[1px] sm:place-items-center"
+                onClick={() => setMessageActionTarget(null)}
+              >
+                <div
+                  className="grid w-full max-w-sm gap-2 rounded-2xl border bg-white p-3 text-sm shadow-xl dark:bg-card"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    className="rounded-xl px-3 py-3 text-right font-semibold transition hover:bg-slate-100 dark:hover:bg-white/10"
+                    disabled={deletingMessageId === messageActionTarget.id}
+                    onClick={() => void deleteConversationMessage('for_me')}
+                    type="button"
+                  >
+                    حذف لدي
+                  </button>
+                  {messageActionTarget.senderId === session.user?.id && (
+                    <button
+                      className="rounded-xl px-3 py-3 text-right font-semibold text-red-700 transition hover:bg-red-50 dark:text-red-200 dark:hover:bg-red-400/10"
+                      disabled={deletingMessageId === messageActionTarget.id}
+                      onClick={() =>
+                        void deleteConversationMessage('for_everyone')
+                      }
+                      type="button"
+                    >
+                      حذف لدى الجميع
+                    </button>
+                  )}
+                  <button
+                    className="rounded-xl px-3 py-3 text-center font-semibold text-muted-foreground transition hover:bg-slate-100 dark:hover:bg-white/10"
+                    onClick={() => setMessageActionTarget(null)}
+                    type="button"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 dark:bg-card sm:p-2" onSubmit={sendConversationMessage}>
               <Textarea
                 ref={messageInputRef}
-                className="max-h-24 min-h-12 resize-none"
+                className="col-start-1 row-start-1 max-h-20 min-h-10 resize-none rounded-full px-4 py-2 text-sm leading-6"
                 disabled={conversation?.status !== 'open' || isConversationBlocked}
                 name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
@@ -1375,14 +1563,15 @@ export default function ConversationPage() {
                 value={draft}
               />
               {draftHasManualContact && (
-                <p className="text-xs leading-6 text-amber-700 dark:text-amber-200">
+                <p className="col-span-2 text-xs leading-6 text-amber-700 dark:text-amber-200">
                   تذكير: مشاركة معلومات التواصل أو الدفع خارج المنصة مسؤوليتك. لا تحول مبالغ قبل التأكد.
                 </p>
               )}
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="col-start-2 row-start-1 flex items-center justify-end gap-1.5">
                 {isSeller && (
                   <Button
-                    className="rounded-md"
+                    aria-label="مشاركة الرقم"
+                    className="size-10 rounded-full px-0 text-[0px]"
                     disabled={
                       isSharingContact ||
                       !conversation ||
@@ -1398,7 +1587,8 @@ export default function ConversationPage() {
                   </Button>
                 )}
                 <Button
-                  className="rounded-md bg-blue-600 hover:bg-blue-700"
+                  aria-label="إرسال"
+                  className="size-10 rounded-full bg-blue-600 px-0 text-[0px] hover:bg-blue-700"
                   disabled={
                     !draft.trim() ||
                     draftHasManualContact ||

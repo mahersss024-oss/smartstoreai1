@@ -939,6 +939,85 @@ export function markConversationReadForUser(conversationId: string, userId: stri
   return { status: 'read' as const, conversation };
 }
 
+export function deleteConversationMessageForUser(
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  mode: 'for_me' | 'for_everyone',
+) {
+  seedListings();
+  const conversation = conversations.get(conversationId);
+
+  if (
+    !conversation ||
+    (conversation.buyerId !== userId && conversation.sellerId !== userId) ||
+    isConversationHiddenForUser(conversation, userId)
+  ) {
+    return { status: 'not_found' as const };
+  }
+
+  const message = conversation.messages.find(
+    (currentMessage) => currentMessage.id === messageId,
+  );
+
+  if (
+    !message ||
+    message.type === 'conversation_hidden' ||
+    message.status !== 'sent'
+  ) {
+    return { status: 'not_found' as const };
+  }
+
+  if (mode === 'for_everyone' && message.senderId !== userId) {
+    return { status: 'not_allowed' as const, conversation };
+  }
+
+  const deletedAt = nowIso();
+  conversation.messages = conversation.messages.map((currentMessage) => {
+    if (currentMessage.id !== messageId) {
+      return currentMessage;
+    }
+
+    if (mode === 'for_everyone') {
+      return {
+        ...currentMessage,
+        body: 'message_deleted',
+        type: 'message_deleted',
+        metadata: {
+          ...currentMessage.metadata,
+          deletedForEveryone: {
+            by: userId,
+            at: deletedAt,
+          },
+        },
+      };
+    }
+
+    const deletedFor =
+      typeof currentMessage.metadata.deletedFor === 'object' &&
+      currentMessage.metadata.deletedFor !== null &&
+      !Array.isArray(currentMessage.metadata.deletedFor)
+        ? (currentMessage.metadata.deletedFor as Record<string, unknown>)
+        : {};
+
+    return {
+      ...currentMessage,
+      metadata: {
+        ...currentMessage.metadata,
+        deletedFor: {
+          ...deletedFor,
+          [userId]: deletedAt,
+        },
+      },
+    };
+  });
+  conversation.updatedAt = deletedAt;
+  conversations.set(conversation.id, conversation);
+  persistStore();
+
+  return { status: 'deleted' as const, conversation };
+}
+
 function getOtherConversationUser(conversation: Conversation, userId: string) {
   if (conversation.buyerId === userId) {
     return conversation.sellerId;

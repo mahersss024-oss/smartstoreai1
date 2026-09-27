@@ -547,7 +547,9 @@ function toConversationRecord(
               type:
                 message.type === 'contact_share'
                   ? 'contact_share'
-                  : 'text',
+                  : message.type === 'message_deleted'
+                    ? 'message_deleted'
+                    : 'text',
               reasons: message.reasons,
               metadata: asRecord(message.metadata),
               createdAt: message.createdAt.toISOString(),
@@ -2591,6 +2593,129 @@ export async function markConversationsDeliveredForUser(
   }
 
   return { status: 'delivered' as const, updatedCount: updates.length };
+}
+
+export async function deleteConversationMessageForUser(
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  mode: 'for_me' | 'for_everyone',
+) {
+  if (!shouldUseDatabaseStore()) {
+    const result = memoryStore.deleteConversationMessageForUser(
+      conversationId,
+      messageId,
+      userId,
+      mode,
+    );
+
+    if (result.conversation) {
+      safelyPublishRealtimeEvent({
+        type: 'conversation_updated',
+        payload: {
+          conversationId: result.conversation.id,
+          listingId: result.conversation.listingId,
+          sellerId: result.conversation.sellerId,
+          buyerId: result.conversation.buyerId,
+          status: result.conversation.status,
+        },
+        visibility: {
+          userIds: [result.conversation.sellerId, result.conversation.buyerId],
+        },
+      });
+    }
+
+    return result;
+  }
+
+  const message = await prisma.conversationMessage.findFirst({
+    where: {
+      id: messageId,
+      conversationId,
+      status: 'sent',
+      conversation: {
+        OR: [{ buyerId: userId }, { sellerId: userId }],
+      },
+      NOT: { type: 'conversation_hidden' },
+    },
+    include: {
+      conversation: true,
+    },
+  });
+
+  if (!message) {
+    return { status: 'not_found' as const };
+  }
+
+  if (mode === 'for_everyone' && message.senderId !== userId) {
+    return {
+      status: 'not_allowed' as const,
+      conversation: await getConversationForUser(conversationId, userId),
+    };
+  }
+
+  const metadata = asRecord(message.metadata);
+  const deletedAt = new Date().toISOString();
+
+  if (mode === 'for_everyone') {
+    await prisma.conversationMessage.update({
+      where: { id: message.id },
+      data: {
+        body: 'message_deleted',
+        type: 'message_deleted',
+        metadata: toPrismaJsonObject({
+          ...metadata,
+          deletedForEveryone: {
+            by: userId,
+            at: deletedAt,
+          },
+        }),
+      },
+    });
+  } else {
+    const deletedFor =
+      typeof metadata.deletedFor === 'object' &&
+      metadata.deletedFor !== null &&
+      !Array.isArray(metadata.deletedFor)
+        ? (metadata.deletedFor as Record<string, unknown>)
+        : {};
+
+    await prisma.conversationMessage.update({
+      where: { id: message.id },
+      data: {
+        metadata: toPrismaJsonObject({
+          ...metadata,
+          deletedFor: {
+            ...deletedFor,
+            [userId]: deletedAt,
+          },
+        }),
+      },
+    });
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() },
+  });
+
+  const conversation = await getConversationForUser(conversationId, userId);
+
+  safelyPublishRealtimeEvent({
+    type: 'conversation_updated',
+    payload: {
+      conversationId: message.conversation.id,
+      listingId: message.conversation.listingId,
+      sellerId: message.conversation.sellerId,
+      buyerId: message.conversation.buyerId,
+      status: message.conversation.status,
+    },
+    visibility: {
+      userIds: [message.conversation.sellerId, message.conversation.buyerId],
+    },
+  });
+
+  return { status: 'deleted' as const, conversation };
 }
 
 function getOtherConversationUserId(conversation: Conversation, userId: string) {
