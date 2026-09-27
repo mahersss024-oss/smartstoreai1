@@ -84,6 +84,7 @@ test('seller buyer conversation header shows the other customer, not the listing
   assert.doesNotMatch(source, /<Bot className="size-4" \/>/);
   assert.doesNotMatch(source, /session\.authenticated \? roleLabel/);
   assert.doesNotMatch(source, /conversation\?\.status === 'open'/);
+  assert.doesNotMatch(source, /conversation\?\.listing\?\.title \?\? 'سوق حمد'/);
   assert.match(repository, /seller: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
   assert.match(repository, /buyer: \{ select: \{ id: true, email: true, name: true, picture: true \} \}/);
 });
