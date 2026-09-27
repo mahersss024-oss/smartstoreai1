@@ -74,7 +74,7 @@ export function ListingContactActions({ listingId }: { listingId: string }) {
         onClick={openConversation}
       >
         <MessageCircle className="size-4" />
-        تواصل مع البائع
+        تواصل مع المعلن
       </Button>
       {message && (
         <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground dark:bg-card">

@@ -640,7 +640,7 @@ function AdminListingsPageContent() {
               name="listingSearch"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="ابحث بالعنوان أو البائع أو المدينة"
+              placeholder="ابحث بالعنوان أو المعلن أو المدينة"
             />
             <select
               className="h-10 rounded-md border bg-background px-3 text-sm"

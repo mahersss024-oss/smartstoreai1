@@ -6,8 +6,6 @@ import {
   ArrowRight,
   BadgeCheck,
   MapPin,
-  Store,
-  Users,
 } from 'lucide-react';
 
 import {
@@ -114,12 +112,6 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
               <p className="truncate text-xs text-muted-foreground">بيانات عامة وإعلانات منشورة</p>
             </div>
           </div>
-          <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
-            <Link href={returnHref}>
-              {isAdminUsersSource ? <Users className="size-4" /> : <Store className="size-4" />}
-              {isAdminUsersSource ? 'العودة لإدارة المستخدمين' : 'العودة للسوق'}
-            </Link>
-          </Button>
         </header>
 
         <section className="overflow-hidden bg-white dark:bg-card">

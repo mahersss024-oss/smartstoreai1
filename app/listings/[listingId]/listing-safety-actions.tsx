@@ -20,9 +20,13 @@ type FavoriteStatePayload = {
 export function ListingSafetyActions({
   listingId,
   sellerId,
+  showFavorite = true,
+  showReport = true,
 }: {
   listingId: string;
   sellerId: string;
+  showFavorite?: boolean;
+  showReport?: boolean;
 }) {
   const router = useRouter();
   const { isSessionLoading, session } = useAuthSession();
@@ -176,8 +180,15 @@ export function ListingSafetyActions({
 
   return (
     <div className="grid gap-2">
-      <div className={cn('grid gap-2', canFavorite ? 'grid-cols-2' : 'grid-cols-1')}>
-        {canFavorite && (
+      <div
+        className={cn(
+          'grid gap-2',
+          showFavorite && showReport && canFavorite
+            ? 'grid-cols-2'
+            : 'grid-cols-1',
+        )}
+      >
+        {showFavorite && canFavorite && (
         <Button
           variant="outline"
           className={cn(
@@ -193,6 +204,7 @@ export function ListingSafetyActions({
           حفظ
         </Button>
         )}
+        {showReport && (
         <Button
           variant="outline"
           className="rounded-md"
@@ -202,6 +214,7 @@ export function ListingSafetyActions({
           <Flag className="size-4" />
           إبلاغ
         </Button>
+        )}
       </div>
       {notice && (
         <div className="flex items-start gap-2 rounded-md border bg-white px-3 py-2 text-xs leading-6 text-muted-foreground dark:bg-card">

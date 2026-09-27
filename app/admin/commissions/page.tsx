@@ -286,7 +286,7 @@ export default function AdminCommissionsPage() {
                         {commission.listing?.title ?? 'إعلان غير متاح'}
                       </h2>
                       <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>البائع: {commission.sellerId}</span>
+                        <span>المعلن: {commission.sellerId}</span>
                         <span>قيمة البيع: {formatMoney(commission.productValue)}</span>
                         <span>رسوم المنصة: {formatMoney(commission.commissionAmount)}</span>
                         <span>{formatStatus(commission.status)}</span>

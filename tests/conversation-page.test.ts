@@ -189,7 +189,8 @@ test('conversations list uses compact cards with a small delete menu', () => {
   assert.match(source, /هل أنت متأكد من حذف هذه المحادثة؟/);
   assert.match(source, /تم حذف المحادثة بنجاح/);
   assert.match(source, /تعذر حذف المحادثة\. حاول مرة أخرى/);
-  assert.match(source, /grid-cols-\[3\.25rem_minmax\(0,1fr\)_auto\]/);
+  assert.match(source, /grid-cols-\[2\.75rem_minmax\(0,1fr\)_auto\]/);
+  assert.match(source, /sm:grid-cols-\[3rem_minmax\(0,1fr\)_auto\]/);
   assert.match(source, /otherParticipantName/);
   assert.match(source, /otherParticipant\?\.picture/);
   assert.doesNotMatch(source, /rounded-md border bg-white p-2 shadow-sm/);
@@ -200,11 +201,11 @@ test('conversations list uses compact cards with a small delete menu', () => {
 test('conversations list keeps each conversation card horizontal on every viewport', () => {
   const source = readConversationsIndexPage();
   const cardLinkMatch = source.match(
-    /className="([^"]*grid min-w-0 grid-cols-\[3\.25rem_minmax\(0,1fr\)_auto\][^"]*)"/,
+    /className="([^"]*grid min-w-0 grid-cols-\[2\.75rem_minmax\(0,1fr\)_auto\][^"]*)"/,
   );
 
   assert.ok(cardLinkMatch, 'conversation card link should use a fixed horizontal grid');
-  assert.doesNotMatch(cardLinkMatch[1], /\b(?:sm|md|lg|xl):grid-cols-/);
+  assert.doesNotMatch(cardLinkMatch[1], /\b(?:md|lg|xl):grid-cols-/);
   assert.doesNotMatch(cardLinkMatch[1], /\b(?:sm|md|lg|xl):flex-col\b/);
 });
 

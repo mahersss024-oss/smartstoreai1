@@ -414,7 +414,7 @@ export default function ConversationsPage() {
                     <MessageCircle className="mx-auto size-9 text-blue-600" />
                     <h3 className="text-base font-bold">لا توجد محادثات بعد</h3>
                     <p className="text-sm leading-7 text-muted-foreground">
-                      عندما يتواصل مشتري مع بائع أو تضغط على تواصل داخل إعلان، ستظهر المحادثة هنا.
+                      عندما يبدأ تواصل بخصوص إعلان، ستظهر المحادثة هنا.
                     </p>
                   </div>
                 </div>
@@ -446,17 +446,17 @@ export default function ConversationsPage() {
                     return (
                       <div
                         key={conversation.id}
-                        className={`grid grid-cols-[minmax(0,1fr)_2.25rem] overflow-hidden border-b bg-white transition hover:bg-blue-50/60 dark:bg-card dark:hover:bg-blue-400/10 ${
+                        className={`grid grid-cols-[minmax(0,1fr)_2rem] overflow-hidden border-b bg-white transition hover:bg-blue-50/60 dark:bg-card dark:hover:bg-blue-400/10 ${
                           hasUnreadMessages
                             ? 'border-rose-300 shadow-rose-950/10 dark:border-rose-400/40'
                             : ''
                         }`}
                       >
                         <Link
-                          className="grid min-w-0 grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+                          className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-2 px-2 py-2 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:px-3"
                           href={`/conversations/${conversation.id}`}
                         >
-                          <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100">
+                          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100 sm:size-11">
                             {otherParticipant?.picture ? (
                               <SellerAvatar
                                 alt={otherParticipantName}
@@ -472,11 +472,11 @@ export default function ConversationsPage() {
                                 {otherParticipantName}
                               </h3>
                             </div>
-                            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                               {lastMessage?.body ?? 'لم تبدأ الرسائل بعد'}
                             </p>
                           </div>
-                          <div className="grid justify-items-end gap-2 text-left">
+                          <div className="grid justify-items-end gap-1.5 text-left">
                             <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                               {formatUpdatedAt(conversation.updatedAt)}
                             </span>
@@ -490,7 +490,7 @@ export default function ConversationsPage() {
                             <DropdownMenuTrigger asChild>
                               <Button
                                 aria-label="خيارات المحادثة"
-                                className="size-8 rounded-md"
+                                className="size-7 rounded-md"
                                 disabled={deletingConversationId === conversation.id}
                                 size="icon-sm"
                                 variant="ghost"

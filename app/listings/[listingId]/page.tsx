@@ -11,7 +11,6 @@ import {
   MessageCircle,
   PackageCheck,
   Star,
-  Store,
 } from 'lucide-react';
 
 import {
@@ -242,12 +241,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               <p className="truncate text-xs text-muted-foreground">سوق حمد</p>
             </div>
           </div>
-          <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
-            <Link href="/">
-              <Store className="size-4" />
-              العودة للسوق
-            </Link>
-          </Button>
         </header>
 
         <section className="grid items-start gap-4 px-1 py-3 sm:px-2 lg:grid-cols-[minmax(0,1fr)_14rem]">
@@ -290,6 +283,22 @@ export default async function ListingDetailsPage({ params }: PageProps) {
               images={images}
               title={listing.title ?? 'صورة الإعلان'}
             />
+
+            <section className="grid gap-2 px-1 py-2 sm:px-2">
+              <ListingContactActions listingId={listing.id} />
+              <div className="grid grid-cols-2 gap-2">
+                <ListingSafetyActions
+                  listingId={listing.id}
+                  sellerId={listing.sellerId}
+                  showReport={false}
+                />
+                <ListingShareButton
+                  className="h-10 w-full rounded-md"
+                  listingId={listing.id}
+                  title={listing.title ?? 'إعلان سوق حمد'}
+                />
+              </div>
+            </section>
 
             <section className="px-1 py-3 sm:px-2">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -366,12 +375,15 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                 <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
               </div>
               <ListingShareButton
-                className="mb-3 h-11 w-full rounded-md"
+                className="mb-3 hidden h-11 w-full rounded-md"
                 listingId={listing.id}
                 title={listing.title ?? 'إعلان سوق حمد'}
               />
-              <ListingContactActions listingId={listing.id} />
-              <ListingSafetyActions listingId={listing.id} sellerId={listing.sellerId} />
+              <ListingSafetyActions
+                listingId={listing.id}
+                sellerId={listing.sellerId}
+                showFavorite={false}
+              />
             </section>
 
             <section className="px-1 py-3 sm:px-2">

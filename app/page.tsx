@@ -4390,7 +4390,7 @@ export default function Page() {
                           <div>
                             <h3 className="text-lg font-bold">كيف أساعدك؟</h3>
                             <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                              بيع، بحث، مقارنة، صور، أو فتح شات بين البائع والمشتري.
+                              بيع، بحث، مقارنة، صور، أو فتح شات بخصوص إعلان.
                             </p>
                           </div>
                           <div className="grid gap-2">

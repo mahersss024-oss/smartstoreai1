@@ -1009,7 +1009,7 @@ export default function ConversationPage() {
                           <div className="grid gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-7 text-emerald-950 shadow-sm dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-50">
                             <div className="flex items-center gap-2 font-bold">
                               <Phone className="size-4" />
-                              رقم التواصل الرسمي من البائع
+                              رقم التواصل الرسمي من المعلن
                             </div>
                             {sharedPhoneNumber ? (
                               <a
