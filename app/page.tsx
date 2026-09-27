@@ -532,6 +532,7 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
       aria-label={isBusy ? 'جار الإرسال' : 'إرسال'}
       className="col-start-1 row-start-2 m-2 size-11 self-end rounded-2xl bg-sky-400 text-slate-950 shadow-lg shadow-sky-950/20 transition duration-200 hover:bg-sky-300 disabled:opacity-80"
       disabled={isBusy}
+      onPointerDown={(event) => event.preventDefault()}
       size="icon-sm"
       style={chatSubmitButtonStyle}
       type="submit"
@@ -2985,16 +2986,6 @@ export default function Page() {
         return;
       }
 
-      if (isCompactViewport) {
-        const activeElement = document.activeElement;
-
-        if (activeElement instanceof HTMLElement) {
-          activeElement.blur();
-        }
-
-        resetChatKeyboardState();
-      }
-
       expandAssistant();
 
       const text = hasText && 'text' in message ? message.text : '';
@@ -3061,8 +3052,6 @@ export default function Page() {
       sendMessage,
       expandAssistant,
       filteredMessages.length,
-      isCompactViewport,
-      resetChatKeyboardState,
     ],
   );
 
@@ -4356,7 +4345,16 @@ export default function Page() {
                   ? 'pointer-events-auto opacity-100'
                   : 'pointer-events-none opacity-0'
               }`}>
-                <Conversation className="min-h-0 flex-1">
+                <Conversation
+                  className="min-h-0 flex-1"
+                  onPointerDown={() => {
+                    const activeElement = document.activeElement;
+
+                    if (activeElement instanceof HTMLTextAreaElement) {
+                      activeElement.blur();
+                    }
+                  }}
+                >
                   <ConversationContent className="gap-4 px-4 py-5">
                     <ConversationAutoScroll watchKey={scrollWatchKey} enabled />
                     {filteredMessages.length === 0 ? (

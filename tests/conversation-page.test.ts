@@ -49,10 +49,22 @@ function readMarketplaceRepository() {
 test('seller buyer conversation scrolls to the latest message', () => {
   const source = readConversationPage();
 
-  assert.match(source, /messagesEndRef/);
-  assert.match(source, /scrollIntoView/);
+  assert.match(source, /messagesContainerRef/);
+  assert.match(source, /messagesContainer\.scrollTo/);
+  assert.match(source, /messagesContainer\.scrollHeight/);
+  assert.doesNotMatch(source, /scrollIntoView/);
   assert.match(source, /visibleMessages\.length/);
   assert.match(source, /flex min-h-full flex-col justify-end gap-3/);
+});
+
+test('seller buyer conversation fills the mobile viewport and keeps the keyboard open after send', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /h-dvh overflow-hidden/);
+  assert.match(source, /min-h-0 flex-1 overscroll-contain overflow-y-auto/);
+  assert.match(source, /onPointerDown=\{\(\) => messageInputRef\.current\?\.blur\(\)\}/);
+  assert.match(source, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
+  assert.match(source, /className="max-h-24 min-h-12 resize-none"/);
 });
 
 test('seller buyer conversation exposes report and block controls', () => {

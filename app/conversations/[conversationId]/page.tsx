@@ -255,7 +255,8 @@ export default function ConversationPage() {
   const [isUnblockingUser, setIsUnblockingUser] = useState(false);
   const [blockStatus, setBlockStatus] =
     useState<ConversationBlockStatus | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isSeller = session.user?.id === conversation?.sellerId;
   const otherParticipantId =
@@ -376,10 +377,14 @@ export default function ConversationPage() {
     }
 
     const animationFrame = window.requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({
-        block: 'end',
-        behavior: 'smooth',
-      });
+      const messagesContainer = messagesContainerRef.current;
+
+      if (messagesContainer) {
+        messagesContainer.scrollTo({
+          top: messagesContainer.scrollHeight,
+          behavior: 'auto',
+        });
+      }
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
@@ -789,9 +794,9 @@ export default function ConversationPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid min-h-screen max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+    <main className="h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-auto lg:min-h-screen lg:overflow-visible" dir="rtl">
+      <div className="mx-auto flex h-full max-w-6xl flex-col gap-2 px-2 py-2 sm:px-4 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/conversations">
@@ -807,9 +812,9 @@ export default function ConversationPage() {
           </div>
         </header>
 
-        <section className="grid min-h-0 gapx-1 py-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-md bg-white dark:bg-card lg:h-[calc(100vh-8.5rem)]">
-            <div className="flex items-center justify-between gap-3 px-1 py-3">
+        <section className="grid min-h-0 flex-1 lg:py-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-white dark:bg-card lg:h-[calc(100vh-8.5rem)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 px-2 py-2 lg:px-1 lg:py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link
                   href={otherParticipantProfileHref}
@@ -887,7 +892,11 @@ export default function ConversationPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-[#f7f9fc] p-4 dark:bg-background">
+            <div
+              ref={messagesContainerRef}
+              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] p-3 dark:bg-background sm:p-4"
+              onPointerDown={() => messageInputRef.current?.blur()}
+            >
               {isLoading ? (
                 <div className="grid h-full place-items-center text-sm text-muted-foreground">
                   جار تحميل المحادثة...
@@ -955,7 +964,6 @@ export default function ConversationPage() {
                       </div>
                     );
                   })}
-                  <div ref={messagesEndRef} aria-hidden="true" />
                 </div>
               )}
             </div>
@@ -971,9 +979,10 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="grid gap-2 border-t bg-white p-3 dark:bg-card" onSubmit={sendConversationMessage}>
+            <form className="grid shrink-0 gap-2 border-t bg-white p-2 dark:bg-card sm:p-3" onSubmit={sendConversationMessage}>
               <Textarea
-                className="min-h-20 resize-none"
+                ref={messageInputRef}
+                className="max-h-24 min-h-12 resize-none"
                 disabled={conversation?.status !== 'open' || isConversationBlocked}
                 name="conversationMessage"
                 onChange={(event) => setDraft(event.target.value)}
@@ -1013,6 +1022,7 @@ export default function ConversationPage() {
                     !conversation ||
                     isConversationBlocked
                   }
+                  onPointerDown={(event) => event.preventDefault()}
                   type="submit"
                 >
                   <Send className="size-4" />
@@ -1022,7 +1032,7 @@ export default function ConversationPage() {
             </form>
           </section>
 
-          <aside className="grid h-fit gap-4 px-1 py-3">
+          <aside className="hidden h-fit gap-4 px-1 py-3 lg:grid">
             <div className="flex items-start gap-3">
               {conversation?.listing ? (
                 <Link

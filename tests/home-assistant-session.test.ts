@@ -79,12 +79,17 @@ test('mobile chat view keeps input attached to the keyboard while focused', () =
   assert.doesNotMatch(homePage, /height: `calc\(100dvh - \$\{keyboardOffset\}px\)`/);
 });
 
-test('mobile chat submit dismisses the keyboard before sending', () => {
+test('mobile chat submit keeps the keyboard open until the user dismisses it', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
-  assert.match(homePage, /if \(isCompactViewport\) \{/);
-  assert.match(homePage, /activeElement\.blur\(\)/);
-  assert.match(homePage, /resetChatKeyboardState\(\)/);
+  const submitHandler = homePage.match(
+    /const handleSubmit = useCallback\([\s\S]*?\n  \);/,
+  )?.[0] ?? '';
+
+  assert.doesNotMatch(submitHandler, /activeElement\.blur\(\)/);
+  assert.doesNotMatch(submitHandler, /resetChatKeyboardState\(\)/);
+  assert.match(homePage, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
+  assert.match(homePage, /activeElement instanceof HTMLTextAreaElement/);
 });
 
 test('mobile bottom navigation is hidden while assistant chat view is open', () => {
