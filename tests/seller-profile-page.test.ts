@@ -42,6 +42,9 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /getPublicSellerProfile/);
   assert.match(page, /export const dynamic = 'force-dynamic'/);
   assert.match(page, /decodeURIComponent\(rawSellerId\)/);
+  assert.match(page, /source === 'admin-users'/);
+  assert.match(page, /const returnHref = isAdminUsersSource \? '\/admin\/users' : '\/'/);
+  assert.match(page, /العودة لإدارة المستخدمين/);
   assert.match(page, /notFound\(\)/);
   assert.match(page, /href=\{`\/listings\/\$\{listing\.id\}`\}/);
   assert.match(page, /SellerProfileActions/);

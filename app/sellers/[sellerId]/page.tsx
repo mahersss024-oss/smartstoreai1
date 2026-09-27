@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   MapPin,
   Store,
+  Users,
 } from 'lucide-react';
 
 import {
@@ -21,6 +22,9 @@ import { SellerProfileActions } from './seller-profile-actions';
 type PageProps = {
   params: Promise<{
     sellerId: string;
+  }>;
+  searchParams: Promise<{
+    source?: string | string[];
   }>;
 };
 
@@ -80,9 +84,12 @@ function formatJoinDate(value: string | undefined) {
   }).format(new Date(value));
 }
 
-export default async function SellerProfilePage({ params }: PageProps) {
+export default async function SellerProfilePage({ params, searchParams }: PageProps) {
   const { sellerId: rawSellerId } = await params;
+  const { source } = await searchParams;
   const sellerId = decodeURIComponent(rawSellerId);
+  const isAdminUsersSource = source === 'admin-users';
+  const returnHref = isAdminUsersSource ? '/admin/users' : '/';
   const seller = await getPublicSellerProfile(sellerId);
 
   if (!seller) {
@@ -95,7 +102,7 @@ export default async function SellerProfilePage({ params }: PageProps) {
         <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/">
+              <Link href={returnHref}>
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -108,9 +115,9 @@ export default async function SellerProfilePage({ params }: PageProps) {
             </div>
           </div>
           <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
-            <Link href="/">
-              <Store className="size-4" />
-              العودة للسوق
+            <Link href={returnHref}>
+              {isAdminUsersSource ? <Users className="size-4" /> : <Store className="size-4" />}
+              {isAdminUsersSource ? 'العودة لإدارة المستخدمين' : 'العودة للسوق'}
             </Link>
           </Button>
         </header>

@@ -572,7 +572,7 @@ test('the users page hides role changes and protects the owner account', () => {
   assert.match(page, /canChangeRole/);
   assert.match(page, /isOwnerAccount/);
   assert.match(page, /حساب مالك المنصة محميّ/);
-  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(user\.id\)\}`\}/);
+  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(user\.id\)\}\?source=admin-users`\}/);
   assert.match(page, /عرض صفحة المعلن/);
 });
 

@@ -551,7 +551,7 @@ export default function AdminUsersPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <Link
                       className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                      href={`/sellers/${encodeURIComponent(user.id)}`}
+                      href={`/sellers/${encodeURIComponent(user.id)}?source=admin-users`}
                     >
                       <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                         <SellerAvatar
@@ -674,7 +674,7 @@ export default function AdminUsersPage() {
                         أي تعديل إداري يتم تسجيله في سجل الإدارة.
                       </div>
                       <Button asChild className="rounded-md" size="sm" variant="outline">
-                        <Link href={`/sellers/${encodeURIComponent(user.id)}`}>
+                        <Link href={`/sellers/${encodeURIComponent(user.id)}?source=admin-users`}>
                           <ExternalLink className="size-4" />
                           عرض صفحة المعلن
                         </Link>
