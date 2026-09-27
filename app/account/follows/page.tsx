@@ -1,11 +1,11 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, User, UserPlus } from 'lucide-react';
+import { ArrowRight, UserPlus } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { Button } from '@ui/button';
 
@@ -38,20 +38,9 @@ function formatFollowDate(value: string) {
 }
 
 function PersonAvatar({ person }: { person: FollowPerson }) {
-  if (person.picture) {
-    return (
-      <img
-        alt=""
-        className="size-12 rounded-md object-cover"
-        decoding="async"
-        src={person.picture}
-      />
-    );
-  }
-
   return (
     <div className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-      <User className="size-6" />
+      <SellerAvatar alt={person.name} picture={person.picture} />
     </div>
   );
 }
@@ -188,18 +177,12 @@ export default function AccountFollowsPage() {
         ) : (
           <>
             <section className="grid gap-3 px-1 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-2">
-              {session.user?.picture ? (
-                <img
-                  alt=""
-                  className="size-16 rounded-md object-cover"
-                  decoding="async"
-                  src={session.user.picture}
+              <div className="grid size-16 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                <SellerAvatar
+                  alt={session.user?.name ?? 'حساب سوق حمد'}
+                  picture={session.user?.picture}
                 />
-              ) : (
-                <div className="grid size-16 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <User className="size-8" />
-                </div>
-              )}
+              </div>
               <div className="min-w-0">
                 <h2 className="truncate text-base font-bold">
                   {session.user?.name ?? 'حساب سوق حمد'}

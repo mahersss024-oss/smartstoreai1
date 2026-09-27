@@ -7,7 +7,6 @@ import {
   BadgeCheck,
   MapPin,
   Store,
-  UserRound,
 } from 'lucide-react';
 
 import {
@@ -16,6 +15,7 @@ import {
 } from '@/agent/marketplace/repository';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
+import { SellerAvatar } from '@/components/seller-avatar';
 import { SellerProfileActions } from './seller-profile-actions';
 
 type PageProps = {
@@ -117,15 +117,11 @@ export default async function SellerProfilePage({ params }: PageProps) {
           <div className="h-28 bg-[linear-gradient(135deg,#0f766e,#0f172a_55%,#1d4ed8)] sm:h-36" />
           <div className="-mt-12 grid gap-4 px-4 pb-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-end sm:px-6">
             <div className="grid size-24 place-items-center overflow-hidden rounded-md border-4 border-white bg-[#0f766e] text-3xl font-bold text-white shadow-sm dark:border-card">
-              {seller.picture ? (
-                <img
-                  alt={seller.name}
-                  className="size-full object-cover"
-                  src={seller.picture}
-                />
-              ) : (
-                <UserRound className="size-10" />
-              )}
+              <SellerAvatar
+                alt={seller.name}
+                className="size-full object-cover"
+                picture={seller.picture}
+              />
             </div>
 
             <div className="min-w-0">

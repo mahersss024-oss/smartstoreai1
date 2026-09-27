@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -815,12 +816,9 @@ export default function ConversationPage() {
                   className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm transition hover:opacity-85 active:scale-95 dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100"
                 >
                   {otherParticipant?.picture ? (
-                    <img
-                      alt=""
-                      className="h-full w-full object-cover"
-                      decoding="async"
-                      loading="lazy"
-                      src={otherParticipant.picture}
+                    <SellerAvatar
+                      alt={otherParticipantName}
+                      picture={otherParticipant.picture}
                     />
                   ) : (
                     <span>{getParticipantInitial(otherParticipantName)}</span>
