@@ -146,6 +146,9 @@ test('city selection supports search after opening everywhere it is used', () =>
   assert.match(selector, /max-h-64 overflow-y-auto/);
   assert.match(selector, /normalizeArabicSearch/);
   assert.match(selector, /saudiMarketplaceCities/);
+  assert.match(selector, /focus\(\{ preventScroll: true \}\)/);
+  assert.match(selector, /matchMedia\('\(pointer: fine\)'\)/);
+  assert.match(selector, /\[contain:layout_paint\]/);
   assert.match(accountListings, /<CitySelector/);
   assert.match(adminListings, /<CitySelector/);
 });

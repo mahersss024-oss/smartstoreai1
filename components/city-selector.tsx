@@ -59,7 +59,9 @@ export function CitySelector({
   useEffect(() => {
     if (!isOpen) return;
 
-    searchRef.current?.focus();
+    if (window.matchMedia('(pointer: fine)').matches) {
+      searchRef.current?.focus({ preventScroll: true });
+    }
     const closeOnOutsideClick = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
@@ -84,7 +86,10 @@ export function CitySelector({
   const visibleLabel = value === allValue ? allLabel : value || placeholder;
 
   return (
-    <div className={cn('relative min-w-0', className)} ref={rootRef}>
+    <div
+      className={cn('relative min-w-0', isOpen && 'z-50', className)}
+      ref={rootRef}
+    >
       {name ? <input name={name} type="hidden" value={value} /> : null}
       <button
         aria-expanded={isOpen}
@@ -115,7 +120,7 @@ export function CitySelector({
       </button>
 
       {isOpen ? (
-        <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg">
+        <div className="absolute inset-x-0 top-full mt-1 min-w-64 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg [contain:layout_paint]">
           <div className="flex items-center gap-2 border-b px-3">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             <input
