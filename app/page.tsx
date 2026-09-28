@@ -4425,16 +4425,14 @@ export default function Page() {
                 </div>
               )}
 
-              <div className="marketplace-section-title mb-3 flex items-center justify-end gap-3">
-                <div className="flex items-center gap-2 text-base font-bold">
-                  <Sparkles className="size-4 text-blue-600" />
-                  {hasActiveAssistantSearch
-                    ? 'استكشف أيضًا'
-                    : hasMarketplaceSearchQuery
-                      ? 'نتائج البحث'
-                      : 'الإعلانات المقترحة'}
+              {(hasActiveAssistantSearch || hasMarketplaceSearchQuery) && (
+                <div className="marketplace-section-title mb-3 flex items-center justify-end gap-3">
+                  <div className="flex items-center gap-2 text-base font-bold">
+                    <Sparkles className="size-4 text-blue-600" />
+                    {hasActiveAssistantSearch ? 'استكشف أيضًا' : 'نتائج البحث'}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="grid max-w-4xl gap-1.5">
                 {exploreMarketplaceListings.map((listing) => (
