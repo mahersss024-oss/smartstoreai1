@@ -72,6 +72,34 @@ test('listing details actions surface network failures clearly', () => {
   assert.match(safetyActions, /تعذر إرسال البلاغ الآن/);
 });
 
+test('listing details localizes visible attribute labels and common values', () => {
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+
+  assert.match(listingPage, /model: 'الموديل'/);
+  assert.match(listingPage, /year: 'سنة الصنع'/);
+  assert.match(listingPage, /mileageKm: 'الممشى'/);
+  assert.match(listingPage, /transmission: 'ناقل الحركة'/);
+  assert.match(listingPage, /fuelType: 'نوع الوقود'/);
+  assert.match(listingPage, /inspectionStatus: 'حالة الفحص'/);
+  assert.match(listingPage, /paymentMethod: 'طريقة الدفع'/);
+  assert.match(listingPage, /deliveryMethod: 'طريقة التسليم'/);
+  assert.match(listingPage, /warrantyStatus: 'حالة الضمان'/);
+  assert.match(listingPage, /propertyType: 'نوع العقار'/);
+  assert.match(listingPage, /screenSize: 'حجم الشاشة'/);
+  assert.match(listingPage, /automatic: 'أوتوماتيك'/);
+  assert.match(listingPage, /gasoline: 'بنزين'/);
+  assert.match(listingPage, /valid: 'سليم'/);
+  assert.match(listingPage, /fixed: 'سعر ثابت'/);
+  assert.match(listingPage, /open_to_offers: 'يقبل العروض'/);
+  assert.match(listingPage, /bank_transfer: 'تحويل بنكي'/);
+  assert.match(listingPage, /free_shipping: 'شحن مجاني'/);
+  assert.match(listingPage, /under_warranty: 'تحت الضمان'/);
+  assert.match(listingPage, /apartment: 'شقة'/);
+  assert.match(listingPage, /return labels\[key\] \?\? labels\[normalizedKey\] \?\? labels\[camelKey\] \?\? 'تفصيل إضافي'/);
+  assert.match(listingPage, /formatAttributeLabel\(key\)/);
+  assert.match(listingPage, /formatAttributeValue\(key, value\)/);
+});
+
 test('home listing contact button opens listing details instead of asking chat to open a conversation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
