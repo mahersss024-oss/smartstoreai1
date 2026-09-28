@@ -127,10 +127,16 @@ test('home marketplace renders assistant search as a separate active layer', () 
     assert.doesNotMatch(homePage, /formData\.append\('displayImage'/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
+  assert.match(homePage, /const askToCompareListing = \(\) => \{/);
+  assert.match(homePage, /absolute left-1\.5 top-1\.5 z-10 size-7/);
+  assert.match(homePage, /absolute left-1\.5 top-1\.5 size-7/);
+  assert.match(homePage, /absolute right-1\.5 top-1\.5 size-7/);
+  assert.match(homePage, /askToCompareListing\(\);/);
   assert.match(homePage, /relative aspect-square min-h-\[6\.25rem\] bg-slate-100/);
   assert.match(homePage, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
   assert.match(homePage, /object-cover/);
   assert.match(homePage, /formatListingRelativeTime/);
+  assert.match(homePage, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
   assert.match(homePage, /loading="lazy"/);
   assert.match(homePage, /decoding="async"/);
   assert.match(homePage, /\[content-visibility:auto\]/);

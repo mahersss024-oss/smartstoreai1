@@ -30,7 +30,7 @@ export async function SiteMessageBanner() {
   return (
     <aside
       aria-live="polite"
-      className={`relative z-40 border-b px-4 py-2.5 text-sm ${style.className}`}
+      className={`site-message-banner relative z-40 border-b px-4 py-2.5 text-sm ${style.className}`}
       dir="rtl"
       role="status"
     >

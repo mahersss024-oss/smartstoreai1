@@ -91,6 +91,8 @@ test('site message visibility honors activation and expiration', () => {
 test('site message updates are owner-only, transactional and audited', async () => {
   const route = await source('app/api/admin/site-message/route.ts');
   const banner = await source('components/site-message-banner.tsx');
+  const homeOnly = await source('components/site-message-home-only.tsx');
+  const layout = await source('app/layout.tsx');
   const maintenance = await source('app/admin/maintenance/page.tsx');
 
   assert.match(route, /hasPlatformOwnerAccess/);
@@ -101,6 +103,9 @@ test('site message updates are owner-only, transactional and audited', async () 
   assert.match(route, /expiration_must_be_future/);
   assert.match(banner, /getActiveSiteMessage/);
   assert.match(banner, /role="status"/);
+  assert.match(homeOnly, /usePathname/);
+  assert.match(homeOnly, /pathname !== '\/'/);
+  assert.match(layout, /<SiteMessageHomeOnly>/);
   assert.match(maintenance, /رسالة الموقع/);
   assert.doesNotMatch(maintenance, /localStorage/);
 });

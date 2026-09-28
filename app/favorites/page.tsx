@@ -356,8 +356,8 @@ export default function FavoritesPage() {
                             <Clock3 className="size-3.5 shrink-0" />
                             <span className="truncate">
                               {formatListingRelativeTime(
-                                favorite.listing?.updatedAt ??
-                                  favorite.listing?.createdAt ??
+                                favorite.listing?.createdAt ??
+                                  favorite.listing?.updatedAt ??
                                   favorite.createdAt,
                               )}
                             </span>

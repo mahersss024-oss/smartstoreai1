@@ -64,6 +64,7 @@ test('favorites page renders saved listings as compact horizontal rows', () => {
   assert.match(favoritesPage, /sm:grid-cols-\[7\.25rem_minmax\(0,1fr\)\]/);
   assert.match(favoritesPage, /className="line-clamp-2 text-\[13px\] font-bold/);
   assert.match(favoritesPage, /formatListingRelativeTime/);
+  assert.match(favoritesPage, /favorite\.listing\?\.createdAt \?\?\s*favorite\.listing\?\.updatedAt/);
   assert.match(favoritesPage, /Clock3/);
   assert.match(favoritesPage, /object-cover/);
   assert.doesNotMatch(favoritesPage, /sm:grid-cols-2 lg:grid-cols-3/);

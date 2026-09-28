@@ -282,7 +282,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                     <div className="flex min-w-0 items-center gap-2 text-[11px] leading-5 text-muted-foreground">
                       <Clock3 className="size-3.5 shrink-0" />
                       <span className="truncate">
-                        {formatListingRelativeTime(listing.updatedAt ?? listing.createdAt)}
+                        {formatListingRelativeTime(listing.createdAt ?? listing.updatedAt)}
                       </span>
                       <MapPin className="size-3.5 shrink-0" />
                       <span className="truncate">{listing.city ?? 'السعودية'}</span>

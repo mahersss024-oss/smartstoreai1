@@ -1186,7 +1186,7 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
         primaryImage?.originalUrl,
       ) ?? null,
     status: formatListingStatus(listing.status),
-    timeLabel: formatListingRelativeTime(listing.updatedAt ?? listing.createdAt),
+    timeLabel: formatListingRelativeTime(listing.createdAt ?? listing.updatedAt),
     stats:
       typeof listing.views === 'number'
         ? `${listing.views} مشاهدة · ${listing.messageCount ?? 0} رسائل`
@@ -1480,6 +1480,14 @@ function ListingCardView({
     image.hidden = true;
     image.nextElementSibling?.removeAttribute('hidden');
   };
+  const askToCompareListing = () => {
+    onAsk(
+      listing.id
+        ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
+        : `قارن لي إعلان ${listing.title} بالسوق`,
+      listing,
+    );
+  };
 
   if (variant === 'horizontal') {
     return (
@@ -1500,6 +1508,18 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
+        <Button
+          size="icon-sm"
+          variant="outline"
+          className="absolute left-1.5 top-1.5 z-10 size-7 rounded-md border-sky-200 bg-white/95 p-0 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 sm:left-2 sm:top-2 sm:size-8"
+          aria-label="مقارنة الإعلان"
+          onClick={(event) => {
+            event.stopPropagation();
+            askToCompareListing();
+          }}
+        >
+          <Sparkles className="size-3.5 sm:size-4" />
+        </Button>
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
@@ -1604,7 +1624,7 @@ function ListingCardView({
           size="icon-sm"
           variant="ghost"
           className={cn(
-            'absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white sm:left-2 sm:top-2 sm:size-8',
+            'absolute right-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white sm:right-2 sm:top-2 sm:size-8',
             isFavorite
               ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
               : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
@@ -1619,6 +1639,18 @@ function ListingCardView({
           <Heart className={cn('size-3.5 sm:size-4', isFavorite && 'fill-current')} />
         </Button>
         )}
+        <Button
+          size="icon-sm"
+          variant="outline"
+          className="absolute left-1.5 top-1.5 size-7 rounded-md border-sky-200 bg-white/95 p-0 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 sm:left-2 sm:top-2 sm:size-8"
+          aria-label="مقارنة الإعلان"
+          onClick={(event) => {
+            event.stopPropagation();
+            askToCompareListing();
+          }}
+        >
+          <Sparkles className="size-3.5 sm:size-4" />
+        </Button>
       </div>
       <div className="grid gap-1 p-2 text-right">
         <h3 className="line-clamp-1 text-xs font-bold leading-5">{listing.title}</h3>
@@ -1639,10 +1671,10 @@ function ListingCardView({
           </span>
           <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">{listing.stats}</span>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t pt-1.5">
+        <div className="border-t pt-1.5">
           <Button
             size="sm"
-            className="h-7 rounded-md bg-blue-600 text-[11px] hover:bg-blue-700"
+            className="h-7 w-full rounded-md bg-blue-600 text-[11px] hover:bg-blue-700"
             onClick={(event) => {
               event.stopPropagation();
               onOpen(listing);
@@ -1650,23 +1682,6 @@ function ListingCardView({
           >
             <MessageCircle className="size-3 sm:size-3.5" />
             تواصل
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="outline"
-            className="size-7 rounded-md"
-            aria-label="مقارنة الإعلان"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAsk(
-                listing.id
-                  ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
-                  : `قارن لي إعلان ${listing.title} بالسوق`,
-                listing,
-              );
-            }}
-          >
-            <Sparkles className="size-3 sm:size-3.5" />
           </Button>
         </div>
       </div>
