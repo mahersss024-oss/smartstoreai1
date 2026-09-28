@@ -110,7 +110,7 @@ test('home assistant keeps only user messages in compact bubbles', () => {
 
   assert.match(homePage, /message\.role === 'assistant'/);
   assert.match(homePage, /<AssistantMessageFrame>/);
-  assert.match(homePage, /max-w-\[min\(74%,28rem\)\]/);
+  assert.match(homePage, /max-w-\[min\(74%,30rem\)\]/);
   assert.match(homePage, /text-\[0\.86rem\]/);
   assert.match(homePage, /rounded-br-md border border-blue-600 bg-blue-600/);
 });

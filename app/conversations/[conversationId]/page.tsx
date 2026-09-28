@@ -1241,7 +1241,13 @@ export default function ConversationPage() {
       dir="rtl"
       style={mobileConversationStyle}
     >
-      <div className="mx-auto flex h-full max-w-6xl flex-col gap-2 px-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-2 focus-within:pb-0 sm:px-4 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5">
+      <div
+        className={`mx-auto flex h-full max-w-6xl flex-col gap-2 px-2 pt-2 sm:px-4 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5 ${
+          isMessageInputFocused && visualViewportFrame
+            ? 'pb-2'
+            : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'
+        }`}
+      >
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">

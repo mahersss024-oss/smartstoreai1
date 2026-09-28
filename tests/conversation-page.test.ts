@@ -105,7 +105,9 @@ test('mobile navigation remains visible without covering the conversation compos
 
   assert.doesNotMatch(mobileNavigation, /\^\\\/conversations\\\/\[\^\/\]\+\$/);
   assert.match(source, /pb-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(source, /focus-within:pb-0/);
+  assert.match(source, /isMessageInputFocused && visualViewportFrame/);
+  assert.match(source, /\? 'pb-2'/);
+  assert.doesNotMatch(source, /focus-within:pb-0/);
 });
 
 test('seller buyer conversation exposes report and block controls', () => {

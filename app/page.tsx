@@ -4571,10 +4571,8 @@ export default function Page() {
                               </AssistantMessageFrame>
                             ) : (
                               <div className="flex justify-start">
-                                <div className="max-w-[min(74%,28rem)] rounded-2xl rounded-br-md border border-blue-600 bg-blue-600 px-2.5 py-1.5 text-right text-[0.86rem] leading-6 text-white shadow-sm">
-                                  <MessageContent>
-                                    {renderMessageParts(message.parts, chatListingCardsById)}
-                                  </MessageContent>
+                                <div className="max-w-[min(74%,30rem)] rounded-2xl rounded-br-md border border-blue-600 bg-blue-600 px-2.5 py-1.5 text-right text-[0.86rem] leading-6 text-white shadow-sm">
+                                  {renderMessageParts(message.parts, chatListingCardsById)}
                                 </div>
                               </div>
                             )}
