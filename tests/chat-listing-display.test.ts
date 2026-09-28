@@ -85,7 +85,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /smart-assistant-results-panel/);
   assert.match(homePage, /smart-assistant-result-card/);
   assert.match(homePage, /smart-assistant-results-grid grid max-w-4xl gap-1\.5 sm:gap-2/);
-  assert.match(homePage, /pb-\[calc\(5rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(homePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(homePage, /marketplace-home-controls max-h-\[min\(58dvh,34rem\)\]/);
+  assert.match(homePage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
+  assert.match(homePage, /pb-\[calc\(4rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
   assert.match(homePage, /label: 'أزياء ومستلزمات'/);

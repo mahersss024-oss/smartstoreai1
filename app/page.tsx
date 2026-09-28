@@ -3776,7 +3776,7 @@ export default function Page() {
   return (
     <main
       className={cn(
-        'marketplace-shell min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-dvh lg:overflow-hidden',
+        'marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground',
         isCompactChatView && 'h-dvh overflow-hidden',
       )}
       dir="rtl"
@@ -3789,7 +3789,7 @@ export default function Page() {
       />
       <div
         className={cn(
-          'mx-auto grid min-h-screen max-w-7xl gap-2 px-1.5 py-2 sm:px-3 md:px-4 lg:h-full lg:min-h-0 lg:gap-3 lg:px-6 lg:py-3',
+          'mx-auto grid h-full min-h-0 max-w-7xl gap-2 px-1.5 py-2 sm:px-3 md:px-4 lg:gap-3 lg:px-6 lg:py-3',
           isCompactChatView && 'h-dvh min-h-0 max-w-none gap-0 px-0 py-0 sm:px-0',
         )}
       >
@@ -3798,7 +3798,7 @@ export default function Page() {
             'marketplace-panel flex min-h-0 flex-col bg-white dark:bg-card',
             isCompactChatView
               ? 'h-full rounded-none border-0 bg-transparent shadow-none dark:bg-transparent'
-              : 'rounded-md border shadow-2xl shadow-slate-950/10 lg:overflow-hidden',
+              : 'h-full overflow-hidden rounded-md border shadow-2xl shadow-slate-950/10',
           )}
         >
           {!isCompactChatView && (
@@ -3861,19 +3861,16 @@ export default function Page() {
               'grid min-h-0 flex-1',
               isCompactChatView
                 ? 'grid-cols-1 overflow-hidden'
-                : 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden',
+                : 'grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_25rem]',
             )}
           >
             {!isCompactChatView && (
             <section
-              className={`min-w-0 border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:p-4 lg:pb-4 ${
-                isCompactViewport
-                  ? 'pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))]'
-                  : ''
-              }`}
+              className="flex min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4"
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
+              <div className="marketplace-home-controls max-h-[min(58dvh,34rem)] shrink-0 overflow-y-auto border-b border-blue-100/70 pb-2 dark:border-blue-400/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="mb-3 grid gap-2 text-center md:justify-end md:text-right">
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
                   <Button className="marketplace-primary-cta rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
@@ -4353,6 +4350,16 @@ export default function Page() {
                   </div>
                 )}
               </div>
+              </div>
+
+              <div
+                className={cn(
+                  'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-3',
+                  isCompactViewport
+                    ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
+                    : 'pb-1',
+                )}
+              >
 
               {hasActiveAssistantSearch && (
                 <div className="smart-assistant-results-panel mb-4 grid gap-2.5">
@@ -4475,6 +4482,7 @@ export default function Page() {
                 </div>
               )}
 
+              </div>
             </section>
             )}
 
