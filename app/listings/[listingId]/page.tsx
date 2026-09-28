@@ -34,6 +34,13 @@ type PageProps = {
   params: Promise<{
     listingId: string;
   }>;
+  searchParams: Promise<{
+    source?: string | string[];
+    conversationId?: string | string[];
+    sellerId?: string | string[];
+    sellerSource?: string | string[];
+    sourceListingId?: string | string[];
+  }>;
 };
 
 export const dynamic = 'force-dynamic';
@@ -168,8 +175,68 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export default async function ListingDetailsPage({ params }: PageProps) {
+function getSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isSafePathSegment(value: string | undefined): value is string {
+  return Boolean(value && /^[a-zA-Z0-9_-]+$/.test(value));
+}
+
+function getListingReturnHref(searchParams: Awaited<PageProps['searchParams']>) {
+  const source = getSingleSearchParam(searchParams.source);
+  const conversationId = getSingleSearchParam(searchParams.conversationId);
+  const sellerId = getSingleSearchParam(searchParams.sellerId);
+  const sellerSource = getSingleSearchParam(searchParams.sellerSource);
+  const sourceListingId = getSingleSearchParam(searchParams.sourceListingId);
+
+  if (source === 'conversation' && isSafePathSegment(conversationId)) {
+    return `/conversations/${encodeURIComponent(conversationId)}`;
+  }
+
+  if (source === 'seller' && isSafePathSegment(sellerId)) {
+    const query = new URLSearchParams();
+
+    if (sellerSource === 'admin-users' || sellerSource === 'follows') {
+      query.set('source', sellerSource);
+    }
+
+    if (sellerSource === 'conversation' && isSafePathSegment(conversationId)) {
+      query.set('source', sellerSource);
+      query.set('conversationId', conversationId);
+    }
+
+    if (sellerSource === 'listing' && isSafePathSegment(sourceListingId)) {
+      query.set('source', sellerSource);
+      query.set('listingId', sourceListingId);
+    }
+
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return `/sellers/${encodeURIComponent(sellerId)}${suffix}`;
+  }
+
+  if (source === 'favorites') {
+    return '/favorites';
+  }
+
+  if (source === 'account-listings') {
+    return '/account/listings';
+  }
+
+  return '/';
+}
+
+function getSellerProfileHref(sellerId: string, listingId: string) {
+  return `/sellers/${encodeURIComponent(sellerId)}?source=listing&listingId=${encodeURIComponent(listingId)}`;
+}
+
+function getListingAssistantHref(listingId: string) {
+  return `/?chat=1&assistant=listing&listingId=${encodeURIComponent(listingId)}`;
+}
+
+export default async function ListingDetailsPage({ params, searchParams }: PageProps) {
   const { listingId } = await params;
+  const resolvedSearchParams = await searchParams;
   const listing = await getListing(listingId);
 
   if (!listing || listing.status !== 'published') {
@@ -184,7 +251,9 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   );
   const isOwnListing = session?.user.id === listing.sellerId;
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
-  const sellerProfileHref = `/sellers/${encodeURIComponent(listing.sellerId)}`;
+  const returnHref = getListingReturnHref(resolvedSearchParams);
+  const sellerProfileHref = getSellerProfileHref(listing.sellerId, listing.id);
+  const listingAssistantHref = getListingAssistantHref(listing.id);
 
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
@@ -238,7 +307,7 @@ export default async function ListingDetailsPage({ params }: PageProps) {
         <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/">
+              <Link href={returnHref}>
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -310,6 +379,20 @@ export default async function ListingDetailsPage({ params }: PageProps) {
                   listingId={listing.id}
                   title={listing.title ?? 'إعلان سوق حمد'}
                 />
+                <Button
+                  asChild
+                  className="h-10 rounded-md border-sky-200 bg-white p-0 shadow-sm hover:bg-sky-50 dark:border-sky-400/20 dark:bg-card dark:hover:bg-sky-400/10"
+                  title="حمد"
+                  variant="outline"
+                >
+                  <Link href={listingAssistantHref} aria-label="حمد">
+                    <img
+                      alt=""
+                      className="size-7 rounded-full object-cover"
+                      src="/hamad-assistant-bubble.webp?v=ask-hamad-20260927"
+                    />
+                  </Link>
+                </Button>
               </div>
             </section>
 

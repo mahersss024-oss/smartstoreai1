@@ -1277,7 +1277,7 @@ export default function AccountListingsPage() {
                       <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/60 px-2 py-2 dark:border-white/10 sm:grid-cols-3 sm:px-3 xl:grid-cols-8">
                         {listing.status === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
-                            <Link href={`/listings/${listing.id}`}>
+                            <Link href={`/listings/${listing.id}?source=account-listings`}>
                               <Store className="size-3.5" />
                               عرض
                             </Link>

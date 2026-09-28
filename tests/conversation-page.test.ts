@@ -96,17 +96,21 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /window\.setTimeout\(scrollConversationToLatest, 180\)/);
 });
 
-test('mobile navigation remains visible without covering the conversation composer', () => {
+test('mobile navigation hides inside an open conversation', () => {
   const source = readConversationPage();
   const mobileNavigation = readFileSync(
     join(process.cwd(), 'components', 'mobile-bottom-navigation.tsx'),
     'utf8',
   );
 
-  assert.doesNotMatch(mobileNavigation, /\^\\\/conversations\\\/\[\^\/\]\+\$/);
-  assert.match(source, /pb-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(source, /isMessageInputFocused && visualViewportFrame/);
-  assert.match(source, /\? 'pb-2'/);
+  assert.match(mobileNavigation, /pathname\.startsWith\('\/conversations\/'\)/);
+  assert.match(
+    source,
+    /w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-\[env\(safe-area-inset-bottom\)\] pt-0/,
+  );
+  assert.match(source, /rounded-none bg-white/);
+  assert.match(source, /px-3 py-2 dark:bg-background/);
+  assert.doesNotMatch(source, /pb-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.doesNotMatch(source, /focus-within:pb-0/);
 });
 
@@ -150,7 +154,8 @@ test('seller buyer conversation header shows the other customer, not the listing
 test('seller buyer conversation shows a compact listing card linking to details', () => {
   const source = readConversationPage();
 
-  assert.match(source, /href=\{`\/listings\/\$\{conversation\.listing\.id\}`\}/);
+  assert.match(source, /conversationListingHref/);
+  assert.match(source, /source=conversation&conversationId=/);
   assert.match(source, /className="size-20 shrink-0/);
   assert.match(source, /className="line-clamp-2 text-sm font-bold/);
   assert.doesNotMatch(source, /className="aspect-square w-full rounded-md object-cover"/);

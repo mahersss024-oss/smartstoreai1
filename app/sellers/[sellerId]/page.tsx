@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  Clock3,
   MapPin,
 } from 'lucide-react';
 
@@ -23,6 +24,8 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     source?: string | string[];
+    conversationId?: string | string[];
+    listingId?: string | string[];
   }>;
 };
 
@@ -82,12 +85,108 @@ function formatJoinDate(value: string | undefined) {
   }).format(new Date(value));
 }
 
+function formatListingRelativeTime(value: string | undefined) {
+  if (!value) {
+    return 'وقت غير محدد';
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return 'وقت غير محدد';
+  }
+
+  const minutes = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+
+  if (minutes < 60) {
+    return `منذ ${minutes} دقيقة`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `منذ ${hours} ساعة`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 30) {
+    return `منذ ${days} يوم`;
+  }
+
+  return new Intl.DateTimeFormat('ar-SA', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(timestamp));
+}
+
+function getSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isSafePathSegment(value: string | undefined): value is string {
+  return Boolean(value && /^[a-zA-Z0-9_-]+$/.test(value));
+}
+
+function getSellerReturnHref(searchParams: Awaited<PageProps['searchParams']>) {
+  const source = getSingleSearchParam(searchParams.source);
+  const conversationId = getSingleSearchParam(searchParams.conversationId);
+  const listingId = getSingleSearchParam(searchParams.listingId);
+
+  if (source === 'admin-users') {
+    return '/admin/users';
+  }
+
+  if (source === 'conversation' && isSafePathSegment(conversationId)) {
+    return `/conversations/${encodeURIComponent(conversationId)}`;
+  }
+
+  if (source === 'listing' && isSafePathSegment(listingId)) {
+    return `/listings/${encodeURIComponent(listingId)}`;
+  }
+
+  if (source === 'follows') {
+    return '/account/follows';
+  }
+
+  return '/';
+}
+
+function getSellerListingHref(
+  listingId: string,
+  sellerId: string,
+  searchParams: Awaited<PageProps['searchParams']>,
+) {
+  const query = new URLSearchParams({
+    source: 'seller',
+    sellerId,
+  });
+  const source = getSingleSearchParam(searchParams.source);
+  const conversationId = getSingleSearchParam(searchParams.conversationId);
+  const sourceListingId = getSingleSearchParam(searchParams.listingId);
+
+  if (source === 'admin-users' || source === 'follows') {
+    query.set('sellerSource', source);
+  }
+
+  if (source === 'conversation' && isSafePathSegment(conversationId)) {
+    query.set('sellerSource', source);
+    query.set('conversationId', conversationId);
+  }
+
+  if (source === 'listing' && isSafePathSegment(sourceListingId)) {
+    query.set('sellerSource', source);
+    query.set('sourceListingId', sourceListingId);
+  }
+
+  return `/listings/${encodeURIComponent(listingId)}?${query.toString()}`;
+}
+
 export default async function SellerProfilePage({ params, searchParams }: PageProps) {
   const { sellerId: rawSellerId } = await params;
-  const { source } = await searchParams;
+  const resolvedSearchParams = await searchParams;
   const sellerId = decodeURIComponent(rawSellerId);
-  const isAdminUsersSource = source === 'admin-users';
-  const returnHref = isAdminUsersSource ? '/admin/users' : '/';
+  const returnHref = getSellerReturnHref(resolvedSearchParams);
   const seller = await getPublicSellerProfile(sellerId);
 
   if (!seller) {
@@ -158,14 +257,14 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           </div>
 
           {seller.listings.length ? (
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               {seller.listings.map((listing) => (
                 <Link
                   key={listing.id}
-                  href={`/listings/${listing.id}`}
-                  className="group grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 rounded-md bg-white/65 p-2 transition hover:bg-blue-50/80 dark:bg-card/45 dark:hover:bg-blue-400/10 sm:grid-cols-[7rem_minmax(0,1fr)_auto]"
+                  href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
+                  className="group grid grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                 >
-                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-[#0b1220]">
+                  <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-[#0b1220] sm:min-h-[7.25rem]">
                     <img
                       alt={listing.title ?? 'صورة الإعلان'}
                       className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
@@ -173,15 +272,22 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                       src={getPrimaryImageUrl(listing)}
                     />
                   </div>
-                  <div className="grid min-w-0 gap-1.5">
-                    <h3 className="truncate text-sm font-bold">
+                  <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
+                    <h3 className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300 sm:text-sm">
                       {listing.title ?? 'إعلان بدون عنوان'}
                     </h3>
-                    <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3.5 text-blue-600" />
+                    <div className="text-[15px] font-black leading-6 text-slate-900 dark:text-white">
+                      {formatPrice(listing.price)}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 text-[11px] leading-5 text-muted-foreground">
+                      <Clock3 className="size-3.5 shrink-0" />
+                      <span className="truncate">
+                        {formatListingRelativeTime(listing.updatedAt ?? listing.createdAt)}
+                      </span>
+                      <MapPin className="size-3.5 shrink-0" />
                       <span className="truncate">{listing.city ?? 'السعودية'}</span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs sm:hidden">
+                    <div className="hidden">
                       <span className="font-bold text-blue-700">
                         {formatPrice(listing.price)}
                       </span>
@@ -190,7 +296,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                       </span>
                     </div>
                   </div>
-                  <div className="hidden min-w-32 justify-items-end gap-2 text-sm sm:grid">
+                  <div className="hidden">
                     <span className="font-bold text-blue-700">
                       {formatPrice(listing.price)}
                     </span>

@@ -484,8 +484,11 @@ export default function ConversationPage() {
     getParticipantFallbackName(otherParticipantId);
   const otherParticipantPresence = getParticipantPresence(otherParticipant);
   const otherParticipantProfileHref = otherParticipantId
-    ? `/sellers/${encodeURIComponent(otherParticipantId)}`
+    ? `/sellers/${encodeURIComponent(otherParticipantId)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
     : '/conversations';
+  const conversationListingHref = conversation?.listing
+    ? `/listings/${encodeURIComponent(conversation.listing.id)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
+    : null;
   const visibleMessages = useMemo(
     () =>
       conversation?.messages.filter(
@@ -1241,14 +1244,8 @@ export default function ConversationPage() {
       dir="rtl"
       style={mobileConversationStyle}
     >
-      <div
-        className={`mx-auto flex h-full max-w-6xl flex-col gap-2 px-2 pt-2 sm:px-4 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5 ${
-          isMessageInputFocused && visualViewportFrame
-            ? 'pb-2'
-            : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'
-        }`}
-      >
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-1.5 lg:py-3">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-[env(safe-area-inset-bottom)] pt-0 sm:gap-2 sm:px-4 sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pt-2 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-2 py-2 sm:px-1 sm:py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/conversations">
@@ -1265,7 +1262,7 @@ export default function ConversationPage() {
         </header>
 
         <section className="grid min-h-0 flex-1 lg:py-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-white dark:bg-card lg:h-[calc(100vh-8.5rem)]">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-none bg-white dark:bg-card sm:rounded-md lg:h-[calc(100vh-8.5rem)]">
             <div className="flex shrink-0 items-center justify-between gap-3 px-2 py-2 lg:px-1 lg:py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link
@@ -1364,7 +1361,7 @@ export default function ConversationPage() {
 
             <div
               ref={messagesContainerRef}
-              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] px-3 py-4 dark:bg-background sm:px-4"
+              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] px-3 py-2 dark:bg-background sm:px-4 sm:py-4"
               onPointerCancel={handleMessagesPointerCancel}
               onPointerDown={handleMessagesPointerDown}
               onPointerMove={handleMessagesPointerMove}
@@ -1616,7 +1613,7 @@ export default function ConversationPage() {
             <div className="flex items-start gap-3">
               {conversation?.listing ? (
                 <Link
-                  href={`/listings/${conversation.listing.id}`}
+                  href={conversationListingHref ?? '/conversations'}
                   className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                 >
                   <img
@@ -1643,7 +1640,7 @@ export default function ConversationPage() {
                 </div>
                 {conversation?.listing ? (
                   <Link
-                    href={`/listings/${conversation.listing.id}`}
+                    href={conversationListingHref ?? '/conversations'}
                     className="line-clamp-2 text-sm font-bold leading-6 transition hover:text-blue-600"
                   >
                     {conversation.listing.title ?? 'إعلان غير متاح'}

@@ -27,7 +27,7 @@ type FollowsPayload = {
 };
 
 function encodeSellerHref(userId: string) {
-  return `/sellers/${encodeURIComponent(userId)}`;
+  return `/sellers/${encodeURIComponent(userId)}?source=follows`;
 }
 
 function formatFollowDate(value: string) {

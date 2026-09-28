@@ -17,7 +17,7 @@ test('listing details links to the public seller profile without exposing privat
 
   assert.match(page, /getPublicSellerProfile/);
   assert.match(page, /export const dynamic = 'force-dynamic'/);
-  assert.match(page, /encodeURIComponent\(listing\.sellerId\)/);
+  assert.match(page, /getSellerProfileHref\(listing\.sellerId, listing\.id\)/);
   assert.match(page, /href=\{sellerProfileHref\}/);
   assert.match(page, /\u0627\u0644\u0645\u0639\u0644\u0646/u);
   assert.ok(sellerLabelIndex !== -1 && galleryIndex !== -1);
@@ -43,21 +43,51 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /export const dynamic = 'force-dynamic'/);
   assert.match(page, /decodeURIComponent\(rawSellerId\)/);
   assert.match(page, /source === 'admin-users'/);
-  assert.match(page, /const returnHref = isAdminUsersSource \? '\/admin\/users' : '\/'/);
+  assert.match(page, /getSellerReturnHref/);
+  assert.match(page, /source === 'conversation'/);
+  assert.match(page, /source === 'listing'/);
+  assert.match(page, /source === 'follows'/);
+  assert.doesNotMatch(page, /returnUrl/);
   assert.doesNotMatch(page, /العودة لإدارة المستخدمين/);
   assert.doesNotMatch(page, /العودة للسوق/);
   assert.match(page, /notFound\(\)/);
-  assert.match(page, /href=\{`\/listings\/\$\{listing\.id\}`\}/);
+  assert.match(page, /getSellerListingHref\(listing\.id, seller\.id, resolvedSearchParams\)/);
   assert.match(page, /SellerProfileActions/);
   assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
   assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
   assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
-  assert.match(page, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
-  assert.match(page, /sm:grid-cols-\[7rem_minmax\(0,1fr\)_auto\]/);
-  assert.match(page, /className="truncate text-sm font-bold"/);
+  assert.match(page, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
+  assert.match(page, /sm:grid-cols-\[7\.25rem_minmax\(0,1fr\)\]/);
+  assert.match(page, /formatListingRelativeTime/);
+  assert.match(page, /aspect-square min-h-\[6\.25rem\]/);
+  assert.match(page, /line-clamp-2 text-\[13px\] font-bold/);
   assert.match(page, /إعلانات المعلن/);
   assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
   assert.doesNotMatch(page, /seller\.email/);
+});
+
+test('listing and seller pages keep return navigation on whitelisted sources only', () => {
+  const listingPage = readSource('app/listings/[listingId]/page.tsx');
+  const sellerPage = readSource('app/sellers/[sellerId]/page.tsx');
+  const conversationPage = readSource('app/conversations/[conversationId]/page.tsx');
+  const favoritesPage = readSource('app/favorites/page.tsx');
+  const accountListingsPage = readSource('app/account/listings/page.tsx');
+  const followsPage = readSource('app/account/follows/page.tsx');
+
+  assert.match(listingPage, /getListingReturnHref/);
+  assert.match(listingPage, /source === 'conversation'/);
+  assert.match(listingPage, /source === 'seller'/);
+  assert.match(listingPage, /source === 'favorites'/);
+  assert.match(listingPage, /source === 'account-listings'/);
+  assert.match(listingPage, /getSellerProfileHref\(listing\.sellerId, listing\.id\)/);
+  assert.doesNotMatch(listingPage, /returnUrl/);
+  assert.doesNotMatch(sellerPage, /returnUrl/);
+
+  assert.match(conversationPage, /source=conversation&conversationId=/);
+  assert.match(conversationPage, /conversationListingHref/);
+  assert.match(favoritesPage, /source=favorites/);
+  assert.match(accountListingsPage, /source=account-listings/);
+  assert.match(followsPage, /source=follows/);
 });
 
 test('public seller profile exposes real trust actions without private seller APIs', () => {

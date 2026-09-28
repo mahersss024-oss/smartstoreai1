@@ -45,10 +45,33 @@ test('primary mobile navigation closes the visible assistant chat view only', ()
   assert.match(closeNavigationHandler, /setIsMobileChatViewOpen\(false\)/);
   assert.match(closeNavigationHandler, /resetChatKeyboardState\(\)/);
   assert.match(closeNavigationHandler, /url\.searchParams\.delete\('chat'\)/);
+  assert.match(closeNavigationHandler, /url\.searchParams\.delete\('assistant'\)/);
+  assert.match(closeNavigationHandler, /url\.searchParams\.delete\('listingId'\)/);
   assert.doesNotMatch(closeNavigationHandler, /clearHomeAssistantRuntimeState/);
   assert.match(mobileNavigation, /closeAssistantViewForPrimaryNavigation/);
   assert.match(mobileNavigation, /href !== '\/' && href !== '\/account'/);
   assert.match(mobileNavigation, /smartstore:close-assistant-view/);
+});
+
+test('listing details can open Hamad with listing context and return to the listing', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+
+  assert.match(listingPage, /getListingAssistantHref/);
+  assert.match(listingPage, /assistant=listing&listingId=/);
+  assert.match(listingPage, /listingAssistantHref/);
+  assert.match(listingPage, /aria-label="حمد"/);
+  assert.match(listingPage, /hamad-assistant-bubble\.webp/);
+  assert.match(homePage, /isSafeListingId/);
+  assert.match(homePage, /const \[assistantReturnListingId, setAssistantReturnListingId\]/);
+  assert.match(homePage, /handledListingAssistantRef/);
+  assert.match(homePage, /url\.searchParams\.get\('assistant'\)/);
+  assert.match(homePage, /url\.searchParams\.get\('listingId'\)/);
+  assert.match(homePage, /assistantMode !== 'listing'/);
+  assert.match(homePage, /sendStarter\(`قارن لي الإعلان رقم \$\{listingId\} مع السوق`\)/);
+  assert.match(homePage, /assistantReturnListingHref/);
+  assert.match(homePage, /href=\{assistantReturnListingHref\}/);
+  assert.match(homePage, /aria-label="العودة للإعلان"/);
 });
 
 test('mobile chat view resets keyboard tracking when opened or closed', () => {

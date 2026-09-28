@@ -23,6 +23,7 @@ import {
   ChevronRight,
   BadgeCheck,
   Bot,
+  Clock3,
   Heart,
   ImageIcon,
   Loader2,
@@ -115,6 +116,7 @@ type ListingCard = {
   status?: string;
   stats?: string;
   description?: string;
+  timeLabel?: string;
 };
 
 type SelectedListingContext = Pick<
@@ -135,6 +137,8 @@ type ApiListingRecord = {
   views?: number;
   messageCount?: number;
   favoriteCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
   images?: Array<{
     displayUrl?: string;
     originalUrl?: string;
@@ -197,6 +201,10 @@ function writeHomeAssistantRuntimeState(state: HomeAssistantRuntimeState) {
 
 function clearHomeAssistantRuntimeState() {
   homeAssistantRuntimeState = null;
+}
+
+function isSafeListingId(value: string | null): value is string {
+  return Boolean(value && /^[a-zA-Z0-9_-]+$/.test(value));
 }
 
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
@@ -1178,11 +1186,47 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
         primaryImage?.originalUrl,
       ) ?? null,
     status: formatListingStatus(listing.status),
+    timeLabel: formatListingRelativeTime(listing.updatedAt ?? listing.createdAt),
     stats:
       typeof listing.views === 'number'
         ? `${listing.views} مشاهدة · ${listing.messageCount ?? 0} رسائل`
         : undefined,
   };
+}
+
+function formatListingRelativeTime(value: string | undefined) {
+  if (!value) {
+    return 'وقت غير محدد';
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return 'وقت غير محدد';
+  }
+
+  const minutes = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+
+  if (minutes < 60) {
+    return `منذ ${minutes} دقيقة`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `منذ ${hours} ساعة`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 30) {
+    return `منذ ${days} يوم`;
+  }
+
+  return new Intl.DateTimeFormat('ar-SA', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(timestamp));
 }
 
 function SignInCard({ text }: { text: string }) {
@@ -1441,8 +1485,8 @@ function ListingCardView({
     return (
       <article
         className={cn(
-          'marketplace-listing-card group relative grid w-full min-w-0 cursor-pointer grid-cols-[5.75rem_minmax(0,1fr)] overflow-hidden rounded-md border bg-white text-right shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:grid-cols-[7.25rem_minmax(0,1fr)]',
-          '[contain-intrinsic-size:160px] [content-visibility:auto]',
+          'marketplace-listing-card group relative grid w-full min-w-0 cursor-pointer grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]',
+          '[contain-intrinsic-size:126px] [content-visibility:auto]',
           className,
         )}
         onClick={() => onOpen(listing)}
@@ -1456,12 +1500,12 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <div className="relative aspect-square self-start bg-slate-100 dark:bg-slate-900">
+        <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
               <img
                 alt={listing.title}
-                className="h-full w-full object-contain"
+                className="h-full w-full object-cover"
                 decoding="async"
                 loading="lazy"
                 onError={(event) => showImageFallback(event.currentTarget)}
@@ -1482,62 +1526,29 @@ function ListingCardView({
               </div>
             </div>
           )}
-          {!isOwnListing && (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className={cn(
-                'absolute left-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white',
-                isFavorite
-                  ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
-                  : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
-              )}
-              aria-label="حفظ الإعلان"
-              aria-pressed={isFavorite}
-              onClick={(event) => {
-                event.stopPropagation();
-                onFavorite(listing);
-              }}
-            >
-              <Heart className={cn('size-3.5', isFavorite && 'fill-current')} />
-            </Button>
-          )}
         </div>
-        <div className="flex min-w-0 flex-col gap-0.5 p-1.5 sm:p-2">
-          <h3 className="line-clamp-1 text-[12px] font-bold leading-5 sm:text-[13px]">
+        <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
+          <h3 className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300 sm:text-sm">
             {listing.title}
           </h3>
-          <div className="text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300">
+          <div className="text-[15px] font-black leading-6 text-slate-900 dark:text-white">
             {listing.price}
           </div>
-          <div className="flex items-center gap-1 text-[10px] leading-4 text-muted-foreground">
-            <MapPin className="size-3" />
-            <span className="truncate">{listing.city}</span>
-          </div>
-          <div className="mt-auto flex items-center justify-between gap-2">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold leading-4 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-              <BadgeCheck className="size-2.5" />
-              {listing.status ?? 'موثق'}
+          <div className="flex min-w-0 items-center gap-2 text-[11px] leading-5 text-muted-foreground">
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <Clock3 className="size-3.5 shrink-0" />
+              <span className="truncate">{listing.timeLabel ?? 'وقت غير محدد'}</span>
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <MapPin className="size-3.5 shrink-0" />
+              <span className="truncate">{listing.city}</span>
             </span>
           </div>
-          <div className="flex justify-end border-t pt-1">
-            <Button
-              size="icon-sm"
-              variant="outline"
-              className="size-6 rounded-md"
-              aria-label="مقارنة الإعلان"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAsk(
-                  listing.id
-                    ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
-                    : `قارن لي إعلان ${listing.title} بالسوق`,
-                  listing,
-                );
-              }}
-            >
-              <Sparkles className="size-3.5" />
-            </Button>
+          <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-5 text-muted-foreground">
+            <span className="truncate">{listing.category ?? listing.status ?? 'إعلان'}</span>
+            {listing.stats && (
+              <span className="truncate text-[10px]">{listing.stats}</span>
+            )}
           </div>
         </div>
       </article>
@@ -1821,6 +1832,8 @@ export default function Page() {
   const [assistantState, setAssistantState] =
     useState<AssistantState>('collapsed');
   const [isMobileChatViewOpen, setIsMobileChatViewOpen] = useState(false);
+  const [assistantReturnListingId, setAssistantReturnListingId] =
+    useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(true);
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
@@ -1836,6 +1849,7 @@ export default function Page() {
   const assistantBubbleDragRef = useRef<AssistantBubbleDragState | null>(null);
   const assistantBubbleRef = useRef<HTMLButtonElement | null>(null);
   const lastAssistantBubbleMessageIdRef = useRef<string | null>(null);
+  const handledListingAssistantRef = useRef<string | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const chatInputContainerRef = useRef<HTMLDivElement | null>(null);
@@ -2417,10 +2431,14 @@ export default function Page() {
 
   const closeMobileChatView = useCallback(() => {
     setIsMobileChatViewOpen(false);
+    setAssistantReturnListingId(null);
+    handledListingAssistantRef.current = null;
     resetChatKeyboardState();
 
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
+    url.searchParams.delete('assistant');
+    url.searchParams.delete('listingId');
     window.history.replaceState(null, '', url);
     window.dispatchEvent(new Event('smartstore:assistant-chat-view-change'));
     restoreMarketplaceScroll();
@@ -2428,11 +2446,15 @@ export default function Page() {
 
   const closeAssistantForNavigation = useCallback(() => {
     setIsMobileChatViewOpen(false);
+    setAssistantReturnListingId(null);
+    handledListingAssistantRef.current = null;
     resetChatKeyboardState();
     collapseAssistant();
 
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
+    url.searchParams.delete('assistant');
+    url.searchParams.delete('listingId');
     window.history.replaceState(null, '', url);
     window.dispatchEvent(new Event('smartstore:assistant-chat-view-change'));
   }, [collapseAssistant, resetChatKeyboardState]);
@@ -3267,6 +3289,31 @@ export default function Page() {
     ],
   );
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const assistantMode = url.searchParams.get('assistant');
+    const listingId = url.searchParams.get('listingId');
+
+    if (assistantMode !== 'listing' || !isSafeListingId(listingId)) {
+      setAssistantReturnListingId(null);
+      handledListingAssistantRef.current = null;
+      return;
+    }
+
+    setAssistantReturnListingId(listingId);
+
+    if (
+      handledListingAssistantRef.current === listingId ||
+      isLoading ||
+      !hasRestoredChat
+    ) {
+      return;
+    }
+
+    handledListingAssistantRef.current = listingId;
+    sendStarter(`قارن لي الإعلان رقم ${listingId} مع السوق`);
+  }, [hasRestoredChat, isLoading, sendStarter]);
+
   const submitManualListing = useCallback(async (options?: { publishAfterSave?: boolean }) => {
     if (isSubmittingManualListing) {
       return;
@@ -3684,10 +3731,16 @@ export default function Page() {
     setMessages([]);
     setActiveListingQuery('');
     setSelectedListingContext(null);
+    setAssistantReturnListingId(null);
+    handledListingAssistantRef.current = null;
     retainedListingImagesRef.current = [];
     shouldResetSearchStateRef.current = true;
     clearHomeAssistantRuntimeState();
     clearStoredChatState();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('assistant');
+    url.searchParams.delete('listingId');
+    window.history.replaceState(null, '', url);
     void clearRetainedListingImages().catch(() => {});
     void resetAssistantSearchState().catch(() => {});
   }, [setMessages]);
@@ -3697,6 +3750,9 @@ export default function Page() {
   }, []);
 
   const isCompactChatView = isCompactViewport && isMobileChatViewOpen;
+  const assistantReturnListingHref = assistantReturnListingId
+    ? `/listings/${encodeURIComponent(assistantReturnListingId)}`
+    : null;
   const shouldRenderAssistantPanel = !isCompactViewport || isCompactChatView;
   const isAssistantContentVisible =
     !isCompactViewport || isAssistantExpanded || isCompactChatView;
@@ -4368,7 +4424,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="grid max-w-3xl gap-3">
+              <div className="grid max-w-3xl gap-1.5">
                 {exploreMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
@@ -4452,7 +4508,20 @@ export default function Page() {
                 )}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    {isCompactChatView && (
+                    {assistantReturnListingHref && (
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="icon-sm"
+                        className="rounded-md"
+                        aria-label="العودة للإعلان"
+                      >
+                        <Link href={assistantReturnListingHref}>
+                          <ChevronRight className="size-4" />
+                        </Link>
+                      </Button>
+                    )}
+                    {!assistantReturnListingHref && isCompactChatView && (
                       <Button
                         variant="outline"
                         size="icon-sm"

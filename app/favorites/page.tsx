@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
+import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
@@ -19,6 +19,8 @@ type FavoriteListing = {
   city?: string;
   category: string;
   description?: string;
+  createdAt?: string;
+  updatedAt?: string;
   images?: Array<{
     displayUrl?: string;
     originalUrl?: string;
@@ -68,6 +70,41 @@ function formatPrice(price: FavoriteListing['price']) {
   }
 
   return 'السعر غير محدد';
+}
+
+function formatListingRelativeTime(value: string | undefined) {
+  if (!value) {
+    return 'وقت غير محدد';
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return 'وقت غير محدد';
+  }
+
+  const minutes = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+
+  if (minutes < 60) {
+    return `منذ ${minutes} دقيقة`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `منذ ${hours} ساعة`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 30) {
+    return `منذ ${days} يوم`;
+  }
+
+  return new Intl.DateTimeFormat('ar-SA', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(timestamp));
 }
 
 export default function FavoritesPage() {
@@ -280,14 +317,14 @@ export default function FavoritesPage() {
               </div>
             ) : (
               <div className="grid gap-4">
-                <div className="grid gap-2">
+                <div className="grid gap-1.5">
                   {favorites.map((favorite) => (
                     <Link
                       key={favorite.id}
-                      className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 rounded-md bg-white/70 p-2 transition hover:bg-blue-50/80 dark:bg-card/45 dark:hover:bg-blue-400/10 sm:grid-cols-[7rem_minmax(0,1fr)_auto]"
-                      href={`/listings/${favorite.listingId}`}
+                      className="grid grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                      href={`/listings/${favorite.listingId}?source=favorites`}
                     >
-                      <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
+                      <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
                         <img
                           alt={favorite.listing?.title ?? 'صورة الإعلان'}
                           className="h-full w-full object-cover"
@@ -303,23 +340,33 @@ export default function FavoritesPage() {
                           <ImageIcon className="size-6" />
                         </div>
                       </div>
-                      <div className="grid min-w-0 gap-1.5">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                      <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
+                        <div className="hidden">
                           <Store className="size-3.5 shrink-0" />
                           <span className="truncate">إعلان محفوظ</span>
                         </div>
-                        <h3 className="truncate text-sm font-bold">
+                        <h3 className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300 sm:text-sm">
                           {favorite.listing?.title ?? 'إعلان غير متاح'}
                         </h3>
-                        <div className="text-sm font-bold text-blue-700 sm:hidden">
+                        <div className="text-[15px] font-black leading-6 text-slate-900 dark:text-white">
                           {formatPrice(favorite.listing?.price)}
                         </div>
-                        <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <div className="flex min-w-0 items-center gap-2 text-[11px] leading-5 text-muted-foreground">
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <Clock3 className="size-3.5 shrink-0" />
+                            <span className="truncate">
+                              {formatListingRelativeTime(
+                                favorite.listing?.updatedAt ??
+                                  favorite.listing?.createdAt ??
+                                  favorite.createdAt,
+                              )}
+                            </span>
+                          </span>
                           <MapPin className="size-3.5 shrink-0" />
                           <span className="truncate">{favorite.listing?.city ?? 'السعودية'}</span>
                         </div>
                       </div>
-                      <div className="hidden min-w-32 justify-items-end text-sm sm:grid">
+                      <div className="hidden">
                         <span className="font-bold text-blue-700">
                           {formatPrice(favorite.listing?.price)}
                         </span>

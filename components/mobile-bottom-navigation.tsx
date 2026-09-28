@@ -121,6 +121,7 @@ export function MobileBottomNavigation() {
 
   if (
     isAssistantChatViewOpen ||
+    pathname.startsWith('/conversations/') ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/api')
   ) {
