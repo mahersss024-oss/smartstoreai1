@@ -17,3 +17,7 @@ test('render pins pnpm before install and pre-deploy commands', () => {
 
   assert.equal([...renderConfig.matchAll(pinnedPnpm)].length, 2);
 });
+
+test('render pins the production Node major version', () => {
+  assert.match(renderConfig, /key: NODE_VERSION\s+value: "24"/);
+});

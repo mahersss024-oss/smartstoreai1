@@ -8,6 +8,8 @@ services:
     preDeployCommand: corepack prepare pnpm@10.32.1 --activate && corepack pnpm db:deploy
     startCommand: node scripts/start.mjs
     envVars:
+      - key: NODE_VERSION
+        value: "24"
       - key: NODE_ENV
         value: production
       - key: DEEPSEEK_API_KEY
