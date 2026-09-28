@@ -1463,6 +1463,7 @@ function ListingCardView({
   onAsk,
   onFavorite,
   onOpen,
+  isSmartResult = false,
   style,
   variant = 'grid',
 }: {
@@ -1470,6 +1471,7 @@ function ListingCardView({
   isFavorite: boolean;
   isOwnListing: boolean;
   className?: string;
+  isSmartResult?: boolean;
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
@@ -1520,6 +1522,11 @@ function ListingCardView({
         >
           <Sparkles className="size-3.5 sm:size-4" />
         </Button>
+        {isSmartResult && (
+          <span className="pointer-events-none absolute left-9 top-1.5 z-10 inline-flex h-7 items-center rounded-md border border-sky-200 bg-white/95 px-2 text-[10px] font-bold text-blue-700 shadow-sm ring-1 ring-slate-950/5 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-100 dark:ring-white/10 sm:left-11 sm:top-2 sm:h-8">
+            ذكي
+          </span>
+        )}
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
@@ -4362,36 +4369,21 @@ export default function Page() {
               >
 
               {hasActiveAssistantSearch && (
-                <div className="smart-assistant-results-panel mb-4 grid gap-2.5">
-                  <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm dark:border-blue-400/20 dark:bg-card">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
-                        <Sparkles className="size-3.5" />
-                        بحث نشط
-                      </div>
-                      <p className="mt-1 truncate text-sm font-semibold">
-                        نتائج ذكية من حمد
-                      </p>
+                <div className="smart-assistant-results-panel mb-3 grid gap-1.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-blue-100/80 pb-1.5 text-right dark:border-blue-400/10">
+                    <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-200">
+                      <Sparkles className="size-3.5 shrink-0" />
+                      <span className="truncate">نتائج حمد حسب طلبك</span>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="hidden rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200 sm:inline-flex">
-                        مختارة حسب طلبك
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full"
-                        aria-label="مسح بحث المساعد"
-                        onClick={clearAssistantSearch}
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 text-base font-bold">
-                    <Sparkles className="size-4 text-blue-600" />
-                    الأقرب لطلبك
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-7 shrink-0 rounded-full"
+                      aria-label="مسح بحث المساعد"
+                      onClick={clearAssistantSearch}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
                   </div>
 
                   {assistantResultListings.length > 0 ? (
@@ -4410,6 +4402,7 @@ export default function Page() {
                           onAsk={sendStarter}
                           onFavorite={favoriteListing}
                           onOpen={openListing}
+                          isSmartResult
                           variant="horizontal"
                           style={{
                             animationDelay: `${Math.min(index, 8) * 45}ms`,
