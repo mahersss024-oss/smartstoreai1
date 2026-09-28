@@ -66,6 +66,7 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -3834,6 +3835,7 @@ export default function Page() {
               {session.authenticated ? (
                 <PushNotificationSettings variant="icon" />
               ) : null}
+              <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <>
                   <Button asChild variant="outline" size="sm" className="hidden rounded-md lg:inline-flex">

@@ -1301,6 +1301,7 @@ export function createConversationForListing(listingId: string, buyerId: string)
 
   const existing = [...conversations.values()].find(
     (conversation) =>
+      conversation.listingId === listingId &&
       conversation.sellerId === listing.sellerId &&
       conversation.buyerId === buyerId,
   );

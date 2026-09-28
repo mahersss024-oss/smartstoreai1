@@ -44,10 +44,10 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
 });
 
-test('theme toggle stays in account settings instead of page headers', () => {
+test('theme toggle stays on home and account settings only', () => {
   const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
   const pagesWithoutThemeToggle = [
-    ['app', 'page.tsx'],
     ['app', 'conversations', 'page.tsx'],
     ['app', 'conversations', '[conversationId]', 'page.tsx'],
     ['app', 'favorites', 'page.tsx'],
@@ -56,6 +56,8 @@ test('theme toggle stays in account settings instead of page headers', () => {
   ].map((segments) => readFileSync(join(process.cwd(), ...segments), 'utf8'));
 
   assert.match(accountPage, /<ThemeToggle language="ar" \/>/);
+  assert.match(homePage, /<ThemeToggle language="ar" \/>/);
+  assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
 
   for (const source of pagesWithoutThemeToggle) {
     assert.doesNotMatch(source, /ThemeToggle/);

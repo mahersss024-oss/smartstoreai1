@@ -207,7 +207,7 @@ test('reuses an existing buyer seller conversation for the same listing', () => 
   assert.equal(second.conversation?.id, first.conversation?.id);
 });
 
-test('reuses an existing buyer seller conversation across the same seller listings', () => {
+test('opens a separate buyer seller conversation for a different listing', () => {
   const firstListing = createListingDraft({
     sellerId: 'seller:same-contact-thread',
     category: 'cars',
@@ -231,9 +231,9 @@ test('reuses an existing buyer seller conversation across the same seller listin
   );
 
   assert.equal(first.status, 'created');
-  assert.equal(second.status, 'existing');
-  assert.equal(second.conversation?.id, first.conversation?.id);
-  assert.equal(second.conversation?.listingId, firstListing.id);
+  assert.equal(second.status, 'created');
+  assert.notEqual(second.conversation?.id, first.conversation?.id);
+  assert.equal(second.conversation?.listingId, secondListing.id);
 });
 
 test('stores internal buyer seller messages for conversation participants', () => {

@@ -2844,12 +2844,14 @@ export async function createConversationForListing(
 
   await ensureActorUser(buyer);
 
-  const existing = await prisma.conversation.findFirst({
+  const existing = await prisma.conversation.findUnique({
     where: {
-      sellerId: listing.sellerId,
-      buyerId,
+      listingId_sellerId_buyerId: {
+        listingId,
+        sellerId: listing.sellerId,
+        buyerId,
+      },
     },
-    orderBy: { updatedAt: 'desc' },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
       listing: {
@@ -2903,12 +2905,14 @@ export async function createConversationForListing(
       throw error;
     }
 
-    const racedConversation = await prisma.conversation.findFirst({
+    const racedConversation = await prisma.conversation.findUnique({
       where: {
-        sellerId: listing.sellerId,
-        buyerId,
+        listingId_sellerId_buyerId: {
+          listingId,
+          sellerId: listing.sellerId,
+          buyerId,
+        },
       },
-      orderBy: { updatedAt: 'desc' },
       include: {
         messages: { orderBy: { createdAt: 'asc' } },
         listing: {
