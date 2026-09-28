@@ -878,8 +878,7 @@ export default function ConversationPage() {
 
       if (
         event.type === 'ad_status_changed' &&
-        conversation &&
-        event.payload.listingId === conversation.listingId
+        event.payload.listingId === conversation?.listingId
       ) {
         void refreshConversation({ showLoading: false, clearNotice: false });
         return;
@@ -1571,7 +1570,7 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="customer-conversation-composer grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] dark:bg-card sm:p-2 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))]" onSubmit={sendConversationMessage}>
+            <form className="customer-conversation-composer grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] dark:bg-card sm:p-2 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onSubmit={sendConversationMessage}>
               <Textarea
                 ref={messageInputRef}
                 className="col-start-1 row-start-1 max-h-20 min-h-10 resize-none rounded-full px-4 py-2 text-sm leading-6"
@@ -1596,8 +1595,7 @@ export default function ConversationPage() {
                     className="size-10 rounded-full px-0 text-[0px]"
                     disabled={
                       isSharingContact ||
-                      !conversation ||
-                      conversation.status !== 'open' ||
+                      conversation?.status !== 'open' ||
                       isConversationBlocked
                     }
                     onClick={shareOfficialContact}
