@@ -8,6 +8,7 @@ import {
   PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -436,9 +437,18 @@ export default function ConversationPage() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
   const messageLongPressTimerRef = useRef<number | null>(null);
+  const hasInitialScrollRef = useRef(false);
   const chatTapTrackerRef = useRef<ChatTapTracker>(
     createEmptyChatTapTracker(),
   );
+
+  useEffect(() => {
+    document.body.dataset.smartstoreConversationPage = 'true';
+
+    return () => {
+      delete document.body.dataset.smartstoreConversationPage;
+    };
+  }, []);
 
   const scrollConversationToLatest = useCallback(() => {
     const messagesContainer = messagesContainerRef.current;
@@ -799,8 +809,17 @@ export default function ConversationPage() {
     };
   }, [isSessionLoading, refreshConversation]);
 
-  useEffect(() => {
+  // First render after the conversation messages exist: jump to the latest
+  // message before the browser paints, so the thread never flashes at the top
+  // and shifts down afterwards.
+  useLayoutEffect(() => {
     if (isLoading) {
+      return;
+    }
+
+    if (!hasInitialScrollRef.current) {
+      hasInitialScrollRef.current = true;
+      scrollConversationToLatest();
       return;
     }
 
@@ -1240,11 +1259,11 @@ export default function ConversationPage() {
 
   return (
     <main
-      className="h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground lg:h-auto lg:min-h-screen lg:overflow-visible"
+      className="customer-conversation-page h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground"
       dir="rtl"
       style={mobileConversationStyle}
     >
-      <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-[env(safe-area-inset-bottom)] pt-0 sm:gap-2 sm:px-4 sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pt-2 lg:grid lg:min-h-screen lg:gap-4 lg:px-6 lg:py-5">
+      <div className="customer-conversation-shell mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-[env(safe-area-inset-bottom)] pt-0 sm:gap-2 sm:px-4 sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pt-2 lg:grid lg:h-full lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-4 lg:px-6 lg:py-5">
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-2 py-2 sm:px-1 sm:py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
@@ -1261,8 +1280,8 @@ export default function ConversationPage() {
           </div>
         </header>
 
-        <section className="grid min-h-0 flex-1 lg:py-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-none bg-white dark:bg-card sm:rounded-md lg:h-[calc(100vh-8.5rem)]">
+        <section className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className="customer-conversation-card flex h-full min-h-0 flex-col overflow-hidden rounded-none bg-white dark:bg-card sm:rounded-md">
             <div className="flex shrink-0 items-center justify-between gap-3 px-2 py-2 lg:px-1 lg:py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link
@@ -1361,7 +1380,7 @@ export default function ConversationPage() {
 
             <div
               ref={messagesContainerRef}
-              className="min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] px-3 py-2 dark:bg-background sm:px-4 sm:py-4"
+              className="customer-conversation-messages min-h-0 flex-1 overscroll-contain overflow-y-auto bg-[#f7f9fc] px-3 py-2 dark:bg-background sm:px-4 sm:py-4"
               onPointerCancel={handleMessagesPointerCancel}
               onPointerDown={handleMessagesPointerDown}
               onPointerMove={handleMessagesPointerMove}
@@ -1552,7 +1571,7 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 dark:bg-card sm:p-2" onSubmit={sendConversationMessage}>
+            <form className="customer-conversation-composer grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 dark:bg-card sm:p-2" onSubmit={sendConversationMessage}>
               <Textarea
                 ref={messageInputRef}
                 className="col-start-1 row-start-1 max-h-20 min-h-10 resize-none rounded-full px-4 py-2 text-sm leading-6"
