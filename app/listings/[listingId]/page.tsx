@@ -230,10 +230,6 @@ function getSellerProfileHref(sellerId: string, listingId: string) {
   return `/sellers/${encodeURIComponent(sellerId)}?source=listing&listingId=${encodeURIComponent(listingId)}`;
 }
 
-function getListingAssistantHref(listingId: string) {
-  return `/?chat=1&assistant=listing&listingId=${encodeURIComponent(listingId)}`;
-}
-
 export default async function ListingDetailsPage({ params, searchParams }: PageProps) {
   const { listingId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -253,7 +249,6 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
   const returnHref = getListingReturnHref(resolvedSearchParams);
   const sellerProfileHref = getSellerProfileHref(listing.sellerId, listing.id);
-  const listingAssistantHref = getListingAssistantHref(listing.id);
 
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
@@ -379,20 +374,6 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                   listingId={listing.id}
                   title={listing.title ?? 'إعلان سوق حمد'}
                 />
-                <Button
-                  asChild
-                  className="h-10 rounded-md border-sky-200 bg-white p-0 shadow-sm hover:bg-sky-50 dark:border-sky-400/20 dark:bg-card dark:hover:bg-sky-400/10"
-                  title="حمد"
-                  variant="outline"
-                >
-                  <Link href={listingAssistantHref} aria-label="حمد">
-                    <img
-                      alt=""
-                      className="size-7 rounded-full object-cover"
-                      src="/hamad-assistant-bubble.webp?v=ask-hamad-20260927"
-                    />
-                  </Link>
-                </Button>
               </div>
             </section>
 

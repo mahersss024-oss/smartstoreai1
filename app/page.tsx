@@ -1832,8 +1832,6 @@ export default function Page() {
   const [assistantState, setAssistantState] =
     useState<AssistantState>('collapsed');
   const [isMobileChatViewOpen, setIsMobileChatViewOpen] = useState(false);
-  const [assistantReturnListingId, setAssistantReturnListingId] =
-    useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(true);
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
@@ -2431,7 +2429,6 @@ export default function Page() {
 
   const closeMobileChatView = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    setAssistantReturnListingId(null);
     handledListingAssistantRef.current = null;
     resetChatKeyboardState();
 
@@ -2446,7 +2443,6 @@ export default function Page() {
 
   const closeAssistantForNavigation = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    setAssistantReturnListingId(null);
     handledListingAssistantRef.current = null;
     resetChatKeyboardState();
     collapseAssistant();
@@ -3295,12 +3291,9 @@ export default function Page() {
     const listingId = url.searchParams.get('listingId');
 
     if (assistantMode !== 'listing' || !isSafeListingId(listingId)) {
-      setAssistantReturnListingId(null);
       handledListingAssistantRef.current = null;
       return;
     }
-
-    setAssistantReturnListingId(listingId);
 
     if (
       handledListingAssistantRef.current === listingId ||
@@ -3731,7 +3724,6 @@ export default function Page() {
     setMessages([]);
     setActiveListingQuery('');
     setSelectedListingContext(null);
-    setAssistantReturnListingId(null);
     handledListingAssistantRef.current = null;
     retainedListingImagesRef.current = [];
     shouldResetSearchStateRef.current = true;
@@ -3750,9 +3742,6 @@ export default function Page() {
   }, []);
 
   const isCompactChatView = isCompactViewport && isMobileChatViewOpen;
-  const assistantReturnListingHref = assistantReturnListingId
-    ? `/listings/${encodeURIComponent(assistantReturnListingId)}`
-    : null;
   const shouldRenderAssistantPanel = !isCompactViewport || isCompactChatView;
   const isAssistantContentVisible =
     !isCompactViewport || isAssistantExpanded || isCompactChatView;
@@ -4508,20 +4497,7 @@ export default function Page() {
                 )}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    {assistantReturnListingHref && (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="icon-sm"
-                        className="rounded-md"
-                        aria-label="العودة للإعلان"
-                      >
-                        <Link href={assistantReturnListingHref}>
-                          <ChevronRight className="size-4" />
-                        </Link>
-                      </Button>
-                    )}
-                    {!assistantReturnListingHref && isCompactChatView && (
+                    {isCompactChatView && (
                       <Button
                         variant="outline"
                         size="icon-sm"

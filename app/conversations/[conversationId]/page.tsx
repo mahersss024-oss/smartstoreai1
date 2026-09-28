@@ -464,17 +464,20 @@ export default function ConversationPage() {
   }, []);
 
   const mobileConversationStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!isMessageInputFocused || !visualViewportFrame) {
+    if (!visualViewportFrame) {
       return undefined;
     }
 
     return {
       height: `${visualViewportFrame.height}px`,
       insetInline: '0',
+      maxHeight: `${visualViewportFrame.height}px`,
+      overflow: 'hidden',
       position: 'fixed',
       top: `${visualViewportFrame.offsetTop}px`,
+      width: '100%',
     };
-  }, [isMessageInputFocused, visualViewportFrame]);
+  }, [visualViewportFrame]);
 
   const isSeller = session.user?.id === conversation?.sellerId;
   const otherParticipantId =
@@ -765,12 +768,7 @@ export default function ConversationPage() {
     };
   }, [clearMessageLongPressTimer]);
 
-  useEffect(() => {
-    if (!isMessageInputFocused) {
-      setVisualViewportFrame(null);
-      return;
-    }
-
+  useLayoutEffect(() => {
     const syncVisualViewport = () => {
       const viewport = window.visualViewport;
 
@@ -790,7 +788,7 @@ export default function ConversationPage() {
       window.visualViewport?.removeEventListener('scroll', syncVisualViewport);
       window.removeEventListener('resize', syncVisualViewport);
     };
-  }, [isMessageInputFocused]);
+  }, []);
 
   useEffect(() => {
     if (isSessionLoading) {

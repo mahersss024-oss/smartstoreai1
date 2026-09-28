@@ -53,25 +53,24 @@ test('primary mobile navigation closes the visible assistant chat view only', ()
   assert.match(mobileNavigation, /smartstore:close-assistant-view/);
 });
 
-test('listing details can open Hamad with listing context and return to the listing', () => {
+test('listing details does not show Hamad comparison while home can still return to the listing', () => {
   const homePage = readProjectFile('app', 'page.tsx');
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
 
-  assert.match(listingPage, /getListingAssistantHref/);
-  assert.match(listingPage, /assistant=listing&listingId=/);
-  assert.match(listingPage, /listingAssistantHref/);
-  assert.match(listingPage, /aria-label="حمد"/);
-  assert.match(listingPage, /hamad-assistant-bubble\.webp/);
+  assert.doesNotMatch(listingPage, /getListingAssistantHref/);
+  assert.doesNotMatch(listingPage, /assistant=listing&listingId=/);
+  assert.doesNotMatch(listingPage, /listingAssistantHref/);
+  assert.doesNotMatch(listingPage, /hamad-assistant-bubble\.webp/);
   assert.match(homePage, /isSafeListingId/);
-  assert.match(homePage, /const \[assistantReturnListingId, setAssistantReturnListingId\]/);
+  assert.doesNotMatch(homePage, /const \[assistantReturnListingId, setAssistantReturnListingId\]/);
   assert.match(homePage, /handledListingAssistantRef/);
   assert.match(homePage, /url\.searchParams\.get\('assistant'\)/);
   assert.match(homePage, /url\.searchParams\.get\('listingId'\)/);
   assert.match(homePage, /assistantMode !== 'listing'/);
   assert.match(homePage, /sendStarter\(`قارن لي الإعلان رقم \$\{listingId\} مع السوق`\)/);
-  assert.match(homePage, /assistantReturnListingHref/);
-  assert.match(homePage, /href=\{assistantReturnListingHref\}/);
-  assert.match(homePage, /aria-label="العودة للإعلان"/);
+  assert.doesNotMatch(homePage, /assistantReturnListingHref/);
+  assert.doesNotMatch(homePage, /href=\{assistantReturnListingHref\}/);
+  assert.doesNotMatch(homePage, /aria-label="العودة للإعلان"/);
 });
 
 test('mobile chat view resets keyboard tracking when opened or closed', () => {

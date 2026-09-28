@@ -92,8 +92,33 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /text-\[0px\]/);
   assert.match(source, /window\.visualViewport/);
   assert.match(source, /height: `\$\{visualViewportFrame\.height\}px`/);
+  assert.match(source, /maxHeight: `\$\{visualViewportFrame\.height\}px`/);
+  assert.match(source, /width: '100%'/);
   assert.match(source, /handleMessageInputFocus/);
   assert.match(source, /window\.setTimeout\(scrollConversationToLatest, 180\)/);
+});
+
+test('seller buyer conversation is a fixed page with only messages scrolling', () => {
+  const source = readConversationPage();
+  const globalCss = readFileSync(
+    join(process.cwd(), 'app', 'globals.css'),
+    'utf8',
+  );
+
+  assert.match(source, /document\.body\.dataset\.smartstoreConversationPage = 'true'/);
+  assert.match(source, /delete document\.body\.dataset\.smartstoreConversationPage/);
+  assert.match(source, /className="customer-conversation-page h-dvh overflow-hidden/);
+  assert.match(source, /customer-conversation-shell/);
+  assert.match(source, /customer-conversation-card/);
+  assert.match(source, /customer-conversation-messages min-h-0 flex-1 overscroll-contain overflow-y-auto/);
+  assert.match(source, /customer-conversation-composer/);
+  assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*syncVisualViewport\(\);/);
+  assert.doesNotMatch(source, /if \(!isMessageInputFocused\) \{\s*setVisualViewportFrame\(null\)/);
+  assert.match(globalCss, /body\[data-smartstore-conversation-page\]/);
+  assert.match(globalCss, /overflow: hidden;/);
+  assert.match(globalCss, /overscroll-behavior: none;/);
+  assert.match(globalCss, /padding-bottom: 0;/);
+  assert.doesNotMatch(source, /lg:h-auto lg:min-h-screen lg:overflow-visible/);
 });
 
 test('mobile navigation hides inside an open conversation', () => {
