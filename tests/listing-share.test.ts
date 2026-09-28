@@ -100,6 +100,17 @@ test('listing details localizes visible attribute labels and common values', () 
   assert.match(listingPage, /formatAttributeValue\(key, value\)/);
 });
 
+test('listing details shows the listing age from its creation time', () => {
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+
+  assert.match(listingPage, /function formatRelativeListingTime/);
+  assert.match(listingPage, /Intl\.RelativeTimeFormat\('ar-SA'/);
+  assert.match(listingPage, /نُشر/);
+  assert.match(listingPage, /formatRelativeListingTime\(listing\.createdAt\)/);
+  assert.match(listingPage, /آخر تحديث/);
+  assert.match(listingPage, /formatDate\(listing\.updatedAt\)/);
+});
+
 test('home listing contact button opens listing details instead of asking chat to open a conversation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

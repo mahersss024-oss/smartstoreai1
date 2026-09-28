@@ -473,6 +473,48 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatRelativeListingTime(value: string) {
+  const date = new Date(value);
+  const timestamp = date.getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return 'غير محدد';
+  }
+
+  const diffMs = timestamp - Date.now();
+  const absDiffMs = Math.abs(diffMs);
+  const relativeFormatter = new Intl.RelativeTimeFormat('ar-SA', {
+    numeric: 'auto',
+  });
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (absDiffMs < minute) {
+    return 'الآن';
+  }
+
+  if (absDiffMs < hour) {
+    return relativeFormatter.format(Math.round(diffMs / minute), 'minute');
+  }
+
+  if (absDiffMs < day) {
+    return relativeFormatter.format(Math.round(diffMs / hour), 'hour');
+  }
+
+  if (absDiffMs < month) {
+    return relativeFormatter.format(Math.round(diffMs / day), 'day');
+  }
+
+  if (absDiffMs < year) {
+    return relativeFormatter.format(Math.round(diffMs / month), 'month');
+  }
+
+  return relativeFormatter.format(Math.round(diffMs / year), 'year');
+}
+
 function getSingleSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -778,6 +820,15 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                     الرسائل
                   </span>
                   <strong className="text-foreground">{listing.messageCount}</strong>
+                </div>
+                <div className="flex items-center justify-between gap-2 py-2">
+                  <span className="flex items-center gap-2">
+                    <CalendarDays className="size-4 text-blue-600" />
+                    نُشر
+                  </span>
+                  <strong className="text-foreground">
+                    {formatRelativeListingTime(listing.createdAt)}
+                  </strong>
                 </div>
                 <div className="flex items-center justify-between gap-2 py-2">
                   <span className="flex items-center gap-2">
