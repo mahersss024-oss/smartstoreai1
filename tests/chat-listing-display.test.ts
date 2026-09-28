@@ -84,6 +84,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.doesNotMatch(homePage, /نتيجة مطابقة/);
   assert.match(homePage, /smart-assistant-results-panel/);
   assert.match(homePage, /smart-assistant-result-card/);
+  assert.match(homePage, /smart-assistant-results-grid grid max-w-4xl gap-1\.5 sm:gap-2/);
+  assert.match(homePage, /pb-\[calc\(5rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
   assert.match(homePage, /label: 'أزياء ومستلزمات'/);
@@ -127,6 +129,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
     assert.doesNotMatch(homePage, /formData\.append\('displayImage'/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
+  assert.match(
+    homePage,
+    /assistantResultListings\.map[\s\S]*className="smart-assistant-result-card"[\s\S]*variant="horizontal"/,
+  );
   assert.match(homePage, /const askToCompareListing = \(\) => \{/);
   assert.match(homePage, /absolute left-1\.5 top-1\.5 z-10 size-7/);
   assert.match(homePage, /absolute left-1\.5 top-1\.5 size-7/);

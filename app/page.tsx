@@ -3789,7 +3789,7 @@ export default function Page() {
       />
       <div
         className={cn(
-          'mx-auto grid min-h-screen max-w-7xl gap-3 px-3 py-3 sm:px-6 lg:h-full lg:min-h-0',
+          'mx-auto grid min-h-screen max-w-7xl gap-2 px-1.5 py-2 sm:px-3 md:px-4 lg:h-full lg:min-h-0 lg:gap-3 lg:px-6 lg:py-3',
           isCompactChatView && 'h-dvh min-h-0 max-w-none gap-0 px-0 py-0 sm:px-0',
         )}
       >
@@ -3866,16 +3866,16 @@ export default function Page() {
           >
             {!isCompactChatView && (
             <section
-              className={`min-w-0 border-b bg-white/45 p-3 dark:bg-background/55 sm:p-4 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:pb-4 ${
+              className={`min-w-0 border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:p-4 lg:pb-4 ${
                 isCompactViewport
-                  ? 'pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))]'
+                  ? 'pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))]'
                   : ''
               }`}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
-              <div className="mb-4 flex flex-col gap-3 text-center md:flex-row md:items-center md:justify-end md:text-right">
-                <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="mb-3 grid gap-2 text-center md:justify-end md:text-right">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
                   <Button className="marketplace-primary-cta rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
                   أنشئ إعلانك مع حمد
@@ -4179,7 +4179,7 @@ export default function Page() {
                 </form>
               )}
 
-              <div className="mb-4 grid gap-3">
+              <div className="mb-3 grid gap-2.5">
                 <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <Button
                     type="button"
@@ -4246,8 +4246,8 @@ export default function Page() {
                   </div>
                 )}
 
-                <div className="marketplace-filter-panel grid grid-cols-1 gap-2 rounded-md border bg-white/85 p-2 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <label className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm sm:col-span-3">
+                <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-2 sm:p-2">
+                  <label className="col-span-2 flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm sm:col-span-3">
                     <Search className="size-4 shrink-0 text-blue-600" />
                     <input
                       className="min-w-0 flex-1 bg-transparent text-right outline-none"
@@ -4355,7 +4355,7 @@ export default function Page() {
               </div>
 
               {hasActiveAssistantSearch && (
-                <div className="smart-assistant-results-panel mb-5 grid gap-3">
+                <div className="smart-assistant-results-panel mb-4 grid gap-2.5">
                   <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm dark:border-blue-400/20 dark:bg-card">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
@@ -4388,7 +4388,7 @@ export default function Page() {
                   </div>
 
                   {assistantResultListings.length > 0 ? (
-                    <div className="smart-assistant-results-grid grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(10.25rem,11.5rem))] sm:justify-start">
+                    <div className="smart-assistant-results-grid grid max-w-4xl gap-1.5 sm:gap-2">
                       {assistantResultListings.map((listing, index) => (
                         <ListingCardView
                           key={listing.id ?? listing.title}
@@ -4403,6 +4403,7 @@ export default function Page() {
                           onAsk={sendStarter}
                           onFavorite={favoriteListing}
                           onOpen={openListing}
+                          variant="horizontal"
                           style={{
                             animationDelay: `${Math.min(index, 8) * 45}ms`,
                           }}
@@ -4428,7 +4429,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="grid max-w-3xl gap-1.5">
+              <div className="grid max-w-4xl gap-1.5">
                 {exploreMarketplaceListings.map((listing) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
