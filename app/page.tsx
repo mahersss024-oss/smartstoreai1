@@ -3878,16 +3878,16 @@ export default function Page() {
               onPointerDown={collapseAssistantFromPage}
             >
               <div className="marketplace-home-controls max-h-[min(58dvh,34rem)] shrink-0 overflow-y-auto border-b border-blue-100/70 pb-2 dark:border-blue-400/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="mb-3 grid gap-2 text-center md:justify-end md:text-right">
-                <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                  <Button className="marketplace-primary-cta rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => sendStarter('أريد بيع منتج')}>
+              <div className="mb-2 grid gap-1.5 text-center md:justify-end md:text-right">
+                <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
+                  <Button className="marketplace-primary-cta h-9 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Store className="size-4" />
                   أنشئ إعلانك مع حمد
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-md"
+                    className="h-9 rounded-md px-2 text-sm sm:px-3"
                     onClick={() => {
                       setIsManualListingOpen((value) => !value);
                       setIsManualListingFallbackDismissed(false);
@@ -4183,15 +4183,15 @@ export default function Page() {
                 </form>
               )}
 
-              <div className="mb-3 grid gap-2.5">
-                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mb-2 grid gap-1.5">
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <Button
                     type="button"
                     size="sm"
                     variant={
                       activeMarketCategoryGroup === 'all' ? 'default' : 'outline'
                     }
-                    className="h-9 shrink-0 rounded-full px-4"
+                    className="h-8 shrink-0 rounded-full px-3 text-xs"
                     onClick={() => {
                       setSelectedMarketCategoryGroup('all');
                       setSelectedMarketSubcategory('all');
@@ -4209,7 +4209,7 @@ export default function Page() {
                           ? 'default'
                           : 'outline'
                       }
-                      className="h-9 shrink-0 rounded-full px-4"
+                      className="h-8 shrink-0 rounded-full px-3 text-xs"
                       onClick={() => {
                         setSelectedMarketCategoryGroup(group.label);
                         setSelectedMarketSubcategory('all');
@@ -4221,14 +4221,14 @@ export default function Page() {
                 </div>
 
                 {activeMarketCategoryGroupConfig && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <Button
                       type="button"
                       size="sm"
                       variant={
                         activeMarketSubcategory === 'all' ? 'default' : 'outline'
                       }
-                      className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      className="h-7 shrink-0 rounded-full px-2.5 text-[11px]"
                       onClick={() => setSelectedMarketSubcategory('all')}
                     >
                       كل {activeMarketCategoryGroup}
@@ -4241,7 +4241,7 @@ export default function Page() {
                         variant={
                           activeMarketSubcategory === category ? 'default' : 'outline'
                         }
-                        className="h-8 shrink-0 rounded-full px-3 text-xs"
+                        className="h-7 shrink-0 rounded-full px-2.5 text-[11px]"
                         onClick={() => setSelectedMarketSubcategory(category)}
                       >
                         {category}
@@ -4250,8 +4250,8 @@ export default function Page() {
                   </div>
                 )}
 
-                <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-2 sm:p-2">
-                  <label className="col-span-2 flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm sm:col-span-3">
+                <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_auto_auto] sm:p-2">
+                  <label className="order-1 flex h-10 min-w-0 items-center gap-2 rounded-md border bg-background px-3 text-sm sm:h-9">
                     <Search className="size-4 shrink-0 text-blue-600" />
                     <input
                       className="min-w-0 flex-1 bg-transparent text-right outline-none"
@@ -4280,6 +4280,7 @@ export default function Page() {
                   </label>
                   <CitySelector
                     allValue="all"
+                    className="order-3 sm:order-2 [&>button]:h-9"
                     value={activeMarketCity}
                     onValueChange={(value) => {
                       setSelectedMarketCity(value);
@@ -4295,7 +4296,7 @@ export default function Page() {
                         ? 'default'
                         : 'outline'
                     }
-                    className="h-10 rounded-md"
+                    className="order-4 h-9 rounded-md px-3 sm:order-3"
                     disabled={isLocatingNearbyListings}
                     onClick={handleNearbyMarketplaceSearch}
                     title={'موقعي يحتاج إذن الموقع الجغرافي'}
@@ -4310,11 +4311,11 @@ export default function Page() {
                   <Button
                     type="button"
                     variant={isMarketFilterOpen ? 'default' : 'outline'}
-                    className="h-10 rounded-md"
+                    className="order-2 h-10 w-10 rounded-md px-0 sm:order-4 sm:h-9 sm:w-auto sm:px-3"
                     onClick={() => setIsMarketFilterOpen((value) => !value)}
                   >
                     <SlidersHorizontal className="size-4" />
-                    {'تصفية البحث'}
+                    <span className="sr-only sm:not-sr-only">{'تصفية البحث'}</span>
                     {activeMarketFilterCount > 0 && (
                       <span className="grid size-5 place-items-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-400/20 dark:text-blue-100">
                         {activeMarketFilterCount}
