@@ -17,7 +17,6 @@ import {
   Users,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { useAdminAccess } from './use-admin-access';
 
@@ -148,7 +147,6 @@ export default function AdminHomePage() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {adminAccessNotice && (

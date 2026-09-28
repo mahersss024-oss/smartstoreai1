@@ -18,7 +18,6 @@ import {
   Users,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -929,7 +928,6 @@ export default function AdminModerationPage() {
                 رسوم المنصة
               </Link>
             </Button>
-            <ThemeToggle language="ar" />
           </div>
         </header>
 

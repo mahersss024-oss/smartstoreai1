@@ -698,7 +698,12 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
             />
 
             <section className="grid gap-2 px-1 py-2 sm:px-2">
-              {!isOwnListing && <ListingContactActions listingId={listing.id} />}
+              {!isOwnListing && (
+                <ListingContactActions
+                  listingId={listing.id}
+                  sellerPhoneNumber={sellerProfile?.phoneNumber}
+                />
+              )}
               <div className="grid grid-cols-2 gap-2">
                 {!isOwnListing && (
                   <ListingSafetyActions

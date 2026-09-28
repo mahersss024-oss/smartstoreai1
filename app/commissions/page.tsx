@@ -13,7 +13,6 @@ import {
   Receipt,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -347,7 +346,6 @@ export default function CommissionsPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {(isSessionLoading || isLoading) && !session.authenticated ? (

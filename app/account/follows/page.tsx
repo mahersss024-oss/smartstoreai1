@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, UserPlus } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { Button } from '@ui/button';
@@ -159,7 +158,6 @@ export default function AccountFollowsPage() {
               <h1 className="truncate text-lg font-bold">قائمة المتابعة</h1>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {!isSessionLoading && !isLoading && !session.authenticated ? (

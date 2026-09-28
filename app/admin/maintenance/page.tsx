@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Megaphone, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
@@ -285,7 +284,6 @@ export default function AdminMaintenancePage() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {(adminAccessNotice || notice) && (

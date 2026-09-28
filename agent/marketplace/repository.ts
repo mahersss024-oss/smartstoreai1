@@ -104,6 +104,7 @@ export type PublicSellerProfile = {
   id: string;
   name: string;
   picture?: string;
+  phoneNumber?: string;
   joinedAt?: string;
   role: string;
   publishedListingCount: number;
@@ -778,6 +779,7 @@ export async function getPublicSellerProfile(
       id: sellerId,
       name: getPublicSellerName({ id: sellerId }),
       role: 'user',
+      phoneNumber: undefined,
       publishedListingCount: publishedListings.length,
       ratingAverage: ratingStats.ratingAverage,
       ratingCount: ratingStats.ratingCount,
@@ -799,6 +801,7 @@ export async function getPublicSellerProfile(
         id: true,
         name: true,
         picture: true,
+        phoneNumber: true,
         role: true,
         createdAt: true,
       },
@@ -841,6 +844,7 @@ export async function getPublicSellerProfile(
     id: seller.id,
     name: getPublicSellerName(seller),
     picture: seller.picture ?? undefined,
+    phoneNumber: seller.phoneNumber ?? undefined,
     joinedAt: seller.createdAt.toISOString(),
     role: seller.role,
     publishedListingCount,
@@ -2840,14 +2844,12 @@ export async function createConversationForListing(
 
   await ensureActorUser(buyer);
 
-  const existing = await prisma.conversation.findUnique({
+  const existing = await prisma.conversation.findFirst({
     where: {
-      listingId_sellerId_buyerId: {
-        listingId,
-        sellerId: listing.sellerId,
-        buyerId,
-      },
+      sellerId: listing.sellerId,
+      buyerId,
     },
+    orderBy: { updatedAt: 'desc' },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
       listing: {
@@ -2901,14 +2903,12 @@ export async function createConversationForListing(
       throw error;
     }
 
-    const racedConversation = await prisma.conversation.findUnique({
+    const racedConversation = await prisma.conversation.findFirst({
       where: {
-        listingId_sellerId_buyerId: {
-          listingId,
-          sellerId: listing.sellerId,
-          buyerId,
-        },
+        sellerId: listing.sellerId,
+        buyerId,
       },
+      orderBy: { updatedAt: 'desc' },
       include: {
         messages: { orderBy: { createdAt: 'asc' } },
         listing: {
@@ -3428,32 +3428,24 @@ export async function addConversationMessage(
   };
 }
 
-export async function shareSellerContact(conversationId: string, seller: Actor) {
-  const sellerId = getActorId(seller);
+export async function shareSellerContact(conversationId: string, actor: Actor) {
+  const actorId = getActorId(actor);
 
   if (!shouldUseDatabaseStore()) {
     return memoryStore.shareSellerContact(
       conversationId,
-      sellerId,
-      typeof seller === 'string' ? null : seller.phoneNumber,
+      actorId,
+      typeof actor === 'string' ? null : actor.phoneNumber,
     );
   }
 
-  const conversation = await getConversationForUser(conversationId, sellerId);
+  const conversation = await getConversationForUser(conversationId, actorId);
 
   if (!conversation) {
     return {
       status: 'not_found' as const,
       message: null,
       conversation: null,
-    };
-  }
-
-  if (conversation.sellerId !== sellerId) {
-    return {
-      status: 'not_seller' as const,
-      message: null,
-      conversation,
     };
   }
 
@@ -3465,7 +3457,7 @@ export async function shareSellerContact(conversationId: string, seller: Actor) 
     };
   }
 
-  const blockStatus = await getConversationBlockStatus(conversationId, sellerId);
+  const blockStatus = await getConversationBlockStatus(conversationId, actorId);
 
   if (blockStatus?.blocked) {
     return {
@@ -3476,11 +3468,11 @@ export async function shareSellerContact(conversationId: string, seller: Actor) 
     };
   }
 
-  const sellerProfile = await prisma.user.findUnique({
-    where: { id: sellerId },
+  const actorProfile = await prisma.user.findUnique({
+    where: { id: actorId },
     select: { phoneNumber: true },
   });
-  const phoneNumber = sellerProfile?.phoneNumber;
+  const phoneNumber = actorProfile?.phoneNumber;
 
   if (!phoneNumber) {
     return {
@@ -3493,7 +3485,7 @@ export async function shareSellerContact(conversationId: string, seller: Actor) 
   const message = await prisma.conversationMessage.create({
     data: {
       conversationId,
-      senderId: sellerId,
+      senderId: actorId,
       body: 'official_contact_share',
       status: 'sent',
       type: 'contact_share',
@@ -3509,7 +3501,7 @@ export async function shareSellerContact(conversationId: string, seller: Actor) 
 
   const updatedConversation = await getConversationForUser(
     conversationId,
-    sellerId,
+    actorId,
   );
   const mappedMessage: ConversationMessage = {
     id: message.id,

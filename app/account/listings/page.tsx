@@ -23,7 +23,6 @@ import {
   X,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
@@ -933,7 +932,6 @@ export default function AccountListingsPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <ThemeToggle language="ar" />
             {session.authenticated && (
               <Button variant="outline" size="sm" className="rounded-md px-2 sm:px-3" onClick={handleLogout}>
                 <LogOut className="size-4" />

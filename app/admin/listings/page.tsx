@@ -16,7 +16,6 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { CitySelector } from '@/components/city-selector';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -618,7 +617,6 @@ function AdminListingsPageContent() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {focusedListingId ? (

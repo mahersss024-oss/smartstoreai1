@@ -207,6 +207,35 @@ test('reuses an existing buyer seller conversation for the same listing', () => 
   assert.equal(second.conversation?.id, first.conversation?.id);
 });
 
+test('reuses an existing buyer seller conversation across the same seller listings', () => {
+  const firstListing = createListingDraft({
+    sellerId: 'seller:same-contact-thread',
+    category: 'cars',
+    title: 'سيارة أولى للبيع',
+  });
+  const secondListing = createListingDraft({
+    sellerId: 'seller:same-contact-thread',
+    category: 'cars',
+    title: 'سيارة ثانية للبيع',
+  });
+  publishListing(firstListing.id);
+  publishListing(secondListing.id);
+
+  const first = createConversationForListing(
+    firstListing.id,
+    'buyer:same-contact-thread',
+  );
+  const second = createConversationForListing(
+    secondListing.id,
+    'buyer:same-contact-thread',
+  );
+
+  assert.equal(first.status, 'created');
+  assert.equal(second.status, 'existing');
+  assert.equal(second.conversation?.id, first.conversation?.id);
+  assert.equal(second.conversation?.listingId, firstListing.id);
+});
+
 test('stores internal buyer seller messages for conversation participants', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-1',
@@ -325,7 +354,7 @@ test('allows manual direct contact for inspection coordination', () => {
   assert.equal(sent.message?.body, 'ممكن موعد معاينة اليوم مساءً وهذا رقمي 0501234567');
 });
 
-test('lets the seller share the official saved phone number', () => {
+test('lets conversation participants share an official saved phone number', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-4',
     category: 'cars',
@@ -343,6 +372,15 @@ test('lets the seller share the official saved phone number', () => {
   assert.equal(shared.status, 'shared');
   assert.equal(shared.message?.type, 'contact_share');
   assert.equal(shared.message?.metadata.phoneNumber, '+966501234567');
+  const buyerShared = shareSellerContact(
+    opened.conversation?.id ?? '',
+    'buyer:messages-4',
+    '+966509999999',
+  );
+
+  assert.equal(buyerShared.status, 'shared');
+  assert.equal(buyerShared.message?.type, 'contact_share');
+  assert.equal(buyerShared.message?.metadata.phoneNumber, '+966509999999');
   assert.equal(
     getConversationForUser(opened.conversation?.id ?? '', 'buyer:messages-4')
       ?.messages[0]?.type,
@@ -350,7 +388,7 @@ test('lets the seller share the official saved phone number', () => {
   );
 });
 
-test('requires a saved seller phone before official contact sharing', () => {
+test('requires a saved phone before official contact sharing', () => {
   const listing = createListingDraft({
     sellerId: 'seller:messages-5',
     category: 'cars',

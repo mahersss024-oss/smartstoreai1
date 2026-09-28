@@ -11,7 +11,6 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -348,9 +347,6 @@ export default function ConversationsPage() {
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">محادثاتي</h1>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle language="ar" />
           </div>
         </header>
 

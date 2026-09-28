@@ -41,7 +41,7 @@ test('listing owner details page keeps only share action visible', () => {
 
   assert.match(listingPage, /getAuthSession/);
   assert.match(listingPage, /const isOwnListing = session\?\.user\.id === listing\.sellerId/);
-  assert.match(listingPage, /!\s*isOwnListing && <ListingContactActions/);
+  assert.match(listingPage, /!\s*isOwnListing && \(\s*<ListingContactActions/);
   assert.match(listingPage, /!\s*isOwnListing && \(/);
   assert.match(listingPage, /isOwnListing \? 'col-span-2' : ''/);
   assert.match(listingPage, /isOwnListing=\{isOwnListing\}/);
@@ -116,6 +116,28 @@ test('home listing contact button opens listing details instead of asking chat t
 
   assert.match(homePage, /onOpen\(listing\)/);
   assert.doesNotMatch(homePage, /أريد التواصل مع البائع بخصوص الإعلان رقم/);
+});
+
+test('listing contact passes the selected listing into the conversation page', () => {
+  const contactActions = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'contact-actions.tsx',
+  );
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const repository = readProjectFile('agent', 'marketplace', 'repository.ts');
+
+  assert.match(contactActions, /\?listingId=\$\{encodeURIComponent\(listingId\)\}/);
+  assert.match(contactActions, /sellerPhoneNumber/);
+  assert.match(contactActions, /cleanSellerPhoneNumber/);
+  assert.match(contactActions, /href=\{`tel:\$\{cleanSellerPhoneNumber\}`\}/);
+  assert.match(contactActions, /setIsContactSheetOpen\(true\)/);
+  assert.match(contactActions, /مراسلة داخل سوق حمد/);
+  assert.match(contactActions, /التواصل مع المعلن/);
+  assert.match(listingPage, /sellerPhoneNumber=\{sellerProfile\?\.phoneNumber\}/);
+  assert.match(repository, /phoneNumber\?: string/);
+  assert.match(repository, /phoneNumber: true/);
 });
 
 test('assistant marketplace context can share real listing links without opening conversations', () => {

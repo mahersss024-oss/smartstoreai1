@@ -438,7 +438,6 @@ export default function AccountPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <ThemeToggle language="ar" />
             {session.authenticated && (
               <Button variant="outline" size="sm" className="rounded-md px-2 sm:px-3" onClick={handleLogout}>
                 <LogOut className="size-4" />
@@ -710,7 +709,7 @@ export default function AccountPage() {
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-bold">بيانات التواصل الرسمية</h2>
                   <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    يستخدم هذا الرقم لاحقًا عند مشاركة التواصل داخل محادثة بيع رسمية، ولا يتم السماح بإرساله كنص عشوائي داخل الرسائل.
+                    يستخدم هذا الرقم عند مشاركة التواصل رسميًا داخل المحادثة. يمكنك أيضًا كتابة رقمك يدويًا، وسيظهر تنبيه أمان بدون منع الإرسال.
                   </p>
                 </div>
               </div>
@@ -786,6 +785,18 @@ export default function AccountPage() {
                   {profileNotice.message}
                 </div>
               ) : null}
+            </section>
+
+            <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold">المظهر</h2>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                    اختر الوضع الليلي أو الفاتح من هنا بدل ظهوره في كل الصفحات.
+                  </p>
+                </div>
+                <ThemeToggle language="ar" />
+              </div>
             </section>
 
             <PushNotificationSettings />

@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -237,7 +236,6 @@ export default function AdminCommissionsPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {(adminAccessNotice || notice) && (

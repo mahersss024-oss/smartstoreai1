@@ -190,8 +190,14 @@ test('seller buyer conversation header shows the other customer, not the listing
 test('seller buyer conversation shows a compact listing card linking to details', () => {
   const source = readConversationPage();
 
+  assert.match(source, /useSearchParams/);
+  assert.match(source, /entryListingId/);
+  assert.match(source, /\/api\/marketplace\/listings\/\$\{encodeURIComponent\(entryListingId\)\}/);
+  assert.match(source, /entryListing\.sellerId === conversation\?\.sellerId/);
+  assert.match(source, /displayListing/);
   assert.match(source, /conversationListingHref/);
   assert.match(source, /source=conversation&conversationId=/);
+  assert.match(source, /lg:hidden/);
   assert.match(source, /className="size-20 shrink-0/);
   assert.match(source, /className="line-clamp-2 text-sm font-bold/);
   assert.doesNotMatch(source, /className="aspect-square w-full rounded-md object-cover"/);
@@ -234,6 +240,9 @@ test('seller buyer conversation hides blocked messages and uses official contact
   assert.match(source, /message\.type === 'contact_share'/);
   assert.match(source, /مشاركة الرقم/);
   assert.match(source, /مشاركة معلومات التواصل أو الدفع خارج المنصة مسؤوليتك/);
+  assert.match(source, /draftHasManualContact &&/);
+  assert.doesNotMatch(source, /draftHasManualContact \|\|\s*isSending/);
+  assert.doesNotMatch(source, /draftHasManualContact \|\|\s*conversation\?\.status/);
   assert.doesNotMatch(source, /لا يمكن إرسال أرقام الجوال أو الإيميلات يدويًا/);
   assert.doesNotMatch(source, /محجوبة/);
 });

@@ -1301,7 +1301,6 @@ export function createConversationForListing(listingId: string, buyerId: string)
 
   const existing = [...conversations.values()].find(
     (conversation) =>
-      conversation.listingId === listingId &&
       conversation.sellerId === listing.sellerId &&
       conversation.buyerId === buyerId,
   );
@@ -1417,7 +1416,7 @@ export function addConversationMessage(
 
 export function shareSellerContact(
   conversationId: string,
-  sellerId: string,
+  userId: string,
   phoneNumber?: string | null,
 ) {
   seedListings();
@@ -1431,19 +1430,11 @@ export function shareSellerContact(
     };
   }
 
-  if (conversation.buyerId !== sellerId && conversation.sellerId !== sellerId) {
+  if (conversation.buyerId !== userId && conversation.sellerId !== userId) {
     return {
       status: 'not_found' as const,
       message: null,
       conversation: null,
-    };
-  }
-
-  if (conversation.sellerId !== sellerId) {
-    return {
-      status: 'not_seller' as const,
-      message: null,
-      conversation,
     };
   }
 
@@ -1455,7 +1446,7 @@ export function shareSellerContact(
     };
   }
 
-  const blockStatus = getConversationBlockStatus(conversationId, sellerId);
+  const blockStatus = getConversationBlockStatus(conversationId, userId);
 
   if (blockStatus?.blocked) {
     return {
@@ -1478,7 +1469,7 @@ export function shareSellerContact(
   const message: ConversationMessage = {
     id: randomUUID(),
     conversationId,
-    senderId: sellerId,
+    senderId: userId,
     body: 'official_contact_share',
     status: 'sent',
     type: 'contact_share',

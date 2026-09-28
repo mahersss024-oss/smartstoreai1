@@ -18,7 +18,6 @@ import {
   Users,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
@@ -450,7 +449,6 @@ export default function AdminUsersPage() {
             <Button variant="outline" className="rounded-md" onClick={() => void refreshUsers(1)}>
               تحديث
             </Button>
-            <ThemeToggle language="ar" />
           </div>
         </header>
 

@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Percent, ShieldCheck, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 
 export default function CommissionAgreementPage() {
@@ -69,7 +68,6 @@ export default function CommissionAgreementPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         <section className="grid gap-5 p-5 md:grid-cols-[16rem_1fr]">

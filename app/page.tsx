@@ -77,7 +77,6 @@ import {
   getExploreListings,
 } from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
@@ -3835,7 +3834,6 @@ export default function Page() {
               {session.authenticated ? (
                 <PushNotificationSettings variant="icon" />
               ) : null}
-              <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <>
                   <Button asChild variant="outline" size="sm" className="hidden rounded-md lg:inline-flex">

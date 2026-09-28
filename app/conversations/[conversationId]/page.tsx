@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   Ban,
@@ -27,7 +27,6 @@ import {
   Unlock,
 } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -58,6 +57,7 @@ type ConversationMessage = {
 
 type ConversationListing = {
   id: string;
+  sellerId?: string;
   title?: string;
   price?: number | 'bid' | 'negotiable';
   city?: string;
@@ -411,9 +411,14 @@ function createEmptyChatTapTracker(): ChatTapTracker {
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams<{ conversationId: string }>();
+  const searchParams = useSearchParams();
   const conversationId = params.conversationId;
+  const entryListingId = searchParams.get('listingId')?.trim() ?? '';
   const { isSessionLoading, session } = useAuthSession();
   const [conversation, setConversation] = useState<ConversationRecord | null>(
+    null,
+  );
+  const [entryListing, setEntryListing] = useState<ConversationListing | null>(
     null,
   );
   const [draft, setDraft] = useState('');
@@ -479,7 +484,6 @@ export default function ConversationPage() {
     };
   }, [visualViewportFrame]);
 
-  const isSeller = session.user?.id === conversation?.sellerId;
   const otherParticipantId =
     conversation && session.user?.id
       ? session.user.id === conversation.sellerId
@@ -499,8 +503,12 @@ export default function ConversationPage() {
   const otherParticipantProfileHref = otherParticipantId
     ? `/sellers/${encodeURIComponent(otherParticipantId)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
     : '/conversations';
-  const conversationListingHref = conversation?.listing
-    ? `/listings/${encodeURIComponent(conversation.listing.id)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
+  const displayListing =
+    entryListing && entryListing.sellerId === conversation?.sellerId
+      ? entryListing
+      : conversation?.listing;
+  const conversationListingHref = displayListing
+    ? `/listings/${encodeURIComponent(displayListing.id)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
     : null;
   const visibleMessages = useMemo(
     () =>
@@ -755,6 +763,49 @@ export default function ConversationPage() {
   }, [conversationId, router, session.authenticated]);
 
   useEffect(() => {
+    if (!entryListingId || entryListingId === conversation?.listing?.id) {
+      setEntryListing(null);
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadEntryListing() {
+      try {
+        const response = await fetch(
+          `/api/marketplace/listings/${encodeURIComponent(entryListingId)}`,
+          { cache: 'no-store' },
+        );
+
+        if (!response.ok) {
+          if (isActive) {
+            setEntryListing(null);
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          listing?: ConversationListing | null;
+        };
+
+        if (isActive) {
+          setEntryListing(payload.listing ?? null);
+        }
+      } catch {
+        if (isActive) {
+          setEntryListing(null);
+        }
+      }
+    }
+
+    void loadEntryListing();
+
+    return () => {
+      isActive = false;
+    };
+  }, [conversation?.listing?.id, entryListingId]);
+
+  useEffect(() => {
     const onPullRefresh = () => {
       void refreshConversation({ showLoading: false, clearNotice: false });
     };
@@ -912,7 +963,6 @@ export default function ConversationPage() {
 
       if (
         !messageBody ||
-        draftHasManualContact ||
         isSending ||
         conversation?.status !== 'open' ||
         isConversationBlocked
@@ -988,7 +1038,6 @@ export default function ConversationPage() {
       conversationId,
       conversation?.status,
       draft,
-      draftHasManualContact,
       isConversationBlocked,
       isSending,
       refreshConversation,
@@ -1006,7 +1055,6 @@ export default function ConversationPage() {
 
       if (
         !draft.trim() ||
-        draftHasManualContact ||
         isSending ||
         conversation?.status !== 'open' ||
         isConversationBlocked
@@ -1019,7 +1067,6 @@ export default function ConversationPage() {
     [
       conversation?.status,
       draft,
-      draftHasManualContact,
       isConversationBlocked,
       isSending,
     ],
@@ -1071,7 +1118,7 @@ export default function ConversationPage() {
         );
       }
 
-      if (payload.error === 'seller_phone_required') {
+      if (payload.error === 'contact_phone_required') {
         setNotice(
           'أضف رقم الجوال من صفحة حسابي أولًا، ثم ارجع للمحادثة لمشاركته رسميًا.',
         );
@@ -1089,7 +1136,7 @@ export default function ConversationPage() {
         return;
       }
 
-      setNotice('تمت مشاركة رقم التواصل الرسمي داخل المحادثة.');
+      setNotice('تمت مشاركة رقم التواصل الرسمي داخل المحادثة. تنبيه: لا تحول أي مبالغ قبل المعاينة والتأكد.');
       void refreshConversation({ showLoading: false, clearNotice: false });
     } finally {
       setIsSharingContact(false);
@@ -1285,9 +1332,6 @@ export default function ConversationPage() {
               <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle language="ar" />
-          </div>
         </header>
 
         <section className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -1385,6 +1429,52 @@ export default function ConversationPage() {
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t bg-white px-3 py-2 dark:bg-card lg:hidden">
+              <div className="flex items-center gap-2">
+                {displayListing ? (
+                  <Link
+                    href={conversationListingHref ?? '/conversations'}
+                    className="size-12 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
+                  >
+                    <img
+                      alt={displayListing.title ?? 'صورة الإعلان'}
+                      className="size-full object-cover"
+                      decoding="async"
+                      loading="lazy"
+                      src={getListingImage(displayListing)}
+                    />
+                  </Link>
+                ) : (
+                  <img
+                    alt="صورة الإعلان"
+                    className="size-12 shrink-0 rounded-md object-cover"
+                    decoding="async"
+                    loading="lazy"
+                    src={missingListingImageDataUrl}
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                    <Store className="size-3.5" />
+                    الإعلان
+                  </div>
+                  {displayListing ? (
+                    <Link
+                      href={conversationListingHref ?? '/conversations'}
+                      className="block truncate text-xs font-bold transition hover:text-blue-600"
+                    >
+                      {displayListing.title ?? 'إعلان غير متاح'}
+                    </Link>
+                  ) : (
+                    <h2 className="truncate text-xs font-bold">إعلان غير متاح</h2>
+                  )}
+                  <p className="mt-0.5 truncate text-xs font-bold text-blue-700">
+                    {formatPrice(displayListing?.price)}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1600,29 +1690,26 @@ export default function ConversationPage() {
                 </p>
               )}
               <div className="col-start-2 row-start-1 flex items-center justify-end gap-1.5">
-                {isSeller && (
-                  <Button
-                    aria-label="مشاركة الرقم"
-                    className="size-10 rounded-full px-0 text-[0px]"
-                    disabled={
-                      isSharingContact ||
-                      conversation?.status !== 'open' ||
-                      isConversationBlocked
-                    }
-                    onClick={shareOfficialContact}
-                    type="button"
-                    variant="outline"
-                  >
-                    <Phone className="size-4" />
-                    {isSharingContact ? 'جار المشاركة...' : 'مشاركة الرقم'}
-                  </Button>
-                )}
+                <Button
+                  aria-label="مشاركة الرقم"
+                  className="size-10 rounded-full px-0 text-[0px]"
+                  disabled={
+                    isSharingContact ||
+                    conversation?.status !== 'open' ||
+                    isConversationBlocked
+                  }
+                  onClick={shareOfficialContact}
+                  type="button"
+                  variant="outline"
+                >
+                  <Phone className="size-4" />
+                  {isSharingContact ? 'جار المشاركة...' : 'مشاركة الرقم'}
+                </Button>
                 <Button
                   aria-label="إرسال"
                   className="size-10 rounded-full bg-blue-600 px-0 text-[0px] hover:bg-blue-700"
                   disabled={
                     !draft.trim() ||
-                    draftHasManualContact ||
                     isSending ||
                     !conversation ||
                     isConversationBlocked
@@ -1639,17 +1726,17 @@ export default function ConversationPage() {
 
           <aside className="hidden h-fit gap-4 px-1 py-3 lg:grid">
             <div className="flex items-start gap-3">
-              {conversation?.listing ? (
+              {displayListing ? (
                 <Link
                   href={conversationListingHref ?? '/conversations'}
                   className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                 >
                   <img
-                    alt={conversation.listing.title ?? 'صورة الإعلان'}
+                    alt={displayListing.title ?? 'صورة الإعلان'}
                     className="size-full object-cover"
                     decoding="async"
                     loading="lazy"
-                    src={getListingImage(conversation.listing)}
+                    src={getListingImage(displayListing)}
                   />
                 </Link>
               ) : (
@@ -1666,12 +1753,12 @@ export default function ConversationPage() {
                   <Store className="size-4" />
                   الإعلان
                 </div>
-                {conversation?.listing ? (
+                {displayListing ? (
                   <Link
                     href={conversationListingHref ?? '/conversations'}
                     className="line-clamp-2 text-sm font-bold leading-6 transition hover:text-blue-600"
                   >
-                    {conversation.listing.title ?? 'إعلان غير متاح'}
+                    {displayListing.title ?? 'إعلان غير متاح'}
                   </Link>
                 ) : (
                   <h2 className="line-clamp-2 text-sm font-bold leading-6">
@@ -1679,10 +1766,10 @@ export default function ConversationPage() {
                   </h2>
                 )}
                 <p className="mt-1 text-sm font-bold text-blue-700">
-                  {formatPrice(conversation?.listing?.price)}
+                  {formatPrice(displayListing?.price)}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {conversation?.listing?.city ?? 'السعودية'}
+                  {displayListing?.city ?? 'السعودية'}
                 </p>
               </div>
             </div>

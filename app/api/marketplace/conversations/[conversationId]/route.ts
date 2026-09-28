@@ -180,7 +180,7 @@ export async function POST(request: Request, context: RouteContext) {
   const idempotency = await reserveIdempotencyKey(request, {
     namespace:
       action === 'share_contact'
-        ? 'seller_contact_share'
+        ? 'contact_share'
         : action === 'report_user'
           ? 'conversation_user_report'
           : action === 'block_user'
@@ -267,18 +267,6 @@ export async function POST(request: Request, context: RouteContext) {
       : Response.json(responseBody, { status: 409 });
   }
 
-  if (result.status === 'not_seller') {
-    const responseBody = {
-      error: 'seller_only',
-      message: 'Only the seller can share official contact information.',
-      conversation: result.conversation,
-    };
-
-    return idempotency
-      ? idempotency.complete(responseBody, 403)
-      : Response.json(responseBody, { status: 403 });
-  }
-
   if (result.status === 'not_allowed') {
     const responseBody = {
       error: 'message_delete_not_allowed',
@@ -292,7 +280,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (result.status === 'missing_phone') {
     const responseBody = {
-      error: 'seller_phone_required',
+      error: 'contact_phone_required',
       message: 'Add your mobile number in account settings before sharing it.',
       conversation: result.conversation,
     };

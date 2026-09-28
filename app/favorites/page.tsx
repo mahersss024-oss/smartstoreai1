@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -252,9 +251,6 @@ export default function FavoritesPage() {
                 المنتجات التي حفظها العميل
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle language="ar" />
           </div>
         </header>
 

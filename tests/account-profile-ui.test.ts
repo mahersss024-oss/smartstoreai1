@@ -32,6 +32,9 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /حفظ الاسم الظاهر/);
   assert.match(page, /saveProfile/);
   assert.match(page, /savedProfilePhone/);
+  assert.match(page, /ThemeToggle/);
+  assert.match(page, /اختر الوضع الليلي أو الفاتح من هنا/);
+  assert.match(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
   assert.match(page, /deleteAccount/);
@@ -39,6 +42,24 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /grid gap-3 rounded-md border bg-white p-4 shadow-sm/);
   assert.doesNotMatch(page, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
   assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
+});
+
+test('theme toggle stays in account settings instead of page headers', () => {
+  const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const pagesWithoutThemeToggle = [
+    ['app', 'page.tsx'],
+    ['app', 'conversations', 'page.tsx'],
+    ['app', 'conversations', '[conversationId]', 'page.tsx'],
+    ['app', 'favorites', 'page.tsx'],
+    ['app', 'account', 'listings', 'page.tsx'],
+    ['app', 'account', 'follows', 'page.tsx'],
+  ].map((segments) => readFileSync(join(process.cwd(), ...segments), 'utf8'));
+
+  assert.match(accountPage, /<ThemeToggle language="ar" \/>/);
+
+  for (const source of pagesWithoutThemeToggle) {
+    assert.doesNotMatch(source, /ThemeToggle/);
+  }
 });
 
 test('account page labels each administrative role accurately', () => {

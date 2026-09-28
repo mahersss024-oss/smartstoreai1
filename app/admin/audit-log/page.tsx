@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ClipboardList, Search } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { useAdminAccess } from '../use-admin-access';
@@ -97,7 +96,6 @@ export default function AdminAuditLogPage() {
             <ClipboardList className="size-6 text-blue-700 dark:text-blue-300" />
             <div><h1 className="font-bold">سجل الإدارة</h1><p className="text-xs text-muted-foreground">سجل تدقيق للعمليات الإدارية الحساسة</p></div>
           </div>
-          <ThemeToggle language="ar" />
         </header>
 
         {(adminAccessNotice || notice) && <p className="text-sm text-muted-foreground">{adminAccessNotice || notice}</p>}
