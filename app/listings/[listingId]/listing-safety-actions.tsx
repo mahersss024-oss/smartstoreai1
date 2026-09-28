@@ -138,9 +138,9 @@ export function ListingSafetyActions({
           ? 'تمت إزالة الإعلان من المفضلة.'
           : 'تم حفظ الإعلان في المفضلة.',
       );
-    } catch {
+        } catch {
       setIsFavorite(previousFavorite);
-      setNotice('طھط¹ط°ط± طھط­ط¯ظٹط« ط§ظ„ظ…ظپط¶ظ„ط© ط§ظ„ط¢ظ†.');
+      setNotice('تعذر تحديث المفضلة الآن.');
     } finally {
       setIsSaving(false);
     }
