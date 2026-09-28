@@ -36,7 +36,7 @@ export function ListingSafetyActions({
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
-  const [canFavorite, setCanFavorite] = useState(false);
+  const [canFavorite, setCanFavorite] = useState(!isOwnListing);
   const canShowFavorite = showFavorite && canFavorite && !isOwnListing;
   const canShowReport = showReport && !isOwnListing;
 
@@ -177,6 +177,8 @@ export function ListingSafetyActions({
       }
 
       setNotice('تم إرسال البلاغ للمراجعة.');
+    } catch {
+      setNotice('تعذر إرسال البلاغ الآن.');
     } finally {
       setIsReporting(false);
     }

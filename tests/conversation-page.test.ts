@@ -139,6 +139,17 @@ test('mobile navigation hides inside an open conversation', () => {
   assert.doesNotMatch(source, /focus-within:pb-0/);
 });
 
+test('conversation back navigation dismisses the keyboard before leaving', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /prepareConversationListNavigation/);
+  assert.match(source, /messageInputRef\.current\?\.blur\(\)/);
+  assert.match(source, /setIsMessageInputFocused\(false\)/);
+  assert.match(source, /setVisualViewportFrame\(\{\s*height: window\.innerHeight,\s*offsetTop: 0,\s*\}\)/);
+  assert.match(source, /onPointerDown=\{prepareConversationListNavigation\}/);
+  assert.match(source, /onClick=\{prepareConversationListNavigation\}/);
+});
+
 test('seller buyer conversation exposes report and block controls', () => {
   const source = readConversationPage();
 

@@ -523,6 +523,15 @@ export default function ConversationPage() {
     window.setTimeout(scrollConversationToLatest, 180);
   }, [scrollConversationToLatest]);
 
+  const prepareConversationListNavigation = useCallback(() => {
+    messageInputRef.current?.blur();
+    setIsMessageInputFocused(false);
+    setVisualViewportFrame({
+      height: window.innerHeight,
+      offsetTop: 0,
+    });
+  }, []);
+
   const handleMessagesPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!isMessageInputFocused || isKeyboardDismissIgnoredTarget(event.target)) {
@@ -1264,7 +1273,11 @@ export default function ConversationPage() {
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-2 py-2 sm:px-1 sm:py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/conversations">
+              <Link
+                href="/conversations"
+                onClick={prepareConversationListNavigation}
+                onPointerDown={prepareConversationListNavigation}
+              >
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

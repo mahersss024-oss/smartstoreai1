@@ -60,6 +60,8 @@ export function ListingContactActions({ listingId }: { listingId: string }) {
       }
 
       setMessage('تم فتح محادثة داخلية بخصوص الإعلان.');
+    } catch {
+      setMessage('تعذر فتح المحادثة الآن. حاول مرة أخرى.');
     } finally {
       requestKeyRef.current = null;
       setIsLoading(false);

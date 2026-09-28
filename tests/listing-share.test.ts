@@ -46,10 +46,31 @@ test('listing owner details page keeps only share action visible', () => {
   assert.match(listingPage, /isOwnListing \? 'col-span-2' : ''/);
   assert.match(listingPage, /isOwnListing=\{isOwnListing\}/);
   assert.match(safetyActions, /isOwnListing = false/);
+  assert.match(safetyActions, /useState\(!isOwnListing\)/);
   assert.match(safetyActions, /canShowReport = showReport && !isOwnListing/);
   assert.match(safetyActions, /canShowFavorite = showFavorite && canFavorite && !isOwnListing/);
 }
 );
+
+test('listing details actions surface network failures clearly', () => {
+  const contactActions = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'contact-actions.tsx',
+  );
+  const safetyActions = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'listing-safety-actions.tsx',
+  );
+
+  assert.match(contactActions, /catch \{/);
+  assert.match(contactActions, /تعذر فتح المحادثة الآن/);
+  assert.match(safetyActions, /catch \{/);
+  assert.match(safetyActions, /تعذر إرسال البلاغ الآن/);
+});
 
 test('home listing contact button opens listing details instead of asking chat to open a conversation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
