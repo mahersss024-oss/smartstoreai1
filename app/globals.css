@@ -492,13 +492,33 @@
   }
 
   .marketplace-bottom-nav {
-    border-color: rgb(120 165 188 / 0.38);
-    background-color: rgb(251 253 255 / 0.9);
+    border-color: rgb(255 255 255 / 0.5);
+    background-color: rgb(248 250 252 / 0.38);
+    -webkit-backdrop-filter: blur(24px) saturate(165%);
+    backdrop-filter: blur(24px) saturate(165%);
+    box-shadow:
+      0 10px 30px rgb(15 23 42 / 0.12),
+      0 2px 8px rgb(15 23 42 / 0.06),
+      inset 0 1px 0 rgb(255 255 255 / 0.7);
   }
 
   .dark .marketplace-bottom-nav {
-    border-color: rgb(90 200 255 / 0.14);
-    background-color: rgb(17 26 43 / 0.92);
+    border-color: rgb(255 255 255 / 0.14);
+    background-color: rgb(15 23 42 / 0.46);
+    box-shadow:
+      0 10px 30px rgb(0 0 0 / 0.22),
+      0 2px 8px rgb(0 0 0 / 0.12),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
+  }
+
+  @supports not ((backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px))) {
+    .marketplace-bottom-nav {
+      background-color: rgb(248 250 252 / 0.88);
+    }
+
+    .dark .marketplace-bottom-nav {
+      background-color: rgb(15 23 42 / 0.88);
+    }
   }
 
   .smart-assistant-results-panel {

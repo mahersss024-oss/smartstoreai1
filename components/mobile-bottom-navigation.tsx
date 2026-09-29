@@ -167,13 +167,12 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`marketplace-bottom-nav fixed inset-x-1 bottom-[calc(0.18rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-2xl border border-white/45 bg-white/16 px-3 py-1.5 shadow-[0_-12px_38px_rgba(15,23,42,0.16)] backdrop-blur-[180px] transition-all duration-200 dark:border-white/15 dark:bg-white/10 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-3 bottom-[calc(0.45rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-full border px-3 py-1.5 transition-all duration-200 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
       }`}
     >
-      <div className="pointer-events-none absolute -inset-x-4 top-full h-[calc(1.8rem+env(safe-area-inset-bottom))] rounded-b-[2rem] bg-slate-700/28 backdrop-blur-[260px] backdrop-saturate-150 dark:bg-slate-900/42" />
       <div
         className="pointer-events-none absolute -top-px h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
         style={{ right: `${indicatorIndex * (100 / 5)}%` }}
