@@ -70,9 +70,16 @@ test('customer section pages keep headers stable while content scrolls', () => {
     styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('.smartstore-stable-page,')),
   );
 
-  assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?height: 100dvh;/);
   assert.doesNotMatch(stablePageBaseRule, /height: 100dvh;/);
   assert.doesNotMatch(stablePageBaseRule, /overflow-y: auto;/);
+  const stablePageMobileRule = styles.slice(
+    styles.indexOf('.smartstore-stable-page,', styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('marketplace-listings-scroll'))),
+    styles.indexOf('.admin-viewport > main {', styles.indexOf('marketplace-listings-scroll')),
+  );
+
+  assert.doesNotMatch(stablePageMobileRule, /height: 100dvh;/);
+  assert.doesNotMatch(stablePageMobileRule, /overflow-y: auto;/);
+  assert.match(styles, /\.admin-viewport > main \{[\s\S]*?height: 100dvh;/);
   assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });

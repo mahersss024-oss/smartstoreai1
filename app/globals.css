@@ -282,14 +282,16 @@
     .marketplace-shell,
     .marketplace-home-controls,
     .smartstore-stable-page,
-    .admin-viewport > main,
     main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
       touch-action: pan-y;
     }
 
     .smartstore-stable-page,
-    .admin-viewport > main,
     main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-viewport > main {
       height: 100dvh;
       min-height: 100dvh;
       -webkit-overflow-scrolling: touch;
