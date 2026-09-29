@@ -114,6 +114,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manuallyFilteredMarketplaceListings/);
   assert.match(homePage, /isManualListingVisible/);
   assert.match(homePage, /submitManualListing/);
+  assert.match(homePage, /setManualListingNotice\(null\)/);
+  assert.doesNotMatch(homePage, /أدخل بيانات الإعلان مباشرة/);
   assert.match(homePage, /fetch\('\/api\/marketplace\/listings'/);
   assert.match(homePage, /publishAfterSave/);
   assert.match(homePage, /isManualPublishAgreementOpen/);

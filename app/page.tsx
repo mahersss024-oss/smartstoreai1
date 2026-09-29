@@ -3943,11 +3943,7 @@ export default function Page() {
                     onClick={() => {
                       setIsManualListingOpen((value) => !value);
                       setIsManualListingFallbackDismissed(false);
-                      setManualListingNotice({
-                        tone: 'info',
-                        message:
-                          'أدخل بيانات الإعلان مباشرة، وسيتم حفظه بنفس نظام المراجعة المعتمد في سوق حمد.',
-                      });
+                      setManualListingNotice(null);
                     }}
                   >
                     <Megaphone className="size-4" />
