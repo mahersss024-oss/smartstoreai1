@@ -252,7 +252,8 @@
   }
 
   .smartstore-stable-page,
-  .admin-viewport > main {
+  .admin-viewport > main,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
     height: 100dvh;
     min-height: 100dvh;
     overflow-x: hidden;
@@ -263,13 +264,15 @@
   }
 
   .smartstore-stable-content,
-  .admin-viewport > main > div {
+  .admin-viewport > main > div,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
     min-height: 100%;
     padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   }
 
   .smartstore-stable-header,
-  .admin-viewport > main > div > header:first-child {
+  .admin-viewport > main > div > header:first-child,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div > header:first-child {
     position: sticky;
     top: 0;
     z-index: 35;
@@ -282,17 +285,20 @@
     .marketplace-shell,
     .marketplace-home-controls,
     .smartstore-stable-page,
-    .admin-viewport > main {
+    .admin-viewport > main,
+    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
       touch-action: pan-y;
     }
 
     .smartstore-stable-page,
-    .admin-viewport > main {
+    .admin-viewport > main,
+    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
       -webkit-overflow-scrolling: touch;
     }
 
     .smartstore-stable-content,
-    .admin-viewport > main > div {
+    .admin-viewport > main > div,
+    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
       padding-bottom: calc(5rem + env(safe-area-inset-bottom));
     }
   }

@@ -66,6 +66,7 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
   assert.match(styles, /\.smartstore-stable-page,[\s\S]*?height: 100dvh;/);
+  assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
