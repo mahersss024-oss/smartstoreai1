@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import {
@@ -88,6 +90,18 @@ type SellerFollowRecord = {
   createdAt: string;
 };
 
+type FollowNotificationRecord = {
+  id: string;
+  userId: string;
+  listingId: string;
+  sellerId: string;
+  title?: string;
+  body?: string;
+  url: string;
+  readAt?: string;
+  createdAt: string;
+};
+
 type SellerRatingRecord = {
   id: string;
   raterId: string;
@@ -100,6 +114,7 @@ type SellerRatingRecord = {
 
 const memorySellerFollows = new Map<string, SellerFollowRecord>();
 const memorySellerRatings = new Map<string, SellerRatingRecord>();
+const memoryFollowNotifications = new Map<string, FollowNotificationRecord>();
 
 export type PublicSellerProfile = {
   id: string;
@@ -371,6 +386,83 @@ async function listSellerFollowerIds(sellerId: string) {
   return followers.map((follow) => follow.followerId);
 }
 
+function getFollowNotificationKey(userId: string, listingId: string) {
+  return `${userId}:${listingId}`;
+}
+
+function buildFollowNotificationBody(listing: memoryStore.ListingRecord) {
+  const title = listing.title?.trim() || 'إعلان جديد';
+  const city = listing.city?.trim();
+
+  return city ? `${title} في ${city}` : title;
+}
+
+async function createFollowNotificationsForListing(
+  listing: memoryStore.ListingRecord,
+  followerIds: string[],
+) {
+  const recipients = [...new Set(followerIds)].filter(
+    (userId) => userId && userId !== listing.sellerId,
+  );
+
+  if (recipients.length === 0) {
+    return;
+  }
+
+  const title = 'إعلان جديد من بائع تتابعه';
+  const body = buildFollowNotificationBody(listing);
+  const url = `/listings/${encodeURIComponent(listing.id)}?source=follow`;
+
+  if (!shouldUseDatabaseStore()) {
+    for (const userId of recipients) {
+      const key = getFollowNotificationKey(userId, listing.id);
+
+      if (memoryFollowNotifications.has(key)) {
+        continue;
+      }
+
+      memoryFollowNotifications.set(key, {
+        id: randomUUID(),
+        userId,
+        listingId: listing.id,
+        sellerId: listing.sellerId,
+        title,
+        body,
+        url,
+        createdAt: nowIso(),
+      });
+    }
+
+    return;
+  }
+
+  await Promise.all(
+    recipients.map((userId) =>
+      (prisma as any).followNotification.upsert({
+        where: {
+          userId_listingId: {
+            userId,
+            listingId: listing.id,
+          },
+        },
+        create: {
+          userId,
+          listingId: listing.id,
+          sellerId: listing.sellerId,
+          title,
+          body,
+          url,
+        },
+        update: {
+          title,
+          body,
+          url,
+        },
+      }),
+    ),
+  );
+}
+
 async function notifyFollowersWhenListingIsPublished(
   listing: memoryStore.ListingRecord,
   previousStatus: ListingStatus,
@@ -384,6 +476,8 @@ async function notifyFollowersWhenListingIsPublished(
   if (followerIds.length === 0) {
     return;
   }
+
+  await createFollowNotificationsForListing(listing, followerIds);
 
   safelyPublishRealtimeEvent({
     type: 'follow_listing_published',
@@ -1104,6 +1198,89 @@ export async function listAccountFollows(actor: Actor) {
     followingCount: followingRecords.length,
     followerCount: followerRecords.length,
   };
+}
+
+export async function listAccountFollowNotifications(actor: Actor) {
+  const userId = getActorId(actor);
+
+  if (!shouldUseDatabaseStore()) {
+    const notifications = [...memoryFollowNotifications.values()]
+      .filter((notification) => notification.userId === userId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+    return {
+      notifications,
+      unreadCount: notifications.filter((notification) => !notification.readAt)
+        .length,
+    };
+  }
+
+  const notifications = await (prisma as any).followNotification.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+
+  return {
+    notifications: notifications.map(
+      (notification: {
+        id: string;
+        userId: string;
+        listingId: string;
+        sellerId: string;
+        title: string | null;
+        body: string | null;
+        url: string;
+        readAt: Date | null;
+        createdAt: Date;
+      }) => ({
+        id: notification.id,
+        userId: notification.userId,
+        listingId: notification.listingId,
+        sellerId: notification.sellerId,
+        title: notification.title ?? undefined,
+        body: notification.body ?? undefined,
+        url: notification.url,
+        readAt: notification.readAt?.toISOString(),
+        createdAt: notification.createdAt.toISOString(),
+      }),
+    ),
+    unreadCount: notifications.filter(
+      (notification: { readAt: Date | null }) => !notification.readAt,
+    ).length,
+  };
+}
+
+export async function markAccountFollowNotificationsRead(actor: Actor) {
+  const userId = getActorId(actor);
+  const readAt = nowIso();
+
+  if (!shouldUseDatabaseStore()) {
+    for (const [key, notification] of memoryFollowNotifications) {
+      if (notification.userId !== userId || notification.readAt) {
+        continue;
+      }
+
+      memoryFollowNotifications.set(key, {
+        ...notification,
+        readAt,
+      });
+    }
+
+    return { readAt };
+  }
+
+  await (prisma as any).followNotification.updateMany({
+    where: {
+      userId,
+      readAt: null,
+    },
+    data: {
+      readAt: new Date(readAt),
+    },
+  });
+
+  return { readAt };
 }
 
 export async function toggleSellerFollow(sellerId: string, follower: Actor) {

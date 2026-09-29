@@ -121,6 +121,7 @@ model User {
   adminAuditLogs        AdminAuditLog[]
   siteMessagesUpdated   SiteMessage[]         @relation("SiteMessageUpdatedBy")
   pushSubscriptions     PushSubscription[]
+  followNotifications   FollowNotification[]
 
   @@index([email])
   @@index([deletedAt, lastActiveAt])
@@ -152,6 +153,7 @@ model Listing {
   favorites     Favorite[]
   reports       Report[]
   commissions   Commission[]
+  followNotifications FollowNotification[]
 
   @@index([sellerId, status])
   @@index([status, updatedAt])
@@ -368,6 +370,25 @@ model SellerFollow {
 
   @@unique([followerId, sellerId])
   @@index([sellerId, createdAt])
+}
+
+model FollowNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  listingId String
+  sellerId  String
+  title     String?
+  body      String?
+  url       String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId, readAt, createdAt])
+  @@index([listingId])
 }
 
 model SellerRating {

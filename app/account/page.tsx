@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BadgeCheck,
+  Bell,
   FileText,
   Heart,
   Image as ImageIcon,
@@ -569,6 +570,12 @@ export default function AccountPage() {
                   <Link href="/favorites">
                     <Heart className="size-4" />
                     المفضلة
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-md">
+                  <Link href="/notifications">
+                    <Bell className="size-4" />
+                    الإشعارات
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="rounded-md">

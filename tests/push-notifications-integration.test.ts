@@ -35,7 +35,7 @@ test('account page exposes push notifications as an opt-in setting', () => {
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
 
-test('home notification bell is shown only to signed-in users and toggles directly', () => {
+test('home notification bell is shown only to signed-in users and opens notifications page', () => {
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
   const settings = readFileSync(
     join(process.cwd(), 'components', 'push-notification-settings.tsx'),
@@ -44,7 +44,10 @@ test('home notification bell is shown only to signed-in users and toggles direct
 
   assert.match(homePage, /session\.authenticated \? \(/);
   assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
-  assert.doesNotMatch(homePage, /href="\/account#notifications"/);
+  assert.match(settings, /import Link from 'next\/link'/);
+  assert.match(settings, /href="\/notifications"/);
+  assert.match(settings, /unreadCount > 0/);
+  assert.match(settings, /follow_listing_published/);
   assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
   assert.match(settings, /className="shrink-0"/);
 });
@@ -110,4 +113,38 @@ test('followed sellers notify followers only when listings become published', ()
   assert.match(followNotifications, /userId !== listing\.sellerId/);
   assert.match(followNotifications, /tag: `follow:listing:\$\{listing\.id\}`/);
   assert.doesNotMatch(followNotifications, /Conversation/);
+});
+
+test('follow notifications are stored and exposed from the notifications page', () => {
+  const schema = readFileSync(join(process.cwd(), 'prisma', 'schema.prisma'), 'utf8');
+  const migration = readFileSync(
+    join(
+      process.cwd(),
+      'prisma',
+      'migrations',
+      '20260929100000_follow_notifications',
+      'migration.sql',
+    ),
+    'utf8',
+  );
+  const repository = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'repository.ts'),
+    'utf8',
+  );
+  const route = readFileSync(join(process.cwd(), 'app', 'api', 'notifications', 'route.ts'), 'utf8');
+  const page = readFileSync(join(process.cwd(), 'app', 'notifications', 'page.tsx'), 'utf8');
+  const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(schema, /model FollowNotification/);
+  assert.match(migration, /CREATE TABLE "FollowNotification"/);
+  assert.match(repository, /createFollowNotificationsForListing/);
+  assert.match(repository, /listAccountFollowNotifications/);
+  assert.match(repository, /markAccountFollowNotificationsRead/);
+  assert.match(route, /listAccountFollowNotifications/);
+  assert.match(route, /markAccountFollowNotificationsRead/);
+  assert.match(page, /fetch\('\/api\/notifications'/);
+  assert.match(page, /<PushNotificationSettings \/>/);
+  assert.match(page, /markAllRead/);
+  assert.match(page, /follow_listing_published/);
+  assert.match(accountPage, /href="\/notifications"/);
 });

@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Bell, BellOff } from 'lucide-react';
 
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type PushConfigResponse = {
   configured: boolean;
   publicKey: string | null;
+};
+
+type NotificationsSummaryResponse = {
+  unreadCount: number;
 };
 
 type PushState =
@@ -54,6 +60,7 @@ export function PushNotificationSettings({
   const [state, setState] = useState<PushState>('checking');
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isSupported = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -105,6 +112,39 @@ export function PushNotificationSettings({
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
+
+  const refreshUnreadCount = useCallback(async () => {
+    if (variant !== 'icon') {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/notifications', {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        setUnreadCount(0);
+        return;
+      }
+
+      const payload = (await response.json()) as NotificationsSummaryResponse;
+      setUnreadCount(payload.unreadCount ?? 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, [variant]);
+
+  useEffect(() => {
+    void refreshUnreadCount();
+  }, [refreshUnreadCount]);
+
+  useSmartstoreRealtime({
+    enabled: variant === 'icon',
+    eventTypes: ['follow_listing_published'],
+    fallbackIntervalMs: 5000,
+    onResync: refreshUnreadCount,
+  });
 
   const enableNotifications = useCallback(async () => {
     if (!isSupported || !publicKey) {
@@ -212,29 +252,28 @@ export function PushNotificationSettings({
           : 'تصل الإشعارات عند وصول رسالة جديدة في محادثاتك.';
 
   if (variant === 'icon') {
-    const iconLabel =
-      state === 'checking'
-        ? 'جار التحقق من الإشعارات'
-        : state === 'working'
-          ? 'جار تحديث الإشعارات'
-          : isActive
-            ? 'إيقاف إشعارات الرسائل'
-            : 'تفعيل إشعارات الرسائل';
+    const iconLabel = isActive
+      ? 'فتح الإشعارات'
+      : 'فتح الإشعارات وإعداد تفعيلها';
 
     return (
       <Button
+        asChild
         aria-label={iconLabel}
         className="shrink-0"
-        disabled={disabled}
-        onClick={() =>
-          void (isActive ? disableNotifications() : enableNotifications())
-        }
         size="icon-sm"
         title={notice ?? iconLabel}
-        type="button"
         variant="ghost"
       >
-        {isActive ? <Bell className="size-4 text-blue-600" /> : <BellOff className="size-4" />}
+        <Link className="relative" href="/notifications">
+          {isActive ? <Bell className="size-4 text-blue-600" /> : <BellOff className="size-4" />}
+          {unreadCount > 0 ? (
+            <>
+              <span className="pointer-events-none absolute -right-1 -top-1 size-3 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.95)]" />
+              <span className="pointer-events-none absolute -right-1 -top-1 size-3 animate-ping rounded-full bg-rose-500/60" />
+            </>
+          ) : null}
+        </Link>
       </Button>
     );
   }
