@@ -3,6 +3,7 @@ export type RealtimeEventType =
   | 'ad_updated'
   | 'ad_deleted'
   | 'ad_status_changed'
+  | 'follow_listing_published'
   | 'message_created'
   | 'conversation_updated'
   | 'commission_updated'
@@ -39,6 +40,11 @@ export type RealtimePayloadByType = {
     sellerId: string;
     previousStatus: string;
     status: string;
+  };
+  follow_listing_published: {
+    listingId: string;
+    sellerId: string;
+    status: 'published';
   };
   message_created: {
     conversationId: string;

@@ -229,6 +229,8 @@ test('account page links to a real follows list', () => {
   );
   assert.match(followsPage, /المتابعون/);
   assert.match(followsPage, /المتابَعون/);
+  assert.match(followsPage, /useSmartstoreRealtime/);
+  assert.match(followsPage, /follow_listing_published/);
   assert.match(followsRoute, /listAccountFollows/);
   assert.match(repository, /export async function listAccountFollows/);
   assert.match(repository, /prisma\.sellerFollow\.findMany/);

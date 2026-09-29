@@ -8,6 +8,7 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 const maxAdminListingUpdateRequestBytes = 64 * 1024;
@@ -41,6 +42,37 @@ async function enforceAdminListingMutationRateLimit(
     maxRequests: 60,
     windowMs: 60_000,
   });
+}
+
+async function notifyFollowersForAdminPublishedListing(listing: {
+  id: string;
+  sellerId: string;
+  title: string | null;
+  city: string | null;
+}) {
+  const followers = await prisma.sellerFollow.findMany({
+    where: { sellerId: listing.sellerId },
+    select: { followerId: true },
+  });
+  const followerIds = followers.map((follow) => follow.followerId);
+
+  if (followerIds.length === 0) {
+    return;
+  }
+
+  publishRealtimeEvent({
+    type: 'follow_listing_published',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      status: 'published',
+    },
+    visibility: {
+      userIds: followerIds,
+    },
+  });
+
+  await notifySellerFollowersOfPublishedListing({ listing, followerIds });
 }
 
 async function deleteStoredListingImagesBestEffort(
@@ -270,6 +302,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         },
         visibility,
       });
+    }
+
+    if (existing.status !== 'published' && updated.status === 'published') {
+      await notifyFollowersForAdminPublishedListing(updated);
     }
   } catch {
     // Admin update must not fail due to realtime delivery.

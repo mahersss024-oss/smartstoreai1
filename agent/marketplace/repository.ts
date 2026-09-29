@@ -10,6 +10,7 @@ import type {
   PublishRealtimeEventInput,
   RealtimeEventVisibility,
 } from '@/lib/realtime/events';
+import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
 import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
@@ -353,6 +354,55 @@ function getMemorySellerFollowerCount(sellerId: string) {
   return [...memorySellerFollows.values()].filter(
     (follow) => follow.sellerId === sellerId,
   ).length;
+}
+
+async function listSellerFollowerIds(sellerId: string) {
+  if (!shouldUseDatabaseStore()) {
+    return [...memorySellerFollows.values()]
+      .filter((follow) => follow.sellerId === sellerId)
+      .map((follow) => follow.followerId);
+  }
+
+  const followers = await prisma.sellerFollow.findMany({
+    where: { sellerId },
+    select: { followerId: true },
+  });
+
+  return followers.map((follow) => follow.followerId);
+}
+
+async function notifyFollowersWhenListingIsPublished(
+  listing: memoryStore.ListingRecord,
+  previousStatus: ListingStatus,
+) {
+  if (previousStatus === 'published' || listing.status !== 'published') {
+    return;
+  }
+
+  const followerIds = await listSellerFollowerIds(listing.sellerId);
+
+  if (followerIds.length === 0) {
+    return;
+  }
+
+  safelyPublishRealtimeEvent({
+    type: 'follow_listing_published',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      status: 'published',
+    },
+    visibility: {
+      userIds: followerIds,
+    },
+  });
+
+  try {
+    await notifySellerFollowersOfPublishedListing({ listing, followerIds });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[follow_listing_push] failure=${errorName}`);
+  }
 }
 
 function getMemorySellerRatingStats(sellerId: string) {
@@ -1752,6 +1802,7 @@ export async function setListingStatusForSeller(
 ) {
   if (!shouldUseDatabaseStore()) {
     const existingListing = memoryStore.getListing(listingId);
+    const previousStatus = existingListing?.status ?? status;
     const listing = memoryStore.setListingStatusForSeller(
       listingId,
       sellerId,
@@ -1764,11 +1815,13 @@ export async function setListingStatusForSeller(
         payload: {
           listingId: listing.id,
           sellerId: listing.sellerId,
-          previousStatus: existingListing?.status ?? listing.status,
+          previousStatus,
           status: listing.status,
         },
         visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
       });
+
+      await notifyFollowersWhenListingIsPublished(listing, previousStatus);
 
       if (listing.status === 'deleted') {
         safelyPublishRealtimeEvent({
@@ -1831,13 +1884,14 @@ export async function setListingStatusForSeller(
   });
 
   const mappedListing = toListingRecord(listing);
+  const previousStatus = existing.status;
 
   safelyPublishRealtimeEvent({
     type: 'ad_status_changed',
     payload: {
       listingId: mappedListing.id,
       sellerId: mappedListing.sellerId,
-      previousStatus: existing.status,
+      previousStatus,
       status: mappedListing.status,
     },
     visibility: getListingRealtimeVisibility(
@@ -1845,6 +1899,8 @@ export async function setListingStatusForSeller(
       mappedListing.status,
     ),
   });
+
+  await notifyFollowersWhenListingIsPublished(mappedListing, previousStatus);
 
   if (mappedListing.status === 'deleted') {
     safelyPublishRealtimeEvent({

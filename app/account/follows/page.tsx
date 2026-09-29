@@ -6,6 +6,7 @@ import { ArrowRight, UserPlus } from 'lucide-react';
 
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
 type FollowPerson = {
@@ -143,6 +144,17 @@ export default function AccountFollowsPage() {
 
   const visiblePeople =
     activeTab === 'followers' ? follows.followers : follows.following;
+
+  useSmartstoreRealtime({
+    enabled: session.authenticated,
+    fallbackIntervalMs: 4000,
+    eventTypes: [
+      'follow_listing_published',
+      'ad_status_changed',
+      'maintenance_cleanup',
+    ],
+    onResync: refreshFollows,
+  });
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">

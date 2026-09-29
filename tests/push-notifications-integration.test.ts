@@ -85,3 +85,29 @@ test('conversation push sender never targets the message sender', () => {
   assert.match(source, /return conversation\.buyerId/);
   assert.match(source, /deactivateSubscriptionById/);
 });
+
+test('followed sellers notify followers only when listings become published', () => {
+  const repository = readFileSync(
+    join(process.cwd(), 'agent', 'marketplace', 'repository.ts'),
+    'utf8',
+  );
+  const adminRoute = readFileSync(
+    join(process.cwd(), 'app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'),
+    'utf8',
+  );
+  const followNotifications = readFileSync(
+    join(process.cwd(), 'lib', 'push', 'follow-notifications.ts'),
+    'utf8',
+  );
+
+  assert.match(repository, /notifyFollowersWhenListingIsPublished/);
+  assert.match(repository, /previousStatus === 'published'/);
+  assert.match(repository, /listing\.status !== 'published'/);
+  assert.match(repository, /type: 'follow_listing_published'/);
+  assert.match(adminRoute, /existing\.status !== 'published' && updated\.status === 'published'/);
+  assert.match(adminRoute, /notifyFollowersForAdminPublishedListing/);
+  assert.match(followNotifications, /listActiveSubscriptionsForUser/);
+  assert.match(followNotifications, /userId !== listing\.sellerId/);
+  assert.match(followNotifications, /tag: `follow:listing:\$\{listing\.id\}`/);
+  assert.doesNotMatch(followNotifications, /Conversation/);
+});
