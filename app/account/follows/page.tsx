@@ -251,7 +251,7 @@ export default function AccountFollowsPage() {
               <div className="flex items-center gap-4 text-sm font-semibold text-muted-foreground">
                 <span>{follows.followerCount} متابع</span>
                 <span>{follows.followingCount} متابعة</span>
-                <span>{follows.similarListingFollowCount} مشابهة</span>
+                <span>{follows.similarListingFollowCount} إشعار تشابه</span>
               </div>
             </section>
 
@@ -280,14 +280,14 @@ export default function AccountFollowsPage() {
               </button>
               <button
                 type="button"
-                className={`rounded-md px-3 py-2 text-sm font-bold transition ${
+                className={`rounded-md px-2 py-2 text-[11px] font-bold transition sm:px-3 sm:text-sm ${
                   activeTab === 'similar'
                     ? 'bg-blue-600 text-white'
                     : 'text-muted-foreground hover:bg-blue-500/10'
                 }`}
                 onClick={() => setActiveTab('similar')}
               >
-                مشابهة
+                إشعارات الإعلانات المتشابهة
               </button>
             </div>
 
@@ -338,7 +338,7 @@ export default function AccountFollowsPage() {
                   ))
                 ) : (
                   <p className="py-10 text-center text-sm text-muted-foreground">
-                    لا توجد إعلانات مشابهة متابَعة.
+                    لا توجد إشعارات إعلانات متشابهة.
                   </p>
                 )
               ) : visiblePeople.length ? (

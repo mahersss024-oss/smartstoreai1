@@ -229,7 +229,7 @@ test('account page links to a real follows list', () => {
   );
   assert.match(followsPage, /المتابِعون/);
   assert.match(followsPage, /أتابعهم/);
-  assert.match(followsPage, /مشابهة/);
+  assert.match(followsPage, /إشعارات الإعلانات المتشابهة/);
   assert.match(followsPage, /similarListingFollows/);
   assert.match(followsPage, /toggleSimilarListingFollow/);
   assert.doesNotMatch(followsPage, /المتابَعون/);
