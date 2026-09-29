@@ -173,7 +173,7 @@ export function MobileBottomNavigation() {
           : 'translate-y-0 opacity-100'
       }`}
     >
-      <div className="pointer-events-none absolute inset-x-2 top-[calc(100%+0.08rem)] h-[calc(1.15rem+env(safe-area-inset-bottom))] rounded-xl bg-slate-950/20 backdrop-blur-[140px] dark:bg-black/38" />
+      <div className="pointer-events-none absolute -inset-x-1 top-[calc(100%+0.08rem)] h-[calc(1.15rem+env(safe-area-inset-bottom))] rounded-2xl bg-slate-950/20 backdrop-blur-[140px] dark:bg-black/38" />
       <div
         className="pointer-events-none absolute -top-px h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
         style={{ right: `${indicatorIndex * (100 / 5)}%` }}
