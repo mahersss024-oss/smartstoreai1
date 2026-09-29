@@ -6,7 +6,10 @@ import {
   updateListingForSeller,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
-import { noStoreHeaders } from '@/lib/api/no-store';
+import {
+  createPublicCacheHeaders,
+  getOrSetPublicJsonCache,
+} from '@/lib/api/public-json-cache';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
@@ -55,13 +58,32 @@ function getActionStatus(action: z.infer<typeof actionSchema>['action']) {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { listingId } = await context.params;
-  const listing = await getListing(listingId);
+  const payload = await getOrSetPublicJsonCache(
+    `public-listing-detail:${listingId}`,
+    {
+      ttlSeconds: 15,
+      load: async () => {
+        const listing = await getListing(listingId);
+
+        return { listing };
+      },
+    },
+  );
+  const { listing } = payload;
 
   if (!listing || listing.status !== 'published') {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
-  return Response.json({ listing }, { headers: noStoreHeaders });
+  return Response.json(
+    { listing },
+    {
+      headers: createPublicCacheHeaders({
+        edgeMaxAgeSeconds: 15,
+        staleWhileRevalidateSeconds: 45,
+      }),
+    },
+  );
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
