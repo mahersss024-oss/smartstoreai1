@@ -59,7 +59,8 @@ async function closeAssistantChatIfOpen(page: Page) {
 }
 
 const corePageText: Record<string, RegExp> = {
-  '/': /الإعلانات المقترحة/i,
+  '/':
+    /\u062a\u0635\u0641\u064a\u0629 \u0627\u0644\u0628\u062d\u062b|\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0645\u062a\u0627\u062d\u0629/i,
   '/account': /حسابي/i,
   '/conversations': /محادثات/i,
   '/favorites': /إعلانات محفوظة|المفضلة/i,
