@@ -177,8 +177,8 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
   assert.match(mobileNavigation, /bottom-\[calc\(0\.35rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(mobileNavigation, /grid h-12 grid-cols-5/);
   assert.match(mobileNavigation, /text-\[12px\] font-bold/);
-  assert.match(mobileNavigation, /active[\s\S]*item\.primary[\s\S]*size-8 bg-blue-600 text-white/);
-  assert.match(mobileNavigation, /ring-4 ring-blue-500\/10/);
+  assert.match(mobileNavigation, /active[\s\S]*item\.primary[\s\S]*size-9 bg-blue-600 text-white/);
+  assert.match(mobileNavigation, /ring-4 ring-blue-500\/15/);
 });
 
 test('mobile bottom navigation highlights conversations when a new message arrives', () => {

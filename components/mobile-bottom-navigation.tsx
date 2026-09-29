@@ -167,7 +167,7 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`marketplace-bottom-nav fixed inset-x-2 bottom-[calc(0.35rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-slate-200/70 bg-white/88 px-3 py-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-200 dark:border-white/10 dark:bg-card/88 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-2 bottom-[calc(0.35rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-white/55 bg-white/68 px-3 py-1.5 shadow-[0_-10px_34px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition-all duration-200 dark:border-white/10 dark:bg-card/62 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
@@ -201,7 +201,7 @@ export function MobileBottomNavigation() {
                 className={`relative grid place-items-center rounded-full transition-all duration-200 ${
                   active
                     ? item.primary
-                      ? 'size-8 bg-blue-600 text-white shadow-lg shadow-blue-500/30 ring-4 ring-blue-500/10'
+                      ? 'size-9 bg-blue-600 text-white shadow-xl shadow-blue-500/35 ring-4 ring-blue-500/15'
                       : 'size-7 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
                     : showAlert
                       ? 'size-7 bg-rose-500/10 text-rose-500 shadow-[0_0_18px_rgba(244,63,94,0.55)] ring-1 ring-rose-400/60 dark:bg-rose-400/15 dark:text-rose-200 dark:shadow-[0_0_22px_rgba(251,113,133,0.5)]'
