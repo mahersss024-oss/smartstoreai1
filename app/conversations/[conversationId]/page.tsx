@@ -469,7 +469,7 @@ export default function ConversationPage() {
   }, []);
 
   const mobileConversationStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!visualViewportFrame) {
+    if (!isMessageInputFocused || !visualViewportFrame) {
       return undefined;
     }
 
@@ -482,7 +482,7 @@ export default function ConversationPage() {
       top: `${visualViewportFrame.offsetTop}px`,
       width: '100%',
     };
-  }, [visualViewportFrame]);
+  }, [isMessageInputFocused, visualViewportFrame]);
 
   const otherParticipantId =
     conversation && session.user?.id
@@ -1316,7 +1316,13 @@ export default function ConversationPage() {
       dir="rtl"
       style={mobileConversationStyle}
     >
-      <div className="customer-conversation-shell mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-[env(safe-area-inset-bottom)] pt-0 sm:gap-2 sm:px-4 sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pt-2 lg:grid lg:h-full lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-4 lg:px-6 lg:py-5">
+      <div
+        className={`customer-conversation-shell mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pt-0 sm:gap-2 sm:px-4 sm:pt-2 lg:grid lg:h-full lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-4 lg:px-6 lg:py-5 ${
+          isMessageInputFocused
+            ? 'pb-0 sm:pb-0'
+            : 'pb-[env(safe-area-inset-bottom)] sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]'
+        }`}
+      >
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-2 py-2 sm:px-1 sm:py-1.5 lg:py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
@@ -1671,7 +1677,14 @@ export default function ConversationPage() {
               </div>
             )}
 
-            <form className="customer-conversation-composer grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] dark:bg-card sm:p-2 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onSubmit={sendConversationMessage}>
+            <form
+              className={`customer-conversation-composer grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5 border-t bg-white p-1.5 dark:bg-card sm:p-2 ${
+                isMessageInputFocused
+                  ? 'pb-1.5 sm:pb-2'
+                  : 'pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+              }`}
+              onSubmit={sendConversationMessage}
+            >
               <Textarea
                 ref={messageInputRef}
                 className="col-start-1 row-start-1 max-h-20 min-h-10 resize-none rounded-full px-4 py-2 text-sm leading-6"

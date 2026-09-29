@@ -1327,6 +1327,9 @@ function getListingIdFromHref(href: string) {
   }
 }
 
+const maxChatListingCardsPerMessage = 3;
+const moreChatListingsGuidance = 'يمكنك مشاهدة إعلانات أكثر في الصفحة الرئيسية.';
+
 function ListingChatLinkCard({
   href,
   listing,
@@ -1389,6 +1392,8 @@ function renderTextMessagePart(
   const renderedParts: ReactElement[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
+  let renderedListingCardCount = 0;
+  let omittedListingCardCount = 0;
 
   while ((match = markdownLinkPattern.exec(text)) !== null) {
     const [rawLink, label, href] = match;
@@ -1407,16 +1412,21 @@ function renderTextMessagePart(
       );
     }
 
-    renderedParts.push(
-      <ListingChatLinkCard
-        key={`listing-link-${index}-${renderedParts.length}`}
-        href={listingHref}
-        listing={
-          listingsById.get(getListingIdFromHref(listingHref) ?? '') ??
-          undefined
-        }
-      />,
-    );
+    if (renderedListingCardCount < maxChatListingCardsPerMessage) {
+      renderedParts.push(
+        <ListingChatLinkCard
+          key={`listing-link-${index}-${renderedParts.length}`}
+          href={listingHref}
+          listing={
+            listingsById.get(getListingIdFromHref(listingHref) ?? '') ??
+            undefined
+          }
+        />,
+      );
+      renderedListingCardCount += 1;
+    } else {
+      omittedListingCardCount += 1;
+    }
     lastIndex = match.index + rawLink.length;
   }
 
@@ -1425,6 +1435,14 @@ function renderTextMessagePart(
     renderedParts.push(
       <MessageResponse key={`text-${index}-${renderedParts.length}`}>
         {trailingText}
+      </MessageResponse>,
+    );
+  }
+
+  if (omittedListingCardCount > 0) {
+    renderedParts.push(
+      <MessageResponse key={`more-listings-${index}`}>
+        {moreChatListingsGuidance}
       </MessageResponse>,
     );
   }
@@ -1513,20 +1531,26 @@ function ListingCardView({
         <Button
           size="icon-sm"
           variant="outline"
-          className="absolute left-1.5 top-1.5 z-10 size-7 rounded-md border-sky-200 bg-white/95 p-0 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 sm:left-2 sm:top-2 sm:size-8"
+          className={cn(
+            'absolute left-1.5 top-1.5 z-10 size-7 rounded-md p-0 shadow-sm ring-1 sm:left-2 sm:top-2 sm:size-8',
+            isSmartResult
+              ? 'border-cyan-300 bg-cyan-50/95 text-cyan-700 shadow-cyan-400/35 ring-2 ring-cyan-200/70 hover:bg-cyan-100 hover:text-cyan-800 dark:border-cyan-300/40 dark:bg-cyan-400/15 dark:text-cyan-100 dark:ring-cyan-300/25 dark:hover:bg-cyan-400/20'
+              : 'border-sky-200 bg-white/95 text-blue-600 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900',
+          )}
           aria-label="مقارنة الإعلان"
           onClick={(event) => {
             event.stopPropagation();
             askToCompareListing();
           }}
         >
-          <Sparkles className="size-3.5 sm:size-4" />
+          <Sparkles
+            className={cn(
+              'size-3.5 sm:size-4',
+              isSmartResult &&
+                'fill-current drop-shadow-[0_0_6px_rgba(34,211,238,0.85)]',
+            )}
+          />
         </Button>
-        {isSmartResult && (
-          <span className="pointer-events-none absolute left-9 top-1.5 z-10 inline-flex h-7 items-center rounded-md border border-sky-200 bg-white/95 px-2 text-[10px] font-bold text-blue-700 shadow-sm ring-1 ring-slate-950/5 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-100 dark:ring-white/10 sm:left-11 sm:top-2 sm:h-8">
-            ذكي
-          </span>
-        )}
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>

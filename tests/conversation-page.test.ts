@@ -91,6 +91,7 @@ test('seller buyer conversation fills the mobile viewport and keeps the keyboard
   assert.match(source, /max-h-20 min-h-10/);
   assert.match(source, /text-\[0px\]/);
   assert.match(source, /window\.visualViewport/);
+  assert.match(source, /if \(!isMessageInputFocused \|\| !visualViewportFrame\)/);
   assert.match(source, /height: `\$\{visualViewportFrame\.height\}px`/);
   assert.match(source, /maxHeight: `\$\{visualViewportFrame\.height\}px`/);
   assert.match(source, /width: '100%'/);
@@ -113,7 +114,7 @@ test('seller buyer conversation is a fixed page with only messages scrolling', (
   assert.match(source, /customer-conversation-messages min-h-0 flex-1 overscroll-contain overflow-y-auto/);
   assert.match(source, /customer-conversation-composer/);
   assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*syncVisualViewport\(\);/);
-  assert.doesNotMatch(source, /if \(!isMessageInputFocused\) \{\s*setVisualViewportFrame\(null\)/);
+  assert.doesNotMatch(source, /setVisualViewportFrame\(null\)/);
   assert.match(globalCss, /body\[data-smartstore-conversation-page\]/);
   assert.match(globalCss, /overflow: hidden;/);
   assert.match(globalCss, /overscroll-behavior: none;/);
@@ -131,8 +132,11 @@ test('mobile navigation hides inside an open conversation', () => {
   assert.match(mobileNavigation, /pathname\.startsWith\('\/conversations\/'\)/);
   assert.match(
     source,
-    /w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pb-\[env\(safe-area-inset-bottom\)\] pt-0/,
+    /isMessageInputFocused[\s\S]*\? 'pb-0 sm:pb-0'/,
   );
+  assert.match(source, /pb-\[env\(safe-area-inset-bottom\)\] sm:pb-\[calc\(0\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(source, /\? 'pb-1\.5 sm:pb-2'/);
+  assert.match(source, /pb-\[calc\(1\.25rem\+env\(safe-area-inset-bottom\)\)\] sm:pb-\[calc\(1\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(source, /rounded-none bg-white/);
   assert.match(source, /px-3 py-2 dark:bg-background/);
   assert.doesNotMatch(source, /pb-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);

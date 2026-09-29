@@ -86,6 +86,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /smart-assistant-result-card/);
   assert.match(homePage, /isSmartResult\?: boolean/);
   assert.match(homePage, /isSmartResult &&/);
+  assert.match(homePage, /maxChatListingCardsPerMessage = 3/);
+  assert.match(homePage, /omittedListingCardCount > 0/);
+  assert.match(homePage, /moreChatListingsGuidance/);
   assert.match(homePage, /smart-assistant-results-grid grid max-w-4xl gap-1\.5 sm:gap-2/);
   assert.match(homePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(homePage, /marketplace-home-controls shrink-0/);
@@ -142,7 +145,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   );
   assert.match(homePage, /const askToCompareListing = \(\) => \{/);
   assert.match(homePage, /absolute left-1\.5 top-1\.5 z-10 size-7/);
-  assert.match(homePage, /absolute left-1\.5 top-1\.5 size-7/);
+  assert.match(homePage, /shadow-cyan-400\/35/);
+  assert.match(homePage, /drop-shadow-\[0_0_6px_rgba\(34,211,238,0\.85\)\]/);
+  assert.doesNotMatch(homePage, /absolute left-9 top-1\.5/);
   assert.match(homePage, /absolute right-1\.5 top-1\.5 size-7/);
   assert.match(homePage, /askToCompareListing\(\);/);
   assert.match(homePage, /relative aspect-square min-h-\[6\.25rem\] bg-slate-100/);
