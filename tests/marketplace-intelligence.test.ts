@@ -205,3 +205,61 @@ test('comparable listing filter excludes unrelated cities and categories', () =>
 
   assert.equal(comparable.length, 0);
 });
+
+test('comparable listing filter requires a strong product match within the category', () => {
+  const target = listing({
+    id: 'compare-product:target',
+    price: 78000,
+    year: 2024,
+    mileage: 32000,
+  });
+  const sameProduct = listing({
+    id: 'compare-product:same',
+    price: 79000,
+    year: 2024,
+    mileage: 36000,
+  });
+  const differentModel = {
+    ...listing({
+      id: 'compare-product:different-model',
+      price: 76000,
+      year: 2024,
+      mileage: 34000,
+    }),
+    title: 'Toyota Corolla 2024',
+    description: 'Corolla 2024 clean',
+    attributes: {
+      brand: 'Toyota',
+      model: 'Corolla',
+      year: 2024,
+      mileage: 34000,
+    },
+  };
+  const differentBrand = {
+    ...listing({
+      id: 'compare-product:different-brand',
+      price: 82000,
+      year: 2024,
+      mileage: 33000,
+    }),
+    title: 'Nissan Patrol 2024',
+    description: 'Patrol 2024 clean',
+    attributes: {
+      brand: 'Nissan',
+      model: 'Patrol',
+      year: 2024,
+      mileage: 33000,
+    },
+  };
+
+  const comparable = getComparableListings(target, [
+    differentModel,
+    differentBrand,
+    sameProduct,
+  ]);
+
+  assert.deepEqual(
+    comparable.map((candidate) => candidate.id),
+    ['compare-product:same'],
+  );
+});

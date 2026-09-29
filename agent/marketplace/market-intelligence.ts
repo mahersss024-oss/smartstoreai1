@@ -3,6 +3,7 @@ import {
   extractListingYear,
   scoreListingQuality,
 } from './ranking-engine';
+import { normalizeMarketplaceSearchText } from './search';
 import type { ListingRecord } from './store';
 
 export type ListingMarketIntelligence = {
@@ -148,6 +149,167 @@ function confidence(similarListingCount: number) {
   return 'low';
 }
 
+const genericProductTokens = new Set([
+  'للبيع',
+  'بيع',
+  'مستعمل',
+  'مستعمله',
+  'مستعملة',
+  'نظيف',
+  'نظيفه',
+  'نظيفة',
+  'جديد',
+  'جديده',
+  'جديدة',
+  'ممتاز',
+  'ممتازه',
+  'ممتازة',
+  'سعر',
+  'محدد',
+  'غير',
+  'على',
+  'السوم',
+  'سيارة',
+  'سياره',
+  'سيارات',
+  'موتر',
+  'اثاث',
+  'أثاث',
+  'جوال',
+  'جوالات',
+  'هاتف',
+  'عقار',
+  'بيت',
+  'للإيجار',
+  'للايجار',
+  'sale',
+  'used',
+  'new',
+  'clean',
+  'car',
+  'cars',
+  'furniture',
+  'phone',
+]);
+
+const productIdentityAttributeKeys = [
+  'brand',
+  'make',
+  'model',
+  'series',
+  'type',
+  'product',
+  'name',
+  'material',
+  'style',
+];
+
+function normalizeProductValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return normalizeMarketplaceSearchText(String(value));
+}
+
+function productIdentityValue(listing: ListingRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = normalizeProductValue(listing.attributes[key]);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function productTextTokens(listing: ListingRecord) {
+  const identityAttributeValues = productIdentityAttributeKeys
+    .map((key) => listing.attributes[key])
+    .filter((value) => value !== undefined && value !== null);
+  const text = normalizeMarketplaceSearchText(
+    [
+      listing.title,
+      listing.description,
+      ...identityAttributeValues.map(String),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+
+  return new Set(
+    text
+      .split(/[^\p{L}\p{N}]+/u)
+      .map((token) => token.trim())
+      .filter((token) => {
+        return (
+          token.length >= 3 &&
+          !/^\d+$/.test(token) &&
+          !genericProductTokens.has(token)
+        );
+      }),
+  );
+}
+
+function productSimilarityScore(target: ListingRecord, candidate: ListingRecord) {
+  if (candidate.id === target.id || candidate.category !== target.category) {
+    return 0;
+  }
+
+  const targetBrand = productIdentityValue(target, ['brand', 'make']);
+  const candidateBrand = productIdentityValue(candidate, ['brand', 'make']);
+  const targetModel = productIdentityValue(target, ['model', 'series']);
+  const candidateModel = productIdentityValue(candidate, ['model', 'series']);
+  const targetTokens = productTextTokens(target);
+  const candidateTokens = productTextTokens(candidate);
+  let score = 0;
+  let hasProductIdentityMatch = false;
+
+  if (targetBrand && candidateBrand) {
+    if (targetBrand !== candidateBrand) {
+      return 0;
+    }
+
+    score += 5;
+    hasProductIdentityMatch = true;
+  }
+
+  if (targetModel && candidateModel) {
+    if (targetModel !== candidateModel) {
+      return 0;
+    }
+
+    score += 8;
+    hasProductIdentityMatch = true;
+  }
+
+  let sharedProductTokens = 0;
+
+  for (const token of targetTokens) {
+    if (candidateTokens.has(token)) {
+      sharedProductTokens += 1;
+    }
+  }
+
+  score += sharedProductTokens * 4;
+
+  if (!hasProductIdentityMatch && sharedProductTokens === 0) {
+    return 0;
+  }
+
+  if (target.city && candidate.city) {
+    const targetCity = normalizeMarketplaceSearchText(target.city);
+    const candidateCity = normalizeMarketplaceSearchText(candidate.city);
+
+    if (targetCity === candidateCity) {
+      score += 3;
+    }
+  }
+
+  return score;
+}
+
 function buildInsights(input: {
   price: number | null;
   medianMarketPrice: number | null;
@@ -198,41 +360,57 @@ export function getComparableListings(
   const targetYear = extractListingYear(target);
   const targetMileage = extractListingMileage(target);
 
-  return candidates.filter((candidate) => {
-    if (candidate.id === target.id) {
-      return false;
-    }
+  return candidates
+    .map((candidate) => ({
+      listing: candidate,
+      productScore: productSimilarityScore(target, candidate),
+    }))
+    .filter(({ listing: candidate, productScore }) => {
+      if (candidate.id === target.id) {
+        return false;
+      }
 
-    if (candidate.category !== target.category) {
-      return false;
-    }
+      if (candidate.category !== target.category) {
+        return false;
+      }
 
-    if (target.city && candidate.city && candidate.city !== target.city) {
-      return false;
-    }
+      if (productScore <= 0) {
+        return false;
+      }
 
-    const candidateYear = extractListingYear(candidate);
+      if (
+        target.city &&
+        candidate.city &&
+        normalizeMarketplaceSearchText(candidate.city) !==
+          normalizeMarketplaceSearchText(target.city)
+      ) {
+        return false;
+      }
 
-    if (
-      targetYear &&
-      candidateYear &&
-      Math.abs(candidateYear - targetYear) > 3
-    ) {
-      return false;
-    }
+      const candidateYear = extractListingYear(candidate);
 
-    const candidateMileage = extractListingMileage(candidate);
+      if (
+        targetYear &&
+        candidateYear &&
+        Math.abs(candidateYear - targetYear) > 3
+      ) {
+        return false;
+      }
 
-    if (
-      targetMileage &&
-      candidateMileage &&
-      Math.abs(candidateMileage - targetMileage) > 80_000
-    ) {
-      return false;
-    }
+      const candidateMileage = extractListingMileage(candidate);
 
-    return true;
-  });
+      if (
+        targetMileage &&
+        candidateMileage &&
+        Math.abs(candidateMileage - targetMileage) > 80_000
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((left, right) => right.productScore - left.productScore)
+    .map(({ listing }) => listing);
 }
 
 export function analyzeListingMarket(

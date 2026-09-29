@@ -108,6 +108,7 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /source === 'listing'/);
   assert.match(listingPage, /sourceListingId/);
   assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(listingPage, /relaxedMatches/);
   assert.ok(activityIndex !== -1 && latestUpdateIndex !== -1 && similarAdsIndex !== -1);
   assert.ok(activityIndex < latestUpdateIndex);
   assert.ok(latestUpdateIndex < similarAdsIndex);

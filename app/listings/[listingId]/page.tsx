@@ -608,16 +608,9 @@ function getDetailSimilarListings(
 ) {
   const strictMatches = getComparableListings(listing, candidates);
 
-  if (strictMatches.length >= 6) {
-    return strictMatches.slice(0, 6);
-  }
-
-  const relaxedMatches = candidates.filter((candidate) => {
-    return candidate.id !== listing.id && candidate.category === listing.category;
-  });
   const uniqueMatches = new Map<string, ListingRecord>();
 
-  for (const candidate of [...strictMatches, ...relaxedMatches]) {
+  for (const candidate of strictMatches) {
     uniqueMatches.set(candidate.id, candidate);
   }
 
