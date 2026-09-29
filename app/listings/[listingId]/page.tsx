@@ -700,8 +700,23 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
           thumbnailUrl: missingListingImageDataUrl,
         },
       ];
-  const attributes = Object.entries(listing.attributes).filter(([, value]) => {
-    return value !== null && value !== undefined && String(value).trim() !== '';
+  const summaryAttributeKeys = new Set([
+    'askingPrice',
+    'city',
+    'condition',
+    'location',
+    'price',
+    'priceType',
+    'saleTerms',
+    'status',
+  ]);
+  const attributes = Object.entries(listing.attributes).filter(([key, value]) => {
+    return (
+      !summaryAttributeKeys.has(key) &&
+      value !== null &&
+      value !== undefined &&
+      String(value).trim() !== ''
+    );
   });
   const saleTerms = formatSaleTerms(listing.price, listing.attributes);
 
@@ -808,29 +823,29 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 </div>
               </div>
 
-              <div className="grid gap-3 border-t border-slate-200/60 pt-4 dark:border-white/10 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="pt-3">
-                  <div className="text-xs text-muted-foreground">السعر</div>
-                  <div className="mt-1 text-lg font-bold text-blue-700">{formatPrice(listing.price)}</div>
+              <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-xs dark:border-white/10 sm:grid-cols-3">
+                <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="shrink-0 text-muted-foreground">السعر</span>
+                  <strong className="min-w-0 truncate text-sm text-blue-700">{formatPrice(listing.price)}</strong>
                 </div>
-                <div className="pt-3">
-                  <div className="text-xs text-muted-foreground">المدينة</div>
-                  <div className="mt-1 flex items-center gap-1 text-sm font-bold">
-                    <MapPin className="size-4 text-blue-600" />
+                <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="shrink-0 text-muted-foreground">المدينة</span>
+                  <strong className="flex min-w-0 items-center gap-1 truncate text-sm">
+                    <MapPin className="size-3.5 shrink-0 text-blue-600" />
                     {listing.city ?? 'السعودية'}
-                  </div>
+                  </strong>
                 </div>
-                <div className="pt-3">
-                  <div className="text-xs text-muted-foreground">الحالة</div>
-                  <div className="mt-1 text-sm font-bold">{formatCondition(listing.condition)}</div>
+                <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="shrink-0 text-muted-foreground">الحالة</span>
+                  <strong className="min-w-0 truncate text-sm">{formatCondition(listing.condition)}</strong>
                 </div>
-                <div className="pt-3">
-                  <div className="text-xs text-muted-foreground">طريقة البيع</div>
-                  <div className="mt-1 text-sm font-bold">{saleTerms}</div>
+                <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="shrink-0 text-muted-foreground">طريقة البيع</span>
+                  <strong className="min-w-0 truncate text-sm">{saleTerms}</strong>
                 </div>
-                <div className="pt-3">
-                  <div className="text-xs text-muted-foreground">رقم الإعلان</div>
-                  <div className="mt-1 truncate text-sm font-bold">{listing.id}</div>
+                <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2 sm:col-span-2">
+                  <span className="shrink-0 text-muted-foreground">رقم الإعلان</span>
+                  <strong className="min-w-0 truncate text-sm">{listing.id}</strong>
                 </div>
               </div>
             </section>
@@ -841,13 +856,16 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 بيانات المنتج
               </div>
               {attributes.length ? (
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {attributes.map(([key, value]) => (
-                    <div key={key} className="pt-3">
-                      <div className="text-xs text-muted-foreground">{formatAttributeLabel(key)}</div>
-                      <div className="mt-1 break-words text-sm font-semibold">
+                    <div
+                      key={key}
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/60 bg-background/45 px-3 py-2 text-xs"
+                    >
+                      <span className="shrink-0 text-muted-foreground">{formatAttributeLabel(key)}</span>
+                      <strong className="min-w-0 truncate text-sm">
                         {formatAttributeValue(key, value)}
-                      </div>
+                      </strong>
                     </div>
                   ))}
                 </div>

@@ -107,6 +107,12 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /getSimilarListingHref\(similarListing\.id, listing\.id\)/);
   assert.match(listingPage, /source === 'listing'/);
   assert.match(listingPage, /sourceListingId/);
+  assert.match(listingPage, /summaryAttributeKeys = new Set/);
+  assert.match(listingPage, /!summaryAttributeKeys\.has\(key\)/);
+  assert.match(listingPage, /grid grid-cols-2 gap-2 border-t/);
+  assert.match(listingPage, /flex min-w-0 items-center justify-between gap-2 rounded-md/);
+  assert.match(listingPage, /grid grid-cols-1 gap-2 sm:grid-cols-2/);
+  assert.match(listingPage, /flex min-w-0 items-center justify-between gap-3 rounded-md/);
   assert.match(listingPage, /grid grid-cols-2 gap-2 text-xs/);
   assert.match(listingPage, /rounded-md border border-border\/60 bg-background\/45 px-3 py-2/);
   assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
