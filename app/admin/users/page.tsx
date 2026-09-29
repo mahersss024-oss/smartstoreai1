@@ -13,7 +13,7 @@ import {
   Save,
   Search,
   ShieldCheck,
-  Store,
+  Megaphone,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -632,7 +632,7 @@ export default function AdminUsersPage() {
 
                   <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
                     <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
-                      <Store className="size-4 text-blue-600" />
+                      <Megaphone className="size-4 text-blue-600" />
                       الإعلانات: {formatNumber(user.counts.listings)}
                     </div>
                     <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">

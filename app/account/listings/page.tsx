@@ -17,7 +17,6 @@ import {
   Save,
   ShieldCheck,
   Star,
-  Store,
   Trash2,
   Upload,
   X,
@@ -910,15 +909,15 @@ export default function AccountListingsPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <CommissionAgreementDialog
         mode="publish"
         onCancel={() => setPendingPublishListing(null)}
         onConfirm={confirmPublishListing}
         open={Boolean(pendingPublishListing)}
       />
-      <div className="mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
+      <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
+        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
@@ -1005,7 +1004,7 @@ export default function AccountListingsPage() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                    <Store className="size-4" />
+                    <Megaphone className="size-4" />
                     إعلاناتي
                   </div>
                   <h2 className="mt-1 text-lg font-bold">قائمة إعلانات العميل</h2>
@@ -1276,7 +1275,7 @@ export default function AccountListingsPage() {
                         {listing.status === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}?source=account-listings`}>
-                              <Store className="size-3.5" />
+                              <Megaphone className="size-3.5" />
                               عرض
                             </Link>
                           </Button>

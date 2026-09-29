@@ -476,6 +476,132 @@ test('broad category search starts fresh instead of inheriting old filters', asy
   assert.equal(result.rankedCount >= 2, true);
 });
 
+test('changed buyer product intent starts a fresh search without old listing filters', async () => {
+  const ownerKey = 'test:search-state-product-intent-change';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-camry-before-house',
+    title: 'Toyota Camry 2024 - Riyadh',
+    price: 92000,
+    year: 2024,
+    mileage: 25000,
+    city: 'Riyadh',
+    brand: 'Toyota',
+    model: 'Camry',
+  });
+  const house = createListingDraft({
+    id: 'listing:p0-house-after-car',
+    sellerId: 'seller:p0-house-after-car',
+    category: 'real_estate',
+    title: 'House for sale in Riyadh',
+    description: 'Family house with yard',
+    price: 900000,
+    city: 'Riyadh',
+    condition: 'used',
+    attributes: {
+      type: 'house',
+      bedrooms: 4,
+    },
+  });
+  publishListing(house.id);
+
+  await searchMarketplaceWithState({
+    ownerKey,
+    query: 'I want a Camry',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Toyota',
+      model: 'Camry',
+    },
+  });
+  const refinedCarResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'in Riyadh',
+    understoodIntent: {
+      city: 'Riyadh',
+    },
+  });
+
+  assert.equal(refinedCarResult.searchState.searchMode, 'refine');
+  assert.equal(refinedCarResult.searchState.category, 'cars');
+  assert.equal(refinedCarResult.searchState.model, 'Camry');
+  assert.equal(refinedCarResult.searchState.city, 'Riyadh');
+
+  const houseResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'I want a house',
+    understoodIntent: {
+      category: 'real_estate',
+    },
+  });
+  const storedState = await getMarketplaceSearchState(ownerKey);
+  const houseIds = houseResult.listings.map((ranked) => ranked.listing.id);
+
+  assert.equal(houseResult.searchState.searchMode, 'new_search');
+  assert.equal(storedState?.category, 'real_estate');
+  assert.equal(storedState?.brand, undefined);
+  assert.equal(storedState?.model, undefined);
+  assert.equal(storedState?.city, undefined);
+  assert.equal(houseIds.includes('listing:p0-house-after-car'), true);
+  assert.equal(houseIds.includes('listing:p0-camry-before-house'), false);
+});
+
+test('changed car model starts a fresh search instead of mixing old ad context', async () => {
+  const ownerKey = 'test:search-state-car-model-intent-change';
+  await resetMarketplaceSearchState(ownerKey);
+
+  publishTestListing({
+    id: 'listing:p0-camry-old-context',
+    title: 'Toyota Camry 2024 - Riyadh',
+    price: 92000,
+    year: 2024,
+    mileage: 25000,
+    city: 'Riyadh',
+    brand: 'Toyota',
+    model: 'Camry',
+  });
+  publishTestListing({
+    id: 'listing:p0-patrol-new-context',
+    title: 'Nissan Patrol 2025 - Jeddah',
+    price: 230000,
+    year: 2025,
+    mileage: 12000,
+    city: 'Jeddah',
+    brand: 'Nissan',
+    model: 'Patrol',
+  });
+
+  await searchMarketplaceWithState({
+    ownerKey,
+    query: 'Toyota Camry in Riyadh',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Toyota',
+      model: 'Camry',
+      city: 'Riyadh',
+    },
+  });
+  const patrolResult = await searchMarketplaceWithState({
+    ownerKey,
+    query: 'Nissan Patrol',
+    understoodIntent: {
+      category: 'cars',
+      brand: 'Nissan',
+      model: 'Patrol',
+    },
+  });
+  const storedState = await getMarketplaceSearchState(ownerKey);
+  const patrolIds = patrolResult.listings.map((ranked) => ranked.listing.id);
+
+  assert.equal(patrolResult.searchState.searchMode, 'new_search');
+  assert.equal(storedState?.brand, 'Nissan');
+  assert.equal(storedState?.model, 'Patrol');
+  assert.equal(storedState?.city, undefined);
+  assert.equal(patrolIds.includes('listing:p0-patrol-new-context'), true);
+  assert.equal(patrolIds.includes('listing:p0-camry-old-context'), false);
+});
+
 test('structured Arabic search ignores connected brand and model words after extracting intent', () => {
   const intent = parseStructuredSearchIntent('ابي ونيسان والبترول');
 

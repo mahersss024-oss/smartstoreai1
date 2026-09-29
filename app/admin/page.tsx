@@ -12,7 +12,6 @@ import {
   Megaphone,
   Percent,
   ShieldCheck,
-  Store,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -136,7 +135,7 @@ export default function AdminHomePage() {
               </Link>
             </Button>
             <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-600 text-white">
-              <Store className="size-5" />
+              <Megaphone className="size-5" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">

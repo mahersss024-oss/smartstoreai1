@@ -26,3 +26,22 @@ test('light and dark themes share the artistic market surface', () => {
   assert.match(home, /marketplace-section-title/);
   assert.match(navigation, /marketplace-bottom-nav/);
 });
+
+test('market listing indicator uses the megaphone icon instead of the store glyph', () => {
+  const files = [
+    readProjectFile('app', 'page.tsx'),
+    readProjectFile('app', 'conversations', '[conversationId]', 'page.tsx'),
+    readProjectFile('app', 'favorites', 'page.tsx'),
+    readProjectFile('app', 'account', 'page.tsx'),
+    readProjectFile('app', 'account', 'listings', 'page.tsx'),
+    readProjectFile('app', 'admin', 'page.tsx'),
+    readProjectFile('app', 'admin', 'listings', 'page.tsx'),
+    readProjectFile('app', 'admin', 'users', 'page.tsx'),
+  ];
+
+  for (const source of files) {
+    assert.match(source, /Megaphone/);
+    assert.doesNotMatch(source, /\bStore\b/);
+    assert.doesNotMatch(source, /<Store/);
+  }
+});

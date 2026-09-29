@@ -5,6 +5,7 @@ import {
   type StructuredSearchIntent,
   structuredSearchIntentSchema,
 } from './structured-search-intent';
+import { normalizeMarketplaceSearchText } from './search';
 
 export type MarketplaceSearchState = StructuredSearchIntent & {
   revision: number;
@@ -62,7 +63,25 @@ function isDifferentPrimaryTarget(
     return true;
   }
 
+  if (next.brand && current.brand && next.brand !== current.brand) {
+    return true;
+  }
+
   if (next.model && current.model && next.model !== current.model) {
+    return true;
+  }
+
+  const currentTerms = getProductIdentityTerms(current.terms);
+  const nextTerms = getProductIdentityTerms(next.terms);
+
+  if (
+    currentTerms.length > 0 &&
+    nextTerms.length > 0 &&
+    !next.category &&
+    !next.brand &&
+    !next.model &&
+    !nextTerms.some((term) => currentTerms.includes(term))
+  ) {
     return true;
   }
 
@@ -71,6 +90,14 @@ function isDifferentPrimaryTarget(
 
 function uniqueStrings(values: Array<string | undefined>) {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+function getProductIdentityTerms(terms: string[]) {
+  return uniqueStrings(
+    terms
+      .map((term) => normalizeMarketplaceSearchText(term))
+      .filter((term) => !/^\d+$/.test(term) && term.length > 1),
+  );
 }
 
 function mergeSearchState(

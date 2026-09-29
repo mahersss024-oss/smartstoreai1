@@ -23,7 +23,7 @@ import {
   MoreVertical,
   Phone,
   Send,
-  Store,
+  Megaphone,
   Unlock,
 } from 'lucide-react';
 
@@ -1464,7 +1464,7 @@ export default function ConversationPage() {
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                    <Store className="size-3.5" />
+                    <Megaphone className="size-3.5" />
                     الإعلان
                   </div>
                   {displayListing ? (
@@ -1763,7 +1763,7 @@ export default function ConversationPage() {
               )}
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                  <Store className="size-4" />
+                  <Megaphone className="size-4" />
                   الإعلان
                 </div>
                 {displayListing ? (

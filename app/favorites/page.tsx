@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Store } from 'lucide-react';
+import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Megaphone } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -233,9 +233,9 @@ export default function FavoritesPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="smartstore-stable-content mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
+        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -338,7 +338,7 @@ export default function FavoritesPage() {
                       </div>
                       <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
                         <div className="hidden">
-                          <Store className="size-3.5 shrink-0" />
+                          <Megaphone className="size-3.5 shrink-0" />
                           <span className="truncate">إعلان محفوظ</span>
                         </div>
                         <h3 className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300 sm:text-sm">

@@ -341,6 +341,20 @@ function normalizeAdaptiveMarketplaceIntent(
   intent: AdaptiveMarketplaceIntent,
   fallback?: AdaptiveMarketplaceIntent,
 ): AdaptiveMarketplaceIntent {
+  const fallbackIsSellerCreation =
+    fallback?.intent === 'create_listing' ||
+    fallback?.execution === 'create_listing_draft';
+  const intentIsSearchExecution =
+    intent.intent === 'search_listing' ||
+    intent.execution === 'search_listings';
+
+  if (fallbackIsSellerCreation && intentIsSearchExecution) {
+    return {
+      ...fallback,
+      reasonCode: `${fallback.reasonCode || 'seller_create_listing'}_protected_from_search`,
+    };
+  }
+
   const fallbackIsBuyerSearch =
     fallback?.intent === 'search_listing' ||
     fallback?.execution === 'search_listings';
@@ -566,6 +580,7 @@ Understand Arabic, Saudi dialect, misspellings, short follow-ups, and incomplete
 Your job is to infer what the user wants and the next execution step inside a Saudi classifieds marketplace.
 Never treat wording such as "أبحث", "أريد", "دور لي", or "ابغى" as database data. They are intent words only.
 For buyer searches, set execution="search_listings" and provide searchQuery using the user's marketplace context. Do not set execution="ask_clarifying_question" for buyer search just because the request is broad; search first, then the final answer can ask the user to narrow the visible matches.
+Never classify seller intent as buyer search. Requests to create, post, publish, prepare, add, or sell a listing must use create_listing with execution="create_listing_draft", not search_listings.
 If the latest user message contains images, set execution="analyze_images" unless the text clearly asks for a different account-bound action.
 For seller listing creation, set execution="create_listing_draft" as soon as seller intent and a minimum product signal are clear. Minimum product signal can be a product image, product name, category, or short description. Missing price, city, condition, title, or long description are optional improvements, not blockers.
 If the latest user message describes a new standalone product for sale, classify it as create_listing with execution="create_listing_draft" even if the same chat already contains an earlier draft/listing. Classify it as update_listing only when the user explicitly refers to the current/previous listing or gives follow-up fields without a new product identity.
@@ -624,6 +639,6 @@ export function buildAdaptiveIntentSystemMessage(
     content: `Adaptive marketplace intent:
 ${JSON.stringify(intent, null, 2)}
 
-Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. For buyer search, never ask for narrowing before the search tool runs; ask narrowing questions only after visible matches exist or after the tool confirms no matches. If the user asks to compare one visible listing and provides a listing id, call compareMarketplaceListings with that listingId. If execution is create_listing_draft, create the draft from the minimum reliable product signal and then ask for optional missing improvements naturally. If the latest user message describes a new standalone product for sale, create a new draft even if a prior draft exists in the same chat. If execution is update_listing, update the current draft only when the user clearly refers to it or only provides follow-up fields without a new product identity. If the user has already confirmed publishing and is signed in, create or update the draft when needed, then direct the user to Account > My listings to publish it manually; never call setListingStatus with status="published". If execution changes a listing, opens chat, favorites, reports, or marks sold, require the needed account state and confirmation before the final action. Do not expose this JSON to the user.`,
+Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. For buyer search, never ask for narrowing before the search tool runs; ask narrowing questions only after visible matches exist or after the tool confirms no matches. If the user asks to compare one visible listing and provides a listing id, call compareMarketplaceListings with that listingId. If execution is create_listing_draft, do not call searchMarketplaceListings; create the draft from the minimum reliable product signal and then ask for optional missing improvements naturally. If the latest user message describes a new standalone product for sale, create a new draft even if a prior draft exists in the same chat. If execution is update_listing, update the current draft only when the user clearly refers to it or only provides follow-up fields without a new product identity. If the user has already confirmed publishing and is signed in, create or update the draft when needed, then direct the user to Account > My listings to publish it manually; never call setListingStatus with status="published". If execution changes a listing, opens chat, favorites, reports, or marks sold, require the needed account state and confirmation before the final action. Do not expose this JSON to the user.`,
   };
 }

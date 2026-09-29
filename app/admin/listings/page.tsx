@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Save,
   Search,
-  Store,
+  Megaphone,
   Trash2,
 } from 'lucide-react';
 
@@ -608,7 +608,7 @@ function AdminListingsPageContent() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-              <Store className="size-5" />
+              <Megaphone className="size-5" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">إدارة الإعلانات</h1>
@@ -622,7 +622,7 @@ function AdminListingsPageContent() {
         {focusedListingId ? (
           <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
             <div className="flex items-center gap-2 font-semibold">
-              <Store className="size-4" />
+              <Megaphone className="size-4" />
               مراجعة إعلان محدد من البلاغ
             </div>
             <Button asChild variant="outline" className="rounded-md">

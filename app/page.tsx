@@ -36,7 +36,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Square,
-  Store,
+  Megaphone,
   Trash2,
   User,
   X,
@@ -1367,11 +1367,11 @@ function ListingChatLinkCard({
                 src={listing.image}
               />
               <span hidden>
-                <Store className="size-5" />
+                <Megaphone className="size-5" />
               </span>
             </>
           ) : (
-            <Store className="size-5" />
+            <Megaphone className="size-5" />
           )}
         </div>
       </div>
@@ -3933,7 +3933,7 @@ export default function Page() {
               <div className="mb-2 grid gap-1.5 text-center md:justify-end md:text-right">
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
                   <Button className="marketplace-primary-cta h-9 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
-                  <Store className="size-4" />
+                  <Megaphone className="size-4" />
                   أنشئ إعلانك مع حمد
                   </Button>
                   <Button
@@ -3950,7 +3950,7 @@ export default function Page() {
                       });
                     }}
                   >
-                    <Store className="size-4" />
+                    <Megaphone className="size-4" />
                     أنشئ إعلانك يدويًا
                   </Button>
                 </div>
@@ -3998,7 +3998,7 @@ export default function Page() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300">
-                        <Store className="size-4" />
+                        <Megaphone className="size-4" />
                         نموذج الإعلان
                       </div>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">

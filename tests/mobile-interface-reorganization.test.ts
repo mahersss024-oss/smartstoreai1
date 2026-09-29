@@ -45,6 +45,28 @@ test('account page exposes former more links without changing routes', () => {
   assert.match(page, /href="\/commission-policy"/);
 });
 
+test('customer section pages keep headers stable while content scrolls', () => {
+  const pages = [
+    readProjectFile('app', 'account', 'page.tsx'),
+    readProjectFile('app', 'account', 'listings', 'page.tsx'),
+    readProjectFile('app', 'favorites', 'page.tsx'),
+    readProjectFile('app', 'conversations', 'page.tsx'),
+  ];
+  const styles = readProjectFile('app', 'globals.css');
+
+  for (const page of pages) {
+    assert.match(page, /smartstore-stable-page/);
+    assert.match(page, /smartstore-stable-content/);
+    assert.match(page, /smartstore-stable-header/);
+  }
+
+  assert.match(styles, /\.smartstore-stable-page/);
+  assert.match(styles, /\.smartstore-stable-header/);
+  assert.match(styles, /\.admin-viewport > main/);
+  assert.match(styles, /\.marketplace-home-controls/);
+  assert.match(styles, /\.marketplace-listings-scroll/);
+});
+
 test('customer market pages avoid heavy nested card styling', () => {
   const files = [
     readProjectFile('app', 'account', 'page.tsx'),

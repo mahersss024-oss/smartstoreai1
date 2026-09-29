@@ -68,6 +68,17 @@ test('routes seller listing requests to authenticated draft creation', () => {
   assert.equal(intent.requiresConfirmation, true);
 });
 
+test('does not search listings when the user wants to create an ad', () => {
+  const intent = getFallbackAdaptiveMarketplaceIntent([
+    { role: 'user', parts: [{ type: 'text', text: 'أريد إنشاء إعلان آيفون للبيع' }] },
+  ]);
+
+  assert.equal(intent.intent, 'create_listing');
+  assert.equal(intent.execution, 'create_listing_draft');
+  assert.notEqual(intent.execution, 'search_listings');
+  assert.equal(intent.requiresAuth, true);
+});
+
 test('routes listing approval follow-ups to draft creation', () => {
   const intent = getFallbackAdaptiveMarketplaceIntent([
     {
