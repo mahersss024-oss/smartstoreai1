@@ -70,21 +70,21 @@ test('customer section pages keep headers stable while content scrolls', () => {
     styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('.smartstore-stable-page,')),
   );
 
-  assert.doesNotMatch(stablePageBaseRule, /height: 100dvh;/);
-  assert.doesNotMatch(stablePageBaseRule, /overflow-y: auto;/);
+  assert.match(stablePageBaseRule, /height: 100dvh;/);
+  assert.match(stablePageBaseRule, /overflow-y: auto;/);
   const stablePageMobileRule = styles.slice(
     styles.indexOf('.smartstore-stable-page,', styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('marketplace-listings-scroll'))),
     styles.indexOf('.admin-viewport > main {', styles.indexOf('marketplace-listings-scroll')),
   );
 
   assert.doesNotMatch(stablePageMobileRule, /height: 100dvh;/);
-  assert.doesNotMatch(stablePageMobileRule, /overflow-y: auto;/);
   assert.match(styles, /\.admin-viewport > main \{[\s\S]*?height: 100dvh;/);
+  assert.match(styles, /body:has\(main\.smartstore-stable-page\)[\s\S]*?padding-bottom: 0 !important;/);
   assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
-test('web customer pages keep touchpad scrolling on the document', () => {
+test('web customer pages keep touchpad scrolling inside the page shell', () => {
   const layout = readProjectFile('app', 'layout.tsx');
   const styles = readProjectFile('app', 'globals.css');
   const customerPages = [
@@ -98,10 +98,11 @@ test('web customer pages keep touchpad scrolling on the document', () => {
   assert.doesNotMatch(layout, /<body className="[^"]*overflow-hidden/);
   assert.doesNotMatch(styles, /addEventListener\(['"]wheel/);
   assert.doesNotMatch(styles, /mousewheel/);
+  assert.match(styles, /body:has\(main\.smartstore-stable-page\)/);
+  assert.match(styles, /\.smartstore-stable-page,[\s\S]*?overflow-y: auto;/);
 
   for (const page of customerPages) {
     assert.match(page, /min-h-screen/);
-    assert.doesNotMatch(page, /h-dvh/);
     assert.doesNotMatch(page, /overflow-hidden bg-\[#e8edf3\]/);
   }
 });

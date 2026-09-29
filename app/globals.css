@@ -225,6 +225,24 @@
     touch-action: pan-y;
   }
 
+  html:has(body main.marketplace-shell),
+  html:has(body main.smartstore-stable-page),
+  html:has(body main[class*="bg-[#e8edf3]"]:not(.customer-conversation-page)),
+  body:has(main.marketplace-shell),
+  body:has(main.smartstore-stable-page),
+  body:has(main[class*="bg-[#e8edf3]"]:not(.customer-conversation-page)) {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body:has(main.marketplace-shell),
+  body:has(main.smartstore-stable-page),
+  body:has(main[class*="bg-[#e8edf3]"]:not(.customer-conversation-page)) {
+    padding-bottom: 0 !important;
+  }
+
   main[class*="bg-[#e8edf3]"],
   .admin-viewport > main[class*="bg-[#e8edf3]"] {
     background-color: transparent !important;
@@ -254,7 +272,10 @@
   .smartstore-stable-page,
   .admin-viewport > main,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
+    height: 100dvh;
+    min-height: 100dvh;
     overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior-y: contain;
     scroll-behavior: smooth;
     scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
