@@ -179,9 +179,10 @@ const marketplacePrisma = prisma as typeof prisma & {
   };
   similarListingFollow: {
     findMany(input: {
-      where: { category: string };
-      include: { listing: { include: { images: true } } };
-      take: number;
+      where: { category?: string; userId?: string };
+      include?: { listing: { include: { images: true } } };
+      orderBy?: { createdAt: 'desc' };
+      take?: number;
     }): Promise<SimilarListingFollowDatabaseRecord[]>;
     findUnique(input: {
       where: { userId_listingId: { userId: string; listingId: string } };
@@ -1256,6 +1257,26 @@ export async function listAccountFollows(actor: Actor) {
   const userId = getActorId(actor);
 
   if (!shouldUseDatabaseStore()) {
+    const similarListingFollows = [...memorySimilarListingFollows.values()]
+      .filter((follow) => follow.userId === userId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((follow) => {
+        const listing = memoryStore.getListing(follow.listingId);
+        const image = listing?.images
+          ?.filter((listingImage) => listingImage.status === 'approved')
+          .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary))
+          .at(0) ?? listing?.images?.[0];
+
+        return {
+          id: follow.id,
+          listingId: follow.listingId,
+          title: listing?.title ?? follow.title ?? 'إعلان مشابه',
+          city: listing?.city ?? follow.city,
+          category: listing?.category ?? follow.category,
+          image: image?.thumbnailUrl ?? image?.displayUrl ?? image?.originalUrl,
+          createdAt: follow.createdAt,
+        };
+      });
     const following = [...memorySellerFollows.values()]
       .filter((follow) => follow.followerId === userId)
       .map((follow) => ({
@@ -1288,12 +1309,14 @@ export async function listAccountFollows(actor: Actor) {
     return {
       following,
       followers,
+      similarListingFollows,
       followingCount: following.length,
       followerCount: followers.length,
+      similarListingFollowCount: similarListingFollows.length,
     };
   }
 
-  const [followingRecords, followerRecords] = await Promise.all([
+  const [followingRecords, followerRecords, similarListingFollowRecords] = await Promise.all([
     prisma.sellerFollow.findMany({
       where: { followerId: userId },
       include: {
@@ -1315,6 +1338,17 @@ export async function listAccountFollows(actor: Actor) {
             id: true,
             name: true,
             picture: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    marketplacePrisma.similarListingFollow.findMany({
+      where: { userId },
+      include: {
+        listing: {
+          include: {
+            images: true,
           },
         },
       },
@@ -1374,8 +1408,29 @@ export async function listAccountFollows(actor: Actor) {
       publishedListingCount: countBySellerId.get(follow.follower.id) ?? 0,
       isFollowing: viewerFollowingIds.has(follow.follower.id),
     })),
+    similarListingFollows: similarListingFollowRecords.map((follow) => {
+      const primaryImage =
+        follow.listing?.images
+          ?.filter((image) => image.status === 'approved')
+          .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary))
+          .at(0);
+
+      return {
+        id: follow.id,
+        listingId: follow.listingId,
+        title: follow.listing?.title ?? follow.title ?? 'إعلان مشابه',
+        city: follow.listing?.city ?? follow.city ?? undefined,
+        category: follow.listing?.category ?? follow.category,
+        image:
+          primaryImage?.thumbnailUrl ??
+          primaryImage?.displayUrl ??
+          primaryImage?.originalUrl,
+        createdAt: follow.createdAt.toISOString(),
+      };
+    }),
     followingCount: followingRecords.length,
     followerCount: followerRecords.length,
+    similarListingFollowCount: similarListingFollowRecords.length,
   };
 }
 

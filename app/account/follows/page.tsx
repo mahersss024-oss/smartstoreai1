@@ -1,8 +1,10 @@
+/* eslint-disable @next/next/no-img-element */
+
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, UserPlus } from 'lucide-react';
+import { ArrowRight, ImageIcon, UserPlus } from 'lucide-react';
 
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -22,12 +24,28 @@ type FollowPerson = {
 type FollowsPayload = {
   following: FollowPerson[];
   followers: FollowPerson[];
+  similarListingFollows: SimilarListingFollow[];
   followingCount: number;
   followerCount: number;
+  similarListingFollowCount: number;
+};
+
+type SimilarListingFollow = {
+  id: string;
+  listingId: string;
+  title: string;
+  city?: string;
+  category: string;
+  image?: string;
+  createdAt: string;
 };
 
 function encodeSellerHref(userId: string) {
   return `/sellers/${encodeURIComponent(userId)}?source=follows`;
+}
+
+function encodeListingHref(listingId: string) {
+  return `/listings/${encodeURIComponent(listingId)}?source=follows`;
 }
 
 function formatFollowDate(value: string) {
@@ -50,14 +68,17 @@ export default function AccountFollowsPage() {
   const [follows, setFollows] = useState<FollowsPayload>({
     following: [],
     followers: [],
+    similarListingFollows: [],
     followingCount: 0,
     followerCount: 0,
+    similarListingFollowCount: 0,
   });
-  const [activeTab, setActiveTab] = useState<'followers' | 'following'>(
+  const [activeTab, setActiveTab] = useState<'followers' | 'following' | 'similar'>(
     'followers',
   );
   const [isLoading, setIsLoading] = useState(true);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingSimilarListingId, setPendingSimilarListingId] = useState<string | null>(null);
 
   const refreshFollows = useCallback(async () => {
     setIsLoading(true);
@@ -67,8 +88,10 @@ export default function AccountFollowsPage() {
         setFollows({
           following: [],
           followers: [],
+          similarListingFollows: [],
           followingCount: 0,
           followerCount: 0,
+          similarListingFollowCount: 0,
         });
         return;
       }
@@ -108,8 +131,10 @@ export default function AccountFollowsPage() {
         setFollows({
           following: [],
           followers: [],
+          similarListingFollows: [],
           followingCount: 0,
           followerCount: 0,
+          similarListingFollowCount: 0,
         });
         setIsLoading(false);
       }
@@ -139,6 +164,28 @@ export default function AccountFollowsPage() {
       }
     } finally {
       setPendingUserId(null);
+    }
+  }, [refreshFollows]);
+
+  const toggleSimilarListingFollow = useCallback(async (listingId: string) => {
+    setPendingSimilarListingId(listingId);
+
+    try {
+      const response = await fetch(
+        `/api/marketplace/listings/${encodeURIComponent(listingId)}/similar-follow`,
+        {
+          method: 'POST',
+          headers: {
+            'Idempotency-Key': `account-similar-follow:${crypto.randomUUID()}`,
+          },
+        },
+      );
+
+      if (response.ok) {
+        await refreshFollows();
+      }
+    } finally {
+      setPendingSimilarListingId(null);
     }
   }, [refreshFollows]);
 
@@ -204,10 +251,11 @@ export default function AccountFollowsPage() {
               <div className="flex items-center gap-4 text-sm font-semibold text-muted-foreground">
                 <span>{follows.followerCount} متابع</span>
                 <span>{follows.followingCount} متابعة</span>
+                <span>{follows.similarListingFollowCount} مشابهة</span>
               </div>
             </section>
 
-            <div className="grid grid-cols-2 overflow-hidden rounded-md bg-white/50 p-1 dark:bg-card/30">
+            <div className="grid grid-cols-3 overflow-hidden rounded-md bg-white/50 p-1 dark:bg-card/30">
               <button
                 type="button"
                 className={`rounded-md px-3 py-2 text-sm font-bold transition ${
@@ -217,7 +265,7 @@ export default function AccountFollowsPage() {
                 }`}
                 onClick={() => setActiveTab('followers')}
               >
-                المتابعون
+                المتابِعون
               </button>
               <button
                 type="button"
@@ -228,7 +276,18 @@ export default function AccountFollowsPage() {
                 }`}
                 onClick={() => setActiveTab('following')}
               >
-                المتابَعون
+                أتابعهم
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-2 text-sm font-bold transition ${
+                  activeTab === 'similar'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-muted-foreground hover:bg-blue-500/10'
+                }`}
+                onClick={() => setActiveTab('similar')}
+              >
+                مشابهة
               </button>
             </div>
 
@@ -237,6 +296,51 @@ export default function AccountFollowsPage() {
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   جار تحميل القائمة...
                 </p>
+              ) : activeTab === 'similar' ? (
+                follows.similarListingFollows.length ? (
+                  follows.similarListingFollows.map((follow) => (
+                    <div
+                      key={`similar:${follow.listingId}`}
+                      className="grid grid-cols-[5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200/70 p-3 last:border-b-0 dark:border-white/10"
+                    >
+                      <Link
+                        className="aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900"
+                        href={encodeListingHref(follow.listingId)}
+                      >
+                        {follow.image ? (
+                          <img
+                            alt={follow.title}
+                            className="h-full w-full object-cover"
+                            src={follow.image}
+                          />
+                        ) : (
+                          <span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                            <ImageIcon className="size-5" />
+                          </span>
+                        )}
+                      </Link>
+                      <Link className="min-w-0" href={encodeListingHref(follow.listingId)}>
+                        <h3 className="line-clamp-2 text-sm font-bold">{follow.title}</h3>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {follow.city ?? 'السعودية'} · {follow.category} · {formatFollowDate(follow.createdAt)}
+                        </p>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-md"
+                        disabled={pendingSimilarListingId === follow.listingId}
+                        onClick={() => void toggleSimilarListingFollow(follow.listingId)}
+                      >
+                        إلغاء
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    لا توجد إعلانات مشابهة متابَعة.
+                  </p>
+                )
               ) : visiblePeople.length ? (
                 visiblePeople.map((person) => (
                   <div

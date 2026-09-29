@@ -227,16 +227,22 @@ test('account page links to a real follows list', () => {
     followsPage,
     /\/api\/marketplace\/users\/\$\{encodeURIComponent\(userId\)\}\/follow/,
   );
-  assert.match(followsPage, /المتابعون/);
-  assert.match(followsPage, /المتابَعون/);
+  assert.match(followsPage, /المتابِعون/);
+  assert.match(followsPage, /أتابعهم/);
+  assert.match(followsPage, /مشابهة/);
+  assert.match(followsPage, /similarListingFollows/);
+  assert.match(followsPage, /toggleSimilarListingFollow/);
+  assert.doesNotMatch(followsPage, /المتابَعون/);
   assert.match(followsPage, /useSmartstoreRealtime/);
   assert.match(followsPage, /follow_listing_published/);
   assert.doesNotMatch(followsPage, /latestListing/);
-  assert.doesNotMatch(followsPage, /encodeListingHref/);
+  assert.match(followsPage, /encodeListingHref/);
   assert.doesNotMatch(followsPage, /آخر إعلان/);
   assert.match(followsRoute, /listAccountFollows/);
   assert.match(repository, /export async function listAccountFollows/);
   assert.match(repository, /prisma\.sellerFollow\.findMany/);
+  assert.match(repository, /similarListingFollow\.findMany/);
+  assert.match(repository, /similarListingFollowCount/);
   assert.doesNotMatch(repository, /latestListingBySellerId/);
 });
 
