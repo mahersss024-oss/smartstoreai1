@@ -248,7 +248,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           </div>
         </section>
 
-        <section className="grid gap-3">
+        <section className="grid min-w-0 gap-3">
           <div className="flex items-center justify-between gap-3 px-1 py-2">
             <h2 className="text-base font-bold">إعلانات المعلن</h2>
             <span className="text-xs font-semibold text-muted-foreground">
@@ -257,19 +257,33 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           </div>
 
           {seller.listings.length ? (
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
               {seller.listings.map((listing) => (
                 <Link
                   key={listing.id}
                   href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
-                  className="group grid grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                  className="group grid min-w-0 max-w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                 >
-                  <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-[#0b1220] sm:min-h-[7.25rem]">
+                  <div
+                    className="aspect-square shrink-0 overflow-hidden bg-[#0b1220]"
+                    style={{
+                      maxWidth: 'clamp(6.25rem, 28vw, 7.25rem)',
+                      minHeight: 'clamp(6.25rem, 28vw, 7.25rem)',
+                      overflow: 'hidden',
+                      width: 'clamp(6.25rem, 28vw, 7.25rem)',
+                    }}
+                  >
                     <img
                       alt={listing.title ?? 'صورة الإعلان'}
-                      className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      className="block h-full w-full min-w-0 max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                       loading="lazy"
                       src={getPrimaryImageUrl(listing)}
+                      style={{
+                        height: '100%',
+                        maxWidth: '100%',
+                        objectFit: 'cover',
+                        width: '100%',
+                      }}
                     />
                   </div>
                   <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">

@@ -73,6 +73,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
   );
 
   assert.match(stablePageBaseRule, /height: 100dvh;/);
+  assert.match(stablePageBaseRule, /max-width: 100%;/);
+  assert.match(stablePageBaseRule, /overflow-x: hidden;/);
   assert.match(stablePageBaseRule, /overflow-y: auto;/);
   const stablePageMobileRule = styles.slice(
     styles.indexOf('.smartstore-stable-page,', styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('marketplace-listings-scroll'))),
@@ -83,6 +85,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main \{[\s\S]*?height: 100dvh;/);
   assert.match(styles, /body:has\(main\.smartstore-stable-page\)[\s\S]*?padding-bottom: 0 !important;/);
   assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
+  assert.match(styles, /\.smartstore-stable-page header,[\s\S]*?\.admin-viewport form,[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;/);
+  assert.match(styles, /\.smartstore-stable-page \[dir="ltr"\],[\s\S]*?\.admin-viewport \[dir="ltr"\],[\s\S]*?overflow-wrap: anywhere;/);
   assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: calc\(1rem \+ env\(safe-area-inset-bottom\)\);/);
   assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?\.smartstore-stable-content::after,[\s\S]*?height: var\(--marketplace-bottom-nav-space\);/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);

@@ -275,6 +275,7 @@
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
     height: 100dvh;
     min-height: 100dvh;
+    max-width: 100%;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
@@ -286,8 +287,36 @@
   .admin-viewport > main > div,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
     align-content: start;
+    box-sizing: border-box;
+    max-width: 100%;
     min-height: 100%;
+    min-width: 0;
     padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+    width: 100%;
+  }
+
+  .smartstore-stable-page header,
+  .smartstore-stable-page section,
+  .smartstore-stable-page article,
+  .smartstore-stable-page form,
+  .admin-viewport header,
+  .admin-viewport section,
+  .admin-viewport article,
+  .admin-viewport form,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) header,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) section,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) article,
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) form {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .smartstore-stable-page [dir="ltr"],
+  .admin-viewport [dir="ltr"],
+  main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) [dir="ltr"] {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .smartstore-stable-header,

@@ -19,6 +19,18 @@ test('admin pages use a stable touch viewport without disabling page scrolling',
     globalCss,
     /\.admin-viewport\s*\{[^}]*touch-action:\s*pan-x pan-y;/,
   );
+  assert.match(
+    globalCss,
+    /main\[class\*="bg-\[#e8edf3\]"\][^{]*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*hidden;/,
+  );
+  assert.match(
+    globalCss,
+    /\.admin-viewport header,[\s\S]*\.admin-viewport form[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/,
+  );
+  assert.match(
+    globalCss,
+    /\.admin-viewport \[dir="ltr"\][\s\S]*overflow-wrap:\s*anywhere;/,
+  );
   assert.doesNotMatch(
     globalCss,
     /\.admin-viewport\s*\{[^}]*touch-action:\s*none;/,
@@ -75,9 +87,19 @@ test('admin dashboard stays focused on required statistics and administrative na
   assert.match(dashboard, /الإعلانات المنشورة/);
   assert.match(dashboard, /البلاغات المفتوحة/);
   assert.match(dashboard, /سجل الإدارة/);
-  assert.match(usersPage, /grid gap-2 rounded-md border bg-white px-3 py-2/);
+  assert.match(usersPage, /grid max-w-full gap-2 overflow-hidden rounded-md border bg-white px-3 py-2/);
   assert.match(usersPage, /border-b border-slate-200\/70 py-3 last:border-b-0/);
   assert.doesNotMatch(usersPage, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
+});
+
+test('admin users page keeps long account identifiers inside android pwa viewport', () => {
+  const page = readProjectFile('app', 'admin', 'users', 'page.tsx');
+
+  assert.match(page, /<main className="[^"]*overflow-x-hidden/);
+  assert.match(page, /<header className="[^"]*max-w-full[^"]*overflow-hidden/);
+  assert.match(page, /className="[^"]*min-w-0 flex-1 items-center gap-3/);
+  assert.match(page, /className="mt-1 break-all text-\[11px\] leading-4 text-muted-foreground"/);
+  assert.match(page, /className="h-11 min-w-0 rounded-md border bg-background/);
 });
 
 test('admin pages verify access before protected admin api requests', () => {

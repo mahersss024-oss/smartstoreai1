@@ -60,7 +60,10 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /sm:grid-cols-\[7\.25rem_minmax\(0,1fr\)\]/);
   assert.match(page, /formatListingRelativeTime/);
   assert.match(page, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
-  assert.match(page, /aspect-square min-h-\[6\.25rem\]/);
+  assert.match(page, /className="aspect-square shrink-0 overflow-hidden/);
+  assert.match(page, /width: 'clamp\(6\.25rem, 28vw, 7\.25rem\)'/);
+  assert.match(page, /maxWidth: 'clamp\(6\.25rem, 28vw, 7\.25rem\)'/);
+  assert.match(page, /objectFit: 'cover'/);
   assert.match(page, /line-clamp-2 text-\[13px\] font-bold/);
   assert.match(page, /إعلانات المعلن/);
   assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);

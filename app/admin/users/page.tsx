@@ -426,10 +426,10 @@ export default function AdminUsersPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
+    <main className="min-h-screen overflow-x-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="mx-auto grid w-full max-w-7xl gap-4 px-3 py-5 sm:px-6">
+        <header className="flex max-w-full flex-wrap items-center justify-between gap-3 overflow-hidden rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/admin">
                 <ArrowRight className="size-4" />
@@ -438,14 +438,14 @@ export default function AdminUsersPage() {
             <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
               <Users className="size-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate text-base font-bold">إدارة المستخدمين</h1>
               <p className="truncate text-xs text-muted-foreground">
                 عرض بيانات العملاء والتحكم في الدور ورقم التواصل الرسمي
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Button variant="outline" className="rounded-md" onClick={() => void refreshUsers(1)}>
               تحديث
             </Button>
@@ -473,9 +473,9 @@ export default function AdminUsersPage() {
           </div>
         </section>
 
-        <section className="rounded-md border bg-white p-3 shadow-sm dark:bg-card">
+        <section className="max-w-full overflow-hidden rounded-md border bg-white p-3 shadow-sm dark:bg-card">
           <form
-            className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
+            className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               const nextQuery = query.trim();
@@ -486,10 +486,10 @@ export default function AdminUsersPage() {
               setAppliedQuery(nextQuery);
             }}
           >
-            <label className="grid gap-1 text-sm font-semibold">
+            <label className="grid min-w-0 gap-1 text-sm font-semibold">
               بحث
               <input
-                className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 name="userSearch"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="الاسم، البريد، رقم الجوال، أو معرف المستخدم"
@@ -497,10 +497,10 @@ export default function AdminUsersPage() {
                 value={query}
               />
             </label>
-            <label className="grid gap-1 text-sm font-semibold">
+            <label className="grid min-w-0 gap-1 text-sm font-semibold">
               الدور
               <select
-                className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 name="userRoleFilter"
                 onChange={(event) => setRoleFilter(event.target.value)}
                 value={roleFilter}
@@ -518,7 +518,7 @@ export default function AdminUsersPage() {
           </form>
         </section>
 
-        <section className="grid gap-2 rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card">
+        <section className="grid max-w-full gap-2 overflow-hidden rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card">
           {isLoading && users.length === 0 ? (
             <div className="grid min-h-72 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
               جار تحميل المستخدمين...
@@ -545,10 +545,10 @@ export default function AdminUsersPage() {
               const isBusy = isSaving || isDeleting;
 
               return (
-                <article key={user.id} className="grid gap-3 border-b border-slate-200/70 py-3 last:border-b-0 dark:border-white/10">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <article key={user.id} className="grid min-w-0 gap-3 border-b border-slate-200/70 py-3 last:border-b-0 dark:border-white/10">
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                     <Link
-                      className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                       href={`/sellers/${encodeURIComponent(user.id)}?source=admin-users`}
                     >
                       <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -558,26 +558,26 @@ export default function AdminUsersPage() {
                           picture={user.picture}
                         />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <h2 className="truncate text-sm font-bold">{user.name ?? 'مستخدم سوق حمد'}</h2>
                         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                        <p className="mt-1 truncate text-[11px] text-muted-foreground" dir="ltr">
+                        <p className="mt-1 break-all text-[11px] leading-4 text-muted-foreground" dir="ltr">
                           {user.id}
                         </p>
                       </div>
                     </Link>
-                    <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <span className="shrink-0 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                       {isSoftDeleted
                         ? 'حساب معطّل'
                         : roleLabels[user.role] ?? user.role}
                     </span>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <label className="grid gap-1 text-sm font-semibold">
+                  <div className="grid min-w-0 gap-3 md:grid-cols-3">
+                    <label className="grid min-w-0 gap-1 text-sm font-semibold">
                       الدور
                       <select
-                        className="h-11 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                        className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                         name={`user-${user.id}-role`}
                         disabled={isBusy || !canChangeRole}
                         onChange={(event) =>
@@ -599,9 +599,9 @@ export default function AdminUsersPage() {
                         </span>
                       )}
                     </label>
-                    <label className="grid gap-1 text-sm font-semibold md:col-span-2">
+                    <label className="grid min-w-0 gap-1 text-sm font-semibold md:col-span-2">
                       رقم التواصل الرسمي
-                      <div className="flex gap-2">
+                      <div className="flex min-w-0 gap-2">
                         <input
                           className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-left text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                           dir="ltr"
@@ -630,24 +630,24 @@ export default function AdminUsersPage() {
                     </label>
                   </div>
 
-                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                  <div className="grid min-w-0 gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Megaphone className="size-4 text-blue-600" />
                       الإعلانات: {formatNumber(user.counts.listings)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <MessageCircle className="size-4 text-blue-600" />
                       المحادثات: {formatNumber(user.counts.conversations)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Percent className="size-4 text-blue-600" />
                       رسوم المنصة: {formatNumber(user.counts.commissions)}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Phone className="size-4 text-blue-600" />
                       الرقم: {user.phoneNumber ? 'محفوظ' : 'غير محفوظ'}
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <BadgeCheck className="size-4 text-blue-600" />
                       اتفاقية رسوم المنصة: {user.commissionAgreementAccepted ? 'مقبولة' : 'غير مقبولة'}
                     </div>
@@ -665,9 +665,9 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t pt-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                         <ShieldCheck className="size-4 text-blue-600" />
                         أي تعديل إداري يتم تسجيله في سجل الإدارة.
                       </div>
