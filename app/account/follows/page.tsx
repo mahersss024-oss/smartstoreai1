@@ -16,12 +16,6 @@ type FollowPerson = {
   picture?: string;
   createdAt: string;
   publishedListingCount: number;
-  latestListing?: {
-    id: string;
-    title: string | null;
-    city: string | null;
-    updatedAt: string;
-  } | null;
   isFollowing: boolean;
 };
 
@@ -34,10 +28,6 @@ type FollowsPayload = {
 
 function encodeSellerHref(userId: string) {
   return `/sellers/${encodeURIComponent(userId)}?source=follows`;
-}
-
-function encodeListingHref(listingId: string) {
-  return `/listings/${encodeURIComponent(listingId)}?source=follows`;
 }
 
 function formatFollowDate(value: string) {
@@ -256,32 +246,12 @@ export default function AccountFollowsPage() {
                     <Link href={encodeSellerHref(person.userId)}>
                       <PersonAvatar person={person} />
                     </Link>
-                    <div className="min-w-0">
-                      <Link href={encodeSellerHref(person.userId)}>
+                    <Link className="min-w-0" href={encodeSellerHref(person.userId)}>
                       <h3 className="truncate text-sm font-bold">{person.name}</h3>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {person.publishedListingCount} إعلان · {formatFollowDate(person.createdAt)}
                       </p>
-                      </Link>
-                      {person.latestListing ? (
-                        <Link
-                          href={encodeListingHref(person.latestListing.id)}
-                          className="mt-2 grid max-w-full gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-3 py-2 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/20 dark:bg-blue-400/10 dark:hover:bg-blue-400/15"
-                        >
-                          <span className="font-bold text-blue-700 dark:text-blue-200">
-                            آخر إعلان
-                          </span>
-                          <span className="truncate text-foreground">
-                            {person.latestListing.title ?? 'إعلان بدون عنوان'}
-                          </span>
-                          {person.latestListing.city ? (
-                            <span className="truncate text-muted-foreground">
-                              {person.latestListing.city}
-                            </span>
-                          ) : null}
-                        </Link>
-                      ) : null}
-                    </div>
+                    </Link>
                     <Button
                       variant={person.isFollowing ? 'outline' : 'default'}
                       size="sm"
