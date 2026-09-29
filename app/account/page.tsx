@@ -26,7 +26,6 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
-import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { SellerAvatar } from '@/components/seller-avatar';
 import type { AuthUser } from '@/hooks/use-auth-session';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -844,8 +843,6 @@ export default function AccountPage() {
                 <ThemeToggle language="ar" />
               </div>
             </section>
-
-            <PushNotificationSettings />
 
             <section className="grid gap-3 border-t border-slate-200/60 px-1 py-5 dark:border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3">

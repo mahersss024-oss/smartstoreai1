@@ -14,9 +14,13 @@ test('service worker displays and routes push notifications', () => {
   assert.match(source, /payload\.url/);
 });
 
-test('account page exposes push notifications as an opt-in setting', () => {
+test('notifications page exposes push notifications as the opt-in setting', () => {
   const accountPage = readFileSync(
     join(process.cwd(), 'app', 'account', 'page.tsx'),
+    'utf8',
+  );
+  const notificationsPage = readFileSync(
+    join(process.cwd(), 'app', 'notifications', 'page.tsx'),
     'utf8',
   );
   const settings = readFileSync(
@@ -24,14 +28,15 @@ test('account page exposes push notifications as an opt-in setting', () => {
     'utf8',
   );
 
-  assert.match(accountPage, /PushNotificationSettings/);
+  assert.doesNotMatch(accountPage, /PushNotificationSettings/);
+  assert.match(accountPage, /href="\/notifications"/);
   assert.match(settings, /Notification\.requestPermission/);
   assert.match(settings, /pushManager\.subscribe/);
   assert.match(settings, /\/api\/push\/subscribe/);
   assert.match(settings, /variant\?: 'panel' \| 'icon'/);
   assert.match(settings, /variant === 'icon'/);
   assert.match(settings, /isActive \? disableNotifications\(\) : enableNotifications\(\)/);
-  assert.match(accountPage, /<PushNotificationSettings \/>/);
+  assert.match(notificationsPage, /<PushNotificationSettings \/>/);
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
 

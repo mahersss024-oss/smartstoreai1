@@ -15,6 +15,14 @@ test('listing details exposes similar listing follow without changing listing ro
   );
 
   assert.match(listingPage, /SimilarListingFollowButton/);
+  assert.ok(
+    listingPage.indexOf('<SimilarListingFollowButton listingId={listing.id} />') >
+      listingPage.indexOf('formatDate(listing.updatedAt)'),
+  );
+  assert.ok(
+    listingPage.indexOf('<SimilarListingFollowButton listingId={listing.id} />') <
+      listingPage.indexOf('similarListings.length > 0'),
+  );
   assert.match(button, /تابع الإعلانات المشابهة/);
   assert.match(button, /similar-follow/);
   assert.match(button, /Idempotency-Key/);

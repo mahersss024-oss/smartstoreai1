@@ -759,7 +759,6 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                   </div>
                 </div>
               </div>
-              {!isOwnListing && <SimilarListingFollowButton listingId={listing.id} />}
             </section>
 
             <ListingImageGallery
@@ -915,6 +914,12 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 </div>
               </div>
             </section>
+
+            {!isOwnListing && (
+              <section className="px-1 py-3 sm:px-2">
+                <SimilarListingFollowButton listingId={listing.id} />
+              </section>
+            )}
 
             {similarListings.length > 0 && (
               <section className="px-1 py-3 sm:px-2">
