@@ -153,17 +153,21 @@ test('mobile bottom navigation is hidden while assistant chat view is open', () 
 test('mobile bottom navigation exposes messages with a visible label', () => {
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
+  assert.match(mobileNavigation, /href: '\/account\/listings'/);
+  assert.match(mobileNavigation, /label: 'إعلاناتي'/);
   assert.match(mobileNavigation, /href: '\/conversations'/);
   assert.match(mobileNavigation, /label: 'محادثاتي'/);
-  assert.match(mobileNavigation, /grid-cols-3/);
-  assert.match(mobileNavigation, /w-1\/3/);
+  assert.match(mobileNavigation, /href: '\/favorites'/);
+  assert.match(mobileNavigation, /label: 'المفضلة'/);
+  assert.match(mobileNavigation, /grid-cols-5/);
+  assert.match(mobileNavigation, /w-1\/5/);
   assert.match(mobileNavigation, /aria-label=\{item\.label\}/);
   assert.doesNotMatch(mobileNavigation, /المزيد/);
   assert.doesNotMatch(mobileNavigation, /iconOnly/);
   assert.doesNotMatch(mobileNavigation, /sr-only/);
-  assert.match(mobileNavigation, /grid h-12 grid-cols-3/);
+  assert.match(mobileNavigation, /grid h-11 grid-cols-5/);
   assert.match(mobileNavigation, /pb-\[calc\(0\.25rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(mobileNavigation, /active[\s\S]*size-8 bg-blue-600 text-white/);
+  assert.match(mobileNavigation, /active[\s\S]*size-7 bg-blue-600 text-white/);
   assert.doesNotMatch(mobileNavigation, /item\.primary \? \([\s\S]*bg-blue-600 text-white/);
 });
 

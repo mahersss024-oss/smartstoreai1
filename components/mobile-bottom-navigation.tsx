@@ -3,6 +3,8 @@
 import { useEffect, useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  BadgePlus,
+  Heart,
   Home,
   MessageCircle,
   type LucideIcon,
@@ -46,7 +48,7 @@ export function MobileBottomNavigation() {
   const [isAssistantChatViewOpen, setIsAssistantChatViewOpen] = useState(false);
 
   useEffect(() => {
-    ['/', '/account', '/conversations'].forEach((href) => {
+    ['/', '/account', '/account/listings', '/favorites', '/conversations'].forEach((href) => {
       router.prefetch(href);
     });
   }, [router]);
@@ -129,7 +131,13 @@ export function MobileBottomNavigation() {
   }
 
   const items: NavItem[] = [
-    { href: '/account', label: 'حسابي', icon: User },
+    { href: '/account/listings', label: 'إعلاناتي', icon: BadgePlus },
+    {
+      href: '/conversations',
+      label: 'محادثاتي',
+      icon: MessageCircle,
+      alert: hasConversationAlert,
+    },
     {
       href: '/',
       label: 'الرئيسية',
@@ -137,18 +145,13 @@ export function MobileBottomNavigation() {
       primary: true,
       active: pathname === '/',
     },
-    {
-      href: '/conversations',
-      label: 'محادثاتي',
-      icon: MessageCircle,
-      alert: hasConversationAlert,
-    },
+    { href: '/favorites', label: 'المفضلة', icon: Heart },
+    { href: '/account', label: 'حسابي', icon: User },
   ];
-
   const activeIndex = items.findIndex(
     (item) => item.active ?? isActive(pathname, item.href),
   );
-  const indicatorIndex = activeIndex >= 0 ? activeIndex : 1;
+  const indicatorIndex = activeIndex >= 0 ? activeIndex : 2;
 
   function navigate(href: string) {
     closeAssistantViewForPrimaryNavigation(href);
@@ -167,10 +170,10 @@ export function MobileBottomNavigation() {
       }`}
     >
       <div
-        className="pointer-events-none absolute top-0 h-0.5 w-1/3 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
-        style={{ right: `${indicatorIndex * (100 / 3)}%` }}
+        className="pointer-events-none absolute top-0 h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
+        style={{ right: `${indicatorIndex * (100 / 5)}%` }}
       />
-      <div className="grid h-12 grid-cols-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+      <div className="grid h-11 grid-cols-5 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
         {items.map((item) => {
           const Icon = item.icon;
           const active = item.active ?? isActive(pathname, item.href);
@@ -193,11 +196,11 @@ export function MobileBottomNavigation() {
               <span
                 className={`relative grid place-items-center rounded-full transition-all duration-200 ${
                   active
-                    ? 'size-8 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                    ? 'size-7 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
                     : showAlert
                       ? 'size-7 bg-rose-500/10 text-rose-500 shadow-[0_0_18px_rgba(244,63,94,0.55)] ring-1 ring-rose-400/60 dark:bg-rose-400/15 dark:text-rose-200 dark:shadow-[0_0_22px_rgba(251,113,133,0.5)]'
                     : item.primary
-                      ? 'size-8 bg-transparent text-current'
+                      ? 'size-7 bg-transparent text-current'
                     : 'size-6 bg-transparent text-current'
                 }`}
               >

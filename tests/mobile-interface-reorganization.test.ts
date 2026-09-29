@@ -17,14 +17,18 @@ test('home marketplace toolbar keeps behavior while simplifying labels', () => {
   assert.match(page, /تصفية البحث/);
 });
 
-test('mobile bottom navigation has account home and conversations only', () => {
+test('mobile bottom navigation keeps home centered with five compact destinations', () => {
   const navigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
+  assert.match(navigation, /href: '\/account\/listings'/);
+  assert.match(navigation, /href: '\/favorites'/);
   assert.match(navigation, /href: '\/account'/);
   assert.match(navigation, /href: '\/'/);
   assert.match(navigation, /href: '\/conversations'/);
-  assert.match(navigation, /grid-cols-3/);
-  assert.match(navigation, /w-1\/3/);
+  assert.match(navigation, /grid-cols-5/);
+  assert.match(navigation, /w-1\/5/);
+  assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
+  assert.match(navigation, /h-11 grid-cols-5 text-\[9px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
