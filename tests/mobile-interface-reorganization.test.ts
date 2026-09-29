@@ -32,10 +32,10 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /fixed inset-x-1/);
   assert.match(navigation, /overflow-visible/);
   assert.match(navigation, /top-\[calc\(100%\+0\.08rem\)\]/);
-  assert.match(navigation, /bg-white\/18 backdrop-blur-lg/);
+  assert.match(navigation, /bg-white\/22 backdrop-blur-\[72px\]/);
   assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
-  assert.match(navigation, /bg-white\/58/);
-  assert.match(navigation, /backdrop-blur-2xl/);
+  assert.match(navigation, /bg-white\/46/);
+  assert.match(navigation, /backdrop-blur-\[72px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);

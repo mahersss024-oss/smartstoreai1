@@ -167,13 +167,13 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`marketplace-bottom-nav fixed inset-x-1 bottom-[calc(0.24rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-2xl border border-white/55 bg-white/58 px-3 py-1.5 shadow-[0_-10px_34px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition-all duration-200 dark:border-white/10 dark:bg-card/54 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-1 bottom-[calc(0.18rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-2xl border border-white/50 bg-white/46 px-3 py-1.5 shadow-[0_-10px_34px_rgba(15,23,42,0.12)] backdrop-blur-[72px] transition-all duration-200 dark:border-white/10 dark:bg-card/42 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
       }`}
     >
-      <div className="pointer-events-none absolute inset-x-2 top-[calc(100%+0.08rem)] h-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-xl bg-white/18 backdrop-blur-lg dark:bg-card/16" />
+      <div className="pointer-events-none absolute inset-x-2 top-[calc(100%+0.08rem)] h-[calc(0.95rem+env(safe-area-inset-bottom))] rounded-xl bg-white/22 backdrop-blur-[72px] dark:bg-card/18" />
       <div
         className="pointer-events-none absolute -top-px h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
         style={{ right: `${indicatorIndex * (100 / 5)}%` }}
