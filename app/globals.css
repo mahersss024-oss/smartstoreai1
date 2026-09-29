@@ -171,6 +171,7 @@
   :root {
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --marketplace-bottom-nav-space: calc(5.5rem + env(safe-area-inset-bottom));
   }
 
   * {
@@ -278,7 +279,7 @@
     overflow-y: auto;
     overscroll-behavior-y: contain;
     scroll-behavior: smooth;
-    scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: var(--marketplace-bottom-nav-space);
   }
 
   .smartstore-stable-content,
@@ -298,6 +299,14 @@
     background: color-mix(in srgb, var(--background) 86%, transparent);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+  }
+
+  @media (max-width: 1023px) {
+    .smartstore-stable-content,
+    .admin-viewport > main > div,
+    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
+      padding-bottom: var(--marketplace-bottom-nav-space);
+    }
   }
 
   @media (pointer: coarse) and (max-width: 1023px) {
@@ -320,11 +329,6 @@
       overflow-y: auto;
     }
 
-    .smartstore-stable-content,
-    .admin-viewport > main > div,
-    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
-      padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-    }
   }
 
   /* Prevent iOS Safari from zooming when focusing form controls. */

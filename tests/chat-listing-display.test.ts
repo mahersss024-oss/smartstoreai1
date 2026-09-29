@@ -95,7 +95,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /isManualListingVisible[\s\S]*max-h-\[min\(58dvh,34rem\)\]/);
   assert.match(homePage, /popoverClassName="z-\[80\]"/);
   assert.match(homePage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
-  assert.match(homePage, /pb-\[calc\(4rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(homePage, /pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
   assert.match(homePage, /label: 'أزياء ومستلزمات'/);

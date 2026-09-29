@@ -4417,7 +4417,7 @@ export default function Page() {
                 className={cn(
                   'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-3',
                   isCompactViewport
-                    ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
+                    ? 'pb-[var(--marketplace-bottom-nav-space)] sm:pb-[var(--marketplace-bottom-nav-space)]'
                     : 'pb-1',
                 )}
               >
