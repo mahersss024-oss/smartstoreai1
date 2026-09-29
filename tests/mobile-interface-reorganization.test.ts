@@ -31,8 +31,8 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
   assert.match(navigation, /fixed inset-x-1/);
   assert.match(navigation, /overflow-visible/);
-  assert.match(navigation, /-inset-x-2 top-full h-\[calc\(1\.35rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(navigation, /border-white\/30 bg-white\/20[\s\S]*backdrop-blur-\[180px\]/);
+  assert.match(navigation, /-inset-x-4 top-full h-\[calc\(1\.8rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(navigation, /bg-slate-700\/28 backdrop-blur-\[260px\] backdrop-saturate-150/);
   assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
   assert.match(navigation, /bg-white\/16/);
   assert.match(navigation, /backdrop-blur-\[180px\]/);
