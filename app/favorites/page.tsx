@@ -282,7 +282,7 @@ export default function FavoritesPage() {
             </div>
           </section>
         ) : (
-          <section className="p-4">
+          <section className="px-1 py-3 sm:px-2">
             <div className="mb-4 flex items-center gap-2 text-sm font-bold">
               <Heart className="size-4 text-blue-600" />
               إعلانات محفوظة
@@ -305,7 +305,7 @@ export default function FavoritesPage() {
                   {favorites.map((favorite) => (
                     <Link
                       key={favorite.id}
-                      className="grid grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                      className="grid w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                       href={`/listings/${favorite.listingId}?source=favorites`}
                     >
                       <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">

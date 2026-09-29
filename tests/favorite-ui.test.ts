@@ -60,6 +60,8 @@ test('listing favorite api exposes exact favorite state for detail pages', () =>
 test('favorites page renders saved listings as compact horizontal rows', () => {
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
 
+  assert.match(favoritesPage, /<section className="px-1 py-3 sm:px-2">/);
+  assert.match(favoritesPage, /grid w-full grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
   assert.match(favoritesPage, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
   assert.match(favoritesPage, /sm:grid-cols-\[7\.25rem_minmax\(0,1fr\)\]/);
   assert.match(favoritesPage, /className="line-clamp-2 text-\[13px\] font-bold/);
