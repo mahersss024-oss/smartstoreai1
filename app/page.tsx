@@ -1473,6 +1473,17 @@ function renderMessageParts(
   });
 }
 
+function isUserImageMessagePart(
+  part: UIMessage['parts'][number],
+): part is Extract<UIMessage['parts'][number], { type: 'file' }> {
+  return (
+    part.type === 'file' &&
+    typeof part.mediaType === 'string' &&
+    part.mediaType.startsWith('image/') &&
+    typeof part.url === 'string'
+  );
+}
+
 function ListingCardView({
   listing,
   isFavorite,
@@ -4652,23 +4663,49 @@ export default function Page() {
                       </div>
                     ) : (
                       <>
-                        {filteredMessages.map((message, messageIndex) => (
-                          <Message key={`${message.id}-${messageIndex}`} from={message.role}>
-                            {message.role === 'assistant' ? (
-                              <AssistantMessageFrame>
-                                <MessageContent>
-                                  {renderMessageParts(message.parts, chatListingCardsById)}
-                                </MessageContent>
-                              </AssistantMessageFrame>
-                            ) : (
-                              <div className="flex justify-start">
-                                <div className="max-w-[min(74%,30rem)] rounded-2xl rounded-br-md border border-blue-600 bg-blue-600 px-2.5 py-1.5 text-right text-[0.86rem] leading-6 text-white shadow-sm">
-                                  {renderMessageParts(message.parts, chatListingCardsById)}
+                        {filteredMessages.map((message, messageIndex) => {
+                          const userImageParts =
+                            message.role === 'user'
+                              ? message.parts.filter(isUserImageMessagePart)
+                              : [];
+                          const userContentParts =
+                            message.role === 'user'
+                              ? message.parts.filter(
+                                  (part) => !isUserImageMessagePart(part),
+                                )
+                              : message.parts;
+
+                          return (
+                            <Message key={`${message.id}-${messageIndex}`} from={message.role}>
+                              {message.role === 'assistant' ? (
+                                <AssistantMessageFrame>
+                                  <MessageContent>
+                                    {renderMessageParts(message.parts, chatListingCardsById)}
+                                  </MessageContent>
+                                </AssistantMessageFrame>
+                              ) : (
+                                <div className="flex flex-col items-start gap-1.5">
+                                  {userImageParts.length > 0 && (
+                                    <div className="flex max-w-[min(74%,30rem)] flex-wrap justify-start gap-1.5">
+                                      {userImageParts.map((part, partIndex) => (
+                                        <MessageAttachment
+                                          key={`user-image-${message.id}-${partIndex}`}
+                                          className="border border-blue-500/20 bg-transparent shadow-sm"
+                                          data={part}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  {userContentParts.length > 0 && (
+                                    <div className="max-w-[min(74%,30rem)] overflow-hidden break-words rounded-2xl rounded-br-md border border-blue-600 bg-blue-600 px-2.5 py-1.5 text-right text-[0.86rem] leading-6 text-white shadow-sm [overflow-wrap:anywhere]">
+                                      {renderMessageParts(userContentParts, chatListingCardsById)}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </Message>
-                        ))}
+                              )}
+                            </Message>
+                          );
+                        })}
                         {isLoading && (
                           <Message from="assistant">
                             <AssistantMessageFrame>
