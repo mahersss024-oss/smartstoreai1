@@ -174,7 +174,7 @@ test('mobile bottom navigation exposes messages with a visible label', () => {
   assert.doesNotMatch(mobileNavigation, /المزيد/);
   assert.doesNotMatch(mobileNavigation, /iconOnly/);
   assert.doesNotMatch(mobileNavigation, /sr-only/);
-  assert.match(mobileNavigation, /bottom-\[calc\(0\.18rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(mobileNavigation, /bottom-\[calc\(0\.24rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(mobileNavigation, /top-\[calc\(100%\+0\.08rem\)\]/);
   assert.match(mobileNavigation, /bg-white\/18 backdrop-blur-lg/);
   assert.match(mobileNavigation, /fixed inset-x-1/);

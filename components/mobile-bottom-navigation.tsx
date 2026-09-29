@@ -167,7 +167,7 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`marketplace-bottom-nav fixed inset-x-1 bottom-[calc(0.18rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-2xl border border-white/55 bg-white/58 px-3 py-1.5 shadow-[0_-10px_34px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition-all duration-200 dark:border-white/10 dark:bg-card/54 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-1 bottom-[calc(0.24rem+env(safe-area-inset-bottom))] z-50 overflow-visible rounded-2xl border border-white/55 bg-white/58 px-3 py-1.5 shadow-[0_-10px_34px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition-all duration-200 dark:border-white/10 dark:bg-card/54 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
