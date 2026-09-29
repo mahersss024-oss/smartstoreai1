@@ -31,11 +31,11 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
   assert.match(navigation, /fixed inset-x-1/);
   assert.match(navigation, /overflow-visible/);
-  assert.match(navigation, /-inset-x-2 -top-1 bottom-\[calc\(-1\.2rem_-_env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(navigation, /bg-slate-950\/18 backdrop-blur-\[160px\]/);
+  assert.match(navigation, /-inset-x-2 top-full h-\[calc\(1\.35rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(navigation, /border-white\/30 bg-white\/20[\s\S]*backdrop-blur-\[180px\]/);
   assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
-  assert.match(navigation, /bg-white\/10/);
-  assert.match(navigation, /backdrop-blur-\[160px\]/);
+  assert.match(navigation, /bg-white\/16/);
+  assert.match(navigation, /backdrop-blur-\[180px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
