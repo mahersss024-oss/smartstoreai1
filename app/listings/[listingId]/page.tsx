@@ -880,37 +880,37 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
             </section>
 
             <section className="px-1 py-3 sm:px-2">
-              <div className="mb-3 text-sm font-bold">نشاط الإعلان</div>
-              <div className="grid gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-2 py-2">
-                  <span className="flex items-center gap-2">
-                    <Eye className="size-4 text-blue-600" />
+              <div className="mb-2 text-sm font-bold">نشاط الإعلان</div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <div className="rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="size-3.5 text-blue-600" />
                     المشاهدات
                   </span>
-                  <strong className="text-foreground">{listing.views}</strong>
+                  <strong className="mt-1 block text-base leading-none text-foreground">{listing.views}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 py-2">
-                  <span className="flex items-center gap-2">
-                    <MessageCircle className="size-4 text-blue-600" />
+                <div className="rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="flex items-center gap-1.5">
+                    <MessageCircle className="size-3.5 text-blue-600" />
                     الرسائل
                   </span>
-                  <strong className="text-foreground">{listing.messageCount}</strong>
+                  <strong className="mt-1 block text-base leading-none text-foreground">{listing.messageCount}</strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 py-2">
-                  <span className="flex items-center gap-2">
-                    <CalendarDays className="size-4 text-blue-600" />
+                <div className="rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays className="size-3.5 text-blue-600" />
                     نُشر
                   </span>
-                  <strong className="text-foreground">
+                  <strong className="mt-1 block truncate text-sm leading-none text-foreground">
                     {formatRelativeListingTime(listing.createdAt)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between gap-2 py-2">
-                  <span className="flex items-center gap-2">
-                    <CalendarDays className="size-4 text-blue-600" />
+                <div className="rounded-md border border-border/60 bg-background/45 px-3 py-2">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays className="size-3.5 text-blue-600" />
                     آخر تحديث
                   </span>
-                  <strong className="text-foreground">{formatDate(listing.updatedAt)}</strong>
+                  <strong className="mt-1 block truncate text-sm leading-none text-foreground">{formatDate(listing.updatedAt)}</strong>
                 </div>
               </div>
             </section>
