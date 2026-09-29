@@ -254,10 +254,7 @@
   .smartstore-stable-page,
   .admin-viewport > main,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
-    height: 100dvh;
-    min-height: 100dvh;
     overflow-x: hidden;
-    overflow-y: auto;
     overscroll-behavior-y: contain;
     scroll-behavior: smooth;
     scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
@@ -293,7 +290,10 @@
     .smartstore-stable-page,
     .admin-viewport > main,
     main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
+      height: 100dvh;
+      min-height: 100dvh;
       -webkit-overflow-scrolling: touch;
+      overflow-y: auto;
     }
 
     .smartstore-stable-content,

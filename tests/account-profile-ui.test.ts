@@ -122,9 +122,19 @@ test('account profile picture upload stores a persistent display image for the a
   assert.match(route, /formData\.get\('image'\)/);
   assert.match(route, /maxProfileImageBytes = 4 \* 1024 \* 1024/);
   assert.match(route, /createPersistentProfileImageUrl/);
+  assert.match(route, /verifyProfilePictureDelivery/);
+  assert.match(route, /profile_picture_delivery_unavailable/);
   assert.match(route, /update: \{ picture \}/);
   assert.match(storage, /objectPrefix: 'profiles'/);
   assert.match(objectStorage, /objectPrefix\?: 'listings' \| 'profiles'/);
+});
+
+test('account profile picture UI waits for public image delivery before adopting it', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /image\.onload = applyUploadedPicture/);
+  assert.doesNotMatch(page, /image\.onerror = applyUploadedPicture/);
+  assert.match(page, /تعذر عرضها من دومين الصور/);
 });
 
 test('account profile picture replacement removes the previous stored profile image', () => {

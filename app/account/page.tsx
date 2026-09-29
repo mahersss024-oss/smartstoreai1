@@ -172,10 +172,6 @@ export default function AccountPage() {
       setSavedProfileName(payload.user.name ?? '');
       setSavedProfilePhone(payload.user.phoneNumber ?? '');
       setIsEditingProfilePhone(false);
-      setProfileNotice({
-        tone: 'success',
-        message: 'تم حفظ بيانات الحساب بنجاح.',
-      });
     } catch {
       setProfileNotice({
         tone: 'danger',
@@ -259,15 +255,15 @@ export default function AccountPage() {
         return;
       }
 
-      setSession((currentSession) => ({
-        ...currentSession,
-        user: currentSession.user
-          ? { ...currentSession.user, ...payload.user }
-          : payload.user ?? null,
-      }));
       const nextPicture = payload.user.picture;
       const image = new window.Image();
       const applyUploadedPicture = () => {
+        setSession((currentSession) => ({
+          ...currentSession,
+          user: currentSession.user
+            ? { ...currentSession.user, ...payload.user }
+            : payload.user ?? null,
+        }));
         setProfilePicture(nextPicture);
         setProfilePicturePreview((currentPreview) => {
           if (currentPreview) {
@@ -276,15 +272,28 @@ export default function AccountPage() {
 
           return '';
         });
+        setProfileNotice({
+          tone: 'success',
+          message: 'تم تحديث صورة الحساب بنجاح.',
+        });
       };
 
       image.onload = applyUploadedPicture;
-      image.onerror = applyUploadedPicture;
+      image.onerror = () => {
+        setProfilePicturePreview((currentPreview) => {
+          if (currentPreview) {
+            URL.revokeObjectURL(currentPreview);
+          }
+
+          return '';
+        });
+        setProfileNotice({
+          tone: 'danger',
+          message:
+            'تم رفع الصورة لكن تعذر عرضها من دومين الصور. تحقق من إعدادات التخزين ثم حاول مرة أخرى.',
+        });
+      };
       image.src = nextPicture;
-      setProfileNotice({
-        tone: 'success',
-        message: 'تم تحديث صورة الحساب بنجاح.',
-      });
     } catch {
       setProfilePicturePreview((currentPreview) => {
         if (currentPreview) {

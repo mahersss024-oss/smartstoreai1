@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
-import { createPersistentProfileImageUrl } from '@/agent/marketplace/profile-image-storage';
+import {
+  canUseProfileImageDataUrlFallback,
+  createPersistentProfileImageUrl,
+} from '@/agent/marketplace/profile-image-storage';
 import { createListingImageVariants } from '@/agent/marketplace/listing-image-variants';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -22,6 +25,7 @@ const supportedMimeTypes = new Set([
 ]);
 const maxProfileImageBytes = 4 * 1024 * 1024;
 const maxProfileImageRequestBytes = maxProfileImageBytes + 256 * 1024;
+const profileImageDeliveryTimeoutMs = 5_000;
 
 function shouldPersistUserProfile() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
@@ -43,6 +47,24 @@ async function deletePreviousProfilePictureBestEffort(
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[profile_picture_storage_delete] failure=${errorName}`);
+  }
+}
+
+async function verifyProfilePictureDelivery(picture: string) {
+  if (picture.startsWith('data:')) {
+    return canUseProfileImageDataUrlFallback();
+  }
+
+  try {
+    const response = await fetch(picture, {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(profileImageDeliveryTimeoutMs),
+    });
+
+    return response.ok && response.headers.get('content-type')?.startsWith('image/');
+  } catch {
+    return false;
   }
 }
 
@@ -156,6 +178,18 @@ export async function POST(request: Request) {
     return Response.json(
       { error: 'unsupported_image_type' },
       { status: 415, headers: noStoreHeaders },
+    );
+  }
+
+  if (!(await verifyProfilePictureDelivery(picture))) {
+    await deletePreviousProfilePictureBestEffort(session.user.id, picture);
+
+    return Response.json(
+      {
+        error: 'profile_picture_delivery_unavailable',
+        message: 'Profile picture storage is not reachable from the public image domain.',
+      },
+      { status: 503, headers: noStoreHeaders },
     );
   }
 
