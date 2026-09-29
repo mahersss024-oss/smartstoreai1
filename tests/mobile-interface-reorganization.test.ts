@@ -29,7 +29,9 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /grid-cols-5/);
   assert.match(navigation, /w-1\/5/);
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
-  assert.match(navigation, /h-10 grid-cols-5 text-\[11px\]/);
+  assert.match(navigation, /h-12 grid-cols-5 text-\[12px\]/);
+  assert.match(navigation, /bg-white\/88/);
+  assert.match(navigation, /backdrop-blur-xl/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
@@ -65,7 +67,7 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main/);
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
-  assert.match(styles, /--marketplace-bottom-nav-space: calc\(4\.25rem \+ env\(safe-area-inset-bottom\)\);/);
+  assert.match(styles, /--marketplace-bottom-nav-space: calc\(5rem \+ env\(safe-area-inset-bottom\)\);/);
   assert.match(styles, /\.smartstore-stable-content,[\s\S]*?align-content: start;/);
   const stablePageBaseRule = styles.slice(
     styles.indexOf('.smartstore-stable-page,'),

@@ -265,7 +265,7 @@ export default function RootLayout({
           media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
         />
       </head>
-      <body className="overflow-x-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
+      <body className="overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <AppWelcomeSplash />
         <SiteMessageHomeOnly>
           <SiteMessageBanner />

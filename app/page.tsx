@@ -2108,7 +2108,7 @@ export default function Page() {
       // شريط الـ Home. أما عند إغلاق الكيبورد فنعتمد عليها لتفادي شريط الـ Home.
       bottom: hasKeyboardOffset
         ? `${keyboardOffset}px`
-        : 'calc(3.75rem + env(safe-area-inset-bottom))',
+        : 'calc(var(--marketplace-bottom-nav-space) - 0.5rem)',
       height: isAssistantExpanded ? expandedHeight : '12.75rem',
       maxHeight: isAssistantExpanded ? '42rem' : 'none',
       minHeight: isAssistantExpanded && !hasKeyboardOffset ? '26rem' : '0',
@@ -4529,7 +4529,7 @@ export default function Page() {
                 isCompactChatView && isChatInputFocused && 'transition-none',
                 isCompactChatView
                   ? 'h-auto rounded-[1.15rem] border border-white/80 shadow-2xl shadow-slate-950/10 dark:border-white/10 dark:shadow-black/30'
-                  : 'fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] h-72 rounded-t-[24px] border shadow-2xl shadow-slate-950/20 lg:static lg:h-auto lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none',
+                  : 'fixed inset-x-0 bottom-[calc(var(--marketplace-bottom-nav-space)-0.5rem)] h-72 rounded-t-[24px] border shadow-2xl shadow-slate-950/20 lg:static lg:h-auto lg:max-h-none lg:rounded-none lg:border-0 lg:shadow-none',
               )}
               style={isCompactChatView ? compactChatViewStyle : assistantPanelStyle}
             >
