@@ -316,6 +316,9 @@ test('customer listings explain drafts and keep image management lightweight', (
 
   assert.match(listingsPage, /listing\.rawStatus === 'draft'/);
   assert.match(listingsPage, /pendingPublishListing/);
+  assert.match(listingsPage, /إضافة إعلان/);
+  assert.doesNotMatch(listingsPage, /قائمة إعلانات العميل/);
+  assert.doesNotMatch(listingsPage, /<h2 className="text-base font-bold">إعلاناتي<\/h2>/);
   assert.doesNotMatch(listingsPage, /bg-blue-700\/80/);
   assert.doesNotMatch(listingsPage, /backdrop-blur-\[1px\]/);
   assert.doesNotMatch(listingsPage, /border-cyan-100\/60/);

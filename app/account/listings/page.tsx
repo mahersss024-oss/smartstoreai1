@@ -975,10 +975,7 @@ export default function AccountListingsPage() {
           </section>
         ) : (
           <>
-            <section className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div>
-                <h2 className="text-base font-bold">إعلاناتي</h2>
-              </div>
+            <section className="flex flex-wrap items-center justify-start gap-3 px-1 py-3 sm:px-4">
               <div className="flex flex-wrap gap-2">
                 <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
                   <Link href="/">
@@ -993,16 +990,6 @@ export default function AccountListingsPage() {
               className="scroll-mt-24 px-1 py-3 sm:px-4"
               id="account-listings"
             >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                    <Megaphone className="size-4" />
-                    إعلاناتي
-                  </div>
-                  <h2 className="mt-1 text-lg font-bold">قائمة إعلانات العميل</h2>
-                </div>
-              </div>
-
               {isListingsLoading && listings.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
                   جار تحميل الإعلانات...
