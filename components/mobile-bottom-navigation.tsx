@@ -177,7 +177,7 @@ export function MobileBottomNavigation() {
         className="pointer-events-none absolute top-0 h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
         style={{ right: `${indicatorIndex * (100 / 5)}%` }}
       />
-      <div className="grid h-10 grid-cols-5 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+      <div className="grid h-10 grid-cols-5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
         {items.map((item) => {
           const Icon = item.icon;
           const active = item.active ?? isActive(pathname, item.href);
