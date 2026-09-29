@@ -38,14 +38,15 @@ export function ListingIdCopyButton({ listingId }: ListingIdCopyButtonProps) {
   return (
     <Button
       aria-label="نسخ رقم الإعلان"
-      className="h-8 shrink-0 rounded-md px-2 text-xs"
+      className="size-8 shrink-0 rounded-md"
       onClick={() => void handleCopy()}
+      size="icon-sm"
       title="نسخ رقم الإعلان"
       type="button"
       variant="outline"
     >
       {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
+      <span className="sr-only">{copied ? 'تم النسخ' : 'نسخ'}</span>
     </Button>
   );
 }

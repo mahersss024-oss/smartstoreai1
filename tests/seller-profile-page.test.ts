@@ -80,9 +80,12 @@ test('public seller profile shows a copyable seller identifier', () => {
   assert.match(identity, /sellerHandle = useMemo\(\(\) => `@\$\{sellerId\}`/);
   assert.match(identity, /navigator\.clipboard\.writeText\(value\)/);
   assert.match(identity, /aria-label="نسخ معرف المستخدم"/);
-  assert.match(identity, /QrCode/);
+  assert.match(identity, /QRCodeSVG/);
+  assert.match(identity, /aria-label="باركود ملف المعلن"/);
+  assert.match(identity, /DialogContent/);
   assert.match(identity, /navigator\.share/);
   assert.match(identity, /postToNative/);
+  assert.match(identity, /<span className="sr-only">\{copied \? 'تم النسخ' : 'نسخ'\}<\/span>/);
 });
 
 test('listing and seller pages keep return navigation on whitelisted sources only', () => {
