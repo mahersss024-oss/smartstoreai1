@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Bell, BellOff } from 'lucide-react';
 
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -253,19 +252,23 @@ export function PushNotificationSettings({
 
   if (variant === 'icon') {
     const iconLabel = isActive
-      ? 'فتح الإشعارات'
-      : 'فتح الإشعارات وإعداد تفعيلها';
+      ? 'إيقاف إشعارات الرسائل'
+      : 'تفعيل إشعارات الرسائل';
 
     return (
       <Button
-        asChild
         aria-label={iconLabel}
         className="shrink-0"
+        disabled={disabled}
+        onClick={() =>
+          void (isActive ? disableNotifications() : enableNotifications())
+        }
         size="icon-sm"
         title={notice ?? iconLabel}
+        type="button"
         variant="ghost"
       >
-        <Link className="relative" href="/notifications">
+        <span className="relative">
           {isActive ? <Bell className="size-4 text-blue-600" /> : <BellOff className="size-4" />}
           {unreadCount > 0 ? (
             <>
@@ -273,7 +276,7 @@ export function PushNotificationSettings({
               <span className="pointer-events-none absolute -right-1 -top-1 size-3 animate-ping rounded-full bg-rose-500/60" />
             </>
           ) : null}
-        </Link>
+        </span>
       </Button>
     );
   }

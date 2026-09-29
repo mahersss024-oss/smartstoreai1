@@ -42,7 +42,7 @@ test('notifications page exposes push notifications as the opt-in setting', () =
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
 
-test('home notification bell is shown only to signed-in users and opens notifications page', () => {
+test('home notification bell is shown only to signed-in users and toggles push directly', () => {
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
   const settings = readFileSync(
     join(process.cwd(), 'components', 'push-notification-settings.tsx'),
@@ -51,8 +51,9 @@ test('home notification bell is shown only to signed-in users and opens notifica
 
   assert.match(homePage, /session\.authenticated \? \(/);
   assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
-  assert.match(settings, /import Link from 'next\/link'/);
-  assert.match(settings, /href="\/notifications"/);
+  assert.doesNotMatch(settings, /import Link from 'next\/link'/);
+  assert.doesNotMatch(settings, /href="\/notifications"/);
+  assert.match(settings, /onClick=\{\(\) =>\s*void \(isActive \? disableNotifications\(\) : enableNotifications\(\)\)\s*\}/);
   assert.match(settings, /unreadCount > 0/);
   assert.match(settings, /follow_listing_published/);
   assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
