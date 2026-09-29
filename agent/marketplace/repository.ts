@@ -983,6 +983,24 @@ export async function listAccountFollows(actor: Actor) {
   const userId = getActorId(actor);
 
   if (!shouldUseDatabaseStore()) {
+    const getLatestPublishedListing = (sellerId: string) => {
+      const listings = memoryStore
+        .listSellerListings(sellerId)
+        .filter((listing) => listing.status === 'published')
+        .sort((left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt),
+        );
+      const latestListing = listings[0];
+
+      return latestListing
+        ? {
+            id: latestListing.id,
+            title: latestListing.title,
+            city: latestListing.city,
+            updatedAt: latestListing.updatedAt,
+          }
+        : null;
+    };
     const following = [...memorySellerFollows.values()]
       .filter((follow) => follow.followerId === userId)
       .map((follow) => ({
@@ -994,6 +1012,7 @@ export async function listAccountFollows(actor: Actor) {
         publishedListingCount: memoryStore
           .listSellerListings(follow.sellerId)
           .filter((listing) => listing.status === 'published').length,
+        latestListing: getLatestPublishedListing(follow.sellerId),
         isFollowing: true,
       }));
     const followers = [...memorySellerFollows.values()]
@@ -1007,6 +1026,7 @@ export async function listAccountFollows(actor: Actor) {
         publishedListingCount: memoryStore
           .listSellerListings(follow.followerId)
           .filter((listing) => listing.status === 'published').length,
+        latestListing: getLatestPublishedListing(follow.followerId),
         isFollowing: memorySellerFollows.has(
           getSellerFollowKey(userId, follow.followerId),
         ),
@@ -1054,7 +1074,7 @@ export async function listAccountFollows(actor: Actor) {
       ...followerRecords.map((follow) => follow.followerId),
     ]),
   ];
-  const [listingCounts, viewerFollowing] = await Promise.all([
+  const [listingCounts, latestListings, viewerFollowing] = await Promise.all([
     relatedUserIds.length
       ? prisma.listing.groupBy({
           by: ['sellerId'],
@@ -1063,6 +1083,22 @@ export async function listAccountFollows(actor: Actor) {
             status: 'published',
           },
           _count: { _all: true },
+        })
+      : [],
+    relatedUserIds.length
+      ? prisma.listing.findMany({
+          where: {
+            sellerId: { in: relatedUserIds },
+            status: 'published',
+          },
+          select: {
+            id: true,
+            sellerId: true,
+            title: true,
+            city: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: 'desc' },
         })
       : [],
     relatedUserIds.length
@@ -1078,6 +1114,28 @@ export async function listAccountFollows(actor: Actor) {
   const countBySellerId = new Map(
     listingCounts.map((count) => [count.sellerId, count._count._all]),
   );
+  const latestListingBySellerId = new Map<
+    string,
+    {
+      id: string;
+      title: string | null;
+      city: string | null;
+      updatedAt: string;
+    }
+  >();
+
+  for (const listing of latestListings) {
+    if (latestListingBySellerId.has(listing.sellerId)) {
+      continue;
+    }
+
+    latestListingBySellerId.set(listing.sellerId, {
+      id: listing.id,
+      title: listing.title,
+      city: listing.city,
+      updatedAt: listing.updatedAt.toISOString(),
+    });
+  }
   const viewerFollowingIds = new Set(
     viewerFollowing.map((follow) => follow.sellerId),
   );
@@ -1090,6 +1148,7 @@ export async function listAccountFollows(actor: Actor) {
       picture: follow.seller.picture ?? undefined,
       createdAt: follow.createdAt.toISOString(),
       publishedListingCount: countBySellerId.get(follow.seller.id) ?? 0,
+      latestListing: latestListingBySellerId.get(follow.seller.id) ?? null,
       isFollowing: true,
     })),
     followers: followerRecords.map((follow) => ({
@@ -1099,6 +1158,7 @@ export async function listAccountFollows(actor: Actor) {
       picture: follow.follower.picture ?? undefined,
       createdAt: follow.createdAt.toISOString(),
       publishedListingCount: countBySellerId.get(follow.follower.id) ?? 0,
+      latestListing: latestListingBySellerId.get(follow.follower.id) ?? null,
       isFollowing: viewerFollowingIds.has(follow.follower.id),
     })),
     followingCount: followingRecords.length,
