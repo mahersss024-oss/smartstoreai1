@@ -97,7 +97,9 @@ test('listing details renders compact similar ads from existing comparable logic
 
   assert.match(listingPage, /listMarketplaceListings/);
   assert.match(listingPage, /getComparableListings/);
-  assert.match(listingPage, /similarListings = getComparableListings/);
+  assert.match(listingPage, /getDetailSimilarListings/);
+  assert.match(listingPage, /strictMatches = getComparableListings/);
+  assert.match(listingPage, /similarListings\.length < 3/);
   assert.match(listingPage, /slice\(0, 6\)/);
   assert.match(listingPage, /getSimilarListingHref\(similarListing\.id, listing\.id\)/);
   assert.match(listingPage, /source === 'listing'/);

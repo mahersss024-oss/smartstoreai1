@@ -29,7 +29,7 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /grid-cols-5/);
   assert.match(navigation, /w-1\/5/);
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
-  assert.match(navigation, /h-11 grid-cols-5 text-\[9px\]/);
+  assert.match(navigation, /h-10 grid-cols-5 text-\[9px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
