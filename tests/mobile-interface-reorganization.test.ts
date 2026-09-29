@@ -65,6 +65,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main/);
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
+  assert.match(styles, /\.smartstore-stable-page,[\s\S]*?height: 100dvh;/);
+  assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
 test('customer market pages avoid heavy nested card styling', () => {

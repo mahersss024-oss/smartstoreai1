@@ -236,54 +236,64 @@
     touch-action: pan-x pan-y;
   }
 
+  .marketplace-shell {
+    overscroll-behavior: none;
+    scroll-behavior: smooth;
+  }
+
+  .marketplace-panel,
+  .marketplace-home-controls,
+  .marketplace-shell > *:not(.marketplace-listings-scroll) {
+    overscroll-behavior: contain;
+  }
+
+  .marketplace-listings-scroll {
+    scroll-behavior: smooth;
+  }
+
+  .smartstore-stable-page,
+  .admin-viewport > main {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
+    scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  .smartstore-stable-content,
+  .admin-viewport > main > div {
+    min-height: 100%;
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  }
+
+  .smartstore-stable-header,
+  .admin-viewport > main > div > header:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    background: color-mix(in srgb, var(--background) 86%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
   @media (pointer: coarse) and (max-width: 1023px) {
-    .marketplace-shell {
-      overscroll-behavior: none;
-      scroll-behavior: smooth;
-      touch-action: pan-y;
-    }
-
-    .marketplace-panel,
+    .marketplace-shell,
     .marketplace-home-controls,
-    .marketplace-shell > *:not(.marketplace-listings-scroll) {
-      overscroll-behavior: contain;
-    }
-
-    .marketplace-home-controls {
+    .smartstore-stable-page,
+    .admin-viewport > main {
       touch-action: pan-y;
-    }
-
-    .marketplace-listings-scroll {
-      scroll-behavior: smooth;
     }
 
     .smartstore-stable-page,
     .admin-viewport > main {
-      height: 100dvh;
-      min-height: 100dvh;
-      overflow-x: hidden;
-      overflow-y: auto;
-      overscroll-behavior-y: contain;
-      scroll-behavior: smooth;
-      scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
-      touch-action: pan-y;
       -webkit-overflow-scrolling: touch;
     }
 
     .smartstore-stable-content,
     .admin-viewport > main > div {
-      min-height: 100%;
       padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-    }
-
-    .smartstore-stable-header,
-    .admin-viewport > main > div > header:first-child {
-      position: sticky;
-      top: 0;
-      z-index: 35;
-      background: color-mix(in srgb, var(--background) 86%, transparent);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
     }
   }
 
