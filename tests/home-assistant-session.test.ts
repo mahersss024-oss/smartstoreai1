@@ -133,8 +133,11 @@ test('home assistant keeps only user messages in compact bubbles', () => {
   assert.match(homePage, /message\.role === 'assistant'/);
   assert.match(homePage, /<AssistantMessageFrame>/);
   assert.match(homePage, /isUserImageMessagePart/);
+  assert.match(homePage, /isRenderableUserBubblePart/);
+  assert.match(homePage, /part\.text\.trim\(\)\.length > 0/);
   assert.match(homePage, /userImageParts/);
   assert.match(homePage, /userContentParts/);
+  assert.match(homePage, /message\.parts\.filter\(isRenderableUserBubblePart\)/);
   assert.match(homePage, /key=\{`user-image-\$\{message\.id\}-\$\{partIndex\}`\}/);
   assert.match(homePage, /max-w-\[min\(74%,30rem\)\]/);
   assert.match(homePage, /overflow-hidden break-words/);

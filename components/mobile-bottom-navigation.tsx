@@ -27,6 +27,10 @@ function isActive(pathname: string, href: string) {
     return pathname === '/';
   }
 
+  if (href === '/account') {
+    return pathname === '/account';
+  }
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

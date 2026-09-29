@@ -1484,6 +1484,18 @@ function isUserImageMessagePart(
   );
 }
 
+function isRenderableUserBubblePart(part: UIMessage['parts'][number]) {
+  if (isUserImageMessagePart(part)) {
+    return false;
+  }
+
+  if (part.type === 'text') {
+    return part.text.trim().length > 0;
+  }
+
+  return true;
+}
+
 function ListingCardView({
   listing,
   isFavorite,
@@ -4670,9 +4682,7 @@ export default function Page() {
                               : [];
                           const userContentParts =
                             message.role === 'user'
-                              ? message.parts.filter(
-                                  (part) => !isUserImageMessagePart(part),
-                                )
+                              ? message.parts.filter(isRenderableUserBubblePart)
                               : message.parts;
 
                           return (

@@ -25,6 +25,7 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /href: '\/account'/);
   assert.match(navigation, /href: '\/'/);
   assert.match(navigation, /href: '\/conversations'/);
+  assert.match(navigation, /if \(href === '\/account'\) \{[\s\S]*return pathname === '\/account';[\s\S]*\}/);
   assert.match(navigation, /grid-cols-5/);
   assert.match(navigation, /w-1\/5/);
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
