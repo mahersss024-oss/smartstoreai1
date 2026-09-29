@@ -65,6 +65,7 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main/);
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
+  assert.match(styles, /\.smartstore-stable-content,[\s\S]*?align-content: start;/);
   const stablePageBaseRule = styles.slice(
     styles.indexOf('.smartstore-stable-page,'),
     styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('.smartstore-stable-page,')),

@@ -284,6 +284,7 @@
   .smartstore-stable-content,
   .admin-viewport > main > div,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
+    align-content: start;
     min-height: 100%;
     padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   }
