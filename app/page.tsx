@@ -3997,9 +3997,6 @@ export default function Page() {
                         <Megaphone className="size-4" />
                         نموذج الإعلان
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        أضف تفاصيل منتجك مباشرة، وسيتم حفظ الإعلان ومراجعته بنفس آلية سوق حمد.
-                      </p>
                     </div>
                     <Button
                       type="button"
@@ -4188,13 +4185,13 @@ export default function Page() {
                         );
                       }}
                     />
-                    <span className="text-[11px] font-normal text-muted-foreground">
-                      {isPreparingManualListingImages
-                        ? `جاري تجهيز ${manualListingImages.length} صور للرفع...`
-                        : manualListingImages.length > 0
-                          ? `تم تجهيز ${manualListingImages.length} صور للرفع.`
-                          : 'يمكنك رفع حتى 8 صور، ويمكن إكمال إدارة الصور من حسابي.'}
-                    </span>
+                    {(isPreparingManualListingImages || manualListingImages.length > 0) && (
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        {isPreparingManualListingImages
+                          ? `جاري تجهيز ${manualListingImages.length} صور للرفع...`
+                          : `تم تجهيز ${manualListingImages.length} صور للرفع.`}
+                      </span>
+                    )}
                   </label>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -4516,9 +4513,6 @@ export default function Page() {
                   <div className="grid max-w-sm gap-3">
                     <Sparkles className="mx-auto size-9 text-blue-600" />
                     <h3 className="text-base font-bold">لا توجد إعلانات متاحة</h3>
-                    <p className="text-sm leading-7 text-muted-foreground">
-                      ستظهر الإعلانات هنا عند توفرها في السوق.
-                    </p>
                   </div>
                 </div>
               )}

@@ -341,9 +341,6 @@ export default function CommissionsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">رسوم المنصة</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                رسوم 1% على البيع الذي يتم عبر الموقع
-              </p>
             </div>
           </div>
         </header>
@@ -353,9 +350,6 @@ export default function CommissionsPage() {
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />
               <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
-              <p className="text-sm leading-7 text-muted-foreground">
-                نتحقق من جلسة الدخول قبل عرض رسوم المنصة.
-              </p>
             </div>
           </section>
         ) : !session.authenticated ? (
@@ -422,9 +416,6 @@ export default function CommissionsPage() {
                   </div>
                   <div>
                     <h2 className="text-base font-bold">طرق دفع رسوم المنصة</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      اختر الجهة المناسبة وحوّل رسوم البيع، ثم احتفظ بصورة الإيصال للمراجعة.
-                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

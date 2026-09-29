@@ -247,9 +247,6 @@ export default function FavoritesPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">المفضلة</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                المنتجات التي حفظها العميل
-              </p>
             </div>
           </div>
         </header>
@@ -260,9 +257,6 @@ export default function FavoritesPage() {
               <Heart className="mx-auto size-12 text-blue-600" />
               <div>
                 <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  نتحقق من جلسة الدخول قبل عرض المفضلة.
-                </p>
               </div>
             </div>
           </section>
@@ -272,9 +266,6 @@ export default function FavoritesPage() {
               <Heart className="mx-auto size-12 text-blue-600" />
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض المفضلة</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  حفظ المنتجات مرتبط بحساب العميل المسجل في المنصة.
-                </p>
               </div>
               <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">

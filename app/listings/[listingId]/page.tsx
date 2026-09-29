@@ -870,9 +870,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                   ))}
                 </div>
               ) : (
-                <p className="pt-4 text-sm leading-7 text-muted-foreground">
-                  لا توجد بيانات إضافية محفوظة لهذا الإعلان حتى الآن.
-                </p>
+                <p className="pt-4 text-sm leading-7 text-muted-foreground">لا توجد بيانات إضافية.</p>
               )}
             </section>
 

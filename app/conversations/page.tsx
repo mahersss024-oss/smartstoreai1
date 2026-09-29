@@ -356,9 +356,6 @@ export default function ConversationsPage() {
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
                 <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  نتحقق من جلسة الدخول قبل عرض محادثاتك.
-                </p>
               </div>
             </div>
           </section>
@@ -368,9 +365,6 @@ export default function ConversationsPage() {
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض محادثاتك</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  المحادثات تظهر فقط للأطراف المرتبطة بالإعلان.
-                </p>
               </div>
               <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
