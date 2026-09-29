@@ -84,6 +84,28 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
+test('web customer pages keep touchpad scrolling on the document', () => {
+  const layout = readProjectFile('app', 'layout.tsx');
+  const styles = readProjectFile('app', 'globals.css');
+  const customerPages = [
+    readProjectFile('app', 'account', 'page.tsx'),
+    readProjectFile('app', 'account', 'listings', 'page.tsx'),
+    readProjectFile('app', 'favorites', 'page.tsx'),
+    readProjectFile('app', 'conversations', 'page.tsx'),
+  ];
+
+  assert.match(layout, /<body className="overflow-x-hidden/);
+  assert.doesNotMatch(layout, /<body className="[^"]*overflow-hidden/);
+  assert.doesNotMatch(styles, /addEventListener\(['"]wheel/);
+  assert.doesNotMatch(styles, /mousewheel/);
+
+  for (const page of customerPages) {
+    assert.match(page, /min-h-screen/);
+    assert.doesNotMatch(page, /h-dvh/);
+    assert.doesNotMatch(page, /overflow-hidden bg-\[#e8edf3\]/);
+  }
+});
+
 test('customer market pages avoid heavy nested card styling', () => {
   const files = [
     readProjectFile('app', 'account', 'page.tsx'),
