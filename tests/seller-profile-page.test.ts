@@ -94,6 +94,9 @@ test('listing and seller pages keep return navigation on whitelisted sources onl
 test('listing details renders compact similar ads from existing comparable logic', () => {
   const listingPage = readSource('app/listings/[listingId]/page.tsx');
   const gallery = readSource('app/listings/[listingId]/listing-image-gallery.tsx');
+  const activityIndex = listingPage.indexOf('\u0646\u0634\u0627\u0637 \u0627\u0644\u0625\u0639\u0644\u0627\u0646');
+  const latestUpdateIndex = listingPage.indexOf('\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b');
+  const similarAdsIndex = listingPage.indexOf('\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0645\u0634\u0627\u0628\u0647\u0629');
 
   assert.match(listingPage, /listMarketplaceListings/);
   assert.match(listingPage, /getComparableListings/);
@@ -105,6 +108,9 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /source === 'listing'/);
   assert.match(listingPage, /sourceListingId/);
   assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
+  assert.ok(activityIndex !== -1 && latestUpdateIndex !== -1 && similarAdsIndex !== -1);
+  assert.ok(activityIndex < latestUpdateIndex);
+  assert.ok(latestUpdateIndex < similarAdsIndex);
   assert.doesNotMatch(gallery, /similarListings|listMarketplaceListings|getComparableListings/);
 });
 
