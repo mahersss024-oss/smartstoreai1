@@ -88,7 +88,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /isSmartResult &&/);
   assert.match(homePage, /smart-assistant-results-grid grid max-w-4xl gap-1\.5 sm:gap-2/);
   assert.match(homePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(homePage, /marketplace-home-controls max-h-\[min\(58dvh,34rem\)\]/);
+  assert.match(homePage, /marketplace-home-controls shrink-0/);
+  assert.match(homePage, /isManualListingVisible[\s\S]*max-h-\[min\(58dvh,34rem\)\]/);
+  assert.match(homePage, /popoverClassName="z-\[80\]"/);
   assert.match(homePage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
   assert.match(homePage, /pb-\[calc\(4rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(homePage, /animationDelay/);

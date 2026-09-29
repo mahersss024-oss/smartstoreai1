@@ -15,6 +15,7 @@ type CitySelectorProps = {
   disabled?: boolean;
   name?: string;
   className?: string;
+  popoverClassName?: string;
 };
 
 function normalizeArabicSearch(value: string) {
@@ -35,6 +36,7 @@ export function CitySelector({
   disabled = false,
   name,
   className,
+  popoverClassName,
 }: CitySelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -120,7 +122,12 @@ export function CitySelector({
       </button>
 
       {isOpen ? (
-        <div className="absolute inset-x-0 top-full mt-1 min-w-64 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg [contain:layout_paint]">
+        <div
+          className={cn(
+            'absolute inset-x-0 top-full mt-1 min-w-64 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg [contain:layout_paint]',
+            popoverClassName,
+          )}
+        >
           <div className="flex items-center gap-2 border-b px-3">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             <input

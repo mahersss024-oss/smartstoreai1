@@ -3877,7 +3877,12 @@ export default function Page() {
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
-              <div className="marketplace-home-controls max-h-[min(58dvh,34rem)] shrink-0 overflow-y-auto border-b border-blue-100/70 pb-2 dark:border-blue-400/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className={cn(
+                'marketplace-home-controls shrink-0 border-b border-blue-100/70 pb-2 dark:border-blue-400/10',
+                isManualListingVisible
+                  ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                  : 'overflow-visible',
+              )}>
               <div className="mb-2 grid gap-1.5 text-center md:justify-end md:text-right">
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
                   <Button className="marketplace-primary-cta h-9 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
@@ -4281,6 +4286,7 @@ export default function Page() {
                   <CitySelector
                     allValue="all"
                     className="order-3 sm:order-2 [&>button]:h-9"
+                    popoverClassName="z-[80]"
                     value={activeMarketCity}
                     onValueChange={(value) => {
                       setSelectedMarketCity(value);
