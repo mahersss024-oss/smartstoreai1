@@ -106,6 +106,18 @@ type FollowNotificationRecord = {
   createdAt: string;
 };
 
+type FollowNotificationDatabaseRecord = {
+  id: string;
+  userId: string;
+  listingId: string;
+  sellerId: string;
+  title: string | null;
+  body: string | null;
+  url: string;
+  readAt: Date | null;
+  createdAt: Date;
+};
+
 type SimilarListingFollowRecord = {
   id: string;
   userId: string;
@@ -114,6 +126,17 @@ type SimilarListingFollowRecord = {
   city?: string;
   title?: string;
   createdAt: string;
+};
+
+type SimilarListingFollowDatabaseRecord = {
+  id: string;
+  userId: string;
+  listingId: string;
+  category: string;
+  city: string | null;
+  title: string | null;
+  createdAt: Date;
+  listing?: DatabaseListingRecord | null;
 };
 
 type SellerRatingRecord = {
@@ -130,6 +153,53 @@ const memorySellerFollows = new Map<string, SellerFollowRecord>();
 const memorySellerRatings = new Map<string, SellerRatingRecord>();
 const memoryFollowNotifications = new Map<string, FollowNotificationRecord>();
 const memorySimilarListingFollows = new Map<string, SimilarListingFollowRecord>();
+
+const marketplacePrisma = prisma as typeof prisma & {
+  followNotification: {
+    createMany(input: {
+      data: Array<{
+        userId: string;
+        listingId: string;
+        sellerId: string;
+        title: string;
+        body: string;
+        url: string;
+      }>;
+      skipDuplicates?: boolean;
+    }): Promise<unknown>;
+    findMany(input: {
+      where: { userId: string };
+      orderBy: { createdAt: 'desc' };
+      take: number;
+    }): Promise<FollowNotificationDatabaseRecord[]>;
+    updateMany(input: {
+      where: { userId: string; readAt: null };
+      data: { readAt: Date };
+    }): Promise<unknown>;
+  };
+  similarListingFollow: {
+    findMany(input: {
+      where: { category: string };
+      include: { listing: { include: { images: true } } };
+      take: number;
+    }): Promise<SimilarListingFollowDatabaseRecord[]>;
+    findUnique(input: {
+      where: { userId_listingId: { userId: string; listingId: string } };
+    }): Promise<SimilarListingFollowDatabaseRecord | null>;
+    delete(input: {
+      where: { userId_listingId: { userId: string; listingId: string } };
+    }): Promise<unknown>;
+    create(input: {
+      data: {
+        userId: string;
+        listingId: string;
+        category: string;
+        city?: string;
+        title?: string;
+      };
+    }): Promise<SimilarListingFollowDatabaseRecord>;
+  };
+};
 
 export type PublicSellerProfile = {
   id: string;
@@ -459,7 +529,7 @@ async function createFollowNotificationsForListing(
     return;
   }
 
-  await (prisma as any).followNotification.createMany({
+  await marketplacePrisma.followNotification.createMany({
     data: recipients.map((userId) => ({
       userId,
       listingId: listing.id,
@@ -500,7 +570,7 @@ async function listSimilarListingFollowerIds(
       .map((follow) => follow.userId);
   }
 
-  const follows = (await (prisma as any).similarListingFollow.findMany({
+  const follows = await marketplacePrisma.similarListingFollow.findMany({
     where: {
       category: listing.category,
     },
@@ -510,16 +580,15 @@ async function listSimilarListingFollowerIds(
       },
     },
     take: 500,
-  })) as Array<{
-    userId: string;
-    listing?: DatabaseListingRecord | null;
-  }>;
+  });
 
   return follows
     .filter(
       (
         follow,
-      ): follow is { userId: string; listing: DatabaseListingRecord } =>
+      ): follow is SimilarListingFollowDatabaseRecord & {
+        listing: DatabaseListingRecord;
+      } =>
         follow.userId !== listing.sellerId &&
         Boolean(follow.listing && follow.listing.status === 'published'),
     )
@@ -1322,7 +1391,7 @@ export async function listAccountFollowNotifications(actor: Actor) {
     };
   }
 
-  const notifications = await (prisma as any).followNotification.findMany({
+  const notifications = await marketplacePrisma.followNotification.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -1377,7 +1446,7 @@ export async function markAccountFollowNotificationsRead(actor: Actor) {
     return { readAt };
   }
 
-  await (prisma as any).followNotification.updateMany({
+  await marketplacePrisma.followNotification.updateMany({
     where: {
       userId,
       readAt: null,
@@ -1415,7 +1484,7 @@ export async function getSimilarListingFollowState(
     };
   }
 
-  const existingFollow = await (prisma as any).similarListingFollow.findUnique({
+  const existingFollow = await marketplacePrisma.similarListingFollow.findUnique({
     where: {
       userId_listingId: {
         userId,
@@ -1478,7 +1547,7 @@ export async function toggleSimilarListingFollow(
 
   await ensureActorUser(actor);
 
-  const existingFollow = await (prisma as any).similarListingFollow.findUnique({
+  const existingFollow = await marketplacePrisma.similarListingFollow.findUnique({
     where: {
       userId_listingId: {
         userId,
@@ -1488,7 +1557,7 @@ export async function toggleSimilarListingFollow(
   });
 
   if (existingFollow) {
-    await (prisma as any).similarListingFollow.delete({
+    await marketplacePrisma.similarListingFollow.delete({
       where: {
         userId_listingId: {
           userId,
@@ -1504,7 +1573,7 @@ export async function toggleSimilarListingFollow(
     };
   }
 
-  await (prisma as any).similarListingFollow.create({
+  await marketplacePrisma.similarListingFollow.create({
     data: {
       userId,
       listingId: listing.id,

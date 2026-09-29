@@ -1,4 +1,4 @@
-﻿CREATE TABLE "FollowNotification" (
+CREATE TABLE "FollowNotification" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "listingId" TEXT NOT NULL,
