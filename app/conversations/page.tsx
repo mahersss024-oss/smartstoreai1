@@ -410,9 +410,6 @@ export default function ConversationsPage() {
                   <div className="grid max-w-sm gap-3">
                     <MessageCircle className="mx-auto size-9 text-blue-600" />
                     <h3 className="text-base font-bold">لا توجد محادثات بعد</h3>
-                    <p className="text-sm leading-7 text-muted-foreground">
-                      عندما يبدأ تواصل بخصوص إعلان، ستظهر المحادثة هنا.
-                    </p>
                   </div>
                 </div>
               ) : (

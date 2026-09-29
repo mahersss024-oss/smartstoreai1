@@ -112,9 +112,6 @@ export default function NotificationsPage() {
             </Button>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold">الإشعارات</h1>
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                تنبيهات المتابعة وإعلانات المعلنين الذين تتابعهم.
-              </p>
             </div>
           </div>
           {payload.unreadCount > 0 ? (
@@ -198,9 +195,6 @@ export default function NotificationsPage() {
                   <div className="grid gap-2">
                     <Bell className="mx-auto size-8 text-blue-600" />
                     <p className="text-sm font-bold">لا توجد إشعارات حتى الآن</p>
-                    <p className="text-xs leading-6 text-muted-foreground">
-                      عندما ينشر معلن تتابعه إعلانا جديدا سيظهر هنا.
-                    </p>
                   </div>
                 </div>
               )}

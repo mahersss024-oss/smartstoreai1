@@ -33,8 +33,8 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /saveProfile/);
   assert.match(page, /savedProfilePhone/);
   assert.match(page, /ThemeToggle/);
-  assert.match(page, /اختر الوضع الليلي أو الفاتح من هنا/);
-  assert.match(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
+  assert.doesNotMatch(page, /اختر الوضع الليلي أو الفاتح من هنا/);
+  assert.doesNotMatch(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
   assert.match(page, /deleteAccount/);

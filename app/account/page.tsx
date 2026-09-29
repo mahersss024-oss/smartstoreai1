@@ -471,7 +471,6 @@ export default function AccountPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">حسابي</h1>
-              <p className="truncate text-[11px] text-muted-foreground sm:text-xs">بيانات العميل وإعلاناته الخاصة</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
@@ -492,9 +491,6 @@ export default function AccountPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  نتحقق من جلسة الدخول قبل عرض بيانات حسابك.
-                </p>
               </div>
             </div>
           </section>
@@ -506,9 +502,6 @@ export default function AccountPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض حسابك</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل الدخول.
-                </p>
               </div>
               <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
@@ -547,9 +540,6 @@ export default function AccountPage() {
                     )}
                   </div>
                   <p className="mt-1 truncate text-sm text-muted-foreground">{session.user?.email}</p>
-                  <p className="mt-2 text-xs leading-6 text-muted-foreground">
-                    من هنا يدير العميل إعلاناته، حالاتها، وبيانات الحساب المرتبطة بالتسجيل.
-                  </p>
                 </div>
               </div>
               <div className="grid gap-2">
@@ -607,9 +597,6 @@ export default function AccountPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-bold">الخدمات والإعدادات</h2>
-                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    روابط السياسات والمعلومات الأساسية في سوق حمد.
-                  </p>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -647,9 +634,6 @@ export default function AccountPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-bold">بيانات الملف الشخصي</h2>
-                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    يمكنك تعديل الاسم وصورة الحساب التي تظهر داخل صفحة حسابك وواجهات السوق.
-                  </p>
                 </div>
               </div>
               <div className="grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
@@ -753,9 +737,6 @@ export default function AccountPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-bold">بيانات التواصل الرسمية</h2>
-                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    يستخدم هذا الرقم عند مشاركة التواصل رسميًا داخل المحادثة. يمكنك أيضًا كتابة رقمك يدويًا، وسيظهر تنبيه أمان بدون منع الإرسال.
-                  </p>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -836,9 +817,6 @@ export default function AccountPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-base font-bold">المظهر</h2>
-                  <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                    اختر الوضع الليلي أو الفاتح من هنا بدل ظهوره في كل الصفحات.
-                  </p>
                 </div>
                 <ThemeToggle language="ar" />
               </div>

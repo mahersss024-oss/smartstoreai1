@@ -306,9 +306,6 @@ export default function FavoritesPage() {
                 <div className="grid max-w-sm gap-3">
                   <Heart className="mx-auto size-9 text-blue-600" />
                   <h3 className="text-base font-bold">لا توجد منتجات محفوظة</h3>
-                  <p className="text-sm leading-7 text-muted-foreground">
-                    اضغط على القلب في أي بطاقة إعلان لحفظها هنا.
-                  </p>
                 </div>
               </div>
             ) : (

@@ -927,7 +927,6 @@ export default function AccountListingsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">إعلاناتي</h1>
-              <p className="truncate text-[11px] text-muted-foreground sm:text-xs">إدارة إعلانات العميل وحالات النشر</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
@@ -948,9 +947,6 @@ export default function AccountListingsPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold">جاري التحقق من الحساب</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  نتحقق من جلسة الدخول قبل عرض بيانات حسابك.
-                </p>
               </div>
             </div>
           </section>
@@ -962,9 +958,6 @@ export default function AccountListingsPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض حسابك</h2>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                  هذه الصفحة مخصصة لبيانات العميل وإعلاناته، وتظهر بعد تسجيل الدخول.
-                </p>
               </div>
               <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                 <a href="/api/auth/google/start">
@@ -985,7 +978,6 @@ export default function AccountListingsPage() {
             <section className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <h2 className="text-base font-bold">إعلاناتي</h2>
-                <p className="mt-1 text-xs leading-6 text-muted-foreground">تابع إعلاناتك وعدلها وانشرها من صفحة مستقلة عن إعدادات الحساب.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
@@ -1020,9 +1012,6 @@ export default function AccountListingsPage() {
                   <div className="grid max-w-sm gap-3">
                     <Megaphone className="mx-auto size-9 text-blue-600" />
                     <h3 className="text-base font-bold">لا توجد إعلانات بعد</h3>
-                    <p className="text-sm leading-7 text-muted-foreground">
-                      ابدأ من مساعد السوق، وسيجمع بيانات المنتج ويصنفه ثم ينشئ الإعلان.
-                    </p>
                   </div>
                 </div>
               ) : (
