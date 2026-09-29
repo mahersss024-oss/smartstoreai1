@@ -582,20 +582,23 @@ async function listSimilarListingFollowerIds(
     take: 500,
   });
 
-  return follows
-    .filter(
-      (
-        follow,
-      ): follow is SimilarListingFollowDatabaseRecord & {
-        listing: DatabaseListingRecord;
-      } =>
-        follow.userId !== listing.sellerId &&
-        Boolean(follow.listing && follow.listing.status === 'published'),
-    )
-    .filter((follow) =>
-      isSimilarListingMatch(toListingRecord(follow.listing), listing),
-    )
-    .map((follow) => follow.userId);
+  const followerIds: string[] = [];
+
+  for (const follow of follows) {
+    if (
+      follow.userId === listing.sellerId ||
+      !follow.listing ||
+      follow.listing.status !== 'published'
+    ) {
+      continue;
+    }
+
+    if (isSimilarListingMatch(toListingRecord(follow.listing), listing)) {
+      followerIds.push(follow.userId);
+    }
+  }
+
+  return followerIds;
 }
 
 async function notifyFollowersWhenListingIsPublished(
