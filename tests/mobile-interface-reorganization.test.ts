@@ -83,7 +83,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main \{[\s\S]*?height: 100dvh;/);
   assert.match(styles, /body:has\(main\.smartstore-stable-page\)[\s\S]*?padding-bottom: 0 !important;/);
   assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
-  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: var\(--marketplace-bottom-nav-space\);/);
+  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: calc\(1rem \+ env\(safe-area-inset-bottom\)\);/);
+  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?\.smartstore-stable-content::after,[\s\S]*?height: var\(--marketplace-bottom-nav-space\);/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
