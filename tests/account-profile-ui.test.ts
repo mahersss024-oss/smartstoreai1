@@ -137,6 +137,17 @@ test('account profile picture UI waits for public image delivery before adopting
   assert.match(page, /تعذر عرضها من دومين الصور/);
 });
 
+test('account page clears a stored profile picture when its public image breaks', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const avatar = readFileSync(join(process.cwd(), 'components', 'seller-avatar.tsx'), 'utf8');
+
+  assert.match(avatar, /onPictureError\?: \(picture: string\) => void/);
+  assert.match(avatar, /onPictureError\?\.\(picture\)/);
+  assert.match(page, /clearBrokenProfilePicture/);
+  assert.match(page, /onPictureError=\{clearBrokenProfilePicture\}/);
+  assert.match(page, /fetch\('\/api\/account\/profile\/picture', \{\s*method: 'DELETE'/);
+});
+
 test('account profile picture replacement removes the previous stored profile image', () => {
   const route = readFileSync(
     join(

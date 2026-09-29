@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -56,6 +56,7 @@ export default function AccountPage() {
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isRemovingProfilePicture, setIsRemovingProfilePicture] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const clearingBrokenProfilePictureRef = useRef(false);
 
   const administrativeRoleLabel =
     session.user?.role === 'owner'
@@ -373,6 +374,34 @@ export default function AccountPage() {
     }
   }, [router, setSession]);
 
+  const clearBrokenProfilePicture = useCallback(async (brokenPicture: string) => {
+    if (
+      !profilePicture ||
+      profilePicturePreview ||
+      brokenPicture !== profilePicture ||
+      clearingBrokenProfilePictureRef.current
+    ) {
+      return;
+    }
+
+    clearingBrokenProfilePictureRef.current = true;
+    setProfilePicture('');
+    setSession((currentSession) => ({
+      ...currentSession,
+      user: currentSession.user
+        ? { ...currentSession.user, picture: undefined }
+        : currentSession.user,
+    }));
+
+    try {
+      await fetch('/api/account/profile/picture', {
+        method: 'DELETE',
+      });
+    } finally {
+      clearingBrokenProfilePictureRef.current = false;
+    }
+  }, [profilePicture, profilePicturePreview, setSession]);
+
   const deleteAccount = useCallback(async () => {
     if (
       !window.confirm(
@@ -502,6 +531,7 @@ export default function AccountPage() {
                 <div className="grid size-16 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <SellerAvatar
                     alt={session.user?.name ?? 'حساب سوق حمد'}
+                    onPictureError={clearBrokenProfilePicture}
                     picture={visibleProfilePicture}
                   />
                 </div>
@@ -621,6 +651,7 @@ export default function AccountPage() {
                   <div className="grid size-24 place-items-center overflow-hidden rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                     <SellerAvatar
                       alt="صورة الحساب"
+                      onPictureError={clearBrokenProfilePicture}
                       picture={visibleProfilePicture}
                     />
                   </div>

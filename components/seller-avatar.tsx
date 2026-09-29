@@ -8,12 +8,18 @@ import { UserRound } from 'lucide-react';
 type SellerAvatarProps = {
   alt: string;
   className?: string;
+  onPictureError?: (picture: string) => void;
   picture?: string;
 };
 
 const brokenProfilePictures = new Set<string>();
 
-export function SellerAvatar({ alt, className = 'size-full object-cover', picture }: SellerAvatarProps) {
+export function SellerAvatar({
+  alt,
+  className = 'size-full object-cover',
+  onPictureError,
+  picture,
+}: SellerAvatarProps) {
   const [failedPicture, setFailedPicture] = useState<string | null>(null);
   const canShowPicture = Boolean(
     picture && failedPicture !== picture && !brokenProfilePictures.has(picture),
@@ -31,6 +37,7 @@ export function SellerAvatar({ alt, className = 'size-full object-cover', pictur
       onError={() => {
         brokenProfilePictures.add(picture);
         setFailedPicture(picture);
+        onPictureError?.(picture);
       }}
       src={picture}
     />
