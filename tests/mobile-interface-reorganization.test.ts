@@ -32,7 +32,9 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /fixed inset-x-3/);
   assert.match(navigation, /overflow-visible/);
   assert.match(navigation, /rounded-full/);
-  assert.doesNotMatch(navigation, /top-full h-\[calc/);
+  assert.match(navigation, /-inset-x-5 top-full h-\[calc\(2\.4rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(navigation, /\[mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.72\)_36%,transparent_100%\)\]/);
+  assert.match(navigation, /\[-webkit-mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.72\)_36%,transparent_100%\)\]/);
   assert.doesNotMatch(navigation, /bg-slate-700\/28/);
   assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
@@ -71,9 +73,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
   assert.match(styles, /--marketplace-bottom-nav-space: calc\(5rem \+ env\(safe-area-inset-bottom\)\);/);
-  assert.match(styles, /\.marketplace-bottom-nav \{[\s\S]*?background-color: rgb\(248 250 252 \/ 0\.38\);/);
-  assert.match(styles, /-webkit-backdrop-filter: blur\(24px\) saturate\(165%\);/);
-  assert.match(styles, /backdrop-filter: blur\(24px\) saturate\(165%\);/);
+  assert.match(styles, /\.marketplace-bottom-nav \{[\s\S]*?background-color: rgb\(255 255 255 \/ 0\.2\);/);
+  assert.match(styles, /-webkit-backdrop-filter: blur\(28px\) saturate\(170%\);/);
+  assert.match(styles, /backdrop-filter: blur\(28px\) saturate\(170%\);/);
   assert.match(styles, /@supports not \(\(backdrop-filter: blur\(10px\)\) or \(-webkit-backdrop-filter: blur\(10px\)\)\)/);
   assert.match(styles, /\.smartstore-stable-content,[\s\S]*?align-content: start;/);
   const stablePageBaseRule = styles.slice(
