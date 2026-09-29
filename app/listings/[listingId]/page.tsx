@@ -17,7 +17,9 @@ import {
 import {
   getListing,
   getPublicSellerProfile,
+  listMarketplaceListings,
 } from '@/agent/marketplace/repository';
+import { getComparableListings } from '@/agent/marketplace/market-intelligence';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { getAuthSession } from '@/lib/auth/session';
 import { Button } from '@ui/button';
@@ -563,11 +565,40 @@ function getListingReturnHref(searchParams: Awaited<PageProps['searchParams']>) 
     return '/account/listings';
   }
 
+  if (source === 'listing' && isSafePathSegment(sourceListingId)) {
+    return `/listings/${encodeURIComponent(sourceListingId)}`;
+  }
+
   return '/';
 }
 
 function getSellerProfileHref(sellerId: string, listingId: string) {
   return `/sellers/${encodeURIComponent(sellerId)}?source=listing&listingId=${encodeURIComponent(listingId)}`;
+}
+
+function getSimilarListingHref(listingId: string, sourceListingId: string) {
+  return `/listings/${encodeURIComponent(listingId)}?source=listing&sourceListingId=${encodeURIComponent(sourceListingId)}`;
+}
+
+function getListingPrimaryImage(listing: {
+  images: Array<{
+    isPrimary?: boolean;
+    thumbnailUrl?: string;
+    displayUrl?: string;
+    originalUrl?: string;
+  }>;
+}) {
+  const image =
+    listing.images.find((candidate) => candidate.isPrimary) ??
+    listing.images[0];
+
+  return image
+    ? getDurableImageUrl(
+        image.thumbnailUrl,
+        image.displayUrl,
+        image.originalUrl,
+      )
+    : null;
 }
 
 export default async function ListingDetailsPage({ params, searchParams }: PageProps) {
@@ -589,6 +620,15 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
   const returnHref = getListingReturnHref(resolvedSearchParams);
   const sellerProfileHref = getSellerProfileHref(listing.sellerId, listing.id);
+  const candidateSimilarListings = await listMarketplaceListings({
+    category: listing.category,
+    city: listing.city,
+    limit: 24,
+  });
+  const similarListings = getComparableListings(
+    listing,
+    candidateSimilarListings,
+  ).slice(0, 6);
 
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
@@ -788,6 +828,60 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 </p>
               )}
             </section>
+
+            {similarListings.length > 0 && (
+              <section className="px-1 py-3 sm:px-2">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold">
+                  <PackageCheck className="size-4 text-blue-600" />
+                  إعلانات مشابهة
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {similarListings.map((similarListing) => {
+                    const imageUrl = getListingPrimaryImage(similarListing);
+
+                    return (
+                      <Link
+                        key={similarListing.id}
+                        className="grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
+                        href={getSimilarListingHref(similarListing.id, listing.id)}
+                      >
+                        <div className="aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900">
+                          {imageUrl ? (
+                            <img
+                              alt={similarListing.title ?? 'صورة الإعلان'}
+                              className="h-full w-full object-cover"
+                              decoding="async"
+                              loading="lazy"
+                              src={imageUrl}
+                            />
+                          ) : (
+                            <div className="grid h-full place-items-center">
+                              <PackageCheck className="size-6 text-slate-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid min-w-0 content-center gap-1 px-3 py-2">
+                          <div className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-700 dark:text-emerald-300">
+                            {similarListing.title ?? 'إعلان مشابه'}
+                          </div>
+                          <div className="truncate text-sm font-bold">
+                            {formatPrice(similarListing.price)}
+                          </div>
+                          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span className="truncate">
+                              {similarListing.city ?? 'السعودية'}
+                            </span>
+                            <span className="truncate">
+                              {formatCategory(similarListing.category)}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </div>
 
           <aside className="grid h-fit gap-3">

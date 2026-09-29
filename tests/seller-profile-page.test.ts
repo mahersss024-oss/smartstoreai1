@@ -91,6 +91,21 @@ test('listing and seller pages keep return navigation on whitelisted sources onl
   assert.match(followsPage, /source=follows/);
 });
 
+test('listing details renders compact similar ads from existing comparable logic', () => {
+  const listingPage = readSource('app/listings/[listingId]/page.tsx');
+  const gallery = readSource('app/listings/[listingId]/listing-image-gallery.tsx');
+
+  assert.match(listingPage, /listMarketplaceListings/);
+  assert.match(listingPage, /getComparableListings/);
+  assert.match(listingPage, /similarListings = getComparableListings/);
+  assert.match(listingPage, /slice\(0, 6\)/);
+  assert.match(listingPage, /getSimilarListingHref\(similarListing\.id, listing\.id\)/);
+  assert.match(listingPage, /source === 'listing'/);
+  assert.match(listingPage, /sourceListingId/);
+  assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(gallery, /similarListings|listMarketplaceListings|getComparableListings/);
+});
+
 test('public seller profile exposes real trust actions without private seller APIs', () => {
   const actions = readSource('app/sellers/[sellerId]/seller-profile-actions.tsx');
 
