@@ -249,7 +249,7 @@ export function PushNotificationSettings({
         ? 'إعدادات الإشعارات غير مكتملة في الخادم.'
         : state === 'blocked'
           ? 'الإشعارات محظورة من إعدادات المتصفح.'
-          : 'تصل الإشعارات عند وصول رسالة جديدة في محادثاتك.';
+          : '';
 
   if (variant === 'icon') {
     const iconLabel = isActive
@@ -290,9 +290,11 @@ export function PushNotificationSettings({
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-bold">إشعارات الرسائل</h2>
-            <p className="mt-1 text-xs leading-6 text-muted-foreground">
-              {helperText}
-            </p>
+            {helperText ? (
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                {helperText}
+              </p>
+            ) : null}
           </div>
         </div>
         <Button

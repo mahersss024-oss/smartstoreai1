@@ -36,6 +36,8 @@ test('notifications page exposes push notifications as the opt-in setting', () =
   assert.match(settings, /variant\?: 'panel' \| 'icon'/);
   assert.match(settings, /variant === 'icon'/);
   assert.match(settings, /isActive \? disableNotifications\(\) : enableNotifications\(\)/);
+  assert.match(settings, /helperText \? \(/);
+  assert.doesNotMatch(settings, /تصل الإشعارات عند وصول رسالة جديدة/);
   assert.match(notificationsPage, /<PushNotificationSettings \/>/);
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
