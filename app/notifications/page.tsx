@@ -80,7 +80,7 @@ export default function NotificationsPage() {
   useSmartstoreRealtime({
     enabled: session.authenticated,
     fallbackIntervalMs: 5000,
-    eventTypes: ['follow_listing_published'],
+    eventTypes: ['follow_listing_published', 'listing_notification_created'],
     onResync: refreshNotifications,
   });
 

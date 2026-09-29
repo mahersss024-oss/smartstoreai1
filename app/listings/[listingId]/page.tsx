@@ -32,6 +32,7 @@ import {
   type ListingGalleryImage,
 } from './listing-image-gallery';
 import { ListingSafetyActions } from './listing-safety-actions';
+import { SimilarListingFollowButton } from './similar-follow-button';
 
 type PageProps = {
   params: Promise<{
@@ -758,6 +759,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                   </div>
                 </div>
               </div>
+              {!isOwnListing && <SimilarListingFollowButton listingId={listing.id} />}
             </section>
 
             <ListingImageGallery

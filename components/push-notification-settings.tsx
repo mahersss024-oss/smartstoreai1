@@ -141,7 +141,7 @@ export function PushNotificationSettings({
 
   useSmartstoreRealtime({
     enabled: variant === 'icon',
-    eventTypes: ['follow_listing_published'],
+    eventTypes: ['follow_listing_published', 'listing_notification_created'],
     fallbackIntervalMs: 5000,
     onResync: refreshUnreadCount,
   });

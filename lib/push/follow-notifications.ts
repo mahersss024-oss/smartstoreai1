@@ -17,6 +17,11 @@ type NotifySellerFollowersInput = {
   followerIds: string[];
 };
 
+type NotifySimilarListingFollowersInput = {
+  listing: PublishedListingNotification;
+  followerIds: string[];
+};
+
 function buildListingNotificationBody(listing: PublishedListingNotification) {
   const title = listing.title?.trim() || 'إعلان جديد';
   const city = listing.city?.trim();
@@ -53,6 +58,45 @@ export async function notifySellerFollowersOfPublishedListing({
           body,
           url,
           tag: `follow:listing:${listing.id}`,
+        });
+
+        if (!result.ok && result.expired) {
+          await deactivateSubscriptionById(subscription.id);
+        }
+      }),
+    ),
+  );
+}
+
+export async function notifySimilarListingFollowersOfPublishedListing({
+  listing,
+  followerIds,
+}: NotifySimilarListingFollowersInput) {
+  const recipients = [...new Set(followerIds)].filter(
+    (userId) => userId && userId !== listing.sellerId,
+  );
+
+  if (recipients.length === 0) {
+    return;
+  }
+
+  const subscriptionsByUser = await Promise.all(
+    recipients.map(async (userId) => ({
+      userId,
+      subscriptions: await listActiveSubscriptionsForUser(userId),
+    })),
+  );
+  const body = buildListingNotificationBody(listing);
+  const url = `/listings/${encodeURIComponent(listing.id)}?source=similar-follow`;
+
+  await Promise.all(
+    subscriptionsByUser.flatMap(({ subscriptions }) =>
+      subscriptions.map(async (subscription) => {
+        const result = await sendWebPush(subscription, {
+          title: 'إعلان مشابه جديد',
+          body,
+          url,
+          tag: `similar:listing:${listing.id}`,
         });
 
         if (!result.ok && result.expired) {

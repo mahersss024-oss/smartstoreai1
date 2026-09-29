@@ -12,10 +12,14 @@ import type {
   PublishRealtimeEventInput,
   RealtimeEventVisibility,
 } from '@/lib/realtime/events';
-import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
+import {
+  notifySellerFollowersOfPublishedListing,
+  notifySimilarListingFollowersOfPublishedListing,
+} from '@/lib/push/follow-notifications';
 import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateSaudiMarketplaceCompliance } from './policy';
+import { getComparableListings } from './market-intelligence';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -102,6 +106,16 @@ type FollowNotificationRecord = {
   createdAt: string;
 };
 
+type SimilarListingFollowRecord = {
+  id: string;
+  userId: string;
+  listingId: string;
+  category: string;
+  city?: string;
+  title?: string;
+  createdAt: string;
+};
+
 type SellerRatingRecord = {
   id: string;
   raterId: string;
@@ -115,6 +129,7 @@ type SellerRatingRecord = {
 const memorySellerFollows = new Map<string, SellerFollowRecord>();
 const memorySellerRatings = new Map<string, SellerRatingRecord>();
 const memoryFollowNotifications = new Map<string, FollowNotificationRecord>();
+const memorySimilarListingFollows = new Map<string, SimilarListingFollowRecord>();
 
 export type PublicSellerProfile = {
   id: string;
@@ -390,6 +405,10 @@ function getFollowNotificationKey(userId: string, listingId: string) {
   return `${userId}:${listingId}`;
 }
 
+function getSimilarListingFollowKey(userId: string, listingId: string) {
+  return `${userId}:${listingId}`;
+}
+
 function buildFollowNotificationBody(listing: memoryStore.ListingRecord) {
   const title = listing.title?.trim() || 'إعلان جديد';
   const city = listing.city?.trim();
@@ -400,6 +419,10 @@ function buildFollowNotificationBody(listing: memoryStore.ListingRecord) {
 async function createFollowNotificationsForListing(
   listing: memoryStore.ListingRecord,
   followerIds: string[],
+  options: {
+    title?: string;
+    urlSource?: string;
+  } = {},
 ) {
   const recipients = [...new Set(followerIds)].filter(
     (userId) => userId && userId !== listing.sellerId,
@@ -409,9 +432,9 @@ async function createFollowNotificationsForListing(
     return;
   }
 
-  const title = 'إعلان جديد من بائع تتابعه';
+  const title = options.title ?? 'إعلان جديد من بائع تتابعه';
   const body = buildFollowNotificationBody(listing);
-  const url = `/listings/${encodeURIComponent(listing.id)}?source=follow`;
+  const url = `/listings/${encodeURIComponent(listing.id)}?source=${encodeURIComponent(options.urlSource ?? 'follow')}`;
 
   if (!shouldUseDatabaseStore()) {
     for (const userId of recipients) {
@@ -436,31 +459,74 @@ async function createFollowNotificationsForListing(
     return;
   }
 
-  await Promise.all(
-    recipients.map((userId) =>
-      (prisma as any).followNotification.upsert({
-        where: {
-          userId_listingId: {
-            userId,
-            listingId: listing.id,
-          },
-        },
-        create: {
-          userId,
-          listingId: listing.id,
-          sellerId: listing.sellerId,
-          title,
-          body,
-          url,
-        },
-        update: {
-          title,
-          body,
-          url,
-        },
-      }),
-    ),
+  await (prisma as any).followNotification.createMany({
+    data: recipients.map((userId) => ({
+      userId,
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      title,
+      body,
+      url,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+function isSimilarListingMatch(
+  referenceListing: memoryStore.ListingRecord,
+  publishedListing: memoryStore.ListingRecord,
+) {
+  return getComparableListings(referenceListing, [publishedListing]).some(
+    (candidate) => candidate.id === publishedListing.id,
   );
+}
+
+async function listSimilarListingFollowerIds(
+  listing: memoryStore.ListingRecord,
+): Promise<string[]> {
+  if (!shouldUseDatabaseStore()) {
+    return [...memorySimilarListingFollows.values()]
+      .filter((follow) => follow.userId !== listing.sellerId)
+      .filter((follow) => follow.category === listing.category)
+      .filter((follow) => {
+        const referenceListing = memoryStore.getListing(follow.listingId);
+
+        return Boolean(
+          referenceListing &&
+            referenceListing.status === 'published' &&
+            isSimilarListingMatch(referenceListing, listing),
+        );
+      })
+      .map((follow) => follow.userId);
+  }
+
+  const follows = (await (prisma as any).similarListingFollow.findMany({
+    where: {
+      category: listing.category,
+    },
+    include: {
+      listing: {
+        include: { images: true },
+      },
+    },
+    take: 500,
+  })) as Array<{
+    userId: string;
+    listing?: DatabaseListingRecord | null;
+  }>;
+
+  return follows
+    .filter(
+      (
+        follow,
+      ): follow is { userId: string; listing: DatabaseListingRecord } =>
+        follow.userId !== listing.sellerId &&
+        Boolean(follow.listing && follow.listing.status === 'published'),
+    )
+    .filter((follow) =>
+      isSimilarListingMatch(toListingRecord(follow.listing), listing),
+    )
+    .map((follow) => follow.userId);
 }
 
 async function notifyFollowersWhenListingIsPublished(
@@ -496,6 +562,47 @@ async function notifyFollowersWhenListingIsPublished(
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[follow_listing_push] failure=${errorName}`);
+  }
+}
+
+async function notifySimilarFollowersWhenListingIsPublished(
+  listing: memoryStore.ListingRecord,
+  previousStatus: ListingStatus,
+) {
+  if (previousStatus === 'published' || listing.status !== 'published') {
+    return;
+  }
+
+  const followerIds = [
+    ...new Set(await listSimilarListingFollowerIds(listing)),
+  ].filter((userId) => userId !== listing.sellerId);
+
+  if (followerIds.length === 0) {
+    return;
+  }
+
+  await createFollowNotificationsForListing(listing, followerIds, {
+    title: 'إعلان مشابه جديد',
+    urlSource: 'similar-follow',
+  });
+
+  safelyPublishRealtimeEvent({
+    type: 'listing_notification_created',
+    payload: {
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      reason: 'similar_listing_follow',
+    },
+    visibility: {
+      userIds: followerIds,
+    },
+  });
+
+  try {
+    await notifySimilarListingFollowersOfPublishedListing({ listing, followerIds });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[similar_listing_push] failure=${errorName}`);
   }
 }
 
@@ -1283,6 +1390,137 @@ export async function markAccountFollowNotificationsRead(actor: Actor) {
   return { readAt };
 }
 
+export async function getSimilarListingFollowState(
+  listingId: string,
+  actor: Actor,
+) {
+  const userId = getActorId(actor);
+  const listing = await getListing(listingId);
+
+  if (!listing || listing.status !== 'published') {
+    return {
+      status: 'not_found' as const,
+      isFollowing: false,
+      canFollow: false,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    return {
+      status: 'ok' as const,
+      isFollowing: memorySimilarListingFollows.has(
+        getSimilarListingFollowKey(userId, listing.id),
+      ),
+      canFollow: true,
+    };
+  }
+
+  const existingFollow = await (prisma as any).similarListingFollow.findUnique({
+    where: {
+      userId_listingId: {
+        userId,
+        listingId: listing.id,
+      },
+    },
+  });
+
+  return {
+    status: 'ok' as const,
+    isFollowing: Boolean(existingFollow),
+    canFollow: true,
+  };
+}
+
+export async function toggleSimilarListingFollow(
+  listingId: string,
+  actor: Actor,
+) {
+  const userId = getActorId(actor);
+  const listing = await getListing(listingId);
+
+  if (!listing || listing.status !== 'published') {
+    return {
+      status: 'not_found' as const,
+      isFollowing: false,
+      canFollow: false,
+    };
+  }
+
+  if (!shouldUseDatabaseStore()) {
+    const key = getSimilarListingFollowKey(userId, listing.id);
+
+    if (memorySimilarListingFollows.has(key)) {
+      memorySimilarListingFollows.delete(key);
+
+      return {
+        status: 'unfollowed' as const,
+        isFollowing: false,
+        canFollow: true,
+      };
+    }
+
+    memorySimilarListingFollows.set(key, {
+      id: `similar-follow:${key}`,
+      userId,
+      listingId: listing.id,
+      category: listing.category,
+      city: listing.city,
+      title: listing.title,
+      createdAt: nowIso(),
+    });
+
+    return {
+      status: 'followed' as const,
+      isFollowing: true,
+      canFollow: true,
+    };
+  }
+
+  await ensureActorUser(actor);
+
+  const existingFollow = await (prisma as any).similarListingFollow.findUnique({
+    where: {
+      userId_listingId: {
+        userId,
+        listingId: listing.id,
+      },
+    },
+  });
+
+  if (existingFollow) {
+    await (prisma as any).similarListingFollow.delete({
+      where: {
+        userId_listingId: {
+          userId,
+          listingId: listing.id,
+        },
+      },
+    });
+
+    return {
+      status: 'unfollowed' as const,
+      isFollowing: false,
+      canFollow: true,
+    };
+  }
+
+  await (prisma as any).similarListingFollow.create({
+    data: {
+      userId,
+      listingId: listing.id,
+      category: listing.category,
+      city: listing.city,
+      title: listing.title,
+    },
+  });
+
+  return {
+    status: 'followed' as const,
+    isFollowing: true,
+    canFollow: true,
+  };
+}
+
 export async function toggleSellerFollow(sellerId: string, follower: Actor) {
   const followerId = getActorId(follower);
 
@@ -1999,6 +2237,7 @@ export async function setListingStatusForSeller(
       });
 
       await notifyFollowersWhenListingIsPublished(listing, previousStatus);
+      await notifySimilarFollowersWhenListingIsPublished(listing, previousStatus);
 
       if (listing.status === 'deleted') {
         safelyPublishRealtimeEvent({
@@ -2078,6 +2317,7 @@ export async function setListingStatusForSeller(
   });
 
   await notifyFollowersWhenListingIsPublished(mappedListing, previousStatus);
+  await notifySimilarFollowersWhenListingIsPublished(mappedListing, previousStatus);
 
   if (mappedListing.status === 'deleted') {
     safelyPublishRealtimeEvent({
