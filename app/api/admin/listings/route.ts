@@ -89,6 +89,7 @@ export async function GET(request: Request) {
     ...(query && !listingId
       ? {
           OR: [
+            { id: { contains: query, mode: 'insensitive' as const } },
             { title: { contains: query, mode: 'insensitive' as const } },
             { description: { contains: query, mode: 'insensitive' as const } },
             { category: { contains: query, mode: 'insensitive' as const } },

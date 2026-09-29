@@ -53,6 +53,8 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /notFound\(\)/);
   assert.match(page, /getSellerListingHref\(listing\.id, seller\.id, resolvedSearchParams\)/);
   assert.match(page, /SellerProfileActions/);
+  assert.match(page, /SellerProfileIdentity/);
+  assert.match(page, /sellerId=\{seller\.id\}/);
   assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
   assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
   assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
@@ -68,6 +70,19 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /إعلانات المعلن/);
   assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
   assert.doesNotMatch(page, /seller\.email/);
+});
+
+test('public seller profile shows a copyable seller identifier', () => {
+  const page = readSource('app/sellers/[sellerId]/page.tsx');
+  const identity = readSource('app/sellers/[sellerId]/seller-profile-identity.tsx');
+
+  assert.match(page, /<SellerProfileIdentity sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
+  assert.match(identity, /sellerHandle = useMemo\(\(\) => `@\$\{sellerId\}`/);
+  assert.match(identity, /navigator\.clipboard\.writeText\(value\)/);
+  assert.match(identity, /aria-label="نسخ معرف المستخدم"/);
+  assert.match(identity, /QrCode/);
+  assert.match(identity, /navigator\.share/);
+  assert.match(identity, /postToNative/);
 });
 
 test('listing and seller pages keep return navigation on whitelisted sources only', () => {

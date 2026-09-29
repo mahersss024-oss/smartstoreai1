@@ -17,6 +17,7 @@ import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { SellerProfileActions } from './seller-profile-actions';
+import { SellerProfileIdentity } from './seller-profile-identity';
 
 type PageProps = {
   params: Promise<{
@@ -232,6 +233,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                   معلن موثق داخل سوق حمد
                 </span>
               </div>
+              <SellerProfileIdentity sellerId={seller.id} sellerName={seller.name} />
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <span>{formatJoinDate(seller.joinedAt)}</span>
                 <span>{seller.publishedListingCount} إعلان منشور</span>

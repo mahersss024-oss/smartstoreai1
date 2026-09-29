@@ -320,6 +320,14 @@ test('admin listings return every listing image instead of a partial preview', (
   assert.match(page, /overflow-x-auto/);
 });
 
+test('admin listings search supports listing id lookup', () => {
+  const route = readProjectFile('app', 'api', 'admin', 'listings', 'route.ts');
+  const page = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(route, /id:\s*\{\s*contains:\s*query,\s*mode:\s*'insensitive' as const\s*\}/);
+  assert.match(page, /placeholder="[^"]*رقم الإعلان/);
+});
+
 test('account page shows the admin dashboard to the owner and appointed admins', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 

@@ -31,6 +31,7 @@ import {
   ListingImageGallery,
   type ListingGalleryImage,
 } from './listing-image-gallery';
+import { ListingIdCopyButton } from './listing-id-copy-button';
 import { ListingSafetyActions } from './listing-safety-actions';
 import { SimilarListingFollowButton } from './similar-follow-button';
 
@@ -845,7 +846,16 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 </div>
                 <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2 sm:col-span-2">
                   <span className="shrink-0 text-muted-foreground">رقم الإعلان</span>
-                  <strong className="min-w-0 truncate text-sm">{listing.id}</strong>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <strong
+                      className="min-w-0 select-all truncate text-sm"
+                      dir="ltr"
+                      title={listing.id}
+                    >
+                      {listing.id}
+                    </strong>
+                    <ListingIdCopyButton listingId={listing.id} />
+                  </div>
                 </div>
               </div>
             </section>

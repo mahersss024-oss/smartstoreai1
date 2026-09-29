@@ -30,6 +30,21 @@ test('published listings expose share controls in seller account and details pag
   assert.match(listingPage, /<ListingShareButton/);
 });
 
+test('listing details exposes a copy action for the listing id', () => {
+  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const copyButton = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'listing-id-copy-button.tsx',
+  );
+
+  assert.match(listingPage, /<ListingIdCopyButton listingId=\{listing\.id\}/);
+  assert.match(listingPage, /select-all/);
+  assert.match(copyButton, /navigator\.clipboard\.writeText\(value\)/);
+  assert.match(copyButton, /aria-label="نسخ رقم الإعلان"/);
+});
+
 test('listing owner details page keeps only share action visible', () => {
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
   const safetyActions = readProjectFile(
