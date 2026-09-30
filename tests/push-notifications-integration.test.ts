@@ -22,6 +22,16 @@ test('service worker bypasses image requests so PWA media loads through the brow
   assert.doesNotMatch(source, /content-type'\)\?\.startsWith\('image\/'\)/);
 });
 
+test('service worker registration bypasses browser cache and checks for updates', () => {
+  const source = readFileSync(
+    join(process.cwd(), 'components', 'service-worker-registrar.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /updateViaCache: 'none'/);
+  assert.match(source, /registration\.update\(\)/);
+});
+
 test('notifications page exposes push notifications as the opt-in setting', () => {
   const accountPage = readFileSync(
     join(process.cwd(), 'app', 'account', 'page.tsx'),
