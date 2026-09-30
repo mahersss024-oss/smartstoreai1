@@ -5,6 +5,7 @@ import { Check, Copy, QrCode, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { isInsideNativeApp, postToNative } from '@/lib/native/app-bridge';
+import { getPublicSellerUrl } from '@/lib/seller-url';
 import { Button } from '@ui/button';
 import {
   Dialog,
@@ -43,9 +44,7 @@ export function SellerProfileIdentity({
 }: SellerProfileIdentityProps) {
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [profileUrl] = useState(() =>
-    typeof window === 'undefined' ? '' : window.location.href,
-  );
+  const profileUrl = useMemo(() => getPublicSellerUrl(sellerId), [sellerId]);
   const sellerHandle = useMemo(() => `@${sellerId}`, [sellerId]);
 
   async function copySellerId() {
@@ -55,13 +54,13 @@ export function SellerProfileIdentity({
   }
 
   async function copySellerProfileUrl() {
-    await copyText(profileUrl || window.location.href);
+    await copyText(profileUrl);
     setLinkCopied(true);
     window.setTimeout(() => setLinkCopied(false), 1600);
   }
 
   async function shareSellerProfile() {
-    const url = profileUrl || window.location.href;
+    const url = profileUrl;
     const title = sellerName.trim() || 'ملف معلن سوق حمد';
 
     if (isInsideNativeApp() && postToNative({ type: 'share', url, title })) {
@@ -106,17 +105,13 @@ export function SellerProfileIdentity({
           </DialogHeader>
 
           <div className="mx-auto grid size-48 place-items-center rounded-md border bg-white p-3 shadow-sm">
-            {profileUrl ? (
-              <QRCodeSVG
-                bgColor="#ffffff"
-                fgColor="#0f172a"
-                level="M"
-                size={168}
-                value={profileUrl}
-              />
-            ) : (
-              <QrCode className="size-16 text-blue-600" />
-            )}
+            <QRCodeSVG
+              bgColor="#ffffff"
+              fgColor="#0f172a"
+              level="M"
+              size={168}
+              value={profileUrl}
+            />
           </div>
 
           <div className="min-w-0 text-center">

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { getPublicListingPath, getPublicListingUrl } from '@/lib/listing-url';
+import { getPublicSellerPath, getPublicSellerUrl } from '@/lib/seller-url';
 
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
@@ -14,6 +15,14 @@ test('public listing urls are stable and shareable', () => {
   assert.equal(
     getPublicListingUrl('listing:share 1', 'https://www.smartstore-ai.com/'),
     'https://www.smartstore-ai.com/listings/listing%3Ashare%201',
+  );
+});
+
+test('public seller urls are stable profile links without listing context', () => {
+  assert.equal(getPublicSellerPath('seller:share 1'), '/sellers/seller%3Ashare%201');
+  assert.equal(
+    getPublicSellerUrl('seller:share 1', 'https://www.smartstore-ai.com/'),
+    'https://www.smartstore-ai.com/sellers/seller%3Ashare%201',
   );
 });
 

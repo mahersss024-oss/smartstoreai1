@@ -78,6 +78,9 @@ test('public seller profile shows a copyable seller identifier', () => {
 
   assert.match(page, /<SellerProfileIdentity sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
   assert.match(identity, /sellerHandle = useMemo\(\(\) => `@\$\{sellerId\}`/);
+  assert.match(identity, /getPublicSellerUrl\(sellerId\)/);
+  assert.match(identity, /value=\{profileUrl\}/);
+  assert.doesNotMatch(identity, /window\.location\.href/);
   assert.match(identity, /navigator\.clipboard\.writeText\(value\)/);
   assert.match(identity, /aria-label="نسخ معرف المستخدم"/);
   assert.match(identity, /QRCodeSVG/);
