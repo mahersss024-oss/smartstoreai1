@@ -6,12 +6,20 @@ import test from 'node:test';
 test('service worker displays and routes push notifications', () => {
   const source = readFileSync(join(process.cwd(), 'public', 'sw.js'), 'utf8');
 
+  assert.match(source, /smartstore-shell-v3/);
   assert.match(source, /addEventListener\('push'/);
   assert.match(source, /showNotification/);
   assert.match(source, /icon: '\/icon\.png'/);
   assert.match(source, /addEventListener\('notificationclick'/);
   assert.match(source, /clients\.openWindow/);
   assert.match(source, /payload\.url/);
+});
+
+test('service worker bypasses image requests so PWA media loads through the browser cache', () => {
+  const source = readFileSync(join(process.cwd(), 'public', 'sw.js'), 'utf8');
+
+  assert.match(source, /request\.destination === 'image'/);
+  assert.doesNotMatch(source, /content-type'\)\?\.startsWith\('image\/'\)/);
 });
 
 test('notifications page exposes push notifications as the opt-in setting', () => {

@@ -1,7 +1,7 @@
 // سوق حمد service worker.
 // Kept intentionally minimal: precache the app shell and fall back safely.
 
-const CACHE_NAME = 'smartstore-shell-v2';
+const CACHE_NAME = 'smartstore-shell-v3';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_URLS = ['/', OFFLINE_URL];
@@ -49,6 +49,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Listing and profile images should go straight to the browser/network stack.
+  // PWA-controlled cache reads can delay media on mobile even when normal
+  // browser loads are fast, so keep the service worker focused on the shell.
+  if (request.destination === 'image') {
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() =>
@@ -72,8 +79,7 @@ self.addEventListener('fetch', (event) => {
             response.ok &&
             response.type === 'basic' &&
             (url.pathname.startsWith('/_next/static/') ||
-              url.pathname.startsWith('/smartstore-') ||
-              response.headers.get('content-type')?.startsWith('image/'))
+              url.pathname.startsWith('/smartstore-'))
           ) {
             const clone = response.clone();
             caches
