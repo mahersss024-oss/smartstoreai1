@@ -1,8 +1,19 @@
-const productionCanonicalUrl = 'https://www.souqhamad.com';
+const productionCanonicalUrl = 'https://souqhamad.com';
 const productionHosts = new Set(['www.souqhamad.com', 'souqhamad.com']);
 
 function normalizeBaseUrl(value: string) {
-  return value.trim().replace(/\/+$/, '');
+  const normalizedValue = value.trim().replace(/\/+$/, '');
+  const url = getUrl(normalizedValue);
+
+  if (url && productionHosts.has(url.hostname.toLowerCase())) {
+    url.protocol = 'https:';
+    url.hostname = 'souqhamad.com';
+    url.port = '';
+
+    return url.origin;
+  }
+
+  return normalizedValue;
 }
 
 function getUrl(value: string) {
@@ -15,16 +26,6 @@ function getUrl(value: string) {
 
 function isRenderUrl(value: string) {
   return getUrl(value)?.hostname.endsWith('.onrender.com') ?? false;
-}
-
-function isTrustedProductionOrigin(value: string) {
-  const url = getUrl(value);
-
-  return Boolean(
-    url &&
-      url.protocol === 'https:' &&
-      productionHosts.has(url.hostname.toLowerCase()),
-  );
 }
 
 export function getAppBaseUrl(request?: Request) {
@@ -41,9 +42,7 @@ export function getAppBaseUrl(request?: Request) {
     const requestOrigin = new URL(request.url).origin;
 
     if (process.env.NODE_ENV === 'production') {
-      return isTrustedProductionOrigin(requestOrigin)
-        ? requestOrigin
-        : productionCanonicalUrl;
+      return productionCanonicalUrl;
     }
 
     return requestOrigin;

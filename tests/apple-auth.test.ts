@@ -142,7 +142,7 @@ test('google auth start uses the configured سوق حمد callback url', async (
     assert.ok(location);
     assert.equal(
       new URL(location).searchParams.get('redirect_uri'),
-      'https://www.souqhamad.com/api/auth/google/callback',
+      'https://souqhamad.com/api/auth/google/callback',
     );
   } finally {
     restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);

@@ -6,10 +6,10 @@ import { appUrl } from '@/lib/app-url';
 
 export const appCustomScheme = 'smartstore';
 
-const productionHost = 'www.smartstore-ai.com';
+const productionHosts = ['souqhamad.com', 'www.souqhamad.com'];
 
 function getTrustedHosts() {
-  const hosts = new Set<string>([productionHost]);
+  const hosts = new Set<string>(productionHosts);
   try {
     hosts.add(new URL(appUrl).host);
   } catch {

@@ -14,7 +14,7 @@ test('production app base url ignores untrusted request origins', () => {
   try {
     assert.equal(
       getAppBaseUrl(new Request('https://attacker.example/api/auth/google/start')),
-      'https://www.souqhamad.com',
+      'https://souqhamad.com',
     );
     assert.equal(
       getAppBaseUrl(
@@ -44,7 +44,7 @@ test('configured production app base url still takes precedence', () => {
   try {
     assert.equal(
       getAppBaseUrl(new Request('https://attacker.example/api/auth/google/start')),
-      'https://www.souqhamad.com',
+      'https://souqhamad.com',
     );
   } finally {
     env.NODE_ENV = previousNodeEnv;

@@ -29,7 +29,7 @@ test('maps an internal URL to the custom scheme', () => {
 
 test('maps an absolute URL to the custom scheme and keeps query', () => {
   assert.equal(
-    toAppDeepLink('https://www.smartstore-ai.com/listings/abc?tab=images'),
+    toAppDeepLink('https://www.souqhamad.com/listings/abc?tab=images'),
     'smartstore://listings/abc?tab=images',
   );
 });

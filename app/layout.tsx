@@ -31,8 +31,7 @@ const welcomeVisiblePercent = Math.round(
 const welcomeStandaloneVisiblePercent = Math.round(
   (WELCOME_STANDALONE_VISIBLE_MS / welcomeStandaloneLifecycleMs) * 100,
 );
-const appBaseUrl =
-  process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://souqhamad.com";
+const appBaseUrl = "https://souqhamad.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),

@@ -3,7 +3,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { clearSessionCookie, getAuthSession } from '@/lib/auth/session';
 
-const productionCanonicalUrl = 'https://www.smartstore-ai.com';
+const productionCanonicalUrl = 'https://souqhamad.com';
+const productionHosts = new Set(['www.souqhamad.com', 'souqhamad.com']);
+
+function normalizeCanonicalUrl(url: URL) {
+  if (productionHosts.has(url.hostname.toLowerCase())) {
+    url.protocol = 'https:';
+    url.hostname = 'souqhamad.com';
+    url.port = '';
+  }
+
+  return url;
+}
 
 function getCanonicalUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
@@ -16,7 +27,7 @@ function getCanonicalUrl() {
 
   return canonicalUrl.hostname.endsWith('.onrender.com')
     ? new URL(productionCanonicalUrl)
-    : canonicalUrl;
+    : normalizeCanonicalUrl(canonicalUrl);
 }
 
 export async function proxy(request: NextRequest) {
@@ -30,7 +41,8 @@ export async function proxy(request: NextRequest) {
 
   if (
     process.env.NODE_ENV === 'production' &&
-    request.nextUrl.hostname.endsWith('.onrender.com') &&
+    (request.nextUrl.hostname.endsWith('.onrender.com') ||
+      request.nextUrl.hostname === 'www.souqhamad.com') &&
     request.nextUrl.hostname !== canonicalUrl.hostname
   ) {
     const url = request.nextUrl.clone();
