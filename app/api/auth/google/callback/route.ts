@@ -16,6 +16,11 @@ import {
   getOauthState,
   type AuthSessionUser,
 } from '@/lib/auth/session';
+import {
+  createMobileAuthCallbackUrl,
+  createMobileAuthTicket,
+  parseMobileAuthState,
+} from '@/lib/auth/mobile-oauth';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { prisma } from '@/lib/db/prisma';
 
@@ -138,11 +143,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
+  const mobileState = parseMobileAuthState(state);
   const storedState = getOauthState(request);
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
-  if (!code || !state || !storedState || state !== storedState) {
+  if (!code || !state || (!mobileState && (!storedState || state !== storedState))) {
     return new Response('Invalid Google sign-in state.', { status: 400 });
   }
 
@@ -245,6 +251,15 @@ export async function GET(request: Request) {
     return new Response('Google registration could not be completed.', {
       status: 502,
     });
+  }
+
+  if (mobileState) {
+    const response = NextResponse.redirect(
+      createMobileAuthCallbackUrl(createMobileAuthTicket(registeredUser)),
+    );
+
+    response.headers.append('Set-Cookie', clearOauthStateCookie());
+    return response;
   }
 
   return redirectToHome(request, createSessionCookie(registeredUser));

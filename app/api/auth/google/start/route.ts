@@ -5,6 +5,7 @@ import {
   createOauthStateCookie,
   hasCommissionAgreement,
 } from '@/lib/auth/session';
+import { createMobileAuthState, isMobileAppRequest } from '@/lib/auth/mobile-oauth';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 
@@ -34,7 +35,9 @@ export async function GET(request: Request) {
     });
   }
 
-  const state = createOauthState();
+  const oauthState = isMobileAppRequest(request)
+    ? createMobileAuthState()
+    : createOauthState();
   const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 
@@ -42,14 +45,14 @@ export async function GET(request: Request) {
   authorizationUrl.searchParams.set('redirect_uri', callbackUrl.toString());
   authorizationUrl.searchParams.set('response_type', 'code');
   authorizationUrl.searchParams.set('scope', 'openid email profile');
-  authorizationUrl.searchParams.set('state', state);
+  authorizationUrl.searchParams.set('state', oauthState);
   authorizationUrl.searchParams.set('prompt', 'select_account');
 
   return new NextResponse(null, {
     status: 302,
     headers: {
       Location: authorizationUrl.toString(),
-      'Set-Cookie': createOauthStateCookie(state),
+      'Set-Cookie': createOauthStateCookie(oauthState),
     },
   });
 }
