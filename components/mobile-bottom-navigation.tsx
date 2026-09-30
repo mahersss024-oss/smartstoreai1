@@ -173,7 +173,7 @@ export function MobileBottomNavigation() {
           : 'translate-y-0 opacity-100'
       }`}
     >
-      <div className="pointer-events-none absolute -inset-x-5 top-full h-[calc(2.4rem+env(safe-area-inset-bottom))] rounded-b-[2.25rem] bg-white/14 backdrop-blur-[32px] backdrop-saturate-[170%] [mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.72)_36%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.72)_36%,transparent_100%)] dark:bg-slate-950/28" />
+      <div className="pointer-events-none absolute -inset-x-5 top-full h-[calc(3rem+env(safe-area-inset-bottom))] rounded-b-[2.25rem] bg-white/28 backdrop-blur-[44px] backdrop-saturate-[180%] [mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.88)_32%,rgba(0,0,0,0.48)_68%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.88)_32%,rgba(0,0,0,0.48)_68%,transparent_100%)] dark:bg-slate-950/38" />
       <div
         className="pointer-events-none absolute -top-px h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
         style={{ right: `${indicatorIndex * (100 / 5)}%` }}

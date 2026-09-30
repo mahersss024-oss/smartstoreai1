@@ -32,9 +32,10 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /fixed inset-x-3/);
   assert.match(navigation, /overflow-visible/);
   assert.match(navigation, /rounded-full/);
-  assert.match(navigation, /-inset-x-5 top-full h-\[calc\(2\.4rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(navigation, /\[mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.72\)_36%,transparent_100%\)\]/);
-  assert.match(navigation, /\[-webkit-mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.72\)_36%,transparent_100%\)\]/);
+  assert.match(navigation, /-inset-x-5 top-full h-\[calc\(3rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(navigation, /bg-white\/28 backdrop-blur-\[44px\] backdrop-saturate-\[180%\]/);
+  assert.match(navigation, /\[mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.88\)_32%,rgba\(0,0,0,0\.48\)_68%,transparent_100%\)\]/);
+  assert.match(navigation, /\[-webkit-mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.88\)_32%,rgba\(0,0,0,0\.48\)_68%,transparent_100%\)\]/);
   assert.doesNotMatch(navigation, /bg-slate-700\/28/);
   assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);

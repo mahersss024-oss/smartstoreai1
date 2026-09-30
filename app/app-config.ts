@@ -8,9 +8,23 @@ export const appConfig = {
     vision: 'deepseek-flash',
   },
   metadata: {
-    title: 'سوق حمد - سوق ذكي',
+    title: 'سوق حمد | حراج بيع وشراء وتسويق',
     description:
-      'Chat-first Saudi marketplace for listings, search, seller tools, buyer chat, and AI-assisted trust checks.',
+      'سوق حمد منصة حراج وإعلانات مبوبة للتسويق وبيع وشراء السيارات والعقار والأثاث والأجهزة والمنتجات الجديدة والمستعملة في السعودية.',
+    keywords: [
+      'سوق حمد',
+      'حراج',
+      'حراج السعودية',
+      'بيع وشراء',
+      'تسويق',
+      'إعلانات مبوبة',
+      'سيارات',
+      'عقار',
+      'أثاث',
+      'أجهزة',
+      'منتجات مستعملة',
+      'منتجات جديدة',
+    ],
   },
   agent: {
     instructions:

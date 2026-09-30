@@ -31,11 +31,40 @@ const welcomeVisiblePercent = Math.round(
 const welcomeStandaloneVisiblePercent = Math.round(
   (WELCOME_STANDALONE_VISIBLE_MS / welcomeStandaloneLifecycleMs) * 100,
 );
+const appBaseUrl =
+  process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://souqhamad.com";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(appBaseUrl),
   title: appConfig.metadata.title,
   description: appConfig.metadata.description,
+  keywords: [...appConfig.metadata.keywords],
   applicationName: "سوق حمد",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: appConfig.metadata.title,
+    description: appConfig.metadata.description,
+    url: "/",
+    siteName: "سوق حمد",
+    locale: "ar_SA",
+    type: "website",
+    images: [
+      {
+        url: "/hamad-market-logo.jpeg",
+        width: 512,
+        height: 512,
+        alt: "سوق حمد",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: appConfig.metadata.title,
+    description: appConfig.metadata.description,
+    images: ["/hamad-market-logo.jpeg"],
+  },
   manifest: "/manifest.webmanifest?v=souq-hamad-20260921",
   appleWebApp: {
     capable: true,
