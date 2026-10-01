@@ -7,7 +7,11 @@ import {
   hasReachedListingImageLimit,
 } from '@/agent/marketplace/listing-image-limits';
 import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
-import { createListingImageVariants } from '@/agent/marketplace/listing-image-variants';
+import {
+  createListingImageVariants,
+  createSanitizedListingImageOriginal,
+  ListingImageSecurityError,
+} from '@/agent/marketplace/listing-image-variants';
 import {
   checkImageMarketplaceCompliance,
   type ImageComplianceDecision,
@@ -172,6 +176,45 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
+  let sanitizedOriginal: Awaited<
+    ReturnType<typeof createSanitizedListingImageOriginal>
+  >;
+  let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>>;
+
+  try {
+    sanitizedOriginal = await createSanitizedListingImageOriginal({
+      data: new Uint8Array(fileBuffer),
+      mediaType: file.type,
+      fileName: file.name,
+    });
+    generatedVariants = await createListingImageVariants({
+      data: new Uint8Array(fileBuffer),
+      mediaType: file.type,
+      fileName: file.name,
+    });
+  } catch (error) {
+    incrementRuntimeCounter('listing.image_upload.rejected', {
+      reason:
+        error instanceof ListingImageSecurityError
+          ? error.code
+          : 'image_decode_failed',
+    });
+    const responseBody = {
+      error:
+        error instanceof ListingImageSecurityError
+          ? error.code
+          : 'image_decode_failed',
+      message: 'Image could not be accepted after server security checks.',
+    };
+    const status =
+      error instanceof ListingImageSecurityError &&
+      ['unsupported_image_type', 'image_type_mismatch'].includes(error.code)
+        ? 415
+        : 422;
+
+    return Response.json(responseBody, { status });
+  }
+
   const listingText = [
     existingListing.title,
     existingListing.description,
@@ -204,8 +247,8 @@ export async function POST(request: Request, context: RouteContext) {
               },
               {
                 type: 'file',
-                mediaType: file.type,
-                data: new Uint8Array(fileBuffer),
+                mediaType: sanitizedOriginal.mediaType,
+                data: sanitizedOriginal.data,
               },
             ],
           },
@@ -255,10 +298,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     imageUrl = await createPersistentListingImageUrl({
-      data: new Uint8Array(fileBuffer),
-      mediaType: file.type,
+      data: sanitizedOriginal.data,
+      mediaType: sanitizedOriginal.mediaType,
       imageId,
-      fileName: file.name,
+      fileName: sanitizedOriginal.fileName,
       variant: 'original',
     });
   } catch (error) {
@@ -300,12 +343,6 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     // The server is the canonical image processor. Browser encoders vary widely
     // and can produce deceptively large files despite a .webp extension.
-    const generatedVariants = await createListingImageVariants({
-      data: new Uint8Array(fileBuffer),
-      mediaType: file.type,
-      fileName: file.name,
-    });
-
     if (generatedVariants) {
       displayUrl =
         (await createPersistentListingImageUrl({

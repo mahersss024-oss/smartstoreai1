@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import type { ModelMessage } from 'ai';
+import sharp from 'sharp';
 
 import { POST as uploadListingImage } from '@/app/api/marketplace/listings/[listingId]/images/route';
 import {
@@ -161,6 +162,87 @@ test('returns a controlled error for malformed listing image uploads', async () 
   assert.equal(body.error, 'invalid_multipart_form_data');
 });
 
+test('rejects listing image uploads when declared type does not match bytes', async () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:spoofed-image-upload',
+    category: 'cars',
+    title: 'Spoofed upload listing',
+  });
+  addListingImageForSeller(listing.id, 'seller:spoofed-image-upload', {
+    id: 'existing-approved-primary-image',
+    listingId: listing.id,
+    originalUrl: 'https://example.com/existing.jpg',
+    displayUrl: 'https://example.com/existing-display.webp',
+    thumbnailUrl: 'https://example.com/existing-thumbnail.webp',
+    isPrimary: true,
+    qualityScore: 90,
+    status: 'approved',
+    enhancements: [],
+  });
+  const jpegBytes = await sharp({
+    create: {
+      width: 64,
+      height: 64,
+      channels: 3,
+      background: '#ffffff',
+    },
+  })
+    .jpeg()
+    .toBuffer();
+  const formData = new FormData();
+  formData.set(
+    'image',
+    new File([jpegBytes], 'spoofed.png', { type: 'image/png' }),
+  );
+
+  const response = await uploadListingImage(
+    new Request(
+      `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
+      {
+        method: 'POST',
+        headers: {
+          cookie: createSessionCookie({
+            id: 'seller:spoofed-image-upload',
+            email: 'spoofed-upload@example.com',
+          }),
+        },
+        body: formData,
+      },
+    ),
+    { params: Promise.resolve({ listingId: listing.id }) },
+  );
+  const body = (await response.json()) as { error?: string };
+
+  assert.equal(response.status, 415);
+  assert.equal(body.error, 'image_type_mismatch');
+});
+
+test('rejects non-image bytes even with an image file extension', async () => {
+  const listing = createListingDraft({
+    sellerId: 'seller:invalid-chat-image',
+    category: 'cars',
+    title: 'Invalid chat image listing',
+  });
+
+  await saveUploadedListingImagesForSeller({
+    listingId: listing.id,
+    sellerId: 'seller:invalid-chat-image',
+    images: [
+      {
+        data: new Uint8Array([0x3c, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74]),
+        mediaType: 'image/png',
+        fileName: 'payload.png',
+      },
+    ],
+  });
+
+  const updated = listSellerListings('seller:invalid-chat-image').find(
+    (sellerListing) => sellerListing.id === listing.id,
+  );
+
+  assert.equal(updated?.images.length, 0);
+});
+
 test('database listing image writes use serializable transactions', () => {
   const repository = readFileSync(
     'agent/marketplace/repository.ts',
@@ -197,12 +279,33 @@ test('saves only the remaining available image slots for chat uploads', async ()
       });
     }
 
+    const firstImage = await sharp({
+      create: {
+        width: 80,
+        height: 80,
+        channels: 3,
+        background: '#ffffff',
+      },
+    })
+      .png()
+      .toBuffer();
+    const secondImage = await sharp({
+      create: {
+        width: 80,
+        height: 80,
+        channels: 3,
+        background: '#eeeeee',
+      },
+    })
+      .png()
+      .toBuffer();
+
     await saveUploadedListingImagesForSeller({
       listingId: listing.id,
       sellerId: 'seller:chat-image-limit',
       images: [
-        { data: new Uint8Array([4]), mediaType: 'image/png' },
-        { data: new Uint8Array([5]), mediaType: 'image/png' },
+        { data: new Uint8Array(firstImage), mediaType: 'image/png' },
+        { data: new Uint8Array(secondImage), mediaType: 'image/png' },
       ],
     });
 
@@ -213,13 +316,15 @@ test('saves only the remaining available image slots for chat uploads', async ()
     assert.equal(updated?.images.length, defaultMaxListingImages);
     assert.equal(
       updated?.images.some(
-        (image) => image.originalUrl === 'data:image/png;base64,BA==',
+        (image) => image.originalUrl.startsWith('data:image/jpeg;base64,'),
       ),
       true,
     );
     assert.equal(
       updated?.images.some(
-        (image) => image.originalUrl === 'data:image/png;base64,BQ==',
+        (image) =>
+          image.originalUrl.startsWith('data:image/png;base64,') ||
+          image.originalUrl.includes('BQ=='),
       ),
       false,
     );

@@ -5,7 +5,11 @@ import sharp from 'sharp';
 
 import {
   createListingImageVariants,
+  createSanitizedListingImageOriginal,
+  detectListingImageMimeType,
+  ListingImageSecurityError,
   listingDisplayMaxDimension,
+  listingOriginalMaxDimension,
   listingThumbnailMaxDimension,
 } from '@/agent/marketplace/listing-image-variants';
 import {
@@ -27,6 +31,51 @@ test('creates independent webp display and thumbnail variants without upscaling'
   assert.equal(variants.thumbnail.width, listingThumbnailMaxDimension);
   assert.ok(variants.thumbnail.data.byteLength < source.byteLength);
   assert.notDeepEqual(variants.display.data, variants.thumbnail.data);
+});
+
+test('sanitizes uploaded listing originals before storage', async () => {
+  const source = await sharp({
+    create: { width: 2400, height: 1600, channels: 4, background: { r: 30, g: 130, b: 180, alpha: 0.5 } },
+  }).png().toBuffer();
+  const original = await createSanitizedListingImageOriginal({
+    data: new Uint8Array(source),
+    mediaType: 'image/png',
+    fileName: 'unsafe upload.png',
+  });
+
+  assert.equal(detectListingImageMimeType(new Uint8Array(source)), 'image/png');
+  assert.equal(original.mediaType, 'image/jpeg');
+  assert.equal(original.fileName, 'unsafe-upload-original.jpg');
+  assert.equal(original.width, listingOriginalMaxDimension);
+  assert.ok(original.data.byteLength < source.byteLength);
+});
+
+test('rejects mismatched or undecodable listing image uploads', async () => {
+  const source = await sharp({
+    create: { width: 64, height: 64, channels: 3, background: '#ffffff' },
+  }).jpeg().toBuffer();
+
+  await assert.rejects(
+    createSanitizedListingImageOriginal({
+      data: new Uint8Array(source),
+      mediaType: 'image/png',
+      fileName: 'spoof.png',
+    }),
+    (error) =>
+      error instanceof ListingImageSecurityError &&
+      error.code === 'image_type_mismatch',
+  );
+
+  await assert.rejects(
+    createSanitizedListingImageOriginal({
+      data: new Uint8Array([0x3c, 0x73, 0x76, 0x67, 0x3e]),
+      mediaType: 'image/png',
+      fileName: 'payload.png',
+    }),
+    (error) =>
+      error instanceof ListingImageSecurityError &&
+      error.code === 'unsupported_image_type',
+  );
 });
 
 test('listing image selectors enforce surface-specific fallback order', () => {

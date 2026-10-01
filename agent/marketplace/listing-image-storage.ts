@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import type { ModelMessage } from 'ai';
 
 import { analyzeImageQuality } from './image-quality';
-import { createListingImageVariants } from './listing-image-variants';
+import {
+  createListingImageVariants,
+  createSanitizedListingImageOriginal,
+} from './listing-image-variants';
 import { createListingImageDeliveryUrls } from './listing-image-delivery';
 import {
   defaultMaxListingImages,
@@ -181,64 +184,54 @@ export async function saveUploadedListingImagesForSeller({
 
   for (const uploadedImage of images.slice(0, remainingSlots)) {
     const imageId = randomUUID();
+    let sanitizedOriginal: Awaited<
+      ReturnType<typeof createSanitizedListingImageOriginal>
+    >;
+    let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>>;
+
+    try {
+      sanitizedOriginal = await createSanitizedListingImageOriginal(
+        uploadedImage,
+      );
+      generatedVariants = await createListingImageVariants(uploadedImage);
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(`[listing_image_security] failure=${errorName}`);
+      continue;
+    }
+
     const imageUrl = await createPersistentListingImageUrl({
-      data: uploadedImage.data,
-      mediaType: uploadedImage.mediaType,
+      data: sanitizedOriginal.data,
+      mediaType: sanitizedOriginal.mediaType,
       imageId,
-      fileName: uploadedImage.fileName,
+      fileName: sanitizedOriginal.fileName,
       variant: 'original',
     });
 
     if (!imageUrl) {
       continue;
     }
-    let displayData: Uint8Array | undefined;
-    let displayMediaType: string | undefined;
-    let displayFileName: string | undefined;
-    let thumbnailData: Uint8Array | undefined;
-    let thumbnailMediaType: string | undefined;
-    let thumbnailFileName: string | undefined;
-
-    try {
-      const generated = await createListingImageVariants(uploadedImage);
-      if (generated) {
-        displayData = generated.display.data;
-        displayMediaType = generated.display.mediaType;
-        displayFileName = generated.display.fileName;
-        thumbnailData = generated.thumbnail.data;
-        thumbnailMediaType = generated.thumbnail.mediaType;
-        thumbnailFileName = generated.thumbnail.fileName;
-      }
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[listing_image_variant_generation] failure=${errorName}`);
-    }
-
     const displayUrl =
-      displayData && displayMediaType
-        ? await createPersistentListingImageUrl({
-            data: displayData,
-            mediaType: displayMediaType,
-            imageId,
-            fileName: displayFileName,
-            variant: 'display',
-          })
-        : imageUrl;
+      (await createPersistentListingImageUrl({
+        data: generatedVariants.display.data,
+        mediaType: generatedVariants.display.mediaType,
+        imageId,
+        fileName: generatedVariants.display.fileName,
+        variant: 'display',
+      })) ?? imageUrl;
     const thumbnailUrl =
-      thumbnailData && thumbnailMediaType
-        ? await createPersistentListingImageUrl({
-            data: thumbnailData,
-            mediaType: thumbnailMediaType,
-            imageId,
-            fileName: thumbnailFileName,
-            variant: 'thumbnail',
-          })
-        : displayUrl;
+      (await createPersistentListingImageUrl({
+        data: generatedVariants.thumbnail.data,
+        mediaType: generatedVariants.thumbnail.mediaType,
+        imageId,
+        fileName: generatedVariants.thumbnail.fileName,
+        variant: 'thumbnail',
+      })) ?? displayUrl;
 
     const quality = analyzeImageQuality({
       fileName: uploadedImage.fileName,
-      mimeType: uploadedImage.mediaType,
-      sizeBytes: uploadedImage.data.byteLength,
+      mimeType: sanitizedOriginal.mediaType,
+      sizeBytes: sanitizedOriginal.data.byteLength,
     });
     const imageUrls = createListingImageDeliveryUrls(imageUrl, {
       displayUrl: displayUrl ?? imageUrl,
