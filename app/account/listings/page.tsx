@@ -285,6 +285,26 @@ function listingHasApprovedImage(listing: ListingCard) {
   return listing.images.some((image) => image.status === 'approved');
 }
 
+function canEditListing(listing: ListingCard) {
+  return listing.rawStatus !== 'deleted';
+}
+
+function canDeleteListing(listing: ListingCard) {
+  return listing.rawStatus !== 'deleted';
+}
+
+function canPublishListing(listing: ListingCard) {
+  return ['draft', 'paused', 'rejected'].includes(listing.rawStatus ?? 'draft');
+}
+
+function canPauseListing(listing: ListingCard) {
+  return listing.rawStatus === 'published';
+}
+
+function canMarkListingSold(listing: ListingCard) {
+  return listing.rawStatus === 'published' || listing.rawStatus === 'paused';
+}
+
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
@@ -1248,7 +1268,7 @@ export default function AccountListingsPage() {
                         </div>
                       )}
                       <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/60 px-2 py-2 dark:border-white/10 sm:grid-cols-3 sm:px-3 xl:grid-cols-8">
-                        {listing.status === 'published' && (
+                        {listing.rawStatus === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}?source=account-listings`}>
                               <Megaphone className="size-3.5" />
@@ -1256,17 +1276,19 @@ export default function AccountListingsPage() {
                             </Link>
                           </Button>
                         )}
-                        {listing.status === 'published' && (
+                        {listing.rawStatus === 'published' && (
                           <ListingShareButton
                             className="rounded-md"
                             listingId={listing.id}
                             title={listing.title}
                           />
                         )}
+                        {canEditListing(listing) && (
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => startEditingListing(listing)}>
                           <Pencil className="size-3.5" />
                           تعديل
                         </Button>
+                        )}
                         <Button asChild size="sm" variant="outline" className="rounded-md">
                           <label>
                             <Upload className="size-3.5" />
@@ -1290,18 +1312,24 @@ export default function AccountListingsPage() {
                             />
                           </label>
                         </Button>
+                        {canPublishListing(listing) && (
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'publish')}>
                           <Megaphone className="size-3.5" />
                           نشر الإعلان
                         </Button>
+                        )}
+                        {canPauseListing(listing) && (
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'pause')}>
                           <Pause className="size-3.5" />
                           إيقاف النشر
                         </Button>
+                        )}
+                        {canMarkListingSold(listing) && (
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'mark_sold')}>
                           <CheckCircle2 className="size-3.5" />
                           تم البيع
                         </Button>
+                        )}
                         {listing.rawStatus === 'sold' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md border-blue-500/40 text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-400/10">
                             <Link href={`/commissions?listingId=${listing.id}`}>
@@ -1310,10 +1338,12 @@ export default function AccountListingsPage() {
                             </Link>
                           </Button>
                         )}
+                        {canDeleteListing(listing) && (
                         <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'delete')}>
                           <Trash2 className="size-3.5" />
                           حذف الإعلان
                         </Button>
+                        )}
                       </div>
                       </article>
                     ))}

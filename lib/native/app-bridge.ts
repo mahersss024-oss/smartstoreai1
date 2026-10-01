@@ -18,7 +18,8 @@ export type AppBridgeInboundMessage =
   | { type: 'theme-changed'; theme: 'light' | 'dark' }
   | { type: 'navigate'; url: string }
   | { type: 'back' }
-  | { type: 'resume' };
+  | { type: 'resume' }
+  | { type: 'viewport-insets'; statusBarInset?: number };
 
 type NativeShell = {
   postMessage: (payload: string) => void;

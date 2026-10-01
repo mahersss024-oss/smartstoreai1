@@ -25,6 +25,8 @@ type NotificationsPayload = {
   unreadCount: number;
 };
 
+const notificationsReadEventName = 'smartstore:notifications-read';
+
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat('ar-SA', {
     dateStyle: 'medium',
@@ -87,6 +89,17 @@ export default function NotificationsPage() {
   const markAllRead = useCallback(async () => {
     setIsMarkingRead(true);
 
+    const readAt = new Date().toISOString();
+
+    setPayload((currentPayload) => ({
+      notifications: currentPayload.notifications.map((notification) => ({
+        ...notification,
+        readAt: notification.readAt ?? readAt,
+      })),
+      unreadCount: 0,
+    }));
+    window.dispatchEvent(new Event(notificationsReadEventName));
+
     try {
       const response = await fetch('/api/notifications', {
         method: 'PATCH',
@@ -99,6 +112,27 @@ export default function NotificationsPage() {
       setIsMarkingRead(false);
     }
   }, [refreshNotifications]);
+
+  useEffect(() => {
+    if (
+      isSessionLoading ||
+      isLoading ||
+      !session.authenticated ||
+      payload.unreadCount <= 0 ||
+      isMarkingRead
+    ) {
+      return;
+    }
+
+    void markAllRead();
+  }, [
+    isLoading,
+    isMarkingRead,
+    isSessionLoading,
+    markAllRead,
+    payload.unreadCount,
+    session.authenticated,
+  ]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">

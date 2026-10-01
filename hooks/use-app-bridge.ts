@@ -37,6 +37,10 @@ export function useAppBridge(): UseAppBridgeResult {
     root.dataset.nativeApp = isNativeApp ? 'true' : 'false';
     root.dataset.platform = platform;
 
+    if (!isNativeApp || platform !== 'android') {
+      root.style.removeProperty('--native-status-bar-inset');
+    }
+
     if (!isNativeApp || announcedRef.current) {
       return;
     }
@@ -72,12 +76,26 @@ export function useAppBridge(): UseAppBridgeResult {
             router.refresh();
             break;
           }
+          case 'viewport-insets': {
+            if (
+              platform === 'android' &&
+              typeof message.statusBarInset === 'number' &&
+              Number.isFinite(message.statusBarInset) &&
+              message.statusBarInset >= 0
+            ) {
+              document.documentElement.style.setProperty(
+                '--native-status-bar-inset',
+                `${Math.min(message.statusBarInset, 96)}px`,
+              );
+            }
+            break;
+          }
         }
       },
     );
 
     return unsubscribe;
-  }, [isNativeApp, router]);
+  }, [isNativeApp, platform, router]);
 
   return {
     isNativeApp,

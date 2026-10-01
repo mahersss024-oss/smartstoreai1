@@ -73,6 +73,7 @@ test('home notification bell is shown only to signed-in users and toggles push d
   assert.doesNotMatch(settings, /href="\/notifications"/);
   assert.match(settings, /onClick=\{\(\) =>\s*void \(isActive \? disableNotifications\(\) : enableNotifications\(\)\)\s*\}/);
   assert.match(settings, /unreadCount > 0/);
+  assert.match(settings, /smartstore:notifications-read/);
   assert.match(settings, /follow_listing_published/);
   assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
   assert.match(settings, /className="shrink-0"/);
@@ -171,6 +172,8 @@ test('follow notifications are stored and exposed from the notifications page', 
   assert.match(page, /fetch\('\/api\/notifications'/);
   assert.match(page, /<PushNotificationSettings \/>/);
   assert.match(page, /markAllRead/);
+  assert.match(page, /window\.dispatchEvent\(new Event\(notificationsReadEventName\)\)/);
+  assert.match(page, /payload\.unreadCount <= 0/);
   assert.match(page, /follow_listing_published/);
   assert.match(accountPage, /href="\/notifications"/);
 });

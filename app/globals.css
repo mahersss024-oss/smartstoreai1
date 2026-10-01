@@ -171,6 +171,7 @@
   :root {
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --native-status-bar-inset: 0px;
     --marketplace-bottom-nav-space: calc(5rem + env(safe-area-inset-bottom));
   }
 
@@ -211,6 +212,45 @@
     max-width: 100%;
     overflow-x: hidden;
     overflow-x: clip;
+  }
+
+  html[data-native-app="true"][data-platform="android"],
+  html[data-native-app="true"][data-platform="android"] body {
+    box-sizing: border-box;
+    height: 100dvh;
+    margin: 0;
+    max-height: 100dvh;
+    max-width: 100dvw;
+    min-height: 100dvh;
+    min-width: 100dvw;
+    overflow: hidden;
+    overscroll-behavior: none;
+    width: 100dvw;
+  }
+
+  html[data-native-app="true"][data-platform="android"] {
+    --native-status-bar-inset: max(env(safe-area-inset-top, 0px), 28px);
+    --safe-area-top: var(--native-status-bar-inset);
+  }
+
+  html[data-native-app="true"][data-platform="android"] body > main,
+  html[data-native-app="true"][data-platform="android"] .marketplace-shell {
+    box-sizing: border-box;
+    height: calc(100dvh - var(--native-status-bar-inset));
+    max-height: calc(100dvh - var(--native-status-bar-inset));
+    max-width: 100dvw;
+    min-height: calc(100dvh - var(--native-status-bar-inset));
+    min-width: 100dvw;
+    overflow: hidden;
+    padding-top: var(--native-status-bar-inset);
+    width: 100dvw;
+  }
+
+  html[data-native-app="true"][data-platform="android"] .marketplace-shell > div {
+    box-sizing: border-box;
+    max-width: 100dvw;
+    min-width: 0;
+    width: 100%;
   }
 
   /* Customer conversation page: lock the document so the only scrollable

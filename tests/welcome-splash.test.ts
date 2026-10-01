@@ -224,6 +224,11 @@ test('welcome has critical first-paint styles in the document head', () => {
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
   assert.ok(
+    layout.indexOf('id="smartstore-native-viewport-init"') <
+      layout.indexOf('id="smartstore-welcome-init"'),
+    'native app viewport state must be marked before the welcome script and first paint',
+  );
+  assert.ok(
     layout.indexOf('id="smartstore-welcome-init"') <
       layout.indexOf('id="smartstore-welcome-critical-style"'),
     'welcome state must be decided before the critical welcome CSS can paint',

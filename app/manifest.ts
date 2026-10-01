@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 import { appConfig } from './app-config';
 
-const pwaAssetVersion = 'souq-hamad-20260921';
+const pwaAssetVersion = 'souq-hamad-20261001';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -26,10 +26,16 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
       {
+        src: `/icon.png?v=${pwaAssetVersion}`,
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
         src: `/apple-icon.png?v=${pwaAssetVersion}`,
         sizes: '180x180',
         type: 'image/png',
-        purpose: 'maskable',
+        purpose: 'any',
       },
     ],
   };

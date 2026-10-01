@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     description: appConfig.metadata.description,
     images: ["/hamad-market-logo.jpeg"],
   },
-  manifest: "/manifest.webmanifest?v=souq-hamad-20260921",
+  manifest: "/manifest.webmanifest?v=souq-hamad-20261001",
   appleWebApp: {
     capable: true,
     title: "سوق حمد",
@@ -75,11 +75,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico?v=souq-hamad-20260921", sizes: "any" },
-      { url: "/icon.png?v=souq-hamad-20260921", type: "image/png" },
-      { url: "/hamad-market-logo.jpeg?v=souq-hamad-20260921", type: "image/jpeg" },
+      { url: "/favicon.ico?v=souq-hamad-20261001", sizes: "any" },
+      { url: "/icon.png?v=souq-hamad-20261001", type: "image/png" },
+      { url: "/hamad-market-logo.jpeg?v=souq-hamad-20261001", type: "image/jpeg" },
     ],
-    apple: "/apple-icon.png?v=souq-hamad-20260921",
+    apple: "/apple-icon.png?v=souq-hamad-20261001",
   },
 };
 
@@ -234,6 +234,25 @@ const themeInitScript = `
 })();
 `;
 
+const nativeViewportInitScript = `
+(function() {
+  try {
+    var root = document.documentElement;
+    var userAgent = navigator.userAgent || '';
+    var platform = /android/i.test(userAgent)
+      ? 'android'
+      : (/iphone|ipad|ipod/i.test(userAgent) ? 'ios' : 'web');
+    var isNativeApp = !!(
+      window.ReactNativeWebView ||
+      window.SmartStoreNative ||
+      (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smartstore)
+    );
+    root.setAttribute('data-platform', platform);
+    root.setAttribute('data-native-app', isNativeApp ? 'true' : 'false');
+  } catch (error) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -250,6 +269,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <script
+          id="smartstore-native-viewport-init"
+          dangerouslySetInnerHTML={{ __html: nativeViewportInitScript }}
+        />
         <script
           id="smartstore-welcome-init"
           dangerouslySetInnerHTML={{ __html: buildWelcomeInitScript() }}

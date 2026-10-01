@@ -24,6 +24,8 @@ type PushState =
   | 'active'
   | 'working';
 
+const notificationsReadEventName = 'smartstore:notifications-read';
+
 function base64UrlToUint8Array(value: string) {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
@@ -137,6 +139,22 @@ export function PushNotificationSettings({
   useEffect(() => {
     void refreshUnreadCount();
   }, [refreshUnreadCount]);
+
+  useEffect(() => {
+    if (variant !== 'icon') {
+      return;
+    }
+
+    const clearUnreadCount = () => {
+      setUnreadCount(0);
+    };
+
+    window.addEventListener(notificationsReadEventName, clearUnreadCount);
+
+    return () => {
+      window.removeEventListener(notificationsReadEventName, clearUnreadCount);
+    };
+  }, [variant]);
 
   useSmartstoreRealtime({
     enabled: variant === 'icon',

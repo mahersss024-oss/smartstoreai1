@@ -356,6 +356,38 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /حذف الإعلان/);
 });
 
+test('customer can edit or delete listings while pending review', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /function canEditListing\(listing: ListingCard\)/);
+  assert.match(listingsPage, /function canDeleteListing\(listing: ListingCard\)/);
+  assert.match(listingsPage, /listing\.rawStatus !== 'deleted'/);
+  assert.doesNotMatch(listingsPage, /listing\.rawStatus !== 'pending'/);
+  assert.match(listingsPage, /\{canEditListing\(listing\) && \(/);
+  assert.match(listingsPage, /\{canDeleteListing\(listing\) && \(/);
+});
+
+test('published customer listings hide publish while keeping management actions', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /function canPublishListing\(listing: ListingCard\)/);
+  assert.match(listingsPage, /\['draft', 'paused', 'rejected'\]\.includes/);
+  assert.doesNotMatch(listingsPage, /\['draft', 'pending', 'published'/);
+  assert.match(listingsPage, /function canPauseListing\(listing: ListingCard\)/);
+  assert.match(listingsPage, /listing\.rawStatus === 'published'/);
+  assert.match(listingsPage, /function canMarkListingSold\(listing: ListingCard\)/);
+  assert.match(listingsPage, /listing\.rawStatus === 'published' \|\| listing\.rawStatus === 'paused'/);
+  assert.match(listingsPage, /\{canPublishListing\(listing\) && \(/);
+  assert.match(listingsPage, /\{canPauseListing\(listing\) && \(/);
+  assert.match(listingsPage, /\{canMarkListingSold\(listing\) && \(/);
+});
+
 test('account page does not flash sign-in controls while session is loading', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const sessionHook = readFileSync(

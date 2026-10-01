@@ -189,6 +189,9 @@ test('prevents page-level horizontal panning on all viewports', () => {
   assert.match(globalCss, /html \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
   assert.match(globalCss, /body \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
   assert.match(globalCss, /body > main \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
+  assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\]/);
+  assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\][\s\S]*width:\s*100dvw;/);
+  assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\] body > main/);
   assert.match(globalCss, /overscroll-behavior-x: none;/);
 });
 
