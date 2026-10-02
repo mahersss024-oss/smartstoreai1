@@ -1053,6 +1053,17 @@ export default function AccountListingsPage() {
                           ? pendingListingControl.action
                           : null;
                       const isListingControlPending = Boolean(pendingControlAction);
+                      const activeImageUploadProgress =
+                        imageUploadProgress?.listingId === listing.id
+                          ? imageUploadProgress
+                          : null;
+                      const imageUploadPercent = activeImageUploadProgress
+                        ? Math.round(
+                            (activeImageUploadProgress.current /
+                              Math.max(activeImageUploadProgress.total, 1)) *
+                              100,
+                          )
+                        : 0;
 
                       return (
                       <article key={listing.id} className="grid min-w-0 border-b border-slate-200/70 py-3 [contain-intrinsic-size:220px] [content-visibility:auto] last:border-b-0 dark:border-white/10">
@@ -1321,11 +1332,11 @@ export default function AccountListingsPage() {
                         </Button>
                         )}
                         <Button asChild size="sm" variant="outline" className="rounded-md">
-                          <label>
+                          <label data-loading={uploadingListingId === listing.id || undefined}>
                             <Upload className="size-3.5" />
                             {uploadingListingId === listing.id
-                              ? imageUploadProgress?.current
-                                ? `جاري تحميل ${imageUploadProgress.current} من ${imageUploadProgress.total}`
+                              ? activeImageUploadProgress?.current
+                                ? `جاري تحميل ${activeImageUploadProgress.current} من ${activeImageUploadProgress.total}`
                                 : 'جاري تجهيز الصور...'
                               : 'تحميل الصور'}
                             <input
@@ -1343,6 +1354,32 @@ export default function AccountListingsPage() {
                             />
                           </label>
                         </Button>
+                        {uploadingListingId === listing.id && (
+                          <div className="col-span-full grid gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-3 py-2 text-[11px] font-medium text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
+                            <div className="flex items-center justify-between gap-3">
+                              <span>
+                                {activeImageUploadProgress?.current
+                                  ? `رفع الصور ${activeImageUploadProgress.current} / ${activeImageUploadProgress.total}`
+                                  : 'تجهيز الصور للرفع'}
+                              </span>
+                              <span>{activeImageUploadProgress ? imageUploadPercent + '%' : '...'}</span>
+                            </div>
+                            <div
+                              aria-hidden="true"
+                              className="upload-progress-track"
+                              data-indeterminate={!activeImageUploadProgress || undefined}
+                            >
+                              <div
+                                className="upload-progress-fill"
+                                style={{
+                                  width: activeImageUploadProgress
+                                    ? `${imageUploadPercent}%`
+                                    : '45%',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
                         {canPublishListing(listing) && (
                         <Button
                           size="sm"

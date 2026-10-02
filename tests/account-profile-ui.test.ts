@@ -353,7 +353,11 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /Math\.max\(8 - listing\.images\.length, 0\)/);
   assert.match(listingsPage, /files\.slice\(0, remainingImageSlots\)/);
   assert.match(listingsPage, /queueUploadableImagePreparation\(filesToUpload\)/);
-  assert.match(listingsPage, /جاري تحميل \$\{imageUploadProgress\.current\} من/);
+  assert.match(listingsPage, /جاري تحميل \$\{activeImageUploadProgress\.current\} من/);
+  assert.match(listingsPage, /activeImageUploadProgress/);
+  assert.match(listingsPage, /imageUploadPercent/);
+  assert.match(listingsPage, /upload-progress-track/);
+  assert.match(listingsPage, /upload-progress-fill/);
   assert.match(listingsPage, /تحميل الصور/);
   assert.match(listingsPage, /إيقاف النشر/);
   assert.match(listingsPage, /تم البيع/);
@@ -371,13 +375,18 @@ test('shared buttons show immediate press and async feedback', () => {
     join(process.cwd(), 'components', 'ui', 'button.tsx'),
     'utf8',
   );
+  const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
 
+  assert.match(button, /action-feedback-button/);
   assert.match(button, /active:scale-\[0\.98\]/);
   assert.match(button, /loadingText/);
   assert.match(button, /aria-busy=\{loading \|\| undefined\}/);
   assert.match(button, /animate-spin/);
   assert.match(button, /if \(asChild\)/);
   assert.match(button, /disabled=\{disabled \|\| loading\}/);
+  assert.match(globals, /action-feedback-shimmer/);
+  assert.match(globals, /upload-progress-track/);
+  assert.match(globals, /upload-progress-indeterminate/);
 });
 
 test('customer can edit or delete listings while pending review', () => {

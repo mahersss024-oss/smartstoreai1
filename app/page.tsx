@@ -4394,11 +4394,23 @@ export default function Page() {
                       </div>
                     )}
                     {(isPreparingManualListingImages || manualListingImages.length > 0) && (
-                      <span className="text-[11px] font-normal text-muted-foreground">
-                        {isPreparingManualListingImages
-                          ? 'جاري تجهيز ' + manualListingImages.length + ' صور للرفع...'
-                          : 'تم تجهيز ' + manualListingImages.length + ' صور للرفع.'}
-                      </span>
+                      <div className="grid gap-1.5">
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          {isPreparingManualListingImages
+                            ? 'جاري تجهيز ' + manualListingImages.length + ' صور للرفع...'
+                            : 'تم تجهيز ' + manualListingImages.length + ' صور للرفع.'}
+                        </span>
+                        <div
+                          aria-hidden="true"
+                          className="upload-progress-track"
+                          data-indeterminate={isPreparingManualListingImages || undefined}
+                        >
+                          <div
+                            className="upload-progress-fill"
+                            style={{ width: isPreparingManualListingImages ? '45%' : '100%' }}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
 

@@ -16,6 +16,9 @@ test('manual listing image picker uses the custom upload surface', async () => {
   assert.match(uploadSurface, /setManualListingImagePreviewIndex\(index\)/);
   assert.match(uploadSurface, /removeManualListingImage\(index\)/);
   assert.match(uploadSurface, /manualListingPreviewUrl/);
+  assert.match(page, /upload-progress-track/);
+  assert.match(page, /upload-progress-fill/);
+  assert.match(page, /data-indeterminate=\{isPreparingManualListingImages \|\| undefined\}/);
   assert.match(page, /showPreviousManualListingImage/);
   assert.match(page, /showNextManualListingImage/);
   assert.doesNotMatch(
