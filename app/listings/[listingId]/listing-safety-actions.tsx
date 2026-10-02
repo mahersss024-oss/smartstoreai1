@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Flag, Heart, ShieldAlert } from 'lucide-react';
+import { Flag, Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { cn } from '@/lib/utils';
 
@@ -184,8 +185,19 @@ export function ListingSafetyActions({
     }
   };
 
+  const noticeTone =
+    notice.startsWith('تعذر') || notice.startsWith('لا يمكن')
+      ? 'danger'
+      : 'success';
+
   return (
     <div className="grid gap-2">
+      <FloatingActionNotice
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={noticeTone}
+      />
       <div
         className={cn(
           'grid gap-2',
@@ -222,12 +234,6 @@ export function ListingSafetyActions({
         </Button>
         )}
       </div>
-      {notice && (
-        <div className="flex items-start gap-2 rounded-md border bg-white px-3 py-2 text-xs leading-6 text-muted-foreground dark:bg-card">
-          <ShieldAlert className="mt-1 size-4 shrink-0 text-blue-600" />
-          <span>{notice}</span>
-        </div>
-      )}
     </div>
   );
 }

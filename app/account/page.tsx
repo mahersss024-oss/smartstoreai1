@@ -26,6 +26,7 @@ import {
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import type { AuthUser } from '@/hooks/use-auth-session';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -460,6 +461,12 @@ export default function AccountPage() {
 
   return (
     <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <FloatingActionNotice
+        message={profileNotice?.message}
+        onDismiss={() => setProfileNotice(null)}
+        open={Boolean(profileNotice)}
+        tone={profileNotice?.tone ?? 'info'}
+      />
       <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -796,19 +803,6 @@ export default function AccountPage() {
                       حذف
                     </Button>
                   </div>
-                </div>
-              ) : null}
-              {profileNotice ? (
-                <div
-                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
-                    profileNotice.tone === 'success'
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-                      : profileNotice.tone === 'danger'
-                        ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-200'
-                        : 'border-blue-500/40 bg-blue-500/10 text-blue-800 dark:text-blue-100'
-                  }`}
-                >
-                  {profileNotice.message}
                 </div>
               ) : null}
             </section>

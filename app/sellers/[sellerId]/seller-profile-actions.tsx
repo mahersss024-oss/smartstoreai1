@@ -5,6 +5,7 @@ import { Flag, Star, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -115,6 +116,11 @@ export function SellerProfileActions({
 
       setIsFollowing(Boolean(result.isFollowing));
       setFollowerCount(Number(result.followerCount ?? followerCount));
+      setNotice(
+        result.isFollowing
+          ? 'تمت متابعة المعلن.'
+          : 'تم إلغاء متابعة المعلن.',
+      );
     } finally {
       setIsFollowingLoading(false);
     }
@@ -155,6 +161,7 @@ export function SellerProfileActions({
       setMyRating(result.myRating?.rating ?? value);
       setRatingAverage(Number(result.ratingAverage ?? ratingAverage));
       setRatingCount(Number(result.ratingCount ?? ratingCount));
+      setNotice('تم حفظ التقييم.');
     } finally {
       setIsRatingLoading(false);
     }
@@ -201,8 +208,21 @@ export function SellerProfileActions({
     }
   }
 
+  const noticeTone =
+    notice.startsWith('تعذر') ||
+    notice.startsWith('لا يمكنك') ||
+    notice.startsWith('يوجد')
+      ? 'danger'
+      : 'success';
+
   return (
     <div className="grid gap-3">
+      <FloatingActionNotice
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={noticeTone}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={isFollowing ? 'default' : 'outline'}
@@ -245,9 +265,6 @@ export function SellerProfileActions({
           </button>
         ))}
       </div>
-      {notice && (
-        <p className="text-xs font-semibold text-muted-foreground">{notice}</p>
-      )}
     </div>
   );
 }

@@ -23,7 +23,6 @@ import {
   ChevronRight,
   BadgeCheck,
   Bot,
-  CheckCircle2,
   Clock3,
   Download,
   Heart,
@@ -67,6 +66,7 @@ import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -4068,60 +4068,25 @@ export default function Page() {
                 </div>
               </div>
 
-              {!isManualListingVisible && manualListingNotice && (
-                <div
-                  className={cn(
-                    'relative mb-4 grid gap-3 rounded-lg border px-4 py-4 text-center text-xs leading-5 shadow-sm',
-                    manualListingNotice.tone === 'danger' &&
-                      'border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200',
-                    manualListingNotice.tone === 'warning' &&
-                      'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100',
-                    manualListingNotice.tone === 'success' &&
-                      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100',
-                    manualListingNotice.tone === 'info' &&
-                      'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
-                  )}
-                  role={manualListingNotice.tone === 'success' ? 'status' : 'alert'}
-                >
-                  <button
-                    aria-label="إغلاق نتيجة إنشاء الإعلان"
-                    className="absolute left-2 top-2 grid size-9 place-items-center rounded-full text-slate-500 transition hover:bg-white/70 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                    onClick={() => setManualListingNotice(null)}
-                    type="button"
-                  >
-                    <X className="size-5" />
-                  </button>
-                  {manualListingNotice.tone === 'success' && (
-                    <div className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-400/15 dark:text-emerald-200">
-                      <CheckCircle2 className="size-8" />
-                    </div>
-                  )}
-                  <div className="grid gap-1 px-8">
-                    {manualListingNotice.title && (
-                      <h3 className="text-base font-black">
-                        {manualListingNotice.title}
-                      </h3>
-                    )}
-                    {manualListingNotice.statusLabel && (
-                      <p className="text-sm font-semibold">
-                        الحالة: {manualListingNotice.statusLabel}
-                      </p>
-                    )}
-                    {manualListingNotice.message && (
-                      <p>{manualListingNotice.message}</p>
-                    )}
-                  </div>
-                  {manualListingNotice.shareListingId && (
-                    <div className="mx-auto w-full max-w-xs">
-                      <ListingShareButton
-                        className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                        listingId={manualListingNotice.shareListingId}
-                        title={manualListingNotice.shareTitle}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+              <FloatingActionNotice
+                action={
+                  manualListingNotice?.shareListingId ? (
+                    <ListingShareButton
+                      className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                      listingId={manualListingNotice.shareListingId}
+                      title={manualListingNotice.shareTitle}
+                    />
+                  ) : undefined
+                }
+                closeLabel="إغلاق نتيجة إنشاء الإعلان"
+                durationMs={manualListingNotice?.shareListingId ? 12000 : 10000}
+                message={manualListingNotice?.message}
+                onDismiss={() => setManualListingNotice(null)}
+                open={Boolean(manualListingNotice)}
+                statusLabel={manualListingNotice?.statusLabel}
+                title={manualListingNotice?.title}
+                tone={manualListingNotice?.tone ?? 'info'}
+              />
 
               {isManualListingVisible && (
                 <form
@@ -4152,24 +4117,6 @@ export default function Page() {
                       <X className="size-4" />
                     </Button>
                   </div>
-
-                  {manualListingNotice && (
-                    <div
-                      className={cn(
-                        'rounded-md border px-3 py-2 text-xs leading-5',
-                        manualListingNotice.tone === 'danger' &&
-                          'border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200',
-                        manualListingNotice.tone === 'warning' &&
-                          'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100',
-                        manualListingNotice.tone === 'success' &&
-                          'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100',
-                        manualListingNotice.tone === 'info' &&
-                          'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
-                      )}
-                    >
-                      {manualListingNotice.message}
-                    </div>
-                  )}
 
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="grid gap-1 text-xs font-semibold">

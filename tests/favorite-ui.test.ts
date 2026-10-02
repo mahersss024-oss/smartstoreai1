@@ -37,6 +37,8 @@ test('listing details favorite action fills the heart after saving', () => {
   assert.match(actions, /setIsFavorite\(payload\.status !== 'removed'\)/);
   assert.match(actions, /aria-pressed=\{isFavorite\}/);
   assert.match(actions, /fill-current/);
+  assert.match(actions, /<FloatingActionNotice/);
+  assert.match(actions, /open=\{Boolean\(notice\)\}/);
 });
 
 test('listing favorite api exposes exact favorite state for detail pages', () => {

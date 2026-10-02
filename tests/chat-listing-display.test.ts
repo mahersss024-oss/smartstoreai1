@@ -130,7 +130,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /disabled=\{manualListingForm\.priceMode === 'bid'\}/);
   assert.match(homePage, /تم حفظ الإعلان/);
   assert.match(homePage, /إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان/);
-  assert.match(homePage, /!isManualListingVisible && manualListingNotice/);
+  assert.match(homePage, /<FloatingActionNotice/);
+  assert.match(homePage, /open=\{Boolean\(manualListingNotice\)\}/);
   assert.match(homePage, /إغلاق نتيجة إنشاء الإعلان/);
   assert.match(homePage, /ListingShareButton/);
   assert.doesNotMatch(homePage, /الذهاب إلى حسابي للنشر/);

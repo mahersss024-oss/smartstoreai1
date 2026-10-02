@@ -19,6 +19,8 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /URL\.createObjectURL\(file\)/);
   assert.match(page, /visibleProfilePicture/);
   assert.match(page, /SellerAvatar/);
+  assert.match(page, /<FloatingActionNotice/);
+  assert.match(page, /open=\{Boolean\(profileNotice\)\}/);
   assert.match(page, /رفع صورة العرض/);
   assert.match(page, /تغيير صورة العرض/);
   assert.match(page, /إزالة صورة العرض/);
@@ -368,9 +370,9 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /loadingText="جاري الحذف\.\.\."/);
   assert.match(listingsPage, /loading=\{savingListingId === listing\.id\}/);
   assert.match(listingsPage, /loading=\{updatingImageId === image\.id\}/);
-  assert.match(listingsPage, /ListingActionResultCard/);
-  assert.match(listingsPage, /actionResult && \(/);
-  assert.match(listingsPage, /imageActionNotice && \(/);
+  assert.match(listingsPage, /<FloatingActionNotice/);
+  assert.match(listingsPage, /open=\{Boolean\(actionResult\)\}/);
+  assert.match(listingsPage, /open=\{Boolean\(imageActionNotice\)\}/);
   assert.doesNotMatch(listingsPage, /currentActionResult/);
   assert.doesNotMatch(listingsPage, /currentImageActionNotice/);
   assert.match(listingsPage, /إغلاق نتيجة الإجراء/);

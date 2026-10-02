@@ -34,7 +34,7 @@ test('published listings expose share controls in seller account and details pag
   assert.match(shareButton, /navigator\.share/);
   assert.match(shareButton, /navigator\.clipboard/);
   assert.match(shareButton, /postToNative/);
-  assert.match(accountListingsPage, /listing\.status === 'published'/);
+  assert.match(accountListingsPage, /listing\.rawStatus === 'published'/);
   assert.match(accountListingsPage, /<ListingShareButton/);
   assert.match(listingPage, /<ListingShareButton/);
 });

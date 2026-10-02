@@ -25,6 +25,7 @@ import {
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -341,59 +342,6 @@ function canMarkListingSold(listing: ListingCard) {
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
-}
-
-function ListingActionResultCard({
-  result,
-  onDismiss,
-}: {
-  result: ListingActionResult;
-  onDismiss: () => void;
-}) {
-  return (
-    <section
-      aria-live="polite"
-      className="relative mx-2 mb-3 grid gap-3 rounded-lg border border-emerald-200 bg-white/92 px-4 py-4 text-center shadow-lg shadow-slate-950/5 dark:border-emerald-400/20 dark:bg-card/95 sm:mx-3"
-      dir="rtl"
-      role="status"
-    >
-      <button
-        aria-label="إغلاق نتيجة الإجراء"
-        className="absolute left-2 top-2 grid size-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-        onClick={onDismiss}
-        type="button"
-      >
-        <X className="size-5" />
-      </button>
-      <div className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-400/15 dark:text-emerald-200">
-        <CheckCircle2 className="size-8" />
-      </div>
-      <div className="grid gap-1 px-8">
-        <h4 className="text-base font-black text-emerald-700 dark:text-emerald-200">
-          {result.title}
-        </h4>
-        {result.statusLabel && (
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            الحالة: {result.statusLabel}
-          </p>
-        )}
-        {result.description && (
-          <p className="text-xs leading-6 text-muted-foreground">
-            {result.description}
-          </p>
-        )}
-      </div>
-      {result.share && (
-        <div className="mx-auto w-full max-w-xs">
-          <ListingShareButton
-            className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
-            listingId={result.listingId}
-            title={result.listingTitle}
-          />
-        </div>
-      )}
-    </section>
-  );
 }
 
 function createEditFormFromListing(listing: ListingCard): ListingEditForm {
@@ -1258,29 +1206,32 @@ export default function AccountListingsPage() {
                 </Button>
               </div>
             </section>
-            {actionResult && (
-              <ListingActionResultCard
-                result={actionResult}
-                onDismiss={() => setActionResult(null)}
-              />
-            )}
-            {imageActionNotice && (
-              <div
-                aria-live="polite"
-                className="mx-2 flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100 sm:mx-3"
-                role="status"
-              >
-                <span>{imageActionNotice.message}</span>
-                <button
-                  aria-label="إغلاق تنبيه الصورة"
-                  className="grid size-7 place-items-center rounded-md text-emerald-700 transition hover:bg-emerald-100 dark:text-emerald-100 dark:hover:bg-emerald-400/10"
-                  onClick={() => setImageActionNotice(null)}
-                  type="button"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            )}
+            <FloatingActionNotice
+              action={
+                actionResult?.share ? (
+                  <ListingShareButton
+                    className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                    listingId={actionResult.listingId}
+                    title={actionResult.listingTitle}
+                  />
+                ) : undefined
+              }
+              closeLabel="إغلاق نتيجة الإجراء"
+              durationMs={actionResult?.share ? 12000 : 10000}
+              message={actionResult?.description}
+              onDismiss={() => setActionResult(null)}
+              open={Boolean(actionResult)}
+              statusLabel={actionResult?.statusLabel}
+              title={actionResult?.title}
+              tone="success"
+            />
+            <FloatingActionNotice
+              closeLabel="إغلاق تنبيه الصورة"
+              message={imageActionNotice?.message}
+              onDismiss={() => setImageActionNotice(null)}
+              open={Boolean(imageActionNotice)}
+              tone="success"
+            />
 
             <section
               className="scroll-mt-24 px-1 py-3 sm:px-4"

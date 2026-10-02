@@ -154,6 +154,8 @@ test('public seller profile exposes real trust actions without private seller AP
   assert.match(actions, /api\/marketplace\/users\/\$\{encodedSellerId\}\/ratings/);
   assert.match(actions, /api\/marketplace\/users\/\$\{encodedSellerId\}\/reports/);
   assert.match(actions, /seller-profile-report/);
+  assert.match(actions, /<FloatingActionNotice/);
+  assert.match(actions, /تم حفظ التقييم/);
   assert.match(actions, /بلاغ من صفحة المعلن العامة/);
   assert.doesNotMatch(actions, /سيتم تفعيل المتابعة في مرحلة لاحقة/);
   assert.doesNotMatch(actions, /MoreVertical/);
