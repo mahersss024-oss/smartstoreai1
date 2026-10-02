@@ -23,6 +23,7 @@ import {
   ChevronRight,
   BadgeCheck,
   Bot,
+  CheckCircle2,
   Clock3,
   Download,
   Heart,
@@ -66,6 +67,7 @@ import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
+import { ListingShareButton } from '@/components/listing-share-button';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -888,7 +890,11 @@ type ManualListingForm = {
 
 type ManualListingNotice = {
   tone: 'success' | 'warning' | 'danger' | 'info';
+  title?: string;
   message: string;
+  statusLabel?: string;
+  shareListingId?: string;
+  shareTitle?: string;
 };
 
 const defaultManualListingForm: ManualListingForm = {
@@ -3670,8 +3676,11 @@ export default function Page() {
         publishStatus === 'published'
           ? {
               tone: 'success',
-              message:
-                'تم حفظ ونشر الإعلان بنجاح. يمكنك الذهاب إلى حسابي لإدارة الإعلان.',
+              title: 'تم نشر الإعلان بنجاح',
+              message: '',
+              statusLabel: 'منشور',
+              shareListingId: createdListing.id,
+              shareTitle: createdListing.title ?? title,
             }
           : publishStatus === 'blocked'
             ? {
@@ -3682,12 +3691,13 @@ export default function Page() {
               ? {
                   tone: 'warning',
                   message:
-                    'تم حفظ الإعلان بنجاح. يمكنك الذهاب إلى صفحة حسابي لإدارة الإعلان.',
+                    'تم حفظ الإعلان، لكن لم يتم رفع كل الصور. يمكنك تعديل الصور لاحقًا من إعلاناتي.',
                 }
               : {
                   tone: 'success',
+                  title: 'تم حفظ الإعلان',
                   message:
-                    'تم حفظ الإعلان بنجاح. يمكنك الذهاب إلى صفحة حسابي لإدارة الإعلان.',
+                    'إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان.',
                 };
 
       setManualListingForm(defaultManualListingForm);
@@ -4061,7 +4071,7 @@ export default function Page() {
               {!isManualListingVisible && manualListingNotice && (
                 <div
                   className={cn(
-                    'mb-4 rounded-md border px-3 py-2 text-right text-xs leading-5 shadow-sm',
+                    'relative mb-4 grid gap-3 rounded-lg border px-4 py-4 text-center text-xs leading-5 shadow-sm',
                     manualListingNotice.tone === 'danger' &&
                       'border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200',
                     manualListingNotice.tone === 'warning' &&
@@ -4071,21 +4081,45 @@ export default function Page() {
                     manualListingNotice.tone === 'info' &&
                       'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100',
                   )}
+                  role={manualListingNotice.tone === 'success' ? 'status' : 'alert'}
                 >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span>{manualListingNotice.message}</span>
-                    {(manualListingNotice.tone === 'success' ||
-                      manualListingNotice.tone === 'warning') && (
-                      <Button
-                        asChild
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 rounded-md"
-                      >
-                        <Link href="/account">الذهاب إلى حسابي للنشر</Link>
-                      </Button>
+                  <button
+                    aria-label="إغلاق نتيجة إنشاء الإعلان"
+                    className="absolute left-2 top-2 grid size-9 place-items-center rounded-full text-slate-500 transition hover:bg-white/70 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                    onClick={() => setManualListingNotice(null)}
+                    type="button"
+                  >
+                    <X className="size-5" />
+                  </button>
+                  {manualListingNotice.tone === 'success' && (
+                    <div className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-400/15 dark:text-emerald-200">
+                      <CheckCircle2 className="size-8" />
+                    </div>
+                  )}
+                  <div className="grid gap-1 px-8">
+                    {manualListingNotice.title && (
+                      <h3 className="text-base font-black">
+                        {manualListingNotice.title}
+                      </h3>
+                    )}
+                    {manualListingNotice.statusLabel && (
+                      <p className="text-sm font-semibold">
+                        الحالة: {manualListingNotice.statusLabel}
+                      </p>
+                    )}
+                    {manualListingNotice.message && (
+                      <p>{manualListingNotice.message}</p>
                     )}
                   </div>
+                  {manualListingNotice.shareListingId && (
+                    <div className="mx-auto w-full max-w-xs">
+                      <ListingShareButton
+                        className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                        listingId={manualListingNotice.shareListingId}
+                        title={manualListingNotice.shareTitle}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -368,6 +368,14 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /loadingText="جاري الحذف\.\.\."/);
   assert.match(listingsPage, /loading=\{savingListingId === listing\.id\}/);
   assert.match(listingsPage, /loading=\{updatingImageId === image\.id\}/);
+  assert.match(listingsPage, /ListingActionResultCard/);
+  assert.match(listingsPage, /إغلاق نتيجة الإجراء/);
+  assert.match(listingsPage, /تم نشر الإعلان بنجاح/);
+  assert.match(listingsPage, /تم حذف الإعلان بنجاح/);
+  assert.match(listingsPage, /تم حفظ الإعلان/);
+  assert.match(listingsPage, /share: true/);
+  assert.match(listingsPage, /تم حذف الصورة/);
+  assert.doesNotMatch(listingsPage, /حسنًا/);
 });
 
 test('shared buttons show immediate press and async feedback', () => {

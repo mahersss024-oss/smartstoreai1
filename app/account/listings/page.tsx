@@ -117,6 +117,20 @@ type PendingListingControl = {
   action: ListingControlAction;
 };
 
+type ListingActionResult = {
+  listingId: string;
+  title: string;
+  description?: string;
+  statusLabel?: string;
+  share?: boolean;
+  listingTitle?: string;
+};
+
+type ListingImageActionNotice = {
+  listingId: string;
+  message: string;
+};
+
 const listingCategoryOptions = [
   'cars',
   'auto_parts',
@@ -316,6 +330,59 @@ function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
 
+function ListingActionResultCard({
+  result,
+  onDismiss,
+}: {
+  result: ListingActionResult;
+  onDismiss: () => void;
+}) {
+  return (
+    <section
+      aria-live="polite"
+      className="relative mx-2 mb-3 grid gap-3 rounded-lg border border-emerald-200 bg-white/92 px-4 py-4 text-center shadow-lg shadow-slate-950/5 dark:border-emerald-400/20 dark:bg-card/95 sm:mx-3"
+      dir="rtl"
+      role="status"
+    >
+      <button
+        aria-label="إغلاق نتيجة الإجراء"
+        className="absolute left-2 top-2 grid size-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+        onClick={onDismiss}
+        type="button"
+      >
+        <X className="size-5" />
+      </button>
+      <div className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-400/15 dark:text-emerald-200">
+        <CheckCircle2 className="size-8" />
+      </div>
+      <div className="grid gap-1 px-8">
+        <h4 className="text-base font-black text-emerald-700 dark:text-emerald-200">
+          {result.title}
+        </h4>
+        {result.statusLabel && (
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            الحالة: {result.statusLabel}
+          </p>
+        )}
+        {result.description && (
+          <p className="text-xs leading-6 text-muted-foreground">
+            {result.description}
+          </p>
+        )}
+      </div>
+      {result.share && (
+        <div className="mx-auto w-full max-w-xs">
+          <ListingShareButton
+            className="w-full justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+            listingId={result.listingId}
+            title={result.listingTitle}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function createEditFormFromListing(listing: ListingCard): ListingEditForm {
   return {
     title: listing.title,
@@ -363,6 +430,11 @@ export default function AccountListingsPage() {
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
   const [pendingListingControl, setPendingListingControl] =
     useState<PendingListingControl | null>(null);
+  const [actionResult, setActionResult] = useState<ListingActionResult | null>(
+    null,
+  );
+  const [imageActionNotice, setImageActionNotice] =
+    useState<ListingImageActionNotice | null>(null);
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -510,6 +582,7 @@ export default function AccountListingsPage() {
       }
 
       if (action === 'publish') {
+        setActionResult(null);
         setPendingPublishListing(listing);
         return;
       }
@@ -526,6 +599,7 @@ export default function AccountListingsPage() {
       }
 
       setPendingListingControl({ listingId: listing.id, action });
+      setActionResult(null);
       void fetch(`/api/marketplace/listings/${listing.id}`, {
         method: 'PATCH',
         headers: {
@@ -540,13 +614,16 @@ export default function AccountListingsPage() {
           listing?: ApiListingRecord;
         } | null;
 
+        let updatedListing: ListingCard | null = null;
+
         if (payload?.listing) {
-          const updatedListing = listingRecordToCard(payload.listing);
+          const nextListing = listingRecordToCard(payload.listing);
+          updatedListing = nextListing;
 
           setListings((currentListings) =>
             currentListings.map((currentListing) =>
-              currentListing.id === updatedListing.id
-                ? updatedListing
+              currentListing.id === nextListing.id
+                ? nextListing
                 : currentListing,
             ),
           );
@@ -562,6 +639,42 @@ export default function AccountListingsPage() {
               payload?.message ??
               'لا يمكن نشر الإعلان الآن. تأكد من وجود صورة حقيقية مطابقة وأن بيانات الإعلان لا تخالف سياسة السوق.',
           });
+        }
+
+        if (response.ok) {
+          const resultListing = updatedListing ?? listing;
+          const resultByAction: Record<ListingControlAction, ListingActionResult> = {
+            publish: {
+              listingId: listing.id,
+              title: 'تم نشر الإعلان بنجاح',
+              statusLabel: resultListing.status,
+              share: true,
+              listingTitle: resultListing.title,
+            },
+            pause: {
+              listingId: listing.id,
+              title: 'تم إيقاف نشر الإعلان',
+              statusLabel: resultListing.status,
+            },
+            mark_sold: {
+              listingId: listing.id,
+              title: 'تم تحديث حالة الإعلان',
+              statusLabel: resultListing.status,
+            },
+            delete: {
+              listingId: listing.id,
+              title: 'تم حذف الإعلان بنجاح',
+            },
+          };
+
+          setEditNotice(null);
+          setActionResult(resultByAction[action]);
+        } else if ((action as string) !== 'publish') {
+          window.alert(
+            payload?.message ??
+              payload?.error ??
+              'تعذر تنفيذ الإجراء الآن. حاول مرة أخرى.',
+          );
         }
 
         void refreshListings(1);
@@ -585,6 +698,7 @@ export default function AccountListingsPage() {
 
     setPendingPublishListing(null);
     setPendingListingControl({ listingId: listing.id, action: 'publish' });
+    setActionResult(null);
 
     void fetch(`/api/marketplace/listings/${listing.id}`, {
       method: 'PATCH',
@@ -600,13 +714,16 @@ export default function AccountListingsPage() {
         listing?: ApiListingRecord;
       } | null;
 
+      let updatedListing: ListingCard | null = null;
+
       if (payload?.listing) {
-        const updatedListing = listingRecordToCard(payload.listing);
+        const nextListing = listingRecordToCard(payload.listing);
+        updatedListing = nextListing;
 
         setListings((currentListings) =>
           currentListings.map((currentListing) =>
-            currentListing.id === updatedListing.id
-              ? updatedListing
+            currentListing.id === nextListing.id
+              ? nextListing
               : currentListing,
           ),
         );
@@ -624,6 +741,19 @@ export default function AccountListingsPage() {
         });
       }
 
+      if (response.ok) {
+        const resultListing = updatedListing ?? listing;
+
+        setEditNotice(null);
+        setActionResult({
+          listingId: listing.id,
+          title: 'تم نشر الإعلان بنجاح',
+          statusLabel: resultListing.status,
+          share: true,
+          listingTitle: resultListing.title,
+        });
+      }
+
       void refreshListings(1);
     }).finally(() => {
       setPendingListingControl((current) =>
@@ -635,6 +765,7 @@ export default function AccountListingsPage() {
   }, [pendingPublishListing, refreshListings]);
 
   const startEditingListing = useCallback((listing: ListingCard) => {
+    setActionResult(null);
     setEditingListingId(listing.id);
     setEditNotice({
       listingId: listing.id,
@@ -654,6 +785,7 @@ export default function AccountListingsPage() {
   const saveListingEdits = useCallback(
     async (listing: ListingCard) => {
       setSavingListingId(listing.id);
+      setActionResult(null);
 
       try {
         const payload: {
@@ -742,9 +874,12 @@ export default function AccountListingsPage() {
         const responsePayload = (await response.json().catch(() => null)) as {
           listing?: ApiListingRecord;
         } | null;
+        const savedListing = responsePayload?.listing
+          ? listingRecordToCard(responsePayload.listing)
+          : null;
 
         if (responsePayload?.listing?.compliance?.decision === 'needs_review') {
-          const reviewedListing = listingRecordToCard(responsePayload.listing);
+          const reviewedListing = savedListing ?? listingRecordToCard(responsePayload.listing);
 
           setListings((currentListings) =>
             currentListings.map((currentListing) =>
@@ -766,6 +901,13 @@ export default function AccountListingsPage() {
 
         setEditNotice(null);
         setEditingListingId(null);
+        setActionResult({
+          listingId: listing.id,
+          title: 'تم حفظ الإعلان',
+          description:
+            'إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان.',
+          statusLabel: savedListing?.status ?? listing.status,
+        });
         await refreshListings(1);
       } finally {
         setSavingListingId(null);
@@ -802,6 +944,7 @@ export default function AccountListingsPage() {
       }
 
       setUploadingListingId(listing.id);
+      setImageActionNotice(null);
       setImageUploadProgress({
         listingId: listing.id,
         current: 0,
@@ -882,6 +1025,7 @@ export default function AccountListingsPage() {
   const setPrimaryListingImage = useCallback(
     async (listing: ListingCard, image: ListingImageCard) => {
       setUpdatingImageId(image.id);
+      setImageActionNotice(null);
 
       try {
         const response = await fetch(
@@ -921,6 +1065,7 @@ export default function AccountListingsPage() {
       }
 
       setUpdatingImageId(image.id);
+      setImageActionNotice(null);
 
       try {
         const response = await fetch(
@@ -943,6 +1088,10 @@ export default function AccountListingsPage() {
           return;
         }
 
+        setImageActionNotice({
+          listingId: listing.id,
+          message: 'تم حذف الصورة',
+        });
         await refreshListings(1);
       } finally {
         setUpdatingImageId(null);
@@ -1053,6 +1202,12 @@ export default function AccountListingsPage() {
                           ? pendingListingControl.action
                           : null;
                       const isListingControlPending = Boolean(pendingControlAction);
+                      const currentActionResult =
+                        actionResult?.listingId === listing.id ? actionResult : null;
+                      const currentImageActionNotice =
+                        imageActionNotice?.listingId === listing.id
+                          ? imageActionNotice
+                          : null;
                       const activeImageUploadProgress =
                         imageUploadProgress?.listingId === listing.id
                           ? imageUploadProgress
@@ -1076,6 +1231,12 @@ export default function AccountListingsPage() {
                           </span>
                           </div>
                           <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{listing.description}</p>
+                          {currentActionResult && (
+                            <ListingActionResultCard
+                              result={currentActionResult}
+                              onDismiss={() => setActionResult(null)}
+                            />
+                          )}
                           {listing.rawStatus === 'draft' && (
                             <div className="rounded-md border border-amber-300/70 bg-amber-50 px-2.5 py-2 text-[11px] font-bold leading-5 text-amber-800 dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-100">
                               مسودة - غير منشور. لن يظهر الإعلان للعملاء حتى تضغط نشر الإعلان وتوافق على اتفاقية الرسوم.
@@ -1236,6 +1397,19 @@ export default function AccountListingsPage() {
                               إلغاء
                             </Button>
                           </div>
+                        </div>
+                      )}
+                      {currentImageActionNotice && (
+                        <div className="mx-2 mb-2 flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100 sm:mx-3">
+                          <span>{currentImageActionNotice.message}</span>
+                          <button
+                            aria-label="إغلاق تنبيه الصورة"
+                            className="grid size-7 place-items-center rounded-full hover:bg-emerald-100 dark:hover:bg-white/10"
+                            onClick={() => setImageActionNotice(null)}
+                            type="button"
+                          >
+                            <X className="size-3.5" />
+                          </button>
                         </div>
                       )}
                       {listing.images.length > 0 && (

@@ -124,19 +124,24 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manual-listing-publish/);
   assert.match(homePage, /JSON\.stringify\(\{ action: 'publish' \}\)/);
   assert.match(homePage, /حفظ ونشر الإعلان/);
-  assert.match(homePage, /تم حفظ ونشر الإعلان بنجاح/);
+  assert.match(homePage, /تم نشر الإعلان بنجاح/);
   assert.match(homePage, /manualListingForm\.priceMode === 'negotiable'/);
   assert.match(homePage, /saleTerms: 'negotiable'/);
   assert.match(homePage, /disabled=\{manualListingForm\.priceMode === 'bid'\}/);
-  assert.match(homePage, /تم حفظ الإعلان بنجاح/);
-  assert.match(homePage, /صفحة حسابي لإدارة الإعلان/);
+  assert.match(homePage, /تم حفظ الإعلان/);
+  assert.match(homePage, /إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان/);
   assert.match(homePage, /!isManualListingVisible && manualListingNotice/);
-  assert.match(homePage, /الذهاب إلى حسابي للنشر/);
+  assert.match(homePage, /إغلاق نتيجة إنشاء الإعلان/);
+  assert.match(homePage, /ListingShareButton/);
+  assert.doesNotMatch(homePage, /الذهاب إلى حسابي للنشر/);
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
     assert.match(homePage, /prepareUploadableImageFiles\(selectedImages\)/);
-    assert.match(homePage, /جاري تجهيز \$\{manualListingImages\.length\} صور للرفع/);
+    assert.match(
+      homePage,
+      /'جاري تجهيز ' \+ manualListingImages\.length \+ ' صور للرفع\.\.\.'/,
+    );
     assert.doesNotMatch(homePage, /formData\.append\('thumbnailImage'/);
     assert.doesNotMatch(homePage, /formData\.append\('displayImage'/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
