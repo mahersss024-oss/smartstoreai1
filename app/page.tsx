@@ -4418,14 +4418,16 @@ export default function Page() {
                       type="submit"
                       variant="outline"
                       className="rounded-md"
-                      disabled={isSubmittingManualListing}
+                      loading={isSubmittingManualListing}
+                      loadingText="جاري الحفظ..."
                     >
                       {isSubmittingManualListing ? 'جاري الحفظ...' : 'حفظ الإعلان'}
                     </Button>
                     <Button
                       type="button"
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      disabled={isSubmittingManualListing}
+                      loading={isSubmittingManualListing}
+                      loadingText="جاري الحفظ..."
                       onClick={() => setIsManualPublishAgreementOpen(true)}
                     >
                       {isSubmittingManualListing

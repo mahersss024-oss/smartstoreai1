@@ -358,6 +358,26 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /إيقاف النشر/);
   assert.match(listingsPage, /تم البيع/);
   assert.match(listingsPage, /حذف الإعلان/);
+  assert.match(listingsPage, /pendingListingControl/);
+  assert.match(listingsPage, /loading=\{pendingControlAction === 'publish'\}/);
+  assert.match(listingsPage, /loadingText="جاري النشر\.\.\."/);
+  assert.match(listingsPage, /loadingText="جاري الحذف\.\.\."/);
+  assert.match(listingsPage, /loading=\{savingListingId === listing\.id\}/);
+  assert.match(listingsPage, /loading=\{updatingImageId === image\.id\}/);
+});
+
+test('shared buttons show immediate press and async feedback', () => {
+  const button = readFileSync(
+    join(process.cwd(), 'components', 'ui', 'button.tsx'),
+    'utf8',
+  );
+
+  assert.match(button, /active:scale-\[0\.98\]/);
+  assert.match(button, /loadingText/);
+  assert.match(button, /aria-busy=\{loading \|\| undefined\}/);
+  assert.match(button, /animate-spin/);
+  assert.match(button, /if \(asChild\)/);
+  assert.match(button, /disabled=\{disabled \|\| loading\}/);
 });
 
 test('customer can edit or delete listings while pending review', () => {

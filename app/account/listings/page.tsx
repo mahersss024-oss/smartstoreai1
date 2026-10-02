@@ -110,6 +110,13 @@ type ListingEditNotice = {
   reasons?: string[];
 };
 
+type ListingControlAction = 'publish' | 'pause' | 'mark_sold' | 'delete';
+
+type PendingListingControl = {
+  listingId: string;
+  action: ListingControlAction;
+};
+
 const listingCategoryOptions = [
   'cars',
   'auto_parts',
@@ -354,6 +361,8 @@ export default function AccountListingsPage() {
   });
   const [editNotice, setEditNotice] = useState<ListingEditNotice | null>(null);
   const [updatingImageId, setUpdatingImageId] = useState<string | null>(null);
+  const [pendingListingControl, setPendingListingControl] =
+    useState<PendingListingControl | null>(null);
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -487,7 +496,7 @@ export default function AccountListingsPage() {
   }, [setSession]);
 
   const controlListing = useCallback(
-    (listing: ListingCard, action: 'publish' | 'pause' | 'mark_sold' | 'delete') => {
+    (listing: ListingCard, action: ListingControlAction) => {
       if (action === 'publish' && !listingHasApprovedImage(listing)) {
         setEditingListingId(listing.id);
         setEditForm(createEditFormFromListing(listing));
@@ -516,6 +525,7 @@ export default function AccountListingsPage() {
         return;
       }
 
+      setPendingListingControl({ listingId: listing.id, action });
       void fetch(`/api/marketplace/listings/${listing.id}`, {
         method: 'PATCH',
         headers: {
@@ -555,6 +565,12 @@ export default function AccountListingsPage() {
         }
 
         void refreshListings(1);
+      }).finally(() => {
+        setPendingListingControl((current) =>
+          current?.listingId === listing.id && current.action === action
+            ? null
+            : current,
+        );
       });
     },
     [refreshListings],
@@ -568,6 +584,7 @@ export default function AccountListingsPage() {
     }
 
     setPendingPublishListing(null);
+    setPendingListingControl({ listingId: listing.id, action: 'publish' });
 
     void fetch(`/api/marketplace/listings/${listing.id}`, {
       method: 'PATCH',
@@ -608,6 +625,12 @@ export default function AccountListingsPage() {
       }
 
       void refreshListings(1);
+    }).finally(() => {
+      setPendingListingControl((current) =>
+        current?.listingId === listing.id && current.action === 'publish'
+          ? null
+          : current,
+      );
     });
   }, [pendingPublishListing, refreshListings]);
 
@@ -1024,7 +1047,14 @@ export default function AccountListingsPage() {
               ) : (
                 <div className="grid gap-4">
                   <div className="grid gap-3">
-                    {listings.map((listing) => (
+                    {listings.map((listing) => {
+                      const pendingControlAction =
+                        pendingListingControl?.listingId === listing.id
+                          ? pendingListingControl.action
+                          : null;
+                      const isListingControlPending = Boolean(pendingControlAction);
+
+                      return (
                       <article key={listing.id} className="grid min-w-0 border-b border-slate-200/70 py-3 [contain-intrinsic-size:220px] [content-visibility:auto] last:border-b-0 dark:border-white/10">
                       <div className="min-w-0">
                         <div className="grid gap-2 px-2 py-1 sm:px-3">
@@ -1178,7 +1208,8 @@ export default function AccountListingsPage() {
                             <Button
                               size="sm"
                               className="rounded-md bg-blue-600 hover:bg-blue-700"
-                              disabled={savingListingId === listing.id}
+                              loading={savingListingId === listing.id}
+                              loadingText="جاري الحفظ..."
                               onClick={() => void saveListingEdits(listing)}
                             >
                               <Save className="size-3.5" />
@@ -1241,7 +1272,7 @@ export default function AccountListingsPage() {
                                     size="icon-sm"
                                     variant="outline"
                                     className="size-8 rounded-md"
-                                    disabled={updatingImageId === image.id}
+                                    loading={updatingImageId === image.id}
                                     onClick={() =>
                                       void setPrimaryListingImage(listing, image)
                                     }
@@ -1253,7 +1284,7 @@ export default function AccountListingsPage() {
                                     size="icon-sm"
                                     variant="outline"
                                     className="size-8 rounded-md text-red-600 hover:text-red-700"
-                                    disabled={updatingImageId === image.id}
+                                    loading={updatingImageId === image.id}
                                     onClick={() =>
                                       void deleteListingImage(listing, image)
                                     }
@@ -1313,19 +1344,43 @@ export default function AccountListingsPage() {
                           </label>
                         </Button>
                         {canPublishListing(listing) && (
-                        <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'publish')}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-md"
+                          disabled={isListingControlPending}
+                          loading={pendingControlAction === 'publish'}
+                          loadingText="جاري النشر..."
+                          onClick={() => controlListing(listing, 'publish')}
+                        >
                           <Megaphone className="size-3.5" />
                           نشر الإعلان
                         </Button>
                         )}
                         {canPauseListing(listing) && (
-                        <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'pause')}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-md"
+                          disabled={isListingControlPending}
+                          loading={pendingControlAction === 'pause'}
+                          loadingText="جاري الإيقاف..."
+                          onClick={() => controlListing(listing, 'pause')}
+                        >
                           <Pause className="size-3.5" />
                           إيقاف النشر
                         </Button>
                         )}
                         {canMarkListingSold(listing) && (
-                        <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'mark_sold')}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-md"
+                          disabled={isListingControlPending}
+                          loading={pendingControlAction === 'mark_sold'}
+                          loadingText="جاري التحديث..."
+                          onClick={() => controlListing(listing, 'mark_sold')}
+                        >
                           <CheckCircle2 className="size-3.5" />
                           تم البيع
                         </Button>
@@ -1339,14 +1394,23 @@ export default function AccountListingsPage() {
                           </Button>
                         )}
                         {canDeleteListing(listing) && (
-                        <Button size="sm" variant="outline" className="rounded-md" onClick={() => controlListing(listing, 'delete')}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-md"
+                          disabled={isListingControlPending}
+                          loading={pendingControlAction === 'delete'}
+                          loadingText="جاري الحذف..."
+                          onClick={() => controlListing(listing, 'delete')}
+                        >
                           <Trash2 className="size-3.5" />
                           حذف الإعلان
                         </Button>
                         )}
                       </div>
                       </article>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div ref={listingsLoadMoreRef} className="h-px" />
                   {listingsPagination?.hasMore && (
