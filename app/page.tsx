@@ -24,6 +24,7 @@ import {
   BadgeCheck,
   Bot,
   Clock3,
+  Download,
   Heart,
   ImageIcon,
   Loader2,
@@ -1876,6 +1877,8 @@ export default function Page() {
   const [manualListingForm, setManualListingForm] =
     useState<ManualListingForm>(defaultManualListingForm);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
+  const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
+    useState<string[]>([]);
   const [isPreparingManualListingImages, setIsPreparingManualListingImages] =
     useState(false);
   const [manualListingNotice, setManualListingNotice] =
@@ -1930,6 +1933,24 @@ export default function Page() {
     source: File[];
     promise: Promise<File[]>;
   } | null>(null);
+
+  useEffect(() => {
+    if (manualListingImages.length === 0) {
+      setManualListingImagePreviewUrls([]);
+      return;
+    }
+
+    const previewUrls = manualListingImages.map((image) =>
+      URL.createObjectURL(image),
+    );
+    setManualListingImagePreviewUrls(previewUrls);
+
+    return () => {
+      for (const previewUrl of previewUrls) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [manualListingImages]);
   const shouldResetSearchStateRef = useRef(true);
   const [clientIntent, setClientIntent] =
     useState<ClientIntentState>(defaultClientIntent);
@@ -3936,7 +3957,7 @@ export default function Page() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 rounded-md px-2 text-sm sm:px-3"
+                    className="h-9 rounded-md px-2 text-sm transition duration-150 active:scale-[0.98] sm:px-3"
                     onClick={() => {
                       setIsManualListingOpen((value) => !value);
                       setIsManualListingFallbackDismissed(false);
@@ -4149,47 +4170,76 @@ export default function Page() {
                     />
                   </label>
 
-                  <label className="grid gap-1 text-xs font-semibold">
-                    الصور
-                    <input
-                      accept="image/*"
-                      className="rounded-md border bg-background px-3 py-2 text-sm"
-                      multiple
-                      type="file"
-                      onChange={(event) => {
-                        const selectedImages = Array.from(
-                          event.target.files ?? [],
-                        ).slice(0, 8);
-                        setManualListingImages(selectedImages);
-                        setIsPreparingManualListingImages(selectedImages.length > 0);
+                  <div className="grid gap-2 text-xs font-semibold">
+                    <span>الصور</span>
+                    <label className="group grid min-h-36 cursor-pointer place-items-center rounded-md border-2 border-dashed border-blue-400/70 bg-blue-50/35 px-4 py-5 text-center transition duration-150 ease-out active:scale-[0.99] active:border-blue-500 active:bg-blue-50 hover:border-blue-500/80 hover:bg-blue-50/55 dark:border-blue-400/45 dark:bg-blue-400/5 dark:hover:border-blue-300/70">
+                      <input
+                        accept="image/*"
+                        className="sr-only"
+                        multiple
+                        type="file"
+                        onChange={(event) => {
+                          const selectedImages = Array.from(
+                            event.target.files ?? [],
+                          ).slice(0, 8);
+                          setManualListingImages(selectedImages);
+                          setIsPreparingManualListingImages(selectedImages.length > 0);
 
-                        const preparation = {
-                          source: selectedImages,
-                          promise: prepareUploadableImageFiles(selectedImages),
-                        };
-                        manualListingImagePreparationRef.current = preparation;
-                        void preparation.promise.then(
-                          () => {
-                            if (manualListingImagePreparationRef.current === preparation) {
-                              setIsPreparingManualListingImages(false);
-                            }
-                          },
-                          () => {
-                            if (manualListingImagePreparationRef.current === preparation) {
-                              setIsPreparingManualListingImages(false);
-                            }
-                          },
-                        );
-                      }}
-                    />
+                          const preparation = {
+                            source: selectedImages,
+                            promise: prepareUploadableImageFiles(selectedImages),
+                          };
+                          manualListingImagePreparationRef.current = preparation;
+                          void preparation.promise.then(
+                            () => {
+                              if (manualListingImagePreparationRef.current === preparation) {
+                                setIsPreparingManualListingImages(false);
+                              }
+                            },
+                            () => {
+                              if (manualListingImagePreparationRef.current === preparation) {
+                                setIsPreparingManualListingImages(false);
+                              }
+                            },
+                          );
+                        }}
+                      />
+                      <span className="grid justify-items-center gap-2">
+                        <span className="grid size-16 place-items-center rounded-full bg-blue-100/80 text-blue-600 transition duration-150 group-active:bg-blue-100 dark:bg-blue-400/10 dark:text-blue-300">
+                          <Download className="size-10 stroke-[2.4]" />
+                        </span>
+                        <span className="text-base font-bold text-foreground">
+                          إضافة صور الإعلان
+                        </span>
+                        <span className="text-sm font-normal text-muted-foreground">
+                          اضغط لاختيار الصور من جهازك
+                        </span>
+                      </span>
+                    </label>
+                    {manualListingImagePreviewUrls.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                        {manualListingImagePreviewUrls.map((previewUrl, index) => (
+                          <div
+                            key={previewUrl + '-' + index}
+                            className="relative aspect-square overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900"
+                          >
+                            <img
+                              alt={'صورة الإعلان ' + (index + 1)}
+                              className="size-full object-cover"
+                              src={previewUrl}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {(isPreparingManualListingImages || manualListingImages.length > 0) && (
                       <span className="text-[11px] font-normal text-muted-foreground">
                         {isPreparingManualListingImages
-                          ? `جاري تجهيز ${manualListingImages.length} صور للرفع...`
-                          : `تم تجهيز ${manualListingImages.length} صور للرفع.`}
+                          ? 'جاري تجهيز ' + manualListingImages.length + ' صور للرفع...'
+                          : 'تم تجهيز ' + manualListingImages.length + ' صور للرفع.'}
                       </span>
                     )}
-                  </label>
+                  </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <Button
