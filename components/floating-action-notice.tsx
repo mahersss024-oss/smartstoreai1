@@ -22,34 +22,49 @@ type FloatingActionNoticeProps = {
 const toneClasses: Record<
   FloatingActionNoticeTone,
   {
-    card: string;
+    accent: string;
+    glow: string;
     icon: string;
+    iconRing: string;
+    status: string;
     title: string;
     Icon: typeof CheckCircle2;
   }
 > = {
   success: {
-    card: 'border-emerald-200 bg-white text-slate-900 shadow-emerald-950/10 dark:border-emerald-400/20 dark:bg-card dark:text-foreground',
-    icon: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-200',
-    title: 'text-emerald-700 dark:text-emerald-200',
+    accent: 'from-emerald-500 via-emerald-400 to-blue-500',
+    glow: 'shadow-emerald-950/10 dark:shadow-emerald-950/40',
+    icon: 'bg-emerald-500 text-white shadow-emerald-700/20 dark:bg-emerald-400 dark:text-emerald-950',
+    iconRing: 'bg-emerald-500/10 ring-emerald-500/15 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
+    status: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/15 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-300/15',
+    title: 'text-foreground',
     Icon: CheckCircle2,
   },
   warning: {
-    card: 'border-amber-200 bg-white text-slate-900 shadow-amber-950/10 dark:border-amber-400/20 dark:bg-card dark:text-foreground',
-    icon: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-100',
-    title: 'text-amber-800 dark:text-amber-100',
+    accent: 'from-amber-500 via-amber-400 to-blue-500',
+    glow: 'shadow-amber-950/10 dark:shadow-amber-950/40',
+    icon: 'bg-amber-500 text-white shadow-amber-700/20 dark:bg-amber-300 dark:text-amber-950',
+    iconRing: 'bg-amber-500/10 ring-amber-500/15 dark:bg-amber-300/10 dark:ring-amber-200/15',
+    status: 'bg-amber-500/10 text-amber-800 ring-amber-500/15 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-200/15',
+    title: 'text-foreground',
     Icon: AlertTriangle,
   },
   danger: {
-    card: 'border-red-200 bg-white text-slate-900 shadow-red-950/10 dark:border-red-400/20 dark:bg-card dark:text-foreground',
-    icon: 'bg-red-100 text-red-600 dark:bg-red-400/15 dark:text-red-200',
-    title: 'text-red-700 dark:text-red-200',
+    accent: 'from-red-500 via-rose-500 to-blue-500',
+    glow: 'shadow-red-950/10 dark:shadow-red-950/40',
+    icon: 'bg-red-500 text-white shadow-red-700/20 dark:bg-red-400 dark:text-red-950',
+    iconRing: 'bg-red-500/10 ring-red-500/15 dark:bg-red-400/10 dark:ring-red-300/15',
+    status: 'bg-red-500/10 text-red-700 ring-red-500/15 dark:bg-red-400/10 dark:text-red-200 dark:ring-red-300/15',
+    title: 'text-foreground',
     Icon: XCircle,
   },
   info: {
-    card: 'border-blue-200 bg-white text-slate-900 shadow-blue-950/10 dark:border-blue-400/20 dark:bg-card dark:text-foreground',
-    icon: 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-100',
-    title: 'text-blue-800 dark:text-blue-100',
+    accent: 'from-blue-600 via-sky-500 to-emerald-500',
+    glow: 'shadow-blue-950/10 dark:shadow-blue-950/40',
+    icon: 'bg-blue-600 text-white shadow-blue-700/20 dark:bg-blue-300 dark:text-blue-950',
+    iconRing: 'bg-blue-500/10 ring-blue-500/15 dark:bg-blue-300/10 dark:ring-blue-200/15',
+    status: 'bg-blue-500/10 text-blue-700 ring-blue-500/15 dark:bg-blue-300/10 dark:text-blue-100 dark:ring-blue-200/15',
+    title: 'text-foreground',
     Icon: Info,
   },
 };
@@ -67,6 +82,7 @@ export function FloatingActionNotice({
 }: FloatingActionNoticeProps) {
   const toneConfig = toneClasses[tone];
   const Icon = toneConfig.Icon;
+  const isRichNotice = Boolean(title || action || statusLabel);
 
   useEffect(() => {
     if (!open || durationMs <= 0) {
@@ -91,14 +107,34 @@ export function FloatingActionNotice({
     >
       <section
         className={cn(
-          'pointer-events-auto relative grid w-full max-w-[22rem] gap-3 rounded-lg border px-4 pb-4 pt-5 text-center shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-white/95 dark:supports-[backdrop-filter]:bg-card/95',
-          'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200',
-          toneConfig.card,
+          'pointer-events-auto relative isolate w-full overflow-hidden rounded-lg border border-border/80 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-card/95',
+          'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:slide-in-from-bottom-2 motion-safe:duration-200',
+          toneConfig.glow,
+          isRichNotice
+            ? 'grid max-w-[23rem] gap-4 px-4 pb-4 pt-5 text-center sm:max-w-[25rem]'
+            : 'grid max-w-[24rem] grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-3 text-right',
         )}
       >
+        <div
+          aria-hidden="true"
+          className={cn(
+            'absolute inset-x-0 top-0 h-1 bg-gradient-to-l',
+            toneConfig.accent,
+          )}
+        />
+        <div
+          aria-hidden="true"
+          className={cn(
+            'absolute -top-20 right-1/2 size-36 translate-x-1/2 rounded-full bg-gradient-to-br opacity-10 blur-2xl',
+            toneConfig.accent,
+          )}
+        />
         <button
           aria-label={closeLabel}
-          className="absolute left-2 top-2 grid size-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className={cn(
+            'grid size-9 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            isRichNotice ? 'absolute left-2 top-2' : 'relative',
+          )}
           onClick={onDismiss}
           type="button"
         >
@@ -106,30 +142,77 @@ export function FloatingActionNotice({
         </button>
         <div
           className={cn(
-            'mx-auto grid size-14 place-items-center rounded-full shadow-inner',
-            toneConfig.icon,
+            'grid place-items-center rounded-full ring-1',
+            toneConfig.iconRing,
+            isRichNotice ? 'mx-auto size-20' : 'size-12',
           )}
         >
-          <Icon className="size-8" />
+          <span
+            className={cn(
+              'grid place-items-center rounded-full shadow-lg',
+              toneConfig.icon,
+              isRichNotice ? 'size-14' : 'size-8',
+            )}
+          >
+            <Icon className={isRichNotice ? 'size-8' : 'size-5'} />
+          </span>
         </div>
-        <div className="grid gap-1 px-8">
-          {title && (
-            <h3 className={cn('text-base font-black', toneConfig.title)}>
-              {title}
-            </h3>
+        <div
+          className={cn(
+            'min-w-0',
+            isRichNotice ? 'grid gap-2 px-8' : 'grid gap-0.5',
           )}
-          {statusLabel && (
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              الحالة: {statusLabel}
-            </p>
-          )}
+        >
+          <div
+            className={cn(
+              'flex min-w-0 gap-2',
+              isRichNotice ? 'flex-col items-center' : 'items-center',
+            )}
+          >
+            {title && (
+              <h3
+                className={cn(
+                  'min-w-0 font-black leading-7 tracking-normal',
+                  isRichNotice ? 'text-lg' : 'truncate text-sm',
+                  toneConfig.title,
+                )}
+              >
+                {title}
+              </h3>
+            )}
+            {statusLabel && (
+              <span
+                className={cn(
+                  'inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1',
+                  toneConfig.status,
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full bg-current"
+                />
+                <span className="truncate">الحالة: {statusLabel}</span>
+              </span>
+            )}
+          </div>
           {message && (
-            <p className="text-xs font-semibold leading-6 text-muted-foreground">
+            <p
+              className={cn(
+                'font-semibold text-muted-foreground',
+                isRichNotice
+                  ? 'text-sm leading-7'
+                  : 'line-clamp-2 text-xs leading-5',
+              )}
+            >
               {message}
             </p>
           )}
         </div>
-        {action && <div className="mx-auto w-full max-w-xs">{action}</div>}
+        {action && (
+          <div className="mx-auto w-full max-w-xs pt-1 [&_.action-feedback-button]:h-11 [&_.action-feedback-button]:text-sm [&_.action-feedback-button]:font-bold">
+            {action}
+          </div>
+        )}
       </section>
     </div>
   );

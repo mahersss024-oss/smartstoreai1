@@ -421,6 +421,22 @@ test('shared buttons show immediate press and async feedback', () => {
   assert.match(globals, /upload-progress-indeterminate/);
 });
 
+test('floating action notices use premium theme-aware styling', () => {
+  const notice = readFileSync(
+    join(process.cwd(), 'components', 'floating-action-notice.tsx'),
+    'utf8',
+  );
+
+  assert.match(notice, /bg-card\/95/);
+  assert.match(notice, /text-card-foreground/);
+  assert.match(notice, /dark:border-white\/10/);
+  assert.match(notice, /isRichNotice/);
+  assert.match(notice, /bg-gradient-to-l/);
+  assert.match(notice, /statusLabel/);
+  assert.match(notice, /focus-visible:ring-ring/);
+  assert.doesNotMatch(notice, /bg-white text-slate-900/);
+});
+
 test('customer can edit or delete listings while pending review', () => {
   const listingsPage = readFileSync(
     join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
