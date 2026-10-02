@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
@@ -57,6 +58,9 @@ export default function AccountPage() {
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isRemovingProfilePicture, setIsRemovingProfilePicture] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [pendingAccountConfirm, setPendingAccountConfirm] = useState<
+    'remove_picture' | 'delete_account' | null
+  >(null);
   const clearingBrokenProfilePictureRef = useRef(false);
 
   const administrativeRoleLabel =
@@ -314,10 +318,7 @@ export default function AccountPage() {
   }, [router, setSession]);
 
   const removeProfilePicture = useCallback(async () => {
-    if (!window.confirm('هل تريد إزالة صورة العرض من حسابك؟')) {
-      return;
-    }
-
+    setPendingAccountConfirm(null);
     setIsRemovingProfilePicture(true);
     setProfileNotice(null);
 
@@ -404,14 +405,7 @@ export default function AccountPage() {
   }, [profilePicture, profilePicturePreview, setSession]);
 
   const deleteAccount = useCallback(async () => {
-    if (
-      !window.confirm(
-        'هل تؤكد حذف الحساب؟ سيتم حذف الإعلانات والمحادثات والبيانات المرتبطة بهذا الحساب من المنصة.',
-      )
-    ) {
-      return;
-    }
-
+    setPendingAccountConfirm(null);
     setIsDeletingAccount(true);
     setProfileNotice(null);
 
@@ -466,6 +460,39 @@ export default function AccountPage() {
         onDismiss={() => setProfileNotice(null)}
         open={Boolean(profileNotice)}
         tone={profileNotice?.tone ?? 'info'}
+      />
+      <ActionConfirmDialog
+        confirmLabel={
+          pendingAccountConfirm === 'delete_account'
+            ? 'حذف الحساب'
+            : 'إزالة الصورة'
+        }
+        description={
+          pendingAccountConfirm === 'delete_account'
+            ? 'سيتم حذف الإعلانات والمحادثات والبيانات المرتبطة بهذا الحساب من المنصة.'
+            : 'سيتم إزالة صورة العرض من حسابك.'
+        }
+        loading={
+          pendingAccountConfirm === 'delete_account'
+            ? isDeletingAccount
+            : isRemovingProfilePicture
+        }
+        loadingText="جاري التنفيذ..."
+        onCancel={() => setPendingAccountConfirm(null)}
+        onConfirm={() => {
+          if (pendingAccountConfirm === 'delete_account') {
+            void deleteAccount();
+          } else if (pendingAccountConfirm === 'remove_picture') {
+            void removeProfilePicture();
+          }
+        }}
+        open={Boolean(pendingAccountConfirm)}
+        title={
+          pendingAccountConfirm === 'delete_account'
+            ? 'تأكيد حذف الحساب'
+            : 'تأكيد إزالة الصورة'
+        }
+        tone={pendingAccountConfirm === 'delete_account' ? 'danger' : 'default'}
       />
       <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
@@ -679,7 +706,7 @@ export default function AccountPage() {
                       <Button
                         className="rounded-md"
                         disabled={isUploadingProfilePicture || isRemovingProfilePicture}
-                        onClick={() => void removeProfilePicture()}
+                        onClick={() => setPendingAccountConfirm('remove_picture')}
                         type="button"
                         variant="outline"
                       >
@@ -827,7 +854,7 @@ export default function AccountPage() {
                 <Button
                   className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
                   disabled={isDeletingAccount}
-                  onClick={() => void deleteAccount()}
+                  onClick={() => setPendingAccountConfirm('delete_account')}
                   type="button"
                   variant="outline"
                 >

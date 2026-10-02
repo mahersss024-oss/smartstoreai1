@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -143,6 +145,8 @@ export default function ConversationsPage() {
     tone: 'success' | 'danger';
     message: string;
   } | null>(null);
+  const [pendingConversationDelete, setPendingConversationDelete] =
+    useState<ConversationRecord | null>(null);
   const trackedListingIds = useMemo(
     () => new Set(conversations.map((conversation) => conversation.listingId)),
     [conversations],
@@ -285,10 +289,7 @@ export default function ConversationsPage() {
   });
 
   const deleteConversation = useCallback(async (conversation: ConversationRecord) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه المحادثة؟')) {
-      return;
-    }
-
+    setPendingConversationDelete(null);
     setDeletingConversationId(conversation.id);
     setConversationNotice(null);
 
@@ -333,6 +334,30 @@ export default function ConversationsPage() {
 
   return (
     <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <FloatingActionNotice
+        message={conversationNotice?.message}
+        onDismiss={() => setConversationNotice(null)}
+        open={Boolean(conversationNotice)}
+        tone={conversationNotice?.tone ?? 'info'}
+      />
+      <ActionConfirmDialog
+        confirmLabel="حذف المحادثة"
+        description="سيتم حذف هذه المحادثة من قائمتك."
+        loading={Boolean(
+          pendingConversationDelete &&
+            deletingConversationId === pendingConversationDelete.id,
+        )}
+        loadingText="جاري الحذف..."
+        onCancel={() => setPendingConversationDelete(null)}
+        onConfirm={() => {
+          if (pendingConversationDelete) {
+            void deleteConversation(pendingConversationDelete);
+          }
+        }}
+        open={Boolean(pendingConversationDelete)}
+        title="تأكيد حذف المحادثة"
+        tone="danger"
+      />
       <div className="smartstore-stable-content mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -383,17 +408,6 @@ export default function ConversationsPage() {
         ) : (
           <>
 <section className="bg-white p-1 dark:bg-card sm:p-2">
-{conversationNotice && (
-                <div
-                  className={`mb-3 rounded-md border px-3 py-2 text-xs font-semibold ${
-                    conversationNotice.tone === 'success'
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-300/30 dark:bg-emerald-400/10 dark:text-emerald-100'
-                      : 'border-red-300 bg-red-50 text-red-800 dark:border-red-300/30 dark:bg-red-400/10 dark:text-red-100'
-                  }`}
-                >
-                  {conversationNotice.message}
-                </div>
-              )}
 
               {isLoading && conversations.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
@@ -498,7 +512,7 @@ export default function ConversationsPage() {
                                 disabled={deletingConversationId === conversation.id}
                                 onSelect={(event) => {
                                   event.preventDefault();
-                                  void deleteConversation(conversation);
+                                  setPendingConversationDelete(conversation);
                                 }}
                               >
                                 <Trash2 className="size-4" />

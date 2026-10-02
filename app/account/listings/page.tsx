@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
@@ -133,11 +134,13 @@ type ListingActionResult = {
   statusLabel?: string;
   share?: boolean;
   listingTitle?: string;
+  tone?: 'success' | 'warning' | 'danger' | 'info';
 };
 
 type ListingImageActionNotice = {
   listingId: string;
   message: string;
+  tone?: 'success' | 'warning' | 'danger' | 'info';
 };
 
 type PendingListingImageDelete = {
@@ -399,6 +402,10 @@ export default function AccountListingsPage() {
   const [pendingImageDelete, setPendingImageDelete] =
     useState<PendingListingImageDelete | null>(null);
   const [imageDeleteError, setImageDeleteError] = useState<string | null>(null);
+  const [pendingListingConfirm, setPendingListingConfirm] = useState<{
+    listing: ListingCard;
+    action: ListingControlAction;
+  } | null>(null);
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -531,37 +538,9 @@ export default function AccountListingsPage() {
     });
   }, [setSession]);
 
-  const controlListing = useCallback(
+  const executeListingControl = useCallback(
     (listing: ListingCard, action: ListingControlAction) => {
-      if (action === 'publish' && !listingHasApprovedImage(listing)) {
-        setEditingListingId(listing.id);
-        setEditForm(createEditFormFromListing(listing));
-        setEditNotice({
-          listingId: listing.id,
-          tone: 'warning',
-          message:
-            'لا يمكن نشر الإعلان قبل إضافة صورة حقيقية مطابقة للمنتج. ارفع صورة واضحة للمنتج نفسه ثم حاول النشر مرة أخرى.',
-        });
-        return;
-      }
-
-      if (action === 'publish') {
-        setActionResult(null);
-        setPendingPublishListing(listing);
-        return;
-      }
-
-      const labels = {
-        publish: 'نشر الإعلان',
-        pause: 'إيقاف الإعلان',
-        mark_sold: 'اعتبار الإعلان مباعًا',
-        delete: 'حذف الإعلان',
-      };
-
-      if (!window.confirm(`هل تؤكد ${labels[action]}: ${listing.title}؟`)) {
-        return;
-      }
-
+      setPendingListingConfirm(null);
       setPendingListingControl({ listingId: listing.id, action });
       setActionResult(null);
       void fetch(`/api/marketplace/listings/${listing.id}`, {
@@ -634,11 +613,14 @@ export default function AccountListingsPage() {
           setEditNotice(null);
           setActionResult(resultByAction[action]);
         } else if ((action as string) !== 'publish') {
-          window.alert(
-            payload?.message ??
+          setActionResult({
+            listingId: listing.id,
+            title:
+              payload?.message ??
               payload?.error ??
               'تعذر تنفيذ الإجراء الآن. حاول مرة أخرى.',
-          );
+            tone: 'danger',
+          });
         }
 
         void refreshListings(1);
@@ -651,6 +633,32 @@ export default function AccountListingsPage() {
       });
     },
     [refreshListings],
+  );
+
+  const controlListing = useCallback(
+    (listing: ListingCard, action: ListingControlAction) => {
+      if (action === 'publish' && !listingHasApprovedImage(listing)) {
+        setEditingListingId(listing.id);
+        setEditForm(createEditFormFromListing(listing));
+        setEditNotice({
+          listingId: listing.id,
+          tone: 'warning',
+          message:
+            'لا يمكن نشر الإعلان قبل إضافة صورة حقيقية مطابقة للمنتج. ارفع صورة واضحة للمنتج نفسه ثم حاول النشر مرة أخرى.',
+        });
+        return;
+      }
+
+      if (action === 'publish') {
+        setActionResult(null);
+        setPendingPublishListing(listing);
+        return;
+      }
+
+      setActionResult(null);
+      setPendingListingConfirm({ listing, action });
+    },
+    [],
   );
 
   const confirmPublishListing = useCallback(() => {
@@ -963,20 +971,26 @@ export default function AccountListingsPage() {
               return;
             }
 
-            window.alert(
-              payload?.message ??
+            setImageActionNotice({
+              listingId: listing.id,
+              message:
+                payload?.message ??
                 payload?.error ??
                 'تعذر رفع الصورة. تأكد من إعداد تخزين الصور ثم حاول مرة أخرى.',
-            );
+              tone: 'danger',
+            });
             return;
           }
         }
 
         await refreshListings(1);
       } catch {
-        window.alert(
-          'تعذر تجهيز الصورة. جرّب صورة JPG أو PNG أو WEBP أو GIF واضحة، أو أعد التقاطها من الكاميرا.',
-        );
+        setImageActionNotice({
+          listingId: listing.id,
+          message:
+            'تعذر تجهيز الصورة. جرّب صورة JPG أو PNG أو WEBP أو GIF واضحة، أو أعد التقاطها من الكاميرا.',
+          tone: 'danger',
+        });
       } finally {
         setUploadingListingId(null);
         setImageUploadProgress(null);
@@ -1009,10 +1023,18 @@ export default function AccountListingsPage() {
         }
 
         if (!response.ok) {
-          window.alert('تعذر تعيين الصورة الرئيسية الآن.');
+          setImageActionNotice({
+            listingId: listing.id,
+            message: 'تعذر تعيين الصورة الرئيسية الآن.',
+            tone: 'danger',
+          });
           return;
         }
 
+        setImageActionNotice({
+          listingId: listing.id,
+          message: 'تم تعيين الصورة الرئيسية.',
+        });
         await refreshListings(1);
       } finally {
         setUpdatingImageId(null);
@@ -1068,6 +1090,48 @@ export default function AccountListingsPage() {
         onCancel={() => setPendingPublishListing(null)}
         onConfirm={confirmPublishListing}
         open={Boolean(pendingPublishListing)}
+      />
+      <ActionConfirmDialog
+        confirmLabel={
+          pendingListingConfirm?.action === 'delete'
+            ? 'حذف الإعلان'
+            : pendingListingConfirm?.action === 'pause'
+              ? 'إيقاف النشر'
+              : pendingListingConfirm?.action === 'mark_sold'
+                ? 'تم البيع'
+                : 'تنفيذ'
+        }
+        description={
+          pendingListingConfirm
+            ? `سيتم تنفيذ الإجراء على الإعلان: ${pendingListingConfirm.listing.title}`
+            : ''
+        }
+        loading={Boolean(
+          pendingListingConfirm &&
+            pendingListingControl?.listingId === pendingListingConfirm.listing.id &&
+            pendingListingControl.action === pendingListingConfirm.action,
+        )}
+        loadingText="جاري التنفيذ..."
+        onCancel={() => setPendingListingConfirm(null)}
+        onConfirm={() => {
+          if (pendingListingConfirm) {
+            executeListingControl(
+              pendingListingConfirm.listing,
+              pendingListingConfirm.action,
+            );
+          }
+        }}
+        open={Boolean(pendingListingConfirm)}
+        title={
+          pendingListingConfirm?.action === 'delete'
+            ? 'تأكيد حذف الإعلان'
+            : pendingListingConfirm?.action === 'pause'
+              ? 'تأكيد إيقاف النشر'
+              : pendingListingConfirm?.action === 'mark_sold'
+                ? 'تأكيد حالة البيع'
+                : 'تأكيد الإجراء'
+        }
+        tone={pendingListingConfirm?.action === 'delete' ? 'danger' : 'default'}
       />
       <Dialog
         open={Boolean(pendingImageDelete)}
@@ -1223,14 +1287,14 @@ export default function AccountListingsPage() {
               open={Boolean(actionResult)}
               statusLabel={actionResult?.statusLabel}
               title={actionResult?.title}
-              tone="success"
+              tone={actionResult?.tone ?? 'success'}
             />
             <FloatingActionNotice
               closeLabel="إغلاق تنبيه الصورة"
               message={imageActionNotice?.message}
               onDismiss={() => setImageActionNotice(null)}
               open={Boolean(imageActionNotice)}
-              tone="success"
+              tone={imageActionNotice?.tone ?? 'success'}
             />
 
             <section

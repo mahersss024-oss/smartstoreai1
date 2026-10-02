@@ -269,9 +269,11 @@ test('conversations list uses compact cards with a small delete menu', () => {
   assert.match(source, /DropdownMenu/);
   assert.match(source, /MoreVertical/);
   assert.match(source, /حذف المحادثة/);
-  assert.match(source, /هل أنت متأكد من حذف هذه المحادثة؟/);
+  assert.match(source, /<ActionConfirmDialog/);
+  assert.match(source, /تأكيد حذف المحادثة/);
   assert.match(source, /تم حذف المحادثة بنجاح/);
   assert.match(source, /تعذر حذف المحادثة\. حاول مرة أخرى/);
+  assert.doesNotMatch(source, /window\.confirm/);
   assert.match(source, /grid-cols-\[2\.75rem_minmax\(0,1fr\)_auto\]/);
   assert.match(source, /sm:grid-cols-\[3rem_minmax\(0,1fr\)_auto\]/);
   assert.match(source, /otherParticipantName/);
@@ -279,6 +281,16 @@ test('conversations list uses compact cards with a small delete menu', () => {
   assert.doesNotMatch(source, /rounded-md border bg-white p-2 shadow-sm/);
   assert.doesNotMatch(source, /rounded-md border bg-white p-6 text-center shadow-sm/);
   assert.doesNotMatch(source, /formatPrice\(conversation\.listing\?\.price\)/);
+});
+
+test('conversation actions use in-app confirmation and floating notices', () => {
+  const source = readConversationPage();
+
+  assert.match(source, /<ActionConfirmDialog/);
+  assert.match(source, /<FloatingActionNotice/);
+  assert.match(source, /setPendingConversationAction\('block'\)/);
+  assert.match(source, /setPendingConversationAction\('unblock'\)/);
+  assert.doesNotMatch(source, /window\.confirm/);
 });
 
 test('conversations list keeps each conversation card horizontal on every viewport', () => {

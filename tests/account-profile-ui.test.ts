@@ -21,6 +21,8 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /SellerAvatar/);
   assert.match(page, /<FloatingActionNotice/);
   assert.match(page, /open=\{Boolean\(profileNotice\)\}/);
+  assert.match(page, /<ActionConfirmDialog/);
+  assert.doesNotMatch(page, /window\.confirm/);
   assert.match(page, /رفع صورة العرض/);
   assert.match(page, /تغيير صورة العرض/);
   assert.match(page, /إزالة صورة العرض/);
@@ -183,7 +185,9 @@ test('account profile picture removal clears the database and stored object', ()
 
   assert.match(page, /fetch\('\/api\/account\/profile\/picture'/);
   assert.match(page, /method: 'DELETE'/);
-  assert.match(page, /هل تريد إزالة صورة العرض من حسابك؟/);
+  assert.match(page, /تأكيد إزالة الصورة/);
+  assert.match(page, /setPendingAccountConfirm\('remove_picture'\)/);
+  assert.doesNotMatch(page, /window\.confirm/);
   assert.match(route, /export async function DELETE/);
   assert.match(route, /account_profile_picture_delete/);
   assert.match(route, /data: \{ picture: null \}/);
@@ -371,6 +375,7 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /loading=\{savingListingId === listing\.id\}/);
   assert.match(listingsPage, /loading=\{updatingImageId === image\.id\}/);
   assert.match(listingsPage, /<FloatingActionNotice/);
+  assert.match(listingsPage, /<ActionConfirmDialog/);
   assert.match(listingsPage, /open=\{Boolean\(actionResult\)\}/);
   assert.match(listingsPage, /open=\{Boolean\(imageActionNotice\)\}/);
   assert.doesNotMatch(listingsPage, /currentActionResult/);
@@ -393,6 +398,8 @@ test('customer listings support an eight-image batch and use explicit action lab
   );
   assert.match(listingsPage, /تم حذف الصورة/);
   assert.doesNotMatch(listingsPage, /حسنًا/);
+  assert.doesNotMatch(listingsPage, /window\.confirm/);
+  assert.doesNotMatch(listingsPage, /window\.alert/);
 });
 
 test('shared buttons show immediate press and async feedback', () => {

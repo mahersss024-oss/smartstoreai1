@@ -27,6 +27,8 @@ import {
   Unlock,
 } from 'lucide-react';
 
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -423,6 +425,9 @@ export default function ConversationPage() {
   );
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingConversationAction, setPendingConversationAction] = useState<
+    'block' | 'unblock' | null
+  >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isSharingContact, setIsSharingContact] = useState(false);
@@ -1202,10 +1207,7 @@ export default function ConversationPage() {
       return;
     }
 
-    if (!window.confirm('هل تؤكد حظر هذا المستخدم وإيقاف الرسائل الجديدة؟')) {
-      return;
-    }
-
+    setPendingConversationAction(null);
     setIsBlockingUser(true);
     setNotice('');
 
@@ -1258,10 +1260,7 @@ export default function ConversationPage() {
       return;
     }
 
-    if (!window.confirm('هل تؤكد إزالة الحظر والسماح بالرسائل الجديدة؟')) {
-      return;
-    }
-
+    setPendingConversationAction(null);
     setIsUnblockingUser(true);
     setNotice('');
 
@@ -1316,6 +1315,47 @@ export default function ConversationPage() {
       dir="rtl"
       style={mobileConversationStyle}
     >
+      <FloatingActionNotice
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={
+          notice.startsWith('تعذر') || notice.startsWith('لا يمكن')
+            ? 'danger'
+            : 'success'
+        }
+      />
+      <ActionConfirmDialog
+        confirmLabel={
+          pendingConversationAction === 'unblock' ? 'إزالة الحظر' : 'حظر المستخدم'
+        }
+        description={
+          pendingConversationAction === 'unblock'
+            ? 'سيتم السماح بالرسائل الجديدة في هذه المحادثة.'
+            : 'سيتم إيقاف الرسائل الجديدة من هذا المستخدم.'
+        }
+        loading={
+          pendingConversationAction === 'unblock'
+            ? isUnblockingUser
+            : isBlockingUser
+        }
+        loadingText="جاري التنفيذ..."
+        onCancel={() => setPendingConversationAction(null)}
+        onConfirm={() => {
+          if (pendingConversationAction === 'unblock') {
+            void unblockConversationParticipant();
+          } else if (pendingConversationAction === 'block') {
+            void blockConversationParticipant();
+          }
+        }}
+        open={Boolean(pendingConversationAction)}
+        title={
+          pendingConversationAction === 'unblock'
+            ? 'تأكيد إزالة الحظر'
+            : 'تأكيد حظر المستخدم'
+        }
+        tone={pendingConversationAction === 'block' ? 'danger' : 'default'}
+      />
       <div
         className={`customer-conversation-shell mx-auto flex h-full w-full max-w-6xl flex-col gap-0 overflow-hidden px-0 pt-0 sm:gap-2 sm:px-4 sm:pt-2 lg:grid lg:h-full lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-4 lg:px-6 lg:py-5 ${
           isMessageInputFocused
@@ -1414,7 +1454,7 @@ export default function ConversationPage() {
                         disabled={!conversation || isUnblockingUser}
                         onSelect={(event) => {
                           event.preventDefault();
-                          void unblockConversationParticipant();
+                          setPendingConversationAction('unblock');
                         }}
                       >
                         <Unlock className="size-4" />
@@ -1426,7 +1466,7 @@ export default function ConversationPage() {
                         disabled={!conversation || isBlockingUser || isConversationBlocked}
                         onSelect={(event) => {
                           event.preventDefault();
-                          void blockConversationParticipant();
+                          setPendingConversationAction('block');
                         }}
                       >
                         <Ban className="size-4" />
@@ -1626,12 +1666,7 @@ export default function ConversationPage() {
               )}
             </div>
 
-            {notice && (
-              <div className="border-t bg-amber-50 px-4 py-2 text-sm leading-7 text-amber-900 dark:bg-amber-400/10 dark:text-amber-100">
-                {notice}
-              </div>
-            )}
-            {isConversationBlocked && !notice && (
+            {isConversationBlocked && (
               <div className="border-t bg-red-50 px-4 py-2 text-sm leading-7 text-red-900 dark:bg-red-400/10 dark:text-red-100">
                 لا يمكن إرسال رسائل جديدة في هذه المحادثة بعد الحظر.
               </div>
