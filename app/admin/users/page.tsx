@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
@@ -420,6 +421,13 @@ export default function AdminUsersPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <FloatingActionNotice
+        closeLabel="إغلاق نتيجة إجراء المستخدم"
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={notice.startsWith('تم') ? 'success' : 'danger'}
+      />
       <ActionConfirmDialog
         confirmLabel={
           pendingUserConfirm?.action === 'restore'

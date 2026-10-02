@@ -305,6 +305,30 @@ export type MarketplaceListingFilters = {
   limit?: number;
 };
 
+function extractListingIdLookup(value?: string) {
+  const query = value?.trim();
+
+  if (!query) {
+    return null;
+  }
+
+  const listingPathMatch = query.match(/\/listings\/([^/?#\s]+)/i);
+
+  if (listingPathMatch?.[1]) {
+    return decodeURIComponent(listingPathMatch[1]).trim();
+  }
+
+  const idLabelMatch = query.match(
+    /(?:listing|ad|advertisement|إعلان|الاعلان|الإعلان|رقم)\s*[:#-]?\s*([a-z0-9_-]{6,})/i,
+  );
+
+  if (idLabelMatch?.[1]) {
+    return idLabelMatch[1].trim();
+  }
+
+  return /^[a-z0-9_-]{6,}$/i.test(query) ? query : null;
+}
+
 export type CreateListingInput = {
   category: string;
   title?: string;
@@ -963,6 +987,7 @@ export async function listMarketplaceListings(
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
+  const listingIdLookup = extractListingIdLookup(filters.query);
   const pagination = getListingPagination(filters);
   const searchConditions: Prisma.ListingWhereInput[] = [];
   const category = filters.category ?? parsedQuery.category;
@@ -972,10 +997,18 @@ export async function listMarketplaceListings(
   const yearMin = filters.yearMin ?? parsedQuery.yearMin;
   const yearMax = filters.yearMax ?? parsedQuery.yearMax;
   const termGroups =
-    filters.termGroups ??
-    (filters.terms?.length ? filters.terms : parsedQuery.terms).map(
-      getMarketplaceSearchTermVariants,
-    );
+    listingIdLookup
+      ? []
+      : (filters.termGroups ??
+        (filters.terms?.length ? filters.terms : parsedQuery.terms).map(
+          getMarketplaceSearchTermVariants,
+        ));
+
+  if (listingIdLookup) {
+    searchConditions.push({
+      id: { contains: listingIdLookup, mode: 'insensitive' },
+    });
+  }
 
   if (category) {
     searchConditions.push({ category });

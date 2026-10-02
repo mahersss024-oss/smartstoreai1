@@ -16,6 +16,7 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { useAdminAccess } from '../use-admin-access';
 
 type CommissionRecord = {
@@ -218,6 +219,13 @@ export default function AdminCommissionsPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <FloatingActionNotice
+        closeLabel="إغلاق نتيجة إجراء الرسوم"
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={notice.startsWith('تم') ? 'success' : 'danger'}
+      />
       <ActionConfirmDialog
         confirmLabel="حذف السجل"
         description="سيتم حذف سجل الرسوم المحدد."

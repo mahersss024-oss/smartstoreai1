@@ -716,3 +716,28 @@ test('moderator overview api is server-side moderator protected and scoped', () 
   assert.doesNotMatch(route, /commission/i);
   assert.doesNotMatch(route, /prisma\.user\b/);
 });
+
+test('admin action pages use floating feedback for mutation results', () => {
+  const pages = [
+    ['app', 'admin', 'listings', 'page.tsx'],
+    ['app', 'admin', 'users', 'page.tsx'],
+    ['app', 'admin', 'commissions', 'page.tsx'],
+    ['app', 'admin', 'moderation', 'page.tsx'],
+    ['app', 'admin', 'maintenance', 'page.tsx'],
+  ];
+
+  for (const pageSegments of pages) {
+    const page = readProjectFile(...pageSegments);
+
+    assert.match(page, /FloatingActionNotice/);
+    assert.match(page, /open=\{Boolean\(/);
+    assert.match(page, /onDismiss=\{\(\) =>/);
+  }
+
+  const listingsPage = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+
+  assert.match(listingsPage, /type PendingAdminListingAction/);
+  assert.match(listingsPage, /loading=\{isSaving\}/);
+  assert.match(listingsPage, /loading=\{isDeleting\}/);
+  assert.match(listingsPage, /loading=\{isPermanentlyDeleting\}/);
+});

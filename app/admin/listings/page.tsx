@@ -18,6 +18,7 @@ import {
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { CitySelector } from '@/components/city-selector';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -67,6 +68,18 @@ type ListingDraft = {
   priceMode: 'fixed' | 'bid' | 'negotiable';
   status: AdminListing['status'];
 };
+
+type AdminListingActionNotice = {
+  tone: 'success' | 'warning' | 'danger' | 'info';
+  title?: string;
+  message: string;
+  statusLabel?: string;
+};
+
+type PendingAdminListingAction =
+  | { listingId: string; action: 'save' }
+  | { listingId: string; action: 'delete' }
+  | { listingId: string; action: 'permanent_delete' };
 
 const statusOptions: Array<{ value: AdminListing['status'] | 'all'; label: string }> = [
   { value: 'all', label: 'كل الحالات' },
@@ -142,6 +155,7 @@ function AdminListingCard({
   onSave,
   onDelete,
   onPermanentDelete,
+  pendingAction,
 }: Readonly<{
   listing: AdminListing;
   draft: ListingDraft;
@@ -150,7 +164,17 @@ function AdminListingCard({
   onSave: (listingId: string) => void;
   onDelete: (listingId: string) => void;
   onPermanentDelete: (listingId: string) => void;
+  pendingAction: PendingAdminListingAction | null;
 }>) {
+  const isSaving =
+    pendingAction?.listingId === listing.id && pendingAction.action === 'save';
+  const isDeleting =
+    pendingAction?.listingId === listing.id && pendingAction.action === 'delete';
+  const isPermanentlyDeleting =
+    pendingAction?.listingId === listing.id &&
+    pendingAction.action === 'permanent_delete';
+  const isActionPending = Boolean(pendingAction);
+
   return (
     <article className="grid gap-3 rounded-md border p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -265,15 +289,31 @@ function AdminListingCard({
 
       {canManageListings && (
       <div className="grid gap-2 sm:grid-cols-4">
-        <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => onSave(listing.id)}>
+        <Button
+          className="rounded-md bg-blue-600 hover:bg-blue-700"
+          disabled={isActionPending && !isSaving}
+          loading={isSaving}
+          loadingText="جاري الحفظ..."
+          onClick={() => onSave(listing.id)}
+        >
           <Save className="size-4" />
           حفظ
         </Button>
-        <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'published' })}>
+        <Button
+          variant="outline"
+          className="rounded-md"
+          disabled={isActionPending}
+          onClick={() => onUpdateDraft(listing.id, { status: 'published' })}
+        >
           <CheckCircle2 className="size-4" />
           نشر الإعلان
         </Button>
-        <Button variant="outline" className="rounded-md" onClick={() => onUpdateDraft(listing.id, { status: 'paused' })}>
+        <Button
+          variant="outline"
+          className="rounded-md"
+          disabled={isActionPending}
+          onClick={() => onUpdateDraft(listing.id, { status: 'paused' })}
+        >
           <Pause className="size-4" />
           إيقاف
         </Button>
@@ -281,6 +321,9 @@ function AdminListingCard({
           <Button
             variant="outline"
             className="rounded-md text-red-600 hover:text-red-700"
+            disabled={isActionPending && !isPermanentlyDeleting}
+            loading={isPermanentlyDeleting}
+            loadingText="جاري الحذف..."
             onClick={() => onPermanentDelete(listing.id)}
           >
             <Trash2 className="size-4" />
@@ -290,6 +333,9 @@ function AdminListingCard({
           <Button
             variant="outline"
             className="rounded-md"
+            disabled={isActionPending && !isDeleting}
+            loading={isDeleting}
+            loadingText="جاري الحذف..."
             onClick={() => onDelete(listing.id)}
           >
             <Trash2 className="size-4" />
@@ -318,6 +364,10 @@ function AdminListingsPageContent() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminListing['status'] | 'all'>('all');
   const [notice, setNotice] = useState('');
+  const [actionNotice, setActionNotice] =
+    useState<AdminListingActionNotice | null>(null);
+  const [pendingAction, setPendingAction] =
+    useState<PendingAdminListingAction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingDeleteAction, setPendingDeleteAction] = useState<{
     listingId: string;
@@ -487,19 +537,36 @@ function AdminListingsPageContent() {
         priceMode: draft.priceMode === 'fixed' ? null : draft.priceMode,
         status: draft.status,
       };
-      const response = await fetch(`/api/admin/listings/${listingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      setPendingAction({ listingId, action: 'save' });
+      setActionNotice(null);
 
-      if (!response.ok) {
-        setNotice('تعذر حفظ الإعلان.');
-        return;
+      try {
+        const response = await fetch(`/api/admin/listings/${listingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          setActionNotice({
+            tone: 'danger',
+            message: 'تعذر حفظ الإعلان.',
+          });
+          return;
+        }
+
+        setActionNotice({
+          tone: 'success',
+          title: 'تم حفظ الإعلان',
+          message: 'تم تحديث بيانات الإعلان في لوحة الإدارة.',
+          statusLabel:
+            statusOptions.find((option) => option.value === draft.status)
+              ?.label ?? draft.status,
+        });
+        await loadListings(1);
+      } finally {
+        setPendingAction(null);
       }
-
-      setNotice('تم حفظ الإعلان.');
-      await loadListings(1);
     },
     [drafts, loadListings],
   );
@@ -507,19 +574,34 @@ function AdminListingsPageContent() {
   const deleteListing = useCallback(
     async (listingId: string) => {
       setPendingDeleteAction(null);
-      const response = await fetch(`/api/admin/listings/${listingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'deleted' }),
-      });
+      setPendingAction({ listingId, action: 'delete' });
+      setActionNotice(null);
 
-      if (!response.ok) {
-        setNotice('تعذر حذف الإعلان.');
-        return;
+      try {
+        const response = await fetch(`/api/admin/listings/${listingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'deleted' }),
+        });
+
+        if (!response.ok) {
+          setActionNotice({
+            tone: 'danger',
+            message: 'تعذر حذف الإعلان.',
+          });
+          return;
+        }
+
+        setActionNotice({
+          tone: 'success',
+          title: 'تم حذف الإعلان',
+          message: 'تم نقل الإعلان إلى حالة محذوف.',
+          statusLabel: 'محذوف',
+        });
+        await loadListings(1);
+      } finally {
+        setPendingAction(null);
       }
-
-      setNotice('تم حذف الإعلان.');
-      await loadListings(1);
     },
     [loadListings],
   );
@@ -527,17 +609,31 @@ function AdminListingsPageContent() {
   const permanentlyDeleteListing = useCallback(
     async (listingId: string) => {
       setPendingDeleteAction(null);
-      const response = await fetch(`/api/admin/listings/${listingId}`, {
-        method: 'DELETE',
-      });
+      setPendingAction({ listingId, action: 'permanent_delete' });
+      setActionNotice(null);
 
-      if (!response.ok) {
-        setNotice('تعذر حذف الإعلان نهائيًا.');
-        return;
+      try {
+        const response = await fetch(`/api/admin/listings/${listingId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          setActionNotice({
+            tone: 'danger',
+            message: 'تعذر حذف الإعلان نهائيًا.',
+          });
+          return;
+        }
+
+        setActionNotice({
+          tone: 'success',
+          title: 'تم حذف الإعلان نهائيًا',
+          message: 'تم حذف الإعلان وسجلاته المرتبطة من لوحة الإدارة.',
+        });
+        await loadListings(1);
+      } finally {
+        setPendingAction(null);
       }
-
-      setNotice('تم حذف الإعلان نهائيًا.');
-      await loadListings(1);
     },
     [loadListings],
   );
@@ -573,6 +669,7 @@ function AdminListingsPageContent() {
             onPermanentDelete={(listingId) =>
               setPendingDeleteAction({ listingId, permanent: true })
             }
+            pendingAction={pendingAction}
           />
         ))}
 
@@ -624,6 +721,15 @@ function AdminListingsPageContent() {
             : 'تأكيد حذف الإعلان'
         }
         tone="danger"
+      />
+      <FloatingActionNotice
+        closeLabel="إغلاق نتيجة إجراء الإدارة"
+        message={actionNotice?.message}
+        onDismiss={() => setActionNotice(null)}
+        open={Boolean(actionNotice)}
+        statusLabel={actionNotice?.statusLabel}
+        title={actionNotice?.title}
+        tone={actionNotice?.tone ?? 'info'}
       />
       <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">

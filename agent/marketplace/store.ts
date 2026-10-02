@@ -109,6 +109,30 @@ export type MarketplaceListingFilters = {
   limit?: number;
 };
 
+function extractListingIdLookup(value?: string) {
+  const query = value?.trim();
+
+  if (!query) {
+    return null;
+  }
+
+  const listingPathMatch = query.match(/\/listings\/([^/?#\s]+)/i);
+
+  if (listingPathMatch?.[1]) {
+    return decodeURIComponent(listingPathMatch[1]).trim();
+  }
+
+  const idLabelMatch = query.match(
+    /(?:listing|ad|advertisement|إعلان|الاعلان|الإعلان|رقم)\s*[:#-]?\s*([a-z0-9_-]{6,})/i,
+  );
+
+  if (idLabelMatch?.[1]) {
+    return idLabelMatch[1].trim();
+  }
+
+  return /^[a-z0-9_-]{6,}$/i.test(query) ? query : null;
+}
+
 function shouldPersistStore() {
   return (
     process.env.SMARTSTORE_MARKETPLACE_STORE !== 'database' &&
@@ -668,6 +692,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
+  const listingIdLookup = extractListingIdLookup(filters.query);
   const category = filters.category ?? parsedQuery.category;
   const city = filters.city ?? parsedQuery.city;
   const minPrice = filters.minPrice ?? parsedQuery.minPrice;
@@ -675,6 +700,13 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
   const yearMin = filters.yearMin ?? parsedQuery.yearMin;
   const yearMax = filters.yearMax ?? parsedQuery.yearMax;
   const filteredListings = publishedListings.filter((listing) => {
+    if (
+      listingIdLookup &&
+      !listing.id.toLowerCase().includes(listingIdLookup.toLowerCase())
+    ) {
+      return false;
+    }
+
     if (category && listing.category !== category) {
       return false;
     }
@@ -733,7 +765,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
 
     return true;
   });
-  const termGroups = getFilterTermGroups(filters);
+  const termGroups = listingIdLookup ? [] : getFilterTermGroups(filters);
 
   if (termGroups.length === 0) {
     return paginateListings(filteredListings, filters);

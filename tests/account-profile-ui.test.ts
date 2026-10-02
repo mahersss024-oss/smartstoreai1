@@ -522,3 +522,17 @@ test('platform fees summary highlights due fees and labels transactions clearly'
   assert.match(page, /rounded-md bg-blue-600/);
   assert.doesNotMatch(page, /عدد السجلات/);
 });
+
+test('customer listing edit keeps the card in place after save', () => {
+  const listingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(listingsPage, /setListings\(\(currentListings\) =>/);
+  assert.match(listingsPage, /currentListing\.id === savedListing\.id/);
+  assert.doesNotMatch(
+    listingsPage,
+    /setActionResult\([\s\S]{0,400}await refreshListings\(1\)/,
+  );
+});

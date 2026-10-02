@@ -228,3 +228,17 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.match(listingGallery, /grid-cols-4/);
   assert.match(listingGallery, /onClick=\{\(\) => openLightbox\(index\)\}/);
 });
+
+test('public marketplace search supports listing id and listing links safely', () => {
+  const repository = readProjectFile('agent', 'marketplace', 'repository.ts');
+  const store = readProjectFile('agent', 'marketplace', 'store.ts');
+  const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
+
+  assert.match(repository, /function extractListingIdLookup/);
+  assert.match(repository, /listingPathMatch/);
+  assert.match(repository, /id: \{ contains: listingIdLookup, mode: 'insensitive' \}/);
+  assert.match(repository, /status: 'published'/);
+  assert.match(store, /function extractListingIdLookup/);
+  assert.match(store, /listing\.id\.toLowerCase\(\)\.includes/);
+  assert.match(route, /const query = url\.searchParams\.get\('q'\)/);
+});

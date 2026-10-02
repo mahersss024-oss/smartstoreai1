@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, Megaphone, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
@@ -266,6 +267,13 @@ export default function AdminMaintenancePage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <FloatingActionNotice
+        closeLabel="إغلاق نتيجة إجراء الصيانة"
+        message={notice}
+        onDismiss={() => setNotice('')}
+        open={Boolean(notice)}
+        tone={notice.startsWith('تم') ? 'success' : 'danger'}
+      />
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">

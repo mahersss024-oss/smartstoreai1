@@ -867,10 +867,18 @@ export default function AccountListingsPage() {
               'تم حفظ التعديل، لكن الإعلان انتقل للمراجعة قبل النشر لأن فحص الذكاء الاصطناعي وجد عناصر تحتاج تحققًا إضافيًا.',
             reasons: responsePayload.listing.compliance.reasons,
           });
-          await refreshListings(1);
           return;
         }
 
+        if (savedListing) {
+          setListings((currentListings) =>
+            currentListings.map((currentListing) =>
+              currentListing.id === savedListing.id
+                ? savedListing
+                : currentListing,
+            ),
+          );
+        }
         setEditNotice(null);
         setEditingListingId(null);
         setActionResult({
@@ -879,12 +887,11 @@ export default function AccountListingsPage() {
           description: 'تم حفظ التعديلات. يمكنك نشر الإعلان من خياراته هنا.',
           statusLabel: savedListing?.status ?? listing.status,
         });
-        await refreshListings(1);
       } finally {
         setSavingListingId(null);
       }
     },
-    [editForm, refreshListings, router],
+    [editForm, router],
   );
 
   const uploadListingImage = useCallback(
