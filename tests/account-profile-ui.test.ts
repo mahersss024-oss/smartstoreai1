@@ -121,11 +121,15 @@ test('account profile picture upload stores a persistent display image for the a
   assert.match(route, /getAuthSession/);
   assert.match(route, /formData\.get\('image'\)/);
   assert.match(route, /maxProfileImageBytes = 4 \* 1024 \* 1024/);
+  assert.match(route, /createSanitizedListingImageOriginal/);
+  assert.match(route, /ListingImageSecurityError/);
+  assert.match(route, /image_type_mismatch/);
   assert.match(route, /createPersistentProfileImageUrl/);
   assert.match(route, /verifyProfilePictureDelivery/);
   assert.match(route, /profile_picture_delivery_unavailable/);
   assert.match(route, /update: \{ picture \}/);
   assert.match(storage, /objectPrefix: 'profiles'/);
+  assert.doesNotMatch(storage, /'image\/gif'/);
   assert.match(objectStorage, /objectPrefix\?: 'listings' \| 'profiles'/);
 });
 

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { checkRateLimit } from '@/lib/rate-limit';
+
+function readProjectFile(...segments: string[]) {
+  return readFileSync(join(process.cwd(), ...segments), 'utf8');
+}
 
 test('rate limit is scoped by namespace and client', async () => {
   const first = await checkRateLimit({
@@ -83,4 +89,45 @@ test('falls back to memory rate limiting when redis stalls', async () => {
       }
     }
   }
+});
+
+test('sensitive mutation and streaming routes enforce rate limits', () => {
+  const expectations = [
+    {
+      path: ['app', 'api', 'chat', 'route.ts'],
+      patterns: [/checkChatRateLimit/],
+    },
+    {
+      path: ['app', 'api', 'chat', 'reset', 'route.ts'],
+      patterns: [/enforceApiRateLimit/, /chat_reset/],
+    },
+    {
+      path: ['app', 'api', 'marketplace', 'listings', '[listingId]', 'images', 'route.ts'],
+      patterns: [/enforceApiRateLimit/, /image_upload/],
+    },
+    {
+      path: ['app', 'api', 'account', 'profile', 'picture', 'route.ts'],
+      patterns: [/enforceApiRateLimit/, /account_profile_picture_upload/],
+    },
+    {
+      path: ['app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'],
+      patterns: [/enforceApiRateLimit/, /admin_listing_mutation/],
+    },
+    {
+      path: ['app', 'api', 'admin', 'users', '[userId]', 'route.ts'],
+      patterns: [/enforceApiRateLimit/, /admin_user_mutation/],
+    },
+  ];
+
+  for (const expectation of expectations) {
+    const source = readProjectFile(...expectation.path);
+
+    for (const pattern of expectation.patterns) {
+      assert.match(source, pattern);
+    }
+  }
+
+  const sharedLimiter = readProjectFile('lib', 'rate-limit.ts');
+  assert.match(sharedLimiter, /export async function checkChatRateLimit/);
+  assert.match(sharedLimiter, /namespace: 'chat'/);
 });

@@ -5,7 +5,10 @@ import {
   canUseProfileImageDataUrlFallback,
   createPersistentProfileImageUrl,
 } from '@/agent/marketplace/profile-image-storage';
-import { createListingImageVariants } from '@/agent/marketplace/listing-image-variants';
+import {
+  createSanitizedListingImageOriginal,
+  ListingImageSecurityError,
+} from '@/agent/marketplace/listing-image-variants';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -150,21 +153,34 @@ export async function POST(request: Request) {
 
   try {
     const originalData = new Uint8Array(await file.arrayBuffer());
-    const variants = await createListingImageVariants({
+    const sanitizedProfileImage = await createSanitizedListingImageOriginal({
       data: originalData,
       mediaType: file.type,
       fileName: file.name,
     });
-    const profileData = variants?.thumbnail.data ?? originalData;
-    const profileMediaType = variants?.thumbnail.mediaType ?? file.type;
-    const profileFileName = variants?.thumbnail.fileName ?? file.name;
     picture = await createPersistentProfileImageUrl({
-      data: profileData,
-      mediaType: profileMediaType,
+      data: sanitizedProfileImage.data,
+      mediaType: sanitizedProfileImage.mediaType,
       imageId: randomUUID(),
-      fileName: profileFileName,
+      fileName: sanitizedProfileImage.fileName,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ListingImageSecurityError) {
+      const status =
+        error.code === 'unsupported_image_type' ||
+        error.code === 'image_type_mismatch'
+          ? 415
+          : 422;
+
+      return Response.json(
+        {
+          error: error.code,
+          message: 'Profile picture could not be accepted after server security checks.',
+        },
+        { status, headers: noStoreHeaders },
+      );
+    }
+
     return Response.json(
       {
         error: 'image_storage_unavailable',
