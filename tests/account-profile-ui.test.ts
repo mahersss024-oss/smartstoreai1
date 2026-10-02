@@ -369,6 +369,10 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /loading=\{savingListingId === listing\.id\}/);
   assert.match(listingsPage, /loading=\{updatingImageId === image\.id\}/);
   assert.match(listingsPage, /ListingActionResultCard/);
+  assert.match(listingsPage, /actionResult && \(/);
+  assert.match(listingsPage, /imageActionNotice && \(/);
+  assert.doesNotMatch(listingsPage, /currentActionResult/);
+  assert.doesNotMatch(listingsPage, /currentImageActionNotice/);
   assert.match(listingsPage, /إغلاق نتيجة الإجراء/);
   assert.match(listingsPage, /تم نشر الإعلان بنجاح/);
   assert.match(listingsPage, /تم حذف الإعلان بنجاح/);
