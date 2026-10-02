@@ -37,6 +37,26 @@ test('admin pages use a stable touch viewport without disabling page scrolling',
   );
 });
 
+test('app pages use in-app confirmations instead of browser dialogs', () => {
+  const pages = [
+    ['app', 'account', 'page.tsx'],
+    ['app', 'account', 'listings', 'page.tsx'],
+    ['app', 'conversations', 'page.tsx'],
+    ['app', 'conversations', '[conversationId]', 'page.tsx'],
+    ['app', 'admin', 'users', 'page.tsx'],
+    ['app', 'admin', 'listings', 'page.tsx'],
+    ['app', 'admin', 'commissions', 'page.tsx'],
+    ['app', 'admin', 'moderation', 'page.tsx'],
+  ];
+
+  for (const pageSegments of pages) {
+    const page = readProjectFile(...pageSegments);
+
+    assert.doesNotMatch(page, /window\.confirm/);
+    assert.doesNotMatch(page, /window\.alert/);
+  }
+});
+
 test('admin dashboard links to user management', () => {
   const page = readProjectFile('app', 'admin', 'page.tsx');
 

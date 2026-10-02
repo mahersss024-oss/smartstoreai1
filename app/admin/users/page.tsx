@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
@@ -107,6 +108,10 @@ export default function AdminUsersPage() {
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [userAction, setUserAction] = useState<'disable' | 'restore' | 'permanent' | null>(null);
+  const [pendingUserConfirm, setPendingUserConfirm] = useState<{
+    user: AdminUserRecord;
+    action: 'soft' | 'permanent' | 'restore';
+  } | null>(null);
 
   const totalUsers = pagination?.total ?? users.length;
   const usersWithPhone = useMemo(
@@ -318,16 +323,7 @@ export default function AdminUsersPage() {
   const deleteUser = useCallback(
     async (user: AdminUserRecord, mode: 'soft' | 'permanent') => {
       const isPermanent = mode === 'permanent';
-      if (
-        !window.confirm(
-          isPermanent
-            ? `هل تؤكد الحذف النهائي للمستخدم ${user.email}؟ سيتم حذف الحساب وبياناته وصور إعلاناته نهائيًا ولا يمكن التراجع.`
-            : `هل تؤكد تعطيل حساب ${user.email}؟ سيفقد المستخدم الوصول مع الاحتفاظ ببياناته للمراجعة ويمكن إعادة تفعيله لاحقًا.`,
-        )
-      ) {
-        return;
-      }
-
+      setPendingUserConfirm(null);
       setDeletingUserId(user.id);
       setUserAction(isPermanent ? 'permanent' : 'disable');
       setNotice('');
@@ -386,10 +382,7 @@ export default function AdminUsersPage() {
 
   const restoreUser = useCallback(
     async (user: AdminUserRecord) => {
-      if (!window.confirm(`هل تريد إعادة تفعيل حساب ${user.email}؟`)) {
-        return;
-      }
-
+      setPendingUserConfirm(null);
       setDeletingUserId(user.id);
       setUserAction('restore');
       setNotice('');
@@ -427,6 +420,49 @@ export default function AdminUsersPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <ActionConfirmDialog
+        confirmLabel={
+          pendingUserConfirm?.action === 'restore'
+            ? 'إعادة التفعيل'
+            : pendingUserConfirm?.action === 'permanent'
+              ? 'حذف نهائي'
+              : 'تعطيل الحساب'
+        }
+        description={
+          pendingUserConfirm
+            ? pendingUserConfirm.action === 'restore'
+              ? `سيتم إعادة تفعيل حساب ${pendingUserConfirm.user.email}.`
+              : pendingUserConfirm.action === 'permanent'
+                ? `سيتم حذف حساب ${pendingUserConfirm.user.email} وبياناته نهائيًا ولا يمكن التراجع.`
+                : `سيتم تعطيل حساب ${pendingUserConfirm.user.email} مع الاحتفاظ ببياناته للمراجعة.`
+            : ''
+        }
+        loading={Boolean(
+          pendingUserConfirm && deletingUserId === pendingUserConfirm.user.id,
+        )}
+        loadingText="جاري التنفيذ..."
+        onCancel={() => setPendingUserConfirm(null)}
+        onConfirm={() => {
+          if (!pendingUserConfirm) {
+            return;
+          }
+
+          if (pendingUserConfirm.action === 'restore') {
+            void restoreUser(pendingUserConfirm.user);
+          } else {
+            void deleteUser(pendingUserConfirm.user, pendingUserConfirm.action);
+          }
+        }}
+        open={Boolean(pendingUserConfirm)}
+        title={
+          pendingUserConfirm?.action === 'restore'
+            ? 'تأكيد إعادة التفعيل'
+            : pendingUserConfirm?.action === 'permanent'
+              ? 'تأكيد الحذف النهائي'
+              : 'تأكيد تعطيل الحساب'
+        }
+        tone={pendingUserConfirm?.action === 'restore' ? 'default' : 'danger'}
+      />
       <div className="mx-auto grid w-full max-w-7xl gap-4 px-3 py-5 sm:px-6">
         <header className="flex max-w-full flex-wrap items-center justify-between gap-3 overflow-hidden rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -682,7 +718,9 @@ export default function AdminUsersPage() {
                       <Button
                         className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
                         disabled={isBusy}
-                        onClick={() => void deleteUser(user, 'soft')}
+                        onClick={() =>
+                          setPendingUserConfirm({ user, action: 'soft' })
+                        }
                         type="button"
                         variant="outline"
                       >
@@ -694,7 +732,9 @@ export default function AdminUsersPage() {
                       <Button
                         className="rounded-md"
                         disabled={isBusy}
-                        onClick={() => void restoreUser(user)}
+                        onClick={() =>
+                          setPendingUserConfirm({ user, action: 'restore' })
+                        }
                         type="button"
                         variant="outline"
                       >
@@ -705,7 +745,9 @@ export default function AdminUsersPage() {
                       <Button
                         className="rounded-md border-red-600 bg-red-600 text-white hover:bg-red-700"
                         disabled={isBusy}
-                        onClick={() => void deleteUser(user, 'permanent')}
+                        onClick={() =>
+                          setPendingUserConfirm({ user, action: 'permanent' })
+                        }
                         type="button"
                       >
                         <Trash2 className="size-4" />

@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -637,6 +638,12 @@ export default function AdminModerationPage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [processingReportId, setProcessingReportId] = useState<string | null>(null);
+  const [pendingModerationConfirm, setPendingModerationConfirm] = useState<{
+    title: string;
+    description: string;
+    tone?: 'default' | 'danger' | 'success';
+    onConfirm: () => void;
+  } | null>(null);
 
   const openReportsCount = useMemo(
     () =>
@@ -791,10 +798,24 @@ export default function AdminModerationPage() {
   );
 
   const moderateUserReport = useCallback(
-    async (reportId: string, action: UserReportResolution) => {
+    async (
+      reportId: string,
+      action: UserReportResolution,
+      skipConfirm = false,
+    ) => {
       const confirmationMessage = getUserReportConfirmationMessage(action);
 
-      if (confirmationMessage && !window.confirm(confirmationMessage)) {
+      if (confirmationMessage && !skipConfirm) {
+        setPendingModerationConfirm({
+          title: 'تأكيد إجراء البلاغ',
+          description: confirmationMessage,
+          tone:
+            action === 'dismiss' || action === 'review' ? 'default' : 'danger',
+          onConfirm: () => {
+            setPendingModerationConfirm(null);
+            void moderateUserReport(reportId, action, true);
+          },
+        });
         return;
       }
 
@@ -822,8 +843,21 @@ export default function AdminModerationPage() {
   );
 
   const deleteClosedReport = useCallback(
-    async (reportId: string, reportType: 'listing' | 'conversation') => {
-      if (!window.confirm('حذف البلاغ المغلق نهائيًا؟')) {
+    async (
+      reportId: string,
+      reportType: 'listing' | 'conversation',
+      skipConfirm = false,
+    ) => {
+      if (!skipConfirm) {
+        setPendingModerationConfirm({
+          title: 'تأكيد حذف البلاغ',
+          description: 'سيتم حذف البلاغ المغلق نهائيًا.',
+          tone: 'danger',
+          onConfirm: () => {
+            setPendingModerationConfirm(null);
+            void deleteClosedReport(reportId, reportType, true);
+          },
+        });
         return;
       }
 
@@ -856,7 +890,11 @@ export default function AdminModerationPage() {
   );
 
   const resolveReport = useCallback(
-    async (report: ReportRecord, action: ListingReportAction) => {
+    async (
+      report: ReportRecord,
+      action: ListingReportAction,
+      skipConfirm = false,
+    ) => {
       if (action !== 'dismiss' && !report.listing) {
         setNotice('الإعلان المرتبط بهذا البلاغ لم يعد متاحًا. يمكنك رفض البلاغ وإغلاقه.');
         return;
@@ -864,7 +902,16 @@ export default function AdminModerationPage() {
 
       const confirmationMessage = getListingReportConfirmMessage(action);
 
-      if (confirmationMessage && !window.confirm(confirmationMessage)) {
+      if (confirmationMessage && !skipConfirm) {
+        setPendingModerationConfirm({
+          title: 'تأكيد إجراء البلاغ',
+          description: confirmationMessage,
+          tone: action === 'dismiss' ? 'default' : 'danger',
+          onConfirm: () => {
+            setPendingModerationConfirm(null);
+            void resolveReport(report, action, true);
+          },
+        });
         return;
       }
 
@@ -903,6 +950,17 @@ export default function AdminModerationPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <ActionConfirmDialog
+        confirmLabel="تنفيذ الإجراء"
+        description={pendingModerationConfirm?.description ?? ''}
+        loading={Boolean(processingReportId)}
+        loadingText="جاري التنفيذ..."
+        onCancel={() => setPendingModerationConfirm(null)}
+        onConfirm={() => pendingModerationConfirm?.onConfirm()}
+        open={Boolean(pendingModerationConfirm)}
+        title={pendingModerationConfirm?.title ?? 'تأكيد الإجراء'}
+        tone={pendingModerationConfirm?.tone ?? 'default'}
+      />
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">

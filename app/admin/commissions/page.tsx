@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { useAdminAccess } from '../use-admin-access';
 
 type CommissionRecord = {
@@ -72,6 +73,8 @@ export default function AdminCommissionsPage() {
     useState<PaginationMeta | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingDeleteCommissionId, setPendingDeleteCommissionId] =
+    useState<string | null>(null);
 
   const totalDue = useMemo(
     () =>
@@ -197,10 +200,7 @@ export default function AdminCommissionsPage() {
 
   const deleteCommission = useCallback(
     async (commissionId: string) => {
-      if (!window.confirm('هل تريد حذف سجل الرسوم؟')) {
-        return;
-      }
-
+      setPendingDeleteCommissionId(null);
       const response = await fetch(`/api/admin/commissions/${commissionId}`, {
         method: 'DELETE',
       });
@@ -218,6 +218,19 @@ export default function AdminCommissionsPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <ActionConfirmDialog
+        confirmLabel="حذف السجل"
+        description="سيتم حذف سجل الرسوم المحدد."
+        onCancel={() => setPendingDeleteCommissionId(null)}
+        onConfirm={() => {
+          if (pendingDeleteCommissionId) {
+            void deleteCommission(pendingDeleteCommissionId);
+          }
+        }}
+        open={Boolean(pendingDeleteCommissionId)}
+        title="تأكيد حذف سجل الرسوم"
+        tone="danger"
+      />
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
           <div className="flex min-w-0 items-center gap-3">
@@ -329,7 +342,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
-                      onClick={() => void deleteCommission(commission.id)}
+                      onClick={() => setPendingDeleteCommissionId(commission.id)}
                     >
                       <Trash2 className="size-4" />
                       حذف
