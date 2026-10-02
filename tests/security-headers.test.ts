@@ -144,6 +144,50 @@ test('same-origin guard blocks cross-site api mutations', () => {
   );
 });
 
+test('same-origin guard treats canonical production hosts as the same site', () => {
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/chat', {
+        method: 'POST',
+        headers: { origin: 'https://www.souqhamad.com' },
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://www.souqhamad.com/api/chat', {
+        method: 'POST',
+        headers: { origin: 'https://souqhamad.com' },
+      }),
+    ),
+    true,
+  );
+});
+
+test('same-origin guard accepts a configured app origin for native shells', () => {
+  const previous = process.env.NEXT_PUBLIC_APP_URL;
+  process.env.NEXT_PUBLIC_APP_URL = 'https://www.souqhamad.com';
+
+  try {
+    assert.equal(
+      isSameOriginApiMutationAllowed(
+        new Request('https://souqhamad.com/api/chat', {
+          method: 'POST',
+          headers: { origin: 'https://www.souqhamad.com' },
+        }),
+      ),
+      true,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NEXT_PUBLIC_APP_URL;
+    } else {
+      process.env.NEXT_PUBLIC_APP_URL = previous;
+    }
+  }
+});
+
 test('same-origin guard preserves required external auth callbacks', () => {
   assert.equal(
     isSameOriginApiMutationAllowed(
