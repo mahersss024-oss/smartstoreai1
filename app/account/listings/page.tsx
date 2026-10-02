@@ -31,6 +31,14 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { queueUploadableImagePreparation } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@ui/dialog';
 
 type ApiListingRecord = {
   id: string;
@@ -129,6 +137,11 @@ type ListingActionResult = {
 type ListingImageActionNotice = {
   listingId: string;
   message: string;
+};
+
+type PendingListingImageDelete = {
+  listing: ListingCard;
+  image: ListingImageCard;
 };
 
 const listingCategoryOptions = [
@@ -435,6 +448,9 @@ export default function AccountListingsPage() {
   );
   const [imageActionNotice, setImageActionNotice] =
     useState<ListingImageActionNotice | null>(null);
+  const [pendingImageDelete, setPendingImageDelete] =
+    useState<PendingListingImageDelete | null>(null);
+  const [imageDeleteError, setImageDeleteError] = useState<string | null>(null);
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -1059,12 +1075,9 @@ export default function AccountListingsPage() {
 
   const deleteListingImage = useCallback(
     async (listing: ListingCard, image: ListingImageCard) => {
-      if (!window.confirm('هل تريد حذف هذه الصورة من الإعلان؟')) {
-        return;
-      }
-
       setUpdatingImageId(image.id);
       setImageActionNotice(null);
+      setImageDeleteError(null);
 
       try {
         const response = await fetch(
@@ -1083,10 +1096,11 @@ export default function AccountListingsPage() {
         }
 
         if (!response.ok) {
-          window.alert('تعذر حذف الصورة الآن.');
+          setImageDeleteError('تعذر حذف الصورة الآن.');
           return;
         }
 
+        setPendingImageDelete(null);
         setImageActionNotice({
           listingId: listing.id,
           message: 'تم حذف الصورة',
@@ -1107,6 +1121,74 @@ export default function AccountListingsPage() {
         onConfirm={confirmPublishListing}
         open={Boolean(pendingPublishListing)}
       />
+      <Dialog
+        open={Boolean(pendingImageDelete)}
+        onOpenChange={(open) => {
+          if (!open && !updatingImageId) {
+            setPendingImageDelete(null);
+            setImageDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[22rem] rounded-lg p-0 text-right" dir="rtl">
+          <div className="grid gap-4 px-5 pb-5 pt-6">
+            <DialogHeader className="items-center text-center">
+              <div className="grid size-12 place-items-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10">
+                <Trash2 className="size-6" />
+              </div>
+              <DialogTitle className="text-lg font-bold text-slate-950 dark:text-foreground">
+                حذف الصورة
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                هل تريد حذف هذه الصورة من الإعلان؟
+              </DialogDescription>
+            </DialogHeader>
+            {imageDeleteError && (
+              <p
+                className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+                role="alert"
+              >
+                {imageDeleteError}
+              </p>
+            )}
+            <DialogFooter className="grid gap-2 sm:grid-cols-2 sm:gap-2">
+              <Button
+                className="rounded-md"
+                loading={Boolean(
+                  pendingImageDelete &&
+                    updatingImageId === pendingImageDelete.image.id,
+                )}
+                loadingText="جاري الحذف..."
+                onClick={() => {
+                  if (pendingImageDelete) {
+                    void deleteListingImage(
+                      pendingImageDelete.listing,
+                      pendingImageDelete.image,
+                    );
+                  }
+                }}
+                type="button"
+                variant="destructive"
+              >
+                <Trash2 className="size-4" />
+                حذف الصورة
+              </Button>
+              <Button
+                className="rounded-md"
+                disabled={Boolean(updatingImageId)}
+                onClick={() => {
+                  setPendingImageDelete(null);
+                  setImageDeleteError(null);
+                }}
+                type="button"
+                variant="outline"
+              >
+                إلغاء
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -1469,9 +1551,10 @@ export default function AccountListingsPage() {
                                     variant="outline"
                                     className="size-8 rounded-md text-red-600 hover:text-red-700"
                                     loading={updatingImageId === image.id}
-                                    onClick={() =>
-                                      void deleteListingImage(listing, image)
-                                    }
+                                    onClick={() => {
+                                      setImageDeleteError(null);
+                                      setPendingImageDelete({ listing, image });
+                                    }}
                                     aria-label="حذف الصورة"
                                   >
                                     <Trash2 className="size-3.5" />

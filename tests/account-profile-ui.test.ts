@@ -379,6 +379,12 @@ test('customer listings support an eight-image batch and use explicit action lab
     /إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان/,
   );
   assert.match(listingsPage, /share: true/);
+  assert.match(listingsPage, /pendingImageDelete/);
+  assert.match(listingsPage, /هل تريد حذف هذه الصورة من الإعلان؟/);
+  assert.doesNotMatch(
+    listingsPage,
+    /window\.confirm\('هل تريد حذف هذه الصورة من الإعلان؟'\)/,
+  );
   assert.match(listingsPage, /تم حذف الصورة/);
   assert.doesNotMatch(listingsPage, /حسنًا/);
 });
