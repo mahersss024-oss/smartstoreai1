@@ -373,6 +373,11 @@ test('customer listings support an eight-image batch and use explicit action lab
   assert.match(listingsPage, /تم نشر الإعلان بنجاح/);
   assert.match(listingsPage, /تم حذف الإعلان بنجاح/);
   assert.match(listingsPage, /تم حفظ الإعلان/);
+  assert.match(listingsPage, /تم حفظ التعديلات\. يمكنك نشر الإعلان من خياراته هنا\./);
+  assert.doesNotMatch(
+    listingsPage,
+    /إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان/,
+  );
   assert.match(listingsPage, /share: true/);
   assert.match(listingsPage, /تم حذف الصورة/);
   assert.doesNotMatch(listingsPage, /حسنًا/);

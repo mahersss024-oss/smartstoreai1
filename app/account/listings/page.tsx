@@ -904,8 +904,7 @@ export default function AccountListingsPage() {
         setActionResult({
           listingId: listing.id,
           title: 'تم حفظ الإعلان',
-          description:
-            'إذا أردت نشره، انتقل إلى حسابي ← إعلاناتي ثم اختر نشر الإعلان.',
+          description: 'تم حفظ التعديلات. يمكنك نشر الإعلان من خياراته هنا.',
           statusLabel: savedListing?.status ?? listing.status,
         });
         await refreshListings(1);
