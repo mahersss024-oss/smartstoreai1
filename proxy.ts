@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { prisma } from '@/lib/db/prisma';
 import { clearSessionCookie, getAuthSession } from '@/lib/auth/session';
+import { isSameOriginApiMutationAllowed } from '@/lib/security/same-origin';
 
 const productionCanonicalUrl = 'https://souqhamad.com';
 const productionHosts = new Set(['www.souqhamad.com', 'souqhamad.com']);
@@ -50,6 +51,13 @@ export async function proxy(request: NextRequest) {
     url.host = canonicalUrl.host;
 
     return NextResponse.redirect(url, 308);
+  }
+
+  if (!isSameOriginApiMutationAllowed(request)) {
+    return NextResponse.json(
+      { error: 'cross_site_request_blocked' },
+      { status: 403 },
+    );
   }
 
   if (

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
   buildContentSecurityPolicy,
   getSecurityHeaders,
 } from '@/lib/security/headers';
+import {
+  isSameOriginApiMutationAllowed,
+  isUnsafeMutationMethod,
+} from '@/lib/security/same-origin';
 
 function headerMap(headers: Array<{ key: string; value: string }>) {
   return new Map(headers.map((header) => [header.key, header.value]));
@@ -84,4 +89,79 @@ test('adds HSTS only in production', () => {
   } finally {
     env.NODE_ENV = previousNodeEnv;
   }
+});
+
+test('same-origin guard allows safe methods and same-origin api mutations', () => {
+  assert.equal(isUnsafeMutationMethod('GET'), false);
+  assert.equal(isUnsafeMutationMethod('POST'), true);
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/marketplace/listings', {
+        method: 'POST',
+        headers: { origin: 'https://souqhamad.com' },
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/marketplace/listings', {
+        method: 'GET',
+        headers: { origin: 'https://evil.example' },
+      }),
+    ),
+    true,
+  );
+});
+
+test('same-origin guard blocks cross-site api mutations', () => {
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/marketplace/listings', {
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/marketplace/listings', {
+        method: 'DELETE',
+        headers: { 'sec-fetch-site': 'cross-site' },
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/marketplace/listings', {
+        method: 'PATCH',
+        headers: { origin: 'not a url' },
+      }),
+    ),
+    false,
+  );
+});
+
+test('same-origin guard preserves required external auth callbacks', () => {
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/auth/apple/callback', {
+        method: 'POST',
+        headers: {
+          origin: 'https://appleid.apple.com',
+          'sec-fetch-site': 'cross-site',
+        },
+      }),
+    ),
+    true,
+  );
+});
+
+test('proxy enforces the same-origin api mutation guard centrally', async () => {
+  const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8');
+
+  assert.match(proxy, /isSameOriginApiMutationAllowed/);
+  assert.match(proxy, /cross_site_request_blocked/);
 });
