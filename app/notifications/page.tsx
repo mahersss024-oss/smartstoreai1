@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Bell, CheckCheck } from 'lucide-react';
+import { ArrowRight, Bell, CheckCheck, Trash2 } from 'lucide-react';
 
+import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -26,6 +28,7 @@ type NotificationsPayload = {
 };
 
 const notificationsReadEventName = 'smartstore:notifications-read';
+const notificationsChangedEventName = 'smartstore:notifications-changed';
 
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat('ar-SA', {
@@ -42,6 +45,18 @@ export default function NotificationsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingRead, setIsMarkingRead] = useState(false);
+  const [deletingNotificationId, setDeletingNotificationId] = useState<string | null>(
+    null,
+  );
+  const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const deletingNotificationRef = useRef<string | null>(null);
+  const isDeletingAllRef = useRef(false);
+  const [actionNotice, setActionNotice] = useState<{
+    tone: 'success' | 'warning' | 'danger' | 'info';
+    title?: string;
+    message: string;
+  } | null>(null);
 
   const refreshNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -113,6 +128,79 @@ export default function NotificationsPage() {
     }
   }, [refreshNotifications]);
 
+  const deleteNotification = useCallback(
+    async (notificationId: string) => {
+      if (deletingNotificationRef.current || isDeletingAllRef.current) {
+        return;
+      }
+
+      deletingNotificationRef.current = notificationId;
+      setDeletingNotificationId(notificationId);
+      setActionNotice(null);
+
+      try {
+        const response = await fetch(
+          `/api/notifications?id=${encodeURIComponent(notificationId)}`,
+          { method: 'DELETE' },
+        );
+
+        if (!response.ok) {
+          setActionNotice({
+            tone: 'danger',
+            message: 'تعذر حذف الإشعار الآن. حاول مرة أخرى.',
+          });
+          return;
+        }
+
+        await refreshNotifications();
+        window.dispatchEvent(new Event(notificationsChangedEventName));
+        setActionNotice({
+          tone: 'success',
+          message: 'تم حذف الإشعار.',
+        });
+      } finally {
+        deletingNotificationRef.current = null;
+        setDeletingNotificationId(null);
+      }
+    },
+    [refreshNotifications],
+  );
+
+  const deleteAllNotifications = useCallback(async () => {
+    if (isDeletingAllRef.current || payload.notifications.length === 0) {
+      return;
+    }
+
+    isDeletingAllRef.current = true;
+    setIsDeletingAll(true);
+    setActionNotice(null);
+
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        setActionNotice({
+          tone: 'danger',
+          message: 'تعذر حذف جميع الإشعارات الآن. حاول مرة أخرى.',
+        });
+        return;
+      }
+
+      setPayload({ notifications: [], unreadCount: 0 });
+      window.dispatchEvent(new Event(notificationsChangedEventName));
+      setActionNotice({
+        tone: 'success',
+        message: 'تم حذف جميع الإشعارات.',
+      });
+    } finally {
+      isDeletingAllRef.current = false;
+      setIsDeletingAll(false);
+      setIsDeleteAllConfirmOpen(false);
+    }
+  }, [payload.notifications.length]);
+
   useEffect(() => {
     if (
       isSessionLoading ||
@@ -170,22 +258,57 @@ export default function NotificationsPage() {
         ) : (
           <>
             <PushNotificationSettings />
+            <FloatingActionNotice
+              closeLabel="إغلاق نتيجة الإشعارات"
+              message={actionNotice?.message}
+              onDismiss={() => setActionNotice(null)}
+              open={Boolean(actionNotice)}
+              title={actionNotice?.title}
+              tone={actionNotice?.tone ?? 'info'}
+            />
+            <ActionConfirmDialog
+              confirmLabel="حذف الكل"
+              description="سيتم حذف جميع الإشعارات من حسابك."
+              loading={isDeletingAll}
+              loadingText="جاري الحذف..."
+              onCancel={() => setIsDeleteAllConfirmOpen(false)}
+              onConfirm={() => void deleteAllNotifications()}
+              open={isDeleteAllConfirmOpen}
+              title="حذف جميع الإشعارات؟"
+              tone="danger"
+            />
 
             <section className="grid gap-3 px-1 py-3 sm:px-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-base font-bold">سجل الإشعارات</h2>
                 </div>
-                <Button
-                  className="rounded-md"
-                  disabled={isMarkingRead || payload.unreadCount === 0}
-                  onClick={() => void markAllRead()}
-                  type="button"
-                  variant="outline"
-                >
-                  <CheckCheck className="size-4" />
-                  تعليم كمقروء
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    className="rounded-md"
+                    disabled={isMarkingRead || payload.unreadCount === 0}
+                    onClick={() => void markAllRead()}
+                    type="button"
+                    variant="outline"
+                  >
+                    <CheckCheck className="size-4" />
+                    تعليم كمقروء
+                  </Button>
+                  {payload.notifications.length > 0 ? (
+                    <Button
+                      className="rounded-md text-red-600 hover:text-red-700"
+                      disabled={isDeletingAll}
+                      loading={isDeletingAll}
+                      loadingText="جاري الحذف..."
+                      onClick={() => setIsDeleteAllConfirmOpen(true)}
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 className="size-4" />
+                      حذف الكل
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               {isLoading ? (
@@ -195,30 +318,48 @@ export default function NotificationsPage() {
               ) : payload.notifications.length ? (
                 <div className="grid gap-2">
                   {payload.notifications.map((notification) => (
-                    <Link
+                    <article
                       key={notification.id}
-                      href={notification.url}
                       className={`grid gap-1 rounded-md border px-3 py-3 text-sm transition hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-400/10 ${
                         notification.readAt
                           ? 'border-slate-200/70 bg-white/45 dark:border-white/10 dark:bg-card/40'
                           : 'border-blue-300 bg-blue-50/75 shadow-[0_0_18px_rgba(37,99,235,0.12)] dark:border-blue-400/30 dark:bg-blue-400/10'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <strong className="min-w-0 truncate">
-                          {notification.title ?? 'إشعار جديد'}
-                        </strong>
-                        {!notification.readAt ? (
-                          <span className="mt-1 size-2 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
-                        ) : null}
+                      <div className="flex items-start justify-between gap-2">
+                        <Link
+                          href={notification.url}
+                          className="grid min-w-0 flex-1 gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        >
+                          <div className="flex min-w-0 items-start justify-between gap-3">
+                            <strong className="min-w-0 truncate">
+                              {notification.title ?? 'إشعار جديد'}
+                            </strong>
+                            {!notification.readAt ? (
+                              <span className="mt-1 size-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
+                            ) : null}
+                          </div>
+                          <p className="line-clamp-2 text-muted-foreground">
+                            {notification.body ?? 'يوجد تحديث جديد من حساب تتابعه.'}
+                          </p>
+                          <time className="text-xs text-muted-foreground">
+                            {formatNotificationTime(notification.createdAt)}
+                          </time>
+                        </Link>
+                        <Button
+                          aria-label="حذف الإشعار"
+                          className="size-8 shrink-0 rounded-md text-red-600 hover:text-red-700"
+                          disabled={isDeletingAll}
+                          loading={deletingNotificationId === notification.id}
+                          onClick={() => void deleteNotification(notification.id)}
+                          size="icon-sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </div>
-                      <p className="line-clamp-2 text-muted-foreground">
-                        {notification.body ?? 'يوجد تحديث جديد من حساب تتابعه.'}
-                      </p>
-                      <time className="text-xs text-muted-foreground">
-                        {formatNotificationTime(notification.createdAt)}
-                      </time>
-                    </Link>
+                    </article>
                   ))}
                 </div>
               ) : (

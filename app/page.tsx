@@ -897,6 +897,8 @@ type ManualListingNotice = {
   shareTitle?: string;
 };
 
+type ManualListingSubmission = 'saving' | 'saving_and_publishing';
+
 const defaultManualListingForm: ManualListingForm = {
   title: '',
   description: '',
@@ -1891,8 +1893,9 @@ export default function Page() {
     useState(false);
   const [manualListingNotice, setManualListingNotice] =
     useState<ManualListingNotice | null>(null);
-  const [isSubmittingManualListing, setIsSubmittingManualListing] =
-    useState(false);
+  const [manualListingSubmission, setManualListingSubmission] =
+    useState<ManualListingSubmission | null>(null);
+  const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
@@ -3492,7 +3495,7 @@ export default function Page() {
   }, [hasRestoredChat, isLoading, sendStarter]);
 
   const submitManualListing = useCallback(async (options?: { publishAfterSave?: boolean }) => {
-    if (isSubmittingManualListing) {
+    if (manualListingSubmissionRef.current) {
       return;
     }
 
@@ -3566,7 +3569,11 @@ export default function Page() {
       payload.price = manualListingForm.priceMode;
     }
 
-    setIsSubmittingManualListing(true);
+    const nextSubmission: ManualListingSubmission = options?.publishAfterSave
+      ? 'saving_and_publishing'
+      : 'saving';
+    manualListingSubmissionRef.current = nextSubmission;
+    setManualListingSubmission(nextSubmission);
     setManualListingNotice(null);
 
     const selectedImages = manualListingImages.slice(0, 8);
@@ -3713,10 +3720,10 @@ export default function Page() {
         message: 'تعذر حفظ الإعلان اليدوي الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
       });
     } finally {
-      setIsSubmittingManualListing(false);
+      manualListingSubmissionRef.current = null;
+      setManualListingSubmission(null);
     }
   }, [
-    isSubmittingManualListing,
     manualListingForm,
     manualListingImages,
     refreshMarketplaceListings,
@@ -4090,6 +4097,7 @@ export default function Page() {
 
               {isManualListingVisible && (
                 <form
+                  aria-busy={Boolean(manualListingSubmission) || undefined}
                   className="mb-4 grid gap-3 rounded-md border border-blue-200 bg-white/95 p-3 text-right shadow-sm dark:border-blue-400/20 dark:bg-card"
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -4400,6 +4408,7 @@ export default function Page() {
                       type="button"
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(manualListingSubmission)}
                       onClick={() => {
                         setIsManualListingOpen(false);
                         setIsManualListingFallbackDismissed(true);
@@ -4411,20 +4420,30 @@ export default function Page() {
                       type="submit"
                       variant="outline"
                       className="rounded-md"
-                      loading={isSubmittingManualListing}
-                      loadingText="جاري الحفظ..."
+                      disabled={manualListingSubmission === 'saving_and_publishing'}
+                      loading={manualListingSubmission === 'saving'}
+                      loadingText="جاري حفظ الإعلان..."
                     >
-                      {isSubmittingManualListing ? 'جاري الحفظ...' : 'حفظ الإعلان'}
+                      {manualListingSubmission === 'saving'
+                        ? 'جاري حفظ الإعلان...'
+                        : 'حفظ الإعلان'}
                     </Button>
                     <Button
                       type="button"
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      loading={isSubmittingManualListing}
-                      loadingText="جاري الحفظ..."
-                      onClick={() => setIsManualPublishAgreementOpen(true)}
+                      disabled={manualListingSubmission === 'saving'}
+                      loading={manualListingSubmission === 'saving_and_publishing'}
+                      loadingText="جاري حفظ ونشر الإعلان..."
+                      onClick={() => {
+                        if (manualListingSubmission) {
+                          return;
+                        }
+
+                        setIsManualPublishAgreementOpen(true);
+                      }}
                     >
-                      {isSubmittingManualListing
-                        ? 'جاري الحفظ...'
+                      {manualListingSubmission === 'saving_and_publishing'
+                        ? 'جاري حفظ ونشر الإعلان...'
                         : 'حفظ ونشر الإعلان'}
                     </Button>
                   </div>

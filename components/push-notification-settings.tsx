@@ -25,6 +25,7 @@ type PushState =
   | 'working';
 
 const notificationsReadEventName = 'smartstore:notifications-read';
+const notificationsChangedEventName = 'smartstore:notifications-changed';
 
 function base64UrlToUint8Array(value: string) {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
@@ -150,11 +151,16 @@ export function PushNotificationSettings({
     };
 
     window.addEventListener(notificationsReadEventName, clearUnreadCount);
+    window.addEventListener(notificationsChangedEventName, refreshUnreadCount);
 
     return () => {
       window.removeEventListener(notificationsReadEventName, clearUnreadCount);
+      window.removeEventListener(
+        notificationsChangedEventName,
+        refreshUnreadCount,
+      );
     };
-  }, [variant]);
+  }, [refreshUnreadCount, variant]);
 
   useSmartstoreRealtime({
     enabled: variant === 'icon',

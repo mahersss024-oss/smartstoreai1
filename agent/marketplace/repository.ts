@@ -176,6 +176,9 @@ const marketplacePrisma = prisma as typeof prisma & {
       where: { userId: string; readAt: null };
       data: { readAt: Date };
     }): Promise<unknown>;
+    deleteMany(input: {
+      where: { id?: string; userId: string };
+    }): Promise<{ count: number }>;
   };
   similarListingFollow: {
     findMany(input: {
@@ -1515,6 +1518,55 @@ export async function markAccountFollowNotificationsRead(actor: Actor) {
   });
 
   return { readAt };
+}
+
+export async function deleteAccountFollowNotification(
+  actor: Actor,
+  notificationId: string,
+) {
+  const userId = getActorId(actor);
+
+  if (!shouldUseDatabaseStore()) {
+    for (const [key, notification] of memoryFollowNotifications) {
+      if (notification.id !== notificationId || notification.userId !== userId) {
+        continue;
+      }
+
+      memoryFollowNotifications.delete(key);
+      return { deleted: true };
+    }
+
+    return { deleted: false };
+  }
+
+  const result = await marketplacePrisma.followNotification.deleteMany({
+    where: {
+      id: notificationId,
+      userId,
+    },
+  });
+
+  return { deleted: result.count > 0 };
+}
+
+export async function deleteAccountFollowNotifications(actor: Actor) {
+  const userId = getActorId(actor);
+
+  if (!shouldUseDatabaseStore()) {
+    for (const [key, notification] of memoryFollowNotifications) {
+      if (notification.userId === userId) {
+        memoryFollowNotifications.delete(key);
+      }
+    }
+
+    return { deleted: true };
+  }
+
+  await marketplacePrisma.followNotification.deleteMany({
+    where: { userId },
+  });
+
+  return { deleted: true };
 }
 
 export async function getSimilarListingFollowState(
