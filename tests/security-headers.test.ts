@@ -159,6 +159,21 @@ test('same-origin guard preserves required external auth callbacks', () => {
   );
 });
 
+test('same-origin guard preserves the public analytics visit beacon', () => {
+  assert.equal(
+    isSameOriginApiMutationAllowed(
+      new Request('https://souqhamad.com/api/analytics/visit', {
+        method: 'POST',
+        headers: {
+          origin: 'https://www.souqhamad.com',
+          'sec-fetch-site': 'cross-site',
+        },
+      }),
+    ),
+    true,
+  );
+});
+
 test('proxy enforces the same-origin api mutation guard centrally', async () => {
   const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8');
 

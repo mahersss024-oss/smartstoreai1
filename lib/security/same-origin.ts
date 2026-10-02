@@ -1,5 +1,8 @@
 const unsafeMutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const csrfExemptApiPaths = new Set(['/api/auth/apple/callback']);
+const csrfExemptApiPaths = new Set([
+  '/api/analytics/visit',
+  '/api/auth/apple/callback',
+]);
 
 export function isUnsafeMutationMethod(method: string) {
   return unsafeMutationMethods.has(method.toUpperCase());
