@@ -5,7 +5,7 @@ import test from 'node:test';
 test('manual listing image picker uses the custom upload surface', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   const uploadInputIndex = page.indexOf('accept="image/*"', page.indexOf('manualListingForm.description'));
-  const uploadSurface = page.slice(uploadInputIndex - 900, uploadInputIndex + 2600);
+  const uploadSurface = page.slice(uploadInputIndex - 900, uploadInputIndex + 5200);
 
   assert.match(uploadSurface, /className="sr-only"/);
   assert.match(uploadSurface, /border-2 border-dashed border-blue-400\/70/);
@@ -13,6 +13,11 @@ test('manual listing image picker uses the custom upload surface', async () => {
   assert.match(uploadSurface, /إضافة صور الإعلان/);
   assert.match(uploadSurface, /اضغط لاختيار الصور من جهازك/);
   assert.match(uploadSurface, /manualListingImagePreviewUrls\.map/);
+  assert.match(uploadSurface, /setManualListingImagePreviewIndex\(index\)/);
+  assert.match(uploadSurface, /removeManualListingImage\(index\)/);
+  assert.match(uploadSurface, /manualListingPreviewUrl/);
+  assert.match(page, /showPreviousManualListingImage/);
+  assert.match(page, /showNextManualListingImage/);
   assert.doesNotMatch(
     uploadSurface,
     /className="rounded-md border bg-background px-3 py-2 text-sm"/,

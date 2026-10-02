@@ -1879,6 +1879,8 @@ export default function Page() {
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
   const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
     useState<string[]>([]);
+  const [manualListingImagePreviewIndex, setManualListingImagePreviewIndex] =
+    useState<number | null>(null);
   const [isPreparingManualListingImages, setIsPreparingManualListingImages] =
     useState(false);
   const [manualListingNotice, setManualListingNotice] =
@@ -1937,6 +1939,7 @@ export default function Page() {
   useEffect(() => {
     if (manualListingImages.length === 0) {
       setManualListingImagePreviewUrls([]);
+      setManualListingImagePreviewIndex(null);
       return;
     }
 
@@ -1951,6 +1954,91 @@ export default function Page() {
       }
     };
   }, [manualListingImages]);
+
+  const stageManualListingImages = useCallback((images: File[]) => {
+    const selectedImages = images.slice(0, 8);
+
+    setManualListingImages(selectedImages);
+    setIsPreparingManualListingImages(selectedImages.length > 0);
+
+    if (selectedImages.length === 0) {
+      manualListingImagePreparationRef.current = null;
+      setManualListingImagePreviewIndex(null);
+      return;
+    }
+
+    const preparation = {
+      source: selectedImages,
+      promise: prepareUploadableImageFiles(selectedImages),
+    };
+    manualListingImagePreparationRef.current = preparation;
+    void preparation.promise.then(
+      () => {
+        if (manualListingImagePreparationRef.current === preparation) {
+          setIsPreparingManualListingImages(false);
+        }
+      },
+      () => {
+        if (manualListingImagePreparationRef.current === preparation) {
+          setIsPreparingManualListingImages(false);
+        }
+      },
+    );
+  }, []);
+
+  const removeManualListingImage = useCallback(
+    (imageIndex: number) => {
+      const nextImages = manualListingImages.filter(
+        (_, index) => index !== imageIndex,
+      );
+
+      stageManualListingImages(nextImages);
+      setManualListingImagePreviewIndex((currentIndex) => {
+        if (currentIndex === null) {
+          return null;
+        }
+
+        if (nextImages.length === 0) {
+          return null;
+        }
+
+        if (currentIndex === imageIndex) {
+          return Math.min(imageIndex, nextImages.length - 1);
+        }
+
+        return currentIndex > imageIndex ? currentIndex - 1 : currentIndex;
+      });
+    },
+    [manualListingImages, stageManualListingImages],
+  );
+
+  const showPreviousManualListingImage = useCallback(() => {
+    setManualListingImagePreviewIndex((currentIndex) => {
+      if (manualListingImages.length === 0) {
+        return null;
+      }
+
+      const activeIndex = currentIndex ?? 0;
+      return (activeIndex - 1 + manualListingImages.length) % manualListingImages.length;
+    });
+  }, [manualListingImages.length]);
+
+  const showNextManualListingImage = useCallback(() => {
+    setManualListingImagePreviewIndex((currentIndex) => {
+      if (manualListingImages.length === 0) {
+        return null;
+      }
+
+      const activeIndex = currentIndex ?? 0;
+      return (activeIndex + 1) % manualListingImages.length;
+    });
+  }, [manualListingImages.length]);
+
+  const manualListingActivePreviewIndex = manualListingImagePreviewIndex ?? 0;
+  const manualListingPreviewUrl =
+    manualListingImagePreviewIndex === null
+      ? null
+      : manualListingImagePreviewUrls[manualListingImagePreviewIndex] ?? null;
   const shouldResetSearchStateRef = useRef(true);
   const [clientIntent, setClientIntent] =
     useState<ClientIntentState>(defaultClientIntent);
@@ -4181,27 +4269,9 @@ export default function Page() {
                         onChange={(event) => {
                           const selectedImages = Array.from(
                             event.target.files ?? [],
-                          ).slice(0, 8);
-                          setManualListingImages(selectedImages);
-                          setIsPreparingManualListingImages(selectedImages.length > 0);
-
-                          const preparation = {
-                            source: selectedImages,
-                            promise: prepareUploadableImageFiles(selectedImages),
-                          };
-                          manualListingImagePreparationRef.current = preparation;
-                          void preparation.promise.then(
-                            () => {
-                              if (manualListingImagePreparationRef.current === preparation) {
-                                setIsPreparingManualListingImages(false);
-                              }
-                            },
-                            () => {
-                              if (manualListingImagePreparationRef.current === preparation) {
-                                setIsPreparingManualListingImages(false);
-                              }
-                            },
                           );
+                          stageManualListingImages(selectedImages);
+                          event.currentTarget.value = '';
                         }}
                       />
                       <span className="grid justify-items-center gap-2">
@@ -4221,15 +4291,106 @@ export default function Page() {
                         {manualListingImagePreviewUrls.map((previewUrl, index) => (
                           <div
                             key={previewUrl + '-' + index}
-                            className="relative aspect-square overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900"
+                            className="relative aspect-square overflow-hidden rounded-md border bg-slate-100 shadow-sm dark:bg-slate-900"
                           >
+                            <button
+                              aria-label={'معاينة صورة الإعلان ' + (index + 1)}
+                              className="size-full"
+                              onClick={() => setManualListingImagePreviewIndex(index)}
+                              type="button"
+                            >
                             <img
                               alt={'صورة الإعلان ' + (index + 1)}
                               className="size-full object-cover"
                               src={previewUrl}
                             />
+                            </button>
+                            <button
+                              aria-label={'حذف صورة الإعلان ' + (index + 1)}
+                              className="absolute left-1 top-1 grid size-7 place-items-center rounded-full border border-white/70 bg-white/92 text-red-600 shadow-sm transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:border-white/10 dark:bg-slate-950/85 dark:text-red-300 dark:hover:bg-red-500/15"
+                              onClick={() => removeManualListingImage(index)}
+                              type="button"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {manualListingPreviewUrl && (
+                      <div
+                        aria-modal="true"
+                        className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md"
+                        onClick={() => setManualListingImagePreviewIndex(null)}
+                        role="dialog"
+                      >
+                        <div
+                          className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 shadow-2xl"
+                          dir="rtl"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-white">
+                                صورة الإعلان {manualListingActivePreviewIndex + 1} / {manualListingImages.length}
+                              </p>
+                              <p className="text-xs text-slate-400">قبل الرفع</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                aria-label="حذف الصورة"
+                                className="rounded-xl text-red-200 hover:bg-red-500/15 hover:text-red-100"
+                                onClick={() => removeManualListingImage(manualListingActivePreviewIndex)}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                              <Button
+                                aria-label="إغلاق المعاينة"
+                                className="rounded-xl text-white hover:bg-white/10"
+                                onClick={() => setManualListingImagePreviewIndex(null)}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                <X className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="relative grid min-h-[18rem] place-items-center bg-slate-900/80 p-3">
+                            <img
+                              alt={'معاينة صورة الإعلان ' + (manualListingActivePreviewIndex + 1)}
+                              className="max-h-[68dvh] max-w-full rounded-xl object-contain"
+                              src={manualListingPreviewUrl}
+                            />
+                            {manualListingImages.length > 1 && (
+                              <>
+                                <Button
+                                  aria-label="الصورة السابقة"
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/70 text-white hover:bg-slate-900"
+                                  onClick={showPreviousManualListingImage}
+                                  size="icon-sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  <ChevronRight className="size-5" />
+                                </Button>
+                                <Button
+                                  aria-label="الصورة التالية"
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/70 text-white hover:bg-slate-900"
+                                  onClick={showNextManualListingImage}
+                                  size="icon-sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  <ChevronLeft className="size-5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                     {(isPreparingManualListingImages || manualListingImages.length > 0) && (
