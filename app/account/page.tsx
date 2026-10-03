@@ -503,7 +503,7 @@ export default function AccountPage() {
         }
         tone={pendingAccountConfirm === 'delete_account' ? 'danger' : 'default'}
       />
-      <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
+      <div className="smartstore-stable-content mx-auto grid max-w-[28rem] gap-4 px-3 py-4 sm:max-w-[30rem] sm:px-5 sm:py-5 lg:max-w-4xl lg:px-6">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/">
@@ -561,7 +561,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : (
-          <div className="grid gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-2 lg:pb-6">
+          <div className="mx-auto grid w-full max-w-[28rem] gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:max-w-[30rem] sm:px-2 lg:max-w-none lg:pb-6">
             <section className="rounded-md border border-slate-200/70 bg-white/82 p-4 shadow-sm dark:border-white/10 dark:bg-card/72">
               <div className="flex min-w-0 items-center gap-4">
                 <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
