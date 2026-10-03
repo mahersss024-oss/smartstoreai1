@@ -308,6 +308,7 @@ export default function FavoritesPage() {
                       key={favorite.id}
                       className="grid w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                       href={`/listings/${favorite.listingId}?source=favorites`}
+                      prefetch={false}
                     >
                       <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
                         <ResilientImage

@@ -161,3 +161,39 @@ test('customer listing pages avoid large framed containers for scalable lists', 
   assert.doesNotMatch(listingDetails, /rounded-md border bg-white\/60 px-3 py-3/);
   assert.doesNotMatch(accountPage, /rounded-md border bg-white\/60 px-3 py-3/);
 });
+
+test('home marketplace prioritizes only initial viewport listing images', async () => {
+  const source = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /prioritizeImage\?: boolean/);
+  assert.match(source, /prioritizeImage=\{index < 4\}/);
+  assert.match(source, /loading=\{prioritizeImage \? 'eager' : 'lazy'\}/);
+  assert.match(source, /fetchPriority=\{prioritizeImage \? 'high' : 'auto'\}/);
+  assert.doesNotMatch(source, /loading="eager"/);
+});
+
+test('large repeated customer lists avoid prefetching every dynamic detail route', async () => {
+  const sources = await Promise.all([
+    readFile(new URL('../app/favorites/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/account/listings/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/account/follows/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/conversations/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/sellers/[sellerId]/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../app/listings/[listingId]/page.tsx', import.meta.url), 'utf8'),
+  ]);
+
+  for (const source of sources) {
+    const linkTags = source.match(/<Link\b[\s\S]*?>/g) ?? [];
+
+    for (const linkTag of linkTags) {
+      const isRepeatedDynamicRoute =
+        /href=\{(?:`\/(?:listings|conversations)|encodeListingHref|encodeSellerHref|getSellerListingHref|getSimilarListingHref)/.test(
+          linkTag,
+        );
+
+      if (isRepeatedDynamicRoute) {
+        assert.match(linkTag, /prefetch=\{false\}/);
+      }
+    }
+  }
+});

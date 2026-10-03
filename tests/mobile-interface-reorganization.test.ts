@@ -43,6 +43,22 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.doesNotMatch(navigation, /Grid2X2/);
 });
 
+test('mobile navigation and conversation alert avoid eager cold-load work', () => {
+  const navigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
+  const alertHook = readProjectFile('hooks', 'use-conversation-message-alert.ts');
+
+  assert.doesNotMatch(
+    navigation,
+    /\['\/', '\/account', '\/account\/listings', '\/favorites', '\/conversations'\]\.forEach/,
+  );
+  assert.match(navigation, /prefetchNavigationTarget\(item\.href\)/);
+  assert.match(navigation, /onPointerEnter=\{\(\) => prefetchNavigationTarget\(item\.href\)\}/);
+  assert.match(navigation, /onFocus=\{\(\) => prefetchNavigationTarget\(item\.href\)\}/);
+  assert.match(alertHook, /requestIdleCallback/);
+  assert.match(alertHook, /unreadConversationSyncIdleTimeoutMs/);
+  assert.doesNotMatch(alertHook, /queueMicrotask\(\(\) => \{\s*if \(!cancelled\) \{\s*if \(currentUserId\)/);
+});
+
 test('account page exposes former more links without changing routes', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 

@@ -264,6 +264,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                 <Link
                   key={listing.id}
                   href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
+                  prefetch={false}
                   className="group grid min-w-0 max-w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                 >
                   <div

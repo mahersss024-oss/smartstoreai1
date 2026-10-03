@@ -1508,6 +1508,7 @@ function ListingCardView({
   onAsk,
   onFavorite,
   onOpen,
+  prioritizeImage = false,
   isSmartResult = false,
   style,
   variant = 'grid',
@@ -1520,6 +1521,7 @@ function ListingCardView({
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
+  prioritizeImage?: boolean;
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
 }) {
@@ -1590,7 +1592,8 @@ function ListingCardView({
                 className="h-full w-full object-cover"
                 decoding="async"
                 fallback={listingImageFallback}
-                loading="lazy"
+                fetchPriority={prioritizeImage ? 'high' : 'auto'}
+                loading={prioritizeImage ? 'eager' : 'lazy'}
                 src={listing.image}
               />
             </>
@@ -1657,7 +1660,8 @@ function ListingCardView({
               className="h-full w-full object-contain"
               decoding="async"
               fallback={listingImageFallback}
-              loading="lazy"
+              fetchPriority={prioritizeImage ? 'high' : 'auto'}
+              loading={prioritizeImage ? 'eager' : 'lazy'}
               src={listing.image}
             />
           </>
@@ -4684,7 +4688,7 @@ export default function Page() {
               )}
 
               <div className="grid max-w-4xl gap-1.5">
-                {exploreMarketplaceListings.map((listing) => (
+                {exploreMarketplaceListings.map((listing, index) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
                     listing={listing}
@@ -4697,6 +4701,7 @@ export default function Page() {
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
+                    prioritizeImage={index < 4}
                     variant="horizontal"
                   />
                 ))}

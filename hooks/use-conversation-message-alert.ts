@@ -7,6 +7,7 @@ import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 
 const conversationAlertStorageKey = 'smartstore_conversation_alert';
+const unreadConversationSyncIdleTimeoutMs = 2500;
 
 type UseConversationMessageAlertOptions = {
   userId?: string | null;
@@ -34,6 +35,23 @@ function isMessageReadBy(
     !Array.isArray(readBy) &&
     typeof (readBy as Record<string, unknown>)[userId] === 'string'
   );
+}
+
+function scheduleIdleTask(task: () => void) {
+  if ('requestIdleCallback' in window) {
+    const idleCallbackId = window.requestIdleCallback(task, {
+      timeout: unreadConversationSyncIdleTimeoutMs,
+    });
+
+    return () => window.cancelIdleCallback(idleCallbackId);
+  }
+
+  const timeoutId = globalThis.setTimeout(
+    task,
+    unreadConversationSyncIdleTimeoutMs,
+  );
+
+  return () => globalThis.clearTimeout(timeoutId);
 }
 
 export function useConversationMessageAlert({
@@ -103,7 +121,7 @@ export function useConversationMessageAlert({
       };
     }
 
-    queueMicrotask(() => {
+    const cancelIdleSync = scheduleIdleTask(() => {
       if (!cancelled) {
         if (currentUserId) {
           void syncUnreadConversations();
@@ -123,6 +141,7 @@ export function useConversationMessageAlert({
 
     return () => {
       cancelled = true;
+      cancelIdleSync();
     };
   }, [currentUserId, isUserIdControlled, pathname, syncUnreadConversations]);
 

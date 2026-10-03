@@ -457,6 +457,7 @@ export default function ConversationsPage() {
                         <Link
                           className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-2 px-2 py-2 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:px-3"
                           href={`/conversations/${conversation.id}`}
+                          prefetch={false}
                         >
                           <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100 sm:size-11">
                             {otherParticipant?.picture ? (
@@ -502,7 +503,7 @@ export default function ConversationsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-40">
                               <DropdownMenuItem asChild>
-                                <Link href={`/conversations/${conversation.id}`}>
+                                <Link href={`/conversations/${conversation.id}`} prefetch={false}>
                                   <MessageCircle className="size-4" />
                                   فتح المحادثة
                                 </Link>

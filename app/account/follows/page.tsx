@@ -305,6 +305,7 @@ export default function AccountFollowsPage() {
                       <Link
                         className="aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900"
                         href={encodeListingHref(follow.listingId)}
+                        prefetch={false}
                       >
                         {follow.image ? (
                           <ResilientImage
@@ -325,7 +326,7 @@ export default function AccountFollowsPage() {
                           </span>
                         )}
                       </Link>
-                      <Link className="min-w-0" href={encodeListingHref(follow.listingId)}>
+                      <Link className="min-w-0" href={encodeListingHref(follow.listingId)} prefetch={false}>
                         <h3 className="line-clamp-2 text-sm font-bold">{follow.title}</h3>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
                           {follow.city ?? 'السعودية'} · {follow.category} · {formatFollowDate(follow.createdAt)}
@@ -353,10 +354,10 @@ export default function AccountFollowsPage() {
                     key={`${activeTab}:${person.userId}`}
                     className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200/70 p-3 last:border-b-0 dark:border-white/10"
                   >
-                    <Link href={encodeSellerHref(person.userId)}>
+                    <Link href={encodeSellerHref(person.userId)} prefetch={false}>
                       <PersonAvatar person={person} />
                     </Link>
-                    <Link className="min-w-0" href={encodeSellerHref(person.userId)}>
+                    <Link className="min-w-0" href={encodeSellerHref(person.userId)} prefetch={false}>
                       <h3 className="truncate text-sm font-bold">{person.name}</h3>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {person.publishedListingCount} إعلان · {formatFollowDate(person.createdAt)}

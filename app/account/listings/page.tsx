@@ -1916,7 +1916,7 @@ export default function AccountListingsPage() {
                       <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/60 pt-2 dark:border-white/10 sm:grid-cols-3 xl:grid-cols-8">
                         {listing.rawStatus === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
-                            <Link href={`/listings/${listing.id}?source=account-listings`}>
+                            <Link href={`/listings/${listing.id}?source=account-listings`} prefetch={false}>
                               <Megaphone className="size-3.5" />
                               عرض
                             </Link>
@@ -1992,7 +1992,7 @@ export default function AccountListingsPage() {
                         )}
                         {listing.rawStatus === 'sold' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md border-blue-500/40 text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-400/10">
-                            <Link href={`/commissions?listingId=${listing.id}`}>
+                            <Link href={`/commissions?listingId=${listing.id}`} prefetch={false}>
                               <Percent className="size-3.5" />
                               رسوم المنصة
                             </Link>
