@@ -56,7 +56,7 @@ export function normalizeContactPhoneNumber(
   if (countContactPhoneCandidates(trimmed) > 1) {
     return {
       ok: false,
-      message: 'يمكن حفظ رقم تواصل رسمي واحد فقط.',
+      message: 'يمكن حفظ رقم اتصال واحد فقط.',
     };
   }
 

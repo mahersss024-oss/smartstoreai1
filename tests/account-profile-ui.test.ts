@@ -32,8 +32,16 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /JPG أو PNG أو WEBP حتى 4MB/);
   assert.match(page, /displayName: profileName/);
   assert.doesNotMatch(page, /picture: profilePicture/);
+  assert.match(page, /user: payload\.user \?\? null/);
+  assert.doesNotMatch(page, /\.\.\.currentSession\.user,\s*\.\.\.payload\.user/);
   assert.match(page, /hasProfileNameChanges/);
-  assert.match(page, /حفظ الاسم الظاهر/);
+  assert.match(page, /حفظ الاسم/);
+  assert.doesNotMatch(page, /حفظ الاسم الظاهر/);
+  assert.doesNotMatch(page, /الاسم الظاهر/);
+  assert.match(page, /بيانات الاتصال/);
+  assert.doesNotMatch(page, /بيانات التواصل الرسمية/);
+  assert.match(page, /رقم الاتصال الحالي/);
+  assert.doesNotMatch(page, /الرقم الرسمي المحفوظ/);
   assert.match(page, /saveProfile/);
   assert.match(page, /savedProfilePhone/);
   assert.match(page, /ThemeToggle/);

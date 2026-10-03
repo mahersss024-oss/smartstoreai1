@@ -43,6 +43,6 @@ test('rejects multiple saved contact phone numbers', () => {
 
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.message, /رقم تواصل رسمي واحد/);
+    assert.match(result.message, /رقم اتصال واحد/);
   }
 });

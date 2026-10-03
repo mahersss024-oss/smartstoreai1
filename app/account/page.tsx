@@ -127,7 +127,7 @@ export default function AccountPage() {
     if (countContactPhoneCandidates(nextPhoneNumber) > 1) {
       setProfileNotice({
         tone: 'danger',
-        message: 'يمكن حفظ رقم تواصل رسمي واحد فقط. احذف الرقم الإضافي ثم احفظ.',
+        message: 'يمكن حفظ رقم اتصال واحد فقط. احذف الرقم الإضافي ثم احفظ.',
       });
       return;
     }
@@ -168,9 +168,7 @@ export default function AccountPage() {
 
       setSession((currentSession) => ({
         ...currentSession,
-        user: currentSession.user
-          ? { ...currentSession.user, ...payload.user }
-          : payload.user ?? null,
+        user: payload.user ?? null,
       }));
       setProfileName(payload.user.name ?? '');
       setProfilePicture(payload.user.picture ?? '');
@@ -193,7 +191,7 @@ export default function AccountPage() {
     setIsEditingProfilePhone(true);
     setProfileNotice({
       tone: 'info',
-      message: 'عدّل الرقم الرسمي ثم اضغط حفظ البيانات.',
+      message: 'عدّل رقم الاتصال ثم اضغط حفظ البيانات.',
     });
   }, [savedProfilePhone]);
 
@@ -266,9 +264,7 @@ export default function AccountPage() {
       const applyUploadedPicture = () => {
         setSession((currentSession) => ({
           ...currentSession,
-          user: currentSession.user
-            ? { ...currentSession.user, ...payload.user }
-            : payload.user ?? null,
+          user: payload.user ?? null,
         }));
         setProfilePicture(nextPicture);
         setProfilePicturePreview((currentPreview) => {
@@ -358,9 +354,7 @@ export default function AccountPage() {
       setProfilePicture('');
       setSession((currentSession) => ({
         ...currentSession,
-        user: currentSession.user
-          ? { ...currentSession.user, ...payload.user, picture: undefined }
-          : payload.user ?? null,
+        user: payload.user ?? null,
       }));
       setProfileNotice({
         tone: 'success',
@@ -391,7 +385,13 @@ export default function AccountPage() {
     setSession((currentSession) => ({
       ...currentSession,
       user: currentSession.user
-        ? { ...currentSession.user, picture: undefined }
+        ? {
+            id: currentSession.user.id,
+            email: currentSession.user.email,
+            name: currentSession.user.name,
+            phoneNumber: currentSession.user.phoneNumber,
+            role: currentSession.user.role,
+          }
         : currentSession.user,
     }));
 
@@ -716,7 +716,7 @@ export default function AccountPage() {
                     ) : null}
                   </div>
                   <label className="grid gap-1 text-sm font-semibold">
-                    الاسم الظاهر
+                    الاسم
                     <input
                       className="h-11 rounded-md border bg-background px-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                       disabled={isSavingProfile || isUploadingProfilePicture || isRemovingProfilePicture}
@@ -741,7 +741,7 @@ export default function AccountPage() {
                       type="button"
                     >
                       <Save className="size-4" />
-                      {isSavingProfile ? 'جار الحفظ...' : 'حفظ الاسم الظاهر'}
+                      {isSavingProfile ? 'جار الحفظ...' : 'حفظ الاسم'}
                     </Button>
                     <Button
                       className="rounded-md"
@@ -770,7 +770,7 @@ export default function AccountPage() {
                   <Phone className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-bold">بيانات التواصل الرسمية</h2>
+                  <h2 className="text-base font-bold">بيانات الاتصال</h2>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -802,7 +802,7 @@ export default function AccountPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm">
                   <div className="min-w-0">
                     <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
-                      الرقم الرسمي المحفوظ
+                      رقم الاتصال الحالي
                     </div>
                     <div className="mt-1 truncate font-semibold" dir="ltr">
                       {savedProfilePhone}
