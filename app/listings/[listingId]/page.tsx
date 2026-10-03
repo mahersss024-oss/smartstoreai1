@@ -25,6 +25,7 @@ import type { ListingCondition } from '@/agent/marketplace/types';
 import { getAuthSession } from '@/lib/auth/session';
 import { Button } from '@ui/button';
 import { ListingShareButton } from '@/components/listing-share-button';
+import { ResilientImage } from '@/components/resilient-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { ListingContactActions } from './contact-actions';
 import {
@@ -965,10 +966,15 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                       >
                         <div className="aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900">
                           {imageUrl ? (
-                            <img
+                            <ResilientImage
                               alt={similarListing.title ?? 'صورة الإعلان'}
                               className="h-full w-full object-cover"
                               decoding="async"
+                              fallback={
+                                <div className="grid h-full place-items-center">
+                                  <PackageCheck className="size-6 text-slate-400" />
+                                </div>
+                              }
                               loading="lazy"
                               src={imageUrl}
                             />

@@ -11,6 +11,12 @@ type ResilientImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   src: string;
 };
 
+type ImageLoadState = {
+  attempt: number;
+  failed: boolean;
+  src: string;
+};
+
 function withRetryToken(src: string, attempt: number) {
   if (attempt === 0 || src.startsWith('data:') || src.startsWith('blob:')) {
     return src;
@@ -33,9 +39,22 @@ export function ResilientImage({
   src,
   ...props
 }: ResilientImageProps) {
-  const [attempt, setAttempt] = useState(0);
-  const [failed, setFailed] = useState(false);
+  const [loadState, setLoadState] = useState<ImageLoadState>({
+    attempt: 0,
+    failed: false,
+    src,
+  });
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeLoadState =
+    loadState.src === src ? loadState : { attempt: 0, failed: false, src };
+  const attempt = activeLoadState.attempt;
+
+  useEffect(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, [src]);
 
   useEffect(() => {
     return () => {
@@ -45,7 +64,7 @@ export function ResilientImage({
     };
   }, []);
 
-  if (failed) {
+  if (activeLoadState.failed) {
     return fallback;
   }
 
@@ -58,12 +77,26 @@ export function ResilientImage({
         onError?.(event);
 
         if (attempt >= maxRetries) {
-          setFailed(true);
+          setLoadState({ ...activeLoadState, failed: true });
           return;
         }
 
+        if (retryTimerRef.current) {
+          clearTimeout(retryTimerRef.current);
+        }
+
         retryTimerRef.current = setTimeout(
-          () => setAttempt((currentAttempt) => currentAttempt + 1),
+          () =>
+            setLoadState((currentState) => {
+              const currentAttempt =
+                currentState.src === src ? currentState.attempt : 0;
+
+              return {
+                attempt: currentAttempt + 1,
+                failed: false,
+                src,
+              };
+            }),
           500 * (attempt + 1),
         );
       }}

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Megaphone } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
+import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -309,20 +310,18 @@ export default function FavoritesPage() {
                       href={`/listings/${favorite.listingId}?source=favorites`}
                     >
                       <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
-                        <img
+                        <ResilientImage
                           alt={favorite.listing?.title ?? 'صورة الإعلان'}
                           className="h-full w-full object-cover"
                           decoding="async"
+                          fallback={
+                            <div className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                              <ImageIcon className="size-6" />
+                            </div>
+                          }
                           loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.hidden = true;
-                            event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                          }}
                           src={getListingImage(favorite.listing)}
                         />
-                        <div hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
-                          <ImageIcon className="size-6" />
-                        </div>
                       </div>
                       <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
                         <div className="hidden">

@@ -29,6 +29,7 @@ import {
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { ResilientImage } from '@/components/resilient-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -1485,10 +1486,19 @@ export default function ConversationPage() {
                     href={conversationListingHref ?? '/conversations'}
                     className="size-12 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                   >
-                    <img
+                    <ResilientImage
                       alt={displayListing.title ?? 'صورة الإعلان'}
                       className="size-full object-cover"
                       decoding="async"
+                      fallback={
+                        <img
+                          alt="صورة الإعلان"
+                          className="size-full object-cover"
+                          decoding="async"
+                          loading="lazy"
+                          src={missingListingImageDataUrl}
+                        />
+                      }
                       loading="lazy"
                       src={getListingImage(displayListing)}
                     />
@@ -1779,10 +1789,19 @@ export default function ConversationPage() {
                   href={conversationListingHref ?? '/conversations'}
                   className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                 >
-                  <img
+                  <ResilientImage
                     alt={displayListing.title ?? 'صورة الإعلان'}
                     className="size-full object-cover"
                     decoding="async"
+                    fallback={
+                      <img
+                        alt="صورة الإعلان"
+                        className="size-full object-cover"
+                        decoding="async"
+                        loading="lazy"
+                        src={missingListingImageDataUrl}
+                      />
+                    }
                     loading="lazy"
                     src={getListingImage(displayListing)}
                   />

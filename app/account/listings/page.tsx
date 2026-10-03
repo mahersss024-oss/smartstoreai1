@@ -33,6 +33,7 @@ import { CommissionAgreementDialog } from '@/components/commission-agreement-dia
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
+import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { queueUploadableImagePreparation } from '@/lib/client-image-normalization';
@@ -1320,10 +1321,15 @@ export default function AccountListingsPage() {
               </DialogHeader>
               <div className="relative overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
                 {previewImageUrl ? (
-                  <img
+                  <ResilientImage
                     alt={imagePreviewListing.title}
                     className="max-h-[70dvh] w-full object-contain"
                     decoding="async"
+                    fallback={
+                      <div className="grid aspect-video place-items-center text-muted-foreground">
+                        <ImageIcon className="size-8" />
+                      </div>
+                    }
                     src={previewImageUrl}
                   />
                 ) : (
@@ -1352,10 +1358,15 @@ export default function AccountListingsPage() {
                       type="button"
                     >
                       {image.url ? (
-                        <img
+                        <ResilientImage
                           alt=""
                           className="h-full w-full object-cover"
                           decoding="async"
+                          fallback={
+                            <span className="grid h-full place-items-center">
+                              <ImageIcon className="size-5 text-muted-foreground" />
+                            </span>
+                          }
                           loading="lazy"
                           src={image.url}
                         />
@@ -1471,10 +1482,15 @@ export default function AccountListingsPage() {
                         type="button"
                       >
                         {image.url ? (
-                          <img
+                          <ResilientImage
                             alt=""
                             className="h-full w-full object-contain"
                             decoding="async"
+                            fallback={
+                              <span className="grid h-full place-items-center">
+                                <ImageIcon className="size-5 text-muted-foreground" />
+                              </span>
+                            }
                             loading="lazy"
                             src={image.url}
                           />
@@ -1678,10 +1694,15 @@ export default function AccountListingsPage() {
                           type="button"
                         >
                           {listing.image ? (
-                            <img
+                            <ResilientImage
                               alt={listing.title}
                               className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
                               decoding="async"
+                              fallback={
+                                <span className="grid h-full place-items-center text-slate-400">
+                                  <ImageIcon className="size-8" />
+                                </span>
+                              }
                               loading="lazy"
                               src={listing.image}
                             />

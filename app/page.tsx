@@ -69,6 +69,7 @@ import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
+import { ResilientImage } from '@/components/resilient-image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   chatServiceUnavailableMessage,
@@ -1364,20 +1365,14 @@ function ListingChatLinkCard({
         <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-slate-900 dark:text-blue-200">
           {listing?.image ? (
             <>
-              <img
+              <ResilientImage
                 alt={listing.title}
                 className="h-full w-full object-contain"
                 decoding="async"
+                fallback={<Megaphone className="size-5" />}
                 loading="lazy"
-                onError={(event) => {
-                  event.currentTarget.hidden = true;
-                  event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                }}
                 src={listing.image}
               />
-              <span hidden>
-                <Megaphone className="size-5" />
-              </span>
             </>
           ) : (
             <Megaphone className="size-5" />
@@ -1528,10 +1523,14 @@ function ListingCardView({
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
 }) {
-  const showImageFallback = (image: HTMLImageElement) => {
-    image.hidden = true;
-    image.nextElementSibling?.removeAttribute('hidden');
-  };
+  const listingImageFallback = (
+    <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+      <div className="grid gap-1">
+        <ImageIcon className="mx-auto size-5" />
+        <span>لا توجد صورة حقيقية</span>
+      </div>
+    </div>
+  );
   const askToCompareListing = () => {
     onAsk(
       listing.id
@@ -1586,20 +1585,14 @@ function ListingCardView({
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
-              <img
+              <ResilientImage
                 alt={listing.title}
                 className="h-full w-full object-cover"
                 decoding="async"
+                fallback={listingImageFallback}
                 loading="lazy"
-                onError={(event) => showImageFallback(event.currentTarget)}
                 src={listing.image}
               />
-              <div hidden className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <div className="grid gap-1">
-                  <ImageIcon className="mx-auto size-5" />
-                  <span>لا توجد صورة حقيقية</span>
-                </div>
-              </div>
             </>
           ) : (
             <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
@@ -1659,20 +1652,14 @@ function ListingCardView({
       <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-900">
         {listing.image ? (
           <>
-            <img
+            <ResilientImage
               alt={listing.title}
               className="h-full w-full object-contain"
               decoding="async"
+              fallback={listingImageFallback}
               loading="lazy"
-              onError={(event) => showImageFallback(event.currentTarget)}
               src={listing.image}
             />
-            <div hidden className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <div className="grid gap-1">
-                <ImageIcon className="mx-auto size-5" />
-                <span>لا توجد صورة حقيقية</span>
-              </div>
-            </div>
           </>
         ) : (
           <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
@@ -4859,20 +4846,14 @@ export default function Page() {
                               >
                                 {listing.image ? (
                                   <span className="relative block aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
-                                    <img
+                                    <ResilientImage
                                       alt={listing.title}
                                       className="h-full w-full object-contain"
                                       decoding="async"
+                                      fallback={<span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400"><ImageIcon className="size-4" /></span>}
                                       loading="lazy"
-                                      onError={(event) => {
-                                        event.currentTarget.hidden = true;
-                                        event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                                      }}
                                       src={listing.image}
                                     />
-                                    <span hidden className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
-                                      <ImageIcon className="size-4" />
-                                    </span>
                                   </span>
                                 ) : (
                                   <div className="grid aspect-square place-items-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">

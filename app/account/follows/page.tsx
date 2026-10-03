@@ -1,11 +1,10 @@
-/* eslint-disable @next/next/no-img-element */
-
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ImageIcon, UserPlus } from 'lucide-react';
 
+import { ResilientImage } from '@/components/resilient-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -308,9 +307,16 @@ export default function AccountFollowsPage() {
                         href={encodeListingHref(follow.listingId)}
                       >
                         {follow.image ? (
-                          <img
+                          <ResilientImage
                             alt={follow.title}
                             className="h-full w-full object-cover"
+                            decoding="async"
+                            fallback={
+                              <span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
+                                <ImageIcon className="size-5" />
+                              </span>
+                            }
+                            loading="lazy"
                             src={follow.image}
                           />
                         ) : (
