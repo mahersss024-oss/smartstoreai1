@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -77,10 +78,13 @@ export function SellerProfileActions({
       }
     }
 
-    loadState().catch(() => undefined);
+    const cancelIdleLoad = scheduleIdleTask(() => {
+      loadState().catch(() => undefined);
+    });
 
     return () => {
       ignore = true;
+      cancelIdleLoad();
     };
   }, [encodedSellerId, initialFollowerCount, initialRatingAverage, initialRatingCount]);
 

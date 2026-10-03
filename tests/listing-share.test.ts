@@ -96,6 +96,27 @@ test('listing details actions surface network failures clearly', () => {
   assert.match(safetyActions, /تعذر إرسال البلاغ الآن/);
 });
 
+test('listing detail secondary action state waits for idle time', () => {
+  const safetyActions = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'listing-safety-actions.tsx',
+  );
+  const similarFollowButton = readProjectFile(
+    'app',
+    'listings',
+    '[listingId]',
+    'similar-follow-button.tsx',
+  );
+  const idleTask = readProjectFile('lib', 'client-idle-task.ts');
+
+  assert.match(safetyActions, /scheduleIdleTask/);
+  assert.match(similarFollowButton, /scheduleIdleTask/);
+  assert.match(idleTask, /requestIdleCallback/);
+  assert.match(idleTask, /cancelIdleCallback/);
+});
+
 test('listing details localizes visible attribute labels and common values', () => {
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
 

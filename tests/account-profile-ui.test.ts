@@ -59,6 +59,30 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
 });
 
+test('account hub links do not prefetch every customer section on page load', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const customerHubLinks = [
+    '/account/listings',
+    '/conversations',
+    '/favorites',
+    '/notifications',
+    '/account/follows',
+    '/commissions',
+    '/terms',
+    '/privacy',
+    '/listing-policy',
+    '/commission-policy',
+    '/admin',
+  ];
+
+  for (const href of customerHubLinks) {
+    assert.match(
+      page,
+      new RegExp(`href="${href.replace(/\//g, '\\/')}"\\s+prefetch=\\{false\\}`),
+    );
+  }
+});
+
 test('theme toggle stays on home and account settings only', () => {
   const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
@@ -267,6 +291,19 @@ test('account page links to a real follows list', () => {
   assert.doesNotMatch(repository, /latestListingBySellerId/);
 });
 
+test('seller profile secondary follow and rating state waits for idle time', () => {
+  const actions = readFileSync(
+    join(process.cwd(), 'app', 'sellers', '[sellerId]', 'seller-profile-actions.tsx'),
+    'utf8',
+  );
+  const idleTask = readFileSync(join(process.cwd(), 'lib', 'client-idle-task.ts'), 'utf8');
+
+  assert.match(actions, /scheduleIdleTask/);
+  assert.match(actions, /\/api\/marketplace\/users\/\$\{encodedSellerId\}\/follow/);
+  assert.match(actions, /\/api\/marketplace\/users\/\$\{encodedSellerId\}\/ratings/);
+  assert.match(idleTask, /requestIdleCallback/);
+});
+
 test('account conversations shortcut stays neutral while alert logic lives in navigation', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const mobileNavigation = readFileSync(
@@ -285,9 +322,10 @@ test('account conversations shortcut stays neutral while alert logic lives in na
   assert.doesNotMatch(page, /from-rose-300 to-red-600/);
   assert.match(mobileNavigation, /useConversationMessageAlert/);
   assert.match(mobileNavigation, /alert: hasConversationAlert/);
-  assert.match(alertHook, /eventTypes: \['message_created', 'conversation_updated'\]/);
+  assert.doesNotMatch(alertHook, /useSmartstoreRealtime/);
+  assert.match(alertHook, /visibilitychange/);
+  assert.match(alertHook, /window\.addEventListener\('focus'/);
   assert.match(alertHook, /smartstore_conversation_alert/);
-  assert.match(alertHook, /senderId !== currentUserId/);
   assert.match(alertHook, /syncUnreadConversations/);
   assert.match(alertHook, /const isUserIdControlled = userId !== undefined/);
   assert.match(alertHook, /if \(currentUserId\) \{\s*void syncUnreadConversations\(\);\s*return;\s*\}/);

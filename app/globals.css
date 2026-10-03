@@ -229,7 +229,7 @@
   }
 
   html[data-native-app="true"][data-platform="android"] {
-    --native-status-bar-inset: max(env(safe-area-inset-top, 0px), 28px);
+    --native-status-bar-inset: env(safe-area-inset-top, 0px);
     --safe-area-top: var(--native-status-bar-inset);
   }
 

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 
-import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 type PushConfigResponse = {
   configured: boolean;
@@ -112,8 +112,14 @@ export function PushNotificationSettings({
   }, [isSupported]);
 
   useEffect(() => {
+    if (variant === 'icon') {
+      return scheduleIdleTask(() => {
+        void refreshStatus();
+      });
+    }
+
     void refreshStatus();
-  }, [refreshStatus]);
+  }, [refreshStatus, variant]);
 
   const refreshUnreadCount = useCallback(async () => {
     if (variant !== 'icon') {
@@ -138,8 +144,14 @@ export function PushNotificationSettings({
   }, [variant]);
 
   useEffect(() => {
+    if (variant === 'icon') {
+      return scheduleIdleTask(() => {
+        void refreshUnreadCount();
+      });
+    }
+
     void refreshUnreadCount();
-  }, [refreshUnreadCount]);
+  }, [refreshUnreadCount, variant]);
 
   useEffect(() => {
     if (variant !== 'icon') {
@@ -161,13 +173,6 @@ export function PushNotificationSettings({
       );
     };
   }, [refreshUnreadCount, variant]);
-
-  useSmartstoreRealtime({
-    enabled: variant === 'icon',
-    eventTypes: ['follow_listing_published', 'listing_notification_created'],
-    fallbackIntervalMs: 5000,
-    onResync: refreshUnreadCount,
-  });
 
   const enableNotifications = useCallback(async () => {
     if (!isSupported || !publicKey) {

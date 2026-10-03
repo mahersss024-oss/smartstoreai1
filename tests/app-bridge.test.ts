@@ -18,6 +18,19 @@ test('isInsideNativeApp is false without a bridge shell', () => {
   assert.equal(isInsideNativeApp(), false);
 });
 
+test('native bridge recognizes the Capacitor wrapper marker used by the mobile shells', () => {
+  const appBridge = readFileSync(
+    join(process.cwd(), 'lib', 'native', 'app-bridge.ts'),
+    'utf8',
+  );
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  assert.match(appBridge, /SouqHamadCapacitor/);
+  assert.match(appBridge, /bridgeWindow\.Capacitor/);
+  assert.match(layout, /userAgent\.indexOf\('SouqHamadCapacitor'\) !== -1/);
+  assert.match(layout, /window\.Capacitor/);
+});
+
 test('postToNative returns false without a native shell', () => {
   assert.equal(
     postToNative({ type: 'ready', platform: 'web', version: '1' }),

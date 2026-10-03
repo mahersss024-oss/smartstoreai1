@@ -74,7 +74,8 @@ test('home notification bell is shown only to signed-in users and toggles push d
   assert.match(settings, /onClick=\{\(\) =>\s*void \(isActive \? disableNotifications\(\) : enableNotifications\(\)\)\s*\}/);
   assert.match(settings, /unreadCount > 0/);
   assert.match(settings, /smartstore:notifications-read/);
-  assert.match(settings, /follow_listing_published/);
+  assert.match(settings, /scheduleIdleTask/);
+  assert.doesNotMatch(settings, /useSmartstoreRealtime/);
   assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
   assert.match(settings, /className="shrink-0"/);
 });

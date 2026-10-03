@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BadgePlus,
@@ -47,7 +47,6 @@ export function MobileBottomNavigation() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const prefetchedHrefsRef = useRef(new Set<string>());
   const { hasConversationAlert } = useConversationMessageAlert();
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isAssistantChatViewOpen, setIsAssistantChatViewOpen] = useState(false);
@@ -155,19 +154,9 @@ export function MobileBottomNavigation() {
   function navigate(href: string) {
     closeAssistantViewForPrimaryNavigation(href);
     setPendingHref(href);
-    prefetchNavigationTarget(href);
     startTransition(() => {
       router.push(href);
     });
-  }
-
-  function prefetchNavigationTarget(href: string) {
-    if (prefetchedHrefsRef.current.has(href) || isActive(pathname, href)) {
-      return;
-    }
-
-    prefetchedHrefsRef.current.add(href);
-    router.prefetch(href);
   }
 
   return (
@@ -201,9 +190,6 @@ export function MobileBottomNavigation() {
                   : 'hover:text-slate-800 dark:hover:text-slate-200'
               }`}
               onClick={() => navigate(item.href)}
-              onFocus={() => prefetchNavigationTarget(item.href)}
-              onPointerEnter={() => prefetchNavigationTarget(item.href)}
-              onTouchStart={() => prefetchNavigationTarget(item.href)}
               type="button"
             >
               <span

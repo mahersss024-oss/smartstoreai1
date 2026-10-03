@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@ui/button';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 import { cn } from '@/lib/utils';
 
 function createClientIdempotencyKey(scope: string) {
@@ -87,12 +88,17 @@ export function ListingSafetyActions({
       }
     }
 
+    let cancelIdleCheck = () => {};
+
     if (!isSessionLoading) {
-      void checkFavoritePermission();
+      cancelIdleCheck = scheduleIdleTask(() => {
+        void checkFavoritePermission();
+      });
     }
 
     return () => {
       isCurrent = false;
+      cancelIdleCheck();
     };
   }, [isSessionLoading, listingId, sellerId, session]);
 

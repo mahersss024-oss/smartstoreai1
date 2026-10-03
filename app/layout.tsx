@@ -243,6 +243,8 @@ const nativeViewportInitScript = `
       ? 'android'
       : (/iphone|ipad|ipod/i.test(userAgent) ? 'ios' : 'web');
     var isNativeApp = !!(
+      userAgent.indexOf('SouqHamadCapacitor') !== -1 ||
+      window.Capacitor ||
       window.ReactNativeWebView ||
       window.SmartStoreNative ||
       (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smartstore)

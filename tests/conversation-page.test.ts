@@ -375,6 +375,9 @@ test('conversation navigation alert syncs unread state from the server', () => {
 
   assert.match(hook, /syncUnreadConversations/);
   assert.match(hook, /\/api\/marketplace\/me\/conversations/);
-  assert.match(hook, /conversation_updated/);
+  assert.match(hook, /scheduleIdleTask/);
+  assert.match(hook, /visibilitychange/);
+  assert.match(hook, /window\.addEventListener\('focus'/);
+  assert.doesNotMatch(hook, /useSmartstoreRealtime/);
   assert.match(hook, /readBy/);
 });

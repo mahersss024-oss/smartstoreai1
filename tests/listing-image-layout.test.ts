@@ -109,6 +109,28 @@ test('R2 orphan image audit is dry-run only', async () => {
   assert.doesNotMatch(source, /purge_cache/);
 });
 
+test('missing listing image repair is dry-run by default and scoped to listing image records', async () => {
+  const source = await readFile(
+    new URL('../scripts/repair-missing-listing-images.ts', import.meta.url),
+    'utf8',
+  );
+  const packageJson = await readFile(
+    new URL('../package.json', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(source, /process\.argv\.includes\('--apply'\)/);
+  assert.match(source, /Listing image repair running in/);
+  assert.match(source, /action: 'delete_record'/);
+  assert.match(source, /action: 'repair_urls'/);
+  assert.match(source, /prisma\.listingImage\.delete/);
+  assert.match(source, /prisma\.listingImage\.update/);
+  assert.match(packageJson, /"images:missing:dry-run"/);
+  assert.match(packageJson, /"images:missing:apply"/);
+  assert.doesNotMatch(source, /deleteMany/);
+  assert.doesNotMatch(source, /prisma\.listing\.delete/);
+});
+
 test('account listing cards show one primary thumbnail and move the full grid to image management', async () => {
   const source = await readFile(
     new URL('../app/account/listings/page.tsx', import.meta.url),

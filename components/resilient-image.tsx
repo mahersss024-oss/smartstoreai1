@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ImgHTMLAttributes, ReactNode } from 'react';
 
 type ResilientImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
+  fallbackSrcs?: string[];
   fallback?: ReactNode;
   maxRetries?: number;
   src: string;
@@ -14,6 +15,7 @@ type ResilientImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
 type ImageLoadState = {
   attempt: number;
   failed: boolean;
+  sourceIndex: number;
   src: string;
 };
 
@@ -33,21 +35,29 @@ function withRetryToken(src: string, attempt: number) {
 
 export function ResilientImage({
   alt = '',
+  fallbackSrcs = [],
   fallback = null,
   maxRetries = 2,
   onError,
   src,
   ...props
 }: ResilientImageProps) {
+  const sources = [src, ...fallbackSrcs].filter((value, index, list) => {
+    return value && list.indexOf(value) === index;
+  });
   const [loadState, setLoadState] = useState<ImageLoadState>({
     attempt: 0,
     failed: false,
+    sourceIndex: 0,
     src,
   });
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeLoadState =
-    loadState.src === src ? loadState : { attempt: 0, failed: false, src };
+    loadState.src === src
+      ? loadState
+      : { attempt: 0, failed: false, sourceIndex: 0, src };
   const attempt = activeLoadState.attempt;
+  const activeSource = sources[activeLoadState.sourceIndex] ?? src;
 
   useEffect(() => {
     if (retryTimerRef.current) {
@@ -72,11 +82,23 @@ export function ResilientImage({
     <img
       {...props}
       alt={alt}
-      src={withRetryToken(src, attempt)}
+      src={withRetryToken(activeSource, attempt)}
       onError={(event) => {
         onError?.(event);
 
         if (attempt >= maxRetries) {
+          const nextSourceIndex = activeLoadState.sourceIndex + 1;
+
+          if (nextSourceIndex < sources.length) {
+            setLoadState({
+              attempt: 0,
+              failed: false,
+              sourceIndex: nextSourceIndex,
+              src,
+            });
+            return;
+          }
+
           setLoadState({ ...activeLoadState, failed: true });
           return;
         }
@@ -94,6 +116,8 @@ export function ResilientImage({
               return {
                 attempt: currentAttempt + 1,
                 failed: false,
+                sourceIndex:
+                  currentState.src === src ? currentState.sourceIndex : 0,
                 src,
               };
             }),

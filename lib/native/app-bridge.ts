@@ -26,6 +26,7 @@ type NativeShell = {
 };
 
 type BridgeWindow = Window & {
+  Capacitor?: unknown;
   ReactNativeWebView?: NativeShell;
   SmartStoreNative?: NativeShell;
   webkit?: {
@@ -59,9 +60,13 @@ export function isInsideNativeApp(): boolean {
   }
 
   const bridgeWindow = window as BridgeWindow;
+  const userAgent =
+    typeof navigator === 'undefined' ? '' : navigator.userAgent;
 
   return Boolean(
-    bridgeWindow.ReactNativeWebView ||
+    userAgent.includes('SouqHamadCapacitor') ||
+      bridgeWindow.Capacitor ||
+      bridgeWindow.ReactNativeWebView ||
       bridgeWindow.SmartStoreNative ||
       bridgeWindow.webkit?.messageHandlers?.smartstore,
   );

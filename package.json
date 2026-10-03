@@ -13,6 +13,8 @@
     "test:e2e": "playwright test",
     "test:ai-load": "tsx scripts/ai-path-load-test.ts",
     "images:orphans:dry-run": "tsx scripts/r2-orphaned-listing-images-dry-run.ts",
+    "images:missing:dry-run": "tsx scripts/repair-missing-listing-images.ts",
+    "images:missing:apply": "tsx scripts/repair-missing-listing-images.ts --apply",
     "images:variants:dry-run": "tsx scripts/backfill-listing-image-variants.ts",
     "images:variants:apply": "tsx scripts/backfill-listing-image-variants.ts --apply",
     "verify": "pnpm exec tsc --noEmit && pnpm lint && pnpm test && pnpm build && pnpm audit --audit-level moderate",

@@ -51,11 +51,13 @@ test('mobile navigation and conversation alert avoid eager cold-load work', () =
     navigation,
     /\['\/', '\/account', '\/account\/listings', '\/favorites', '\/conversations'\]\.forEach/,
   );
-  assert.match(navigation, /prefetchNavigationTarget\(item\.href\)/);
-  assert.match(navigation, /onPointerEnter=\{\(\) => prefetchNavigationTarget\(item\.href\)\}/);
-  assert.match(navigation, /onFocus=\{\(\) => prefetchNavigationTarget\(item\.href\)\}/);
-  assert.match(alertHook, /requestIdleCallback/);
+  assert.doesNotMatch(navigation, /router\.prefetch/);
+  assert.doesNotMatch(navigation, /prefetchNavigationTarget/);
+  assert.doesNotMatch(navigation, /onPointerEnter/);
+  assert.doesNotMatch(navigation, /onTouchStart/);
+  assert.match(alertHook, /scheduleIdleTask/);
   assert.match(alertHook, /unreadConversationSyncIdleTimeoutMs/);
+  assert.doesNotMatch(alertHook, /useSmartstoreRealtime/);
   assert.doesNotMatch(alertHook, /queueMicrotask\(\(\) => \{\s*if \(!cancelled\) \{\s*if \(currentUserId\)/);
 });
 

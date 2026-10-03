@@ -197,9 +197,9 @@ test('mobile bottom navigation highlights conversations when a new message arriv
   assert.match(mobileNavigation, /showAlert/);
   assert.match(mobileNavigation, /shadow-\[0_0_18px_rgba\(244,63,94,0\.55\)\]/);
   assert.match(mobileNavigation, /from-rose-300 to-red-600/);
-  assert.match(alertHook, /useSmartstoreRealtime/);
-  assert.match(alertHook, /eventTypes: \['message_created', 'conversation_updated'\]/);
-  assert.match(alertHook, /senderId !== currentUserId/);
+  assert.doesNotMatch(alertHook, /useSmartstoreRealtime/);
+  assert.match(alertHook, /visibilitychange/);
+  assert.match(alertHook, /window\.addEventListener\('focus'/);
   assert.match(alertHook, /syncUnreadConversations/);
   assert.match(alertHook, /smartstore_conversation_alert/);
   assert.match(alertHook, /pathname\.startsWith\('\/conversations'\)/);

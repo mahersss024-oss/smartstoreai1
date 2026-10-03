@@ -62,6 +62,11 @@ function getListingSearchSummary(listing: MarketplaceListingResult) {
       primaryImage?.thumbnailUrl ??
       primaryImage?.displayUrl ??
       primaryImage?.originalUrl,
+    imageUrls: [
+      primaryImage?.thumbnailUrl,
+      primaryImage?.displayUrl,
+      primaryImage?.originalUrl,
+    ].filter(Boolean),
     views: listing.views,
     messageCount: listing.messageCount,
     favoriteCount: listing.favoriteCount,

@@ -172,6 +172,17 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(globalCss, /prefers-reduced-motion: reduce/);
 });
 
+test('home auxiliary links avoid route prefetch during normal browsing', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  for (const href of ['/terms', '/listing-policy', '/commission-policy', '/account']) {
+    assert.match(
+      homePage,
+      new RegExp(`href="${href.replace(/\//g, '\\/')}"[\\s\\S]{0,80}prefetch=\\{false\\}`),
+    );
+  }
+});
+
 test('city selection supports search after opening everywhere it is used', () => {
   const selector = readProjectFile('components', 'city-selector.tsx');
   const accountListings = readProjectFile('app', 'account', 'listings', 'page.tsx');
@@ -198,6 +209,8 @@ test('prevents page-level horizontal panning on all viewports', () => {
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\]/);
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\][\s\S]*width:\s*100dvw;/);
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\] body > main/);
+  assert.match(globalCss, /--native-status-bar-inset: env\(safe-area-inset-top, 0px\);/);
+  assert.doesNotMatch(globalCss, /max\(env\(safe-area-inset-top, 0px\), 28px\)/);
   assert.match(globalCss, /overscroll-behavior-x: none;/);
 });
 

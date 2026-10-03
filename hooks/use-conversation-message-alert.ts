@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useAuthSession } from '@/hooks/use-auth-session';
-import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 const conversationAlertStorageKey = 'smartstore_conversation_alert';
 const unreadConversationSyncIdleTimeoutMs = 2500;
@@ -35,23 +35,6 @@ function isMessageReadBy(
     !Array.isArray(readBy) &&
     typeof (readBy as Record<string, unknown>)[userId] === 'string'
   );
-}
-
-function scheduleIdleTask(task: () => void) {
-  if ('requestIdleCallback' in window) {
-    const idleCallbackId = window.requestIdleCallback(task, {
-      timeout: unreadConversationSyncIdleTimeoutMs,
-    });
-
-    return () => window.cancelIdleCallback(idleCallbackId);
-  }
-
-  const timeoutId = globalThis.setTimeout(
-    task,
-    unreadConversationSyncIdleTimeoutMs,
-  );
-
-  return () => globalThis.clearTimeout(timeoutId);
 }
 
 export function useConversationMessageAlert({
@@ -137,7 +120,7 @@ export function useConversationMessageAlert({
           window.localStorage.getItem(conversationAlertStorageKey) === '1',
         );
       }
-    });
+    }, unreadConversationSyncIdleTimeoutMs);
 
     return () => {
       cancelled = true;
@@ -145,33 +128,35 @@ export function useConversationMessageAlert({
     };
   }, [currentUserId, isUserIdControlled, pathname, syncUnreadConversations]);
 
-  useSmartstoreRealtime({
-    enabled:
-      Boolean(currentUserId) &&
-      !pathname.startsWith('/conversations') &&
-      !pathname.startsWith('/admin') &&
-      !pathname.startsWith('/api'),
-    eventTypes: ['message_created', 'conversation_updated'],
-    onEvent: (event) => {
-      if (pathname.startsWith('/conversations')) {
-        return;
-      }
+  useEffect(() => {
+    if (!currentUserId || pathname.startsWith('/conversations')) {
+      return;
+    }
 
-      if (event.type === 'conversation_updated') {
+    let cancelPendingSync = () => {};
+
+    const queueUnreadSync = () => {
+      cancelPendingSync();
+      cancelPendingSync = scheduleIdleTask(() => {
         void syncUnreadConversations();
-        return;
-      }
+      }, unreadConversationSyncIdleTimeoutMs);
+    };
 
-      if (
-        event.type === 'message_created' &&
-        event.payload.status === 'sent' &&
-        event.payload.senderId !== currentUserId
-      ) {
-        window.localStorage.setItem(conversationAlertStorageKey, '1');
-        setHasConversationAlert(true);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        queueUnreadSync();
       }
-    },
-  });
+    };
+
+    window.addEventListener('focus', queueUnreadSync);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelPendingSync();
+      window.removeEventListener('focus', queueUnreadSync);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUserId, pathname, syncUnreadConversations]);
 
   return { hasConversationAlert };
 }

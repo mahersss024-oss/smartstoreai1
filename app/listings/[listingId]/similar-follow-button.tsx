@@ -5,6 +5,7 @@ import { Bell, BellOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -54,10 +55,13 @@ export function SimilarListingFollowButton({
       }
     }
 
-    void loadState();
+    const cancelIdleLoad = scheduleIdleTask(() => {
+      void loadState();
+    });
 
     return () => {
       cancelled = true;
+      cancelIdleLoad();
     };
   }, [endpoint]);
 

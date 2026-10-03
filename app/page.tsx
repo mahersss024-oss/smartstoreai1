@@ -116,6 +116,7 @@ type ListingCard = {
   price: string;
   city: string;
   image: string | null;
+  imageFallbacks?: string[];
   category?: string;
   status?: string;
   stats?: string;
@@ -137,6 +138,7 @@ type ApiListingRecord = {
   price?: number | 'bid' | 'negotiable';
   city?: string;
   image?: string;
+  imageUrls?: Array<string | undefined>;
   status?: string;
   views?: number;
   messageCount?: number;
@@ -744,12 +746,13 @@ function shouldSendRetainedListingImages({
   );
 }
 
-function getDurableImageUrl(...urls: Array<string | undefined>) {
-  return urls.find((url) => {
+function getDurableImageUrls(...urls: Array<string | undefined>) {
+  return urls.filter((url, index, list): url is string => {
     return (
       typeof url === 'string' &&
       url.length > 0 &&
-      !url.startsWith('/uploads/listings/')
+      !url.startsWith('/uploads/listings/') &&
+      list.indexOf(url) === index
     );
   });
 }
@@ -1179,6 +1182,13 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
   const primaryImage = listing.images?.find(
     (image) => image.status === 'approved',
   );
+  const imageUrls = getDurableImageUrls(
+    listing.image,
+    ...(listing.imageUrls ?? []),
+    primaryImage?.thumbnailUrl,
+    primaryImage?.displayUrl,
+    primaryImage?.originalUrl,
+  );
 
   return {
     id: listing.id,
@@ -1188,13 +1198,8 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
     city: listing.city ?? 'السعودية',
     category: formatCategory(listing.category),
     description: listing.description,
-    image:
-      getDurableImageUrl(
-        listing.image,
-        primaryImage?.thumbnailUrl,
-        primaryImage?.displayUrl,
-        primaryImage?.originalUrl,
-      ) ?? null,
+    image: imageUrls[0] ?? null,
+    imageFallbacks: imageUrls.slice(1),
     status: formatListingStatus(listing.status),
     timeLabel: formatListingRelativeTime(listing.createdAt ?? listing.updatedAt),
     stats:
@@ -1369,6 +1374,7 @@ function ListingChatLinkCard({
                 alt={listing.title}
                 className="h-full w-full object-contain"
                 decoding="async"
+                fallbackSrcs={listing.imageFallbacks}
                 fallback={<Megaphone className="size-5" />}
                 loading="lazy"
                 src={listing.image}
@@ -1591,6 +1597,7 @@ function ListingCardView({
                 alt={listing.title}
                 className="h-full w-full object-cover"
                 decoding="async"
+                fallbackSrcs={listing.imageFallbacks}
                 fallback={listingImageFallback}
                 fetchPriority={prioritizeImage ? 'high' : 'auto'}
                 loading={prioritizeImage ? 'eager' : 'lazy'}
@@ -1659,6 +1666,7 @@ function ListingCardView({
               alt={listing.title}
               className="h-full w-full object-contain"
               decoding="async"
+              fallbackSrcs={listing.imageFallbacks}
               fallback={listingImageFallback}
               fetchPriority={prioritizeImage ? 'high' : 'auto'}
               loading={prioritizeImage ? 'eager' : 'lazy'}
@@ -3988,13 +3996,13 @@ export default function Page() {
             </div>
 
             <nav className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground xl:flex">
-              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/terms">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/terms" prefetch={false}>
                 الشروط
               </Link>
-              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/listing-policy">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/listing-policy" prefetch={false}>
                 سياسة الإعلانات
               </Link>
-              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/commission-policy">
+              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/commission-policy" prefetch={false}>
                 رسوم المنصة
               </Link>
             </nav>
@@ -4007,7 +4015,7 @@ export default function Page() {
               {session.authenticated ? (
                 <>
                   <Button asChild variant="outline" size="sm" className="hidden rounded-md lg:inline-flex">
-                    <Link href="/account" onClick={closeAssistantForNavigation}>
+                    <Link href="/account" onClick={closeAssistantForNavigation} prefetch={false}>
                       <User className="size-4" />
                       حسابي
                     </Link>
@@ -4855,6 +4863,7 @@ export default function Page() {
                                       alt={listing.title}
                                       className="h-full w-full object-contain"
                                       decoding="async"
+                                      fallbackSrcs={listing.imageFallbacks}
                                       fallback={<span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400"><ImageIcon className="size-4" /></span>}
                                       loading="lazy"
                                       src={listing.image}
