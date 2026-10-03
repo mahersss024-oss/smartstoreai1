@@ -46,7 +46,9 @@ test('mobile bottom navigation keeps home centered with five compact destination
 test('account page exposes former more links without changing routes', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 
-  assert.match(page, /الخدمات والإعدادات/);
+  assert.match(page, /الملف الشخصي/);
+  assert.match(page, /variant="switch"/);
+  assert.doesNotMatch(page, /الخدمات والإعدادات/);
   assert.match(page, /href="\/terms"/);
   assert.match(page, /href="\/privacy"/);
   assert.match(page, /href="\/listing-policy"/);

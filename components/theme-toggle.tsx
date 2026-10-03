@@ -66,9 +66,10 @@ function useTheme(): Theme {
 
 type ThemeToggleProps = {
   language?: AppLanguage;
+  variant?: 'icon' | 'switch';
 };
 
-function ThemeToggle({ language = 'ar' }: ThemeToggleProps) {
+function ThemeToggle({ language = 'ar', variant = 'icon' }: ThemeToggleProps) {
   const theme = useTheme();
   const copy = appCopy[language];
   const label = theme === 'light' ? copy.themeToDark : copy.themeToLight;
@@ -83,6 +84,32 @@ function ThemeToggle({ language = 'ar' }: ThemeToggleProps) {
     applyTheme(nextTheme);
     window.dispatchEvent(new Event(themeChangeEvent));
   }, [theme]);
+
+  if (variant === 'switch') {
+    const isDark = theme === 'dark';
+
+    return (
+      <button
+        aria-label={label}
+        aria-pressed={isDark}
+        className={`relative inline-flex h-11 w-20 shrink-0 items-center rounded-full border p-1 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
+          isDark
+            ? 'border-blue-500/40 bg-blue-600'
+            : 'border-slate-200 bg-blue-600'
+        }`}
+        onClick={toggleTheme}
+        type="button"
+      >
+        <span
+          className={`grid size-9 place-items-center rounded-full bg-white text-blue-600 shadow-sm transition-transform duration-200 ${
+            isDark ? '-translate-x-9' : 'translate-x-0'
+          }`}
+        >
+          {isDark ? <Moon className="size-5" /> : <Sun className="size-5" />}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <Tooltip>

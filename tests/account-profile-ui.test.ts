@@ -8,7 +8,7 @@ test('account page exposes official contact profile settings', () => {
 
   assert.match(page, /\/api\/account\/profile/);
   assert.match(page, /method: 'DELETE'/);
-  assert.match(page, /Phone/);
+  assert.match(page, /profilePhoneNumber/);
   assert.match(page, /inputMode="tel"/);
   assert.match(page, /placeholder="05xxxxxxxx"/);
   assert.match(page, /profileDisplayName/);
@@ -35,10 +35,13 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /user: payload\.user \?\? null/);
   assert.doesNotMatch(page, /\.\.\.currentSession\.user,\s*\.\.\.payload\.user/);
   assert.match(page, /hasProfileNameChanges/);
-  assert.match(page, /حفظ الاسم/);
+  assert.match(page, /hasProfilePhoneChanges/);
+  assert.match(page, /hasProfileChanges/);
+  assert.match(page, /حفظ التغييرات/);
+  assert.doesNotMatch(page, /حفظ الاسم/);
   assert.doesNotMatch(page, /حفظ الاسم الظاهر/);
   assert.doesNotMatch(page, /الاسم الظاهر/);
-  assert.match(page, /بيانات الاتصال/);
+  assert.match(page, /الملف الشخصي/);
   assert.doesNotMatch(page, /بيانات التواصل الرسمية/);
   assert.match(page, /رقم الاتصال الحالي/);
   assert.doesNotMatch(page, /الرقم الرسمي المحفوظ/);
@@ -67,7 +70,7 @@ test('theme toggle stays on home and account settings only', () => {
     ['app', 'account', 'follows', 'page.tsx'],
   ].map((segments) => readFileSync(join(process.cwd(), ...segments), 'utf8'));
 
-  assert.match(accountPage, /<ThemeToggle language="ar" \/>/);
+  assert.match(accountPage, /<ThemeToggle language="ar" variant="switch" \/>/);
   assert.match(homePage, /<ThemeToggle language="ar" \/>/);
   assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
 
