@@ -83,6 +83,22 @@ test('account hub links do not prefetch every customer section on page load', ()
   }
 });
 
+test('account hub options use the same row layout as profile settings', () => {
+  const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+
+  assert.match(page, /href="\/account\/listings" prefetch=\{false\}/);
+  assert.match(page, /href="\/conversations" prefetch=\{false\}/);
+  assert.match(page, /href="\/favorites" prefetch=\{false\}/);
+  assert.match(page, /href="\/notifications" prefetch=\{false\}/);
+  assert.match(page, /href="\/account\/follows" prefetch=\{false\}/);
+  assert.match(page, /href="\/commissions" prefetch=\{false\}/);
+  assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)\] items-center gap-3/);
+  assert.match(page, /grid size-12 place-items-center rounded-md/);
+  assert.doesNotMatch(page, /grid grid-cols-2 gap-2/);
+  assert.doesNotMatch(page, /grid min-h-24 gap-2 rounded-md/);
+}
+);
+
 test('theme toggle stays on home and account settings only', () => {
   const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
