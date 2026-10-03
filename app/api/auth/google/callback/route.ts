@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
+import { normalizeAuthEmail } from '@/lib/auth/identity';
 import {
   clearOauthStateCookie,
   commissionPolicyVersion,
@@ -228,7 +229,7 @@ export async function GET(request: Request) {
 
   const user: AuthSessionUser = {
     id: `google:${userInfo.sub}`,
-    email: userInfo.email,
+    email: normalizeAuthEmail(userInfo.email),
     name: userInfo.name,
     picture: userInfo.picture,
   };

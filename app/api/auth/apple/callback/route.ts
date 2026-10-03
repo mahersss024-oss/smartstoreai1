@@ -10,6 +10,7 @@ import {
   isAppleAuthConfigured,
   verifyAppleIdentityToken,
 } from '@/lib/auth/apple';
+import { normalizeAuthEmail } from '@/lib/auth/identity';
 import {
   createMobileAuthCallbackUrl,
   createMobileAuthTicket,
@@ -275,7 +276,7 @@ async function handleAppleCallback(request: Request) {
 
   const user: AuthSessionUser = {
     id: `apple:${identity.sub}`,
-    email: identity.email,
+    email: normalizeAuthEmail(identity.email),
     name,
   };
   let registeredUser = user;

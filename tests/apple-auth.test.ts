@@ -77,6 +77,7 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
   assert.match(callbackRoute, /parseMobileAuthState\(state\)/);
   assert.match(callbackRoute, /createMobileAuthCallbackUrl\(createMobileAuthTicket\(registeredUser\)\)/);
+  assert.match(callbackRoute, /normalizeAuthEmail\(identity\.email\)/);
   assert.match(callbackRoute, /getOauthState/);
   assert.match(callbackRoute, /enforceApiRateLimit/);
   assert.match(callbackRoute, /auth_apple_callback/);
@@ -120,6 +121,7 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.doesNotMatch(callbackRoute, /Google OAuth is not configured/);
   assert.match(callbackRoute, /fetchWithTimeout\('https:\/\/oauth2\.googleapis\.com\/token'/);
   assert.match(callbackRoute, /fetchWithTimeout\(\s*'https:\/\/www\.googleapis\.com\/oauth2\/v3\/userinfo'/);
+  assert.match(callbackRoute, /normalizeAuthEmail\(userInfo\.email\)/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
 });
