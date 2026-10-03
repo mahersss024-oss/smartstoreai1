@@ -8,9 +8,14 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Eye,
+  Heart,
   ImageIcon,
+  Images,
   LogOut,
+  MapPin,
   Megaphone,
+  MessageCircle,
   Pause,
   Pencil,
   Percent,
@@ -71,6 +76,7 @@ type ApiListingRecord = {
 type ListingImageCard = {
   id: string;
   url: string | null;
+  previewUrl: string | null;
   isPrimary: boolean;
   status?: string;
 };
@@ -94,6 +100,9 @@ type ListingCard = {
   stats: string;
   description?: string;
   images: ListingImageCard[];
+  views: number;
+  messageCount: number;
+  favoriteCount: number;
 };
 
 type ListingEditForm = {
@@ -147,6 +156,11 @@ type PendingListingImageDelete = {
   listing: ListingCard;
   image: ListingImageCard;
 };
+
+type ImagePreviewState = {
+  listingId: string;
+  imageId: string;
+} | null;
 
 const listingCategoryOptions = [
   'cars',
@@ -204,6 +218,18 @@ function formatListingStatus(status: string | undefined) {
   };
 
   return status ? labels[status] ?? status : 'مسودة';
+}
+
+function formatImageCount(count: number) {
+  if (count === 1) {
+    return '1 صورة';
+  }
+
+  if (count === 2) {
+    return '2 صور';
+  }
+
+  return `${count} صور`;
 }
 
 function formatCategory(category: string) {
@@ -283,6 +309,12 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
             image.displayUrl,
             image.originalUrl,
           ) ?? null,
+        previewUrl:
+          getDurableImageUrl(
+            image.displayUrl,
+            image.originalUrl,
+            image.thumbnailUrl,
+          ) ?? null,
         isPrimary: Boolean(image.isPrimary),
         status: image.status,
       })) ?? [];
@@ -313,6 +345,9 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
     rawStatus: listing.status,
     compliance: listing.compliance,
     images,
+    views: listing.views ?? 0,
+    messageCount: listing.messageCount ?? 0,
+    favoriteCount: listing.favoriteCount ?? 0,
     stats: `${listing.views ?? 0} مشاهدة · ${listing.messageCount ?? 0} رسائل · ${
       listing.favoriteCount ?? 0
     } حفظ`,
@@ -402,10 +437,26 @@ export default function AccountListingsPage() {
   const [pendingImageDelete, setPendingImageDelete] =
     useState<PendingListingImageDelete | null>(null);
   const [imageDeleteError, setImageDeleteError] = useState<string | null>(null);
+  const [imageManagerListingId, setImageManagerListingId] = useState<string | null>(
+    null,
+  );
+  const [imagePreviewState, setImagePreviewState] =
+    useState<ImagePreviewState>(null);
   const [pendingListingConfirm, setPendingListingConfirm] = useState<{
     listing: ListingCard;
     action: ListingControlAction;
   } | null>(null);
+  const replaceListingFromRecord = useCallback((listingRecord: ApiListingRecord) => {
+    const nextListing = listingRecordToCard(listingRecord);
+
+    setListings((currentListings) =>
+      currentListings.map((currentListing) =>
+        currentListing.id === nextListing.id ? nextListing : currentListing,
+      ),
+    );
+
+    return nextListing;
+  }, []);
   const refreshListings = useCallback(async (page = 1) => {
     await Promise.resolve();
     setIsListingsLoading(true);
@@ -988,9 +1039,20 @@ export default function AccountListingsPage() {
             });
             return;
           }
+
+          const payload = (await response.json().catch(() => null)) as {
+            listing?: ApiListingRecord;
+          } | null;
+
+          if (payload?.listing) {
+            replaceListingFromRecord(payload.listing);
+          }
         }
 
-        await refreshListings(1);
+        setImageActionNotice({
+          listingId: listing.id,
+          message: 'تم تحديث صور الإعلان.',
+        });
       } catch {
         setImageActionNotice({
           listingId: listing.id,
@@ -1003,7 +1065,7 @@ export default function AccountListingsPage() {
         setImageUploadProgress(null);
       }
     },
-    [refreshListings, router],
+    [replaceListingFromRecord, router],
   );
 
   const setPrimaryListingImage = useCallback(
@@ -1038,16 +1100,23 @@ export default function AccountListingsPage() {
           return;
         }
 
+        const payload = (await response.json().catch(() => null)) as {
+          listing?: ApiListingRecord;
+        } | null;
+
+        if (payload?.listing) {
+          replaceListingFromRecord(payload.listing);
+        }
+
         setImageActionNotice({
           listingId: listing.id,
           message: 'تم تعيين الصورة الرئيسية.',
         });
-        await refreshListings(1);
       } finally {
         setUpdatingImageId(null);
       }
     },
-    [refreshListings, router],
+    [replaceListingFromRecord, router],
   );
 
   const deleteListingImage = useCallback(
@@ -1077,18 +1146,40 @@ export default function AccountListingsPage() {
           return;
         }
 
+        const payload = (await response.json().catch(() => null)) as {
+          listing?: ApiListingRecord;
+        } | null;
+
+        if (payload?.listing) {
+          replaceListingFromRecord(payload.listing);
+        }
+
         setPendingImageDelete(null);
         setImageActionNotice({
           listingId: listing.id,
           message: 'تم حذف الصورة',
         });
-        await refreshListings(1);
       } finally {
         setUpdatingImageId(null);
       }
     },
-    [refreshListings, router],
+    [replaceListingFromRecord, router],
   );
+
+  const imageManagerListing = imageManagerListingId
+    ? listings.find((listing) => listing.id === imageManagerListingId) ?? null
+    : null;
+  const imagePreviewListing = imagePreviewState
+    ? listings.find((listing) => listing.id === imagePreviewState.listingId) ?? null
+    : null;
+  const previewImage =
+    imagePreviewListing?.images.find(
+      (image) => image.id === imagePreviewState?.imageId,
+    ) ??
+    imagePreviewListing?.images.find((image) => image.isPrimary) ??
+    imagePreviewListing?.images[0] ??
+    null;
+  const previewImageUrl = previewImage?.previewUrl ?? previewImage?.url ?? null;
 
   return (
     <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -1206,6 +1297,239 @@ export default function AccountListingsPage() {
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(imagePreviewListing && previewImage)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setImagePreviewState(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[min(94vw,44rem)] rounded-lg p-0" dir="rtl">
+          {imagePreviewListing && previewImage ? (
+            <div className="grid gap-3 p-3">
+              <DialogHeader className="px-1 text-right">
+                <DialogTitle className="truncate text-base font-bold">
+                  {imagePreviewListing.title}
+                </DialogTitle>
+                <DialogDescription>
+                  {formatImageCount(imagePreviewListing.images.length)}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="relative overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
+                {previewImageUrl ? (
+                  <img
+                    alt={imagePreviewListing.title}
+                    className="max-h-[70dvh] w-full object-contain"
+                    decoding="async"
+                    src={previewImageUrl}
+                  />
+                ) : (
+                  <div className="grid aspect-video place-items-center text-muted-foreground">
+                    <ImageIcon className="size-8" />
+                  </div>
+                )}
+              </div>
+              {imagePreviewListing.images.length > 1 ? (
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                  {imagePreviewListing.images.map((image) => (
+                    <button
+                      aria-label="معاينة صورة الإعلان"
+                      className={`relative size-16 shrink-0 overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900 ${
+                        image.id === previewImage.id
+                          ? 'border-blue-500 ring-2 ring-blue-500/25'
+                          : 'border-border'
+                      }`}
+                      key={image.id}
+                      onClick={() =>
+                        setImagePreviewState({
+                          listingId: imagePreviewListing.id,
+                          imageId: image.id,
+                        })
+                      }
+                      type="button"
+                    >
+                      {image.url ? (
+                        <img
+                          alt=""
+                          className="h-full w-full object-cover"
+                          decoding="async"
+                          loading="lazy"
+                          src={image.url}
+                        />
+                      ) : (
+                        <span className="grid h-full place-items-center">
+                          <ImageIcon className="size-5 text-muted-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(imageManagerListing)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setImageManagerListingId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[min(86dvh,42rem)] max-w-[min(94vw,42rem)] overflow-y-auto rounded-lg p-0" dir="rtl">
+          {imageManagerListing ? (
+            <div className="grid gap-4 p-4">
+              <DialogHeader className="text-right">
+                <DialogTitle className="text-base font-bold">
+                  إدارة الصور
+                </DialogTitle>
+                <DialogDescription>
+                  {imageManagerListing.title} · {formatImageCount(imageManagerListing.images.length)}
+                </DialogDescription>
+              </DialogHeader>
+              <Button asChild variant="outline" className="rounded-md">
+                <label data-loading={uploadingListingId === imageManagerListing.id || undefined}>
+                  <Upload className="size-4" />
+                  {uploadingListingId === imageManagerListing.id
+                    ? imageUploadProgress?.current
+                      ? `جاري تحميل ${imageUploadProgress.current} من ${imageUploadProgress.total}`
+                      : 'جاري تجهيز الصور...'
+                    : 'إضافة صور'}
+                  <input
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadingListingId === imageManagerListing.id}
+                    multiple
+                    name={`listing-${imageManagerListing.id}-image-manager`}
+                    onChange={(event) => {
+                      const files = Array.from(event.currentTarget.files ?? []);
+                      void uploadListingImage(imageManagerListing, files);
+                      event.currentTarget.value = '';
+                    }}
+                    type="file"
+                  />
+                </label>
+              </Button>
+              {uploadingListingId === imageManagerListing.id && (
+                <div className="grid gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-3 py-2 text-[11px] font-medium text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>
+                      {imageUploadProgress?.current
+                        ? `رفع الصور ${imageUploadProgress.current} / ${imageUploadProgress.total}`
+                        : 'تجهيز الصور للرفع'}
+                    </span>
+                    <span>
+                      {imageUploadProgress
+                        ? Math.round(
+                            (imageUploadProgress.current /
+                              Math.max(imageUploadProgress.total, 1)) *
+                              100,
+                          ) + '%'
+                        : '...'}
+                    </span>
+                  </div>
+                  <div
+                    aria-hidden="true"
+                    className="upload-progress-track"
+                    data-indeterminate={!imageUploadProgress || undefined}
+                  >
+                    <div
+                      className="upload-progress-fill"
+                      style={{
+                        width: imageUploadProgress
+                          ? `${Math.round(
+                              (imageUploadProgress.current /
+                                Math.max(imageUploadProgress.total, 1)) *
+                                100,
+                            )}%`
+                          : '45%',
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {imageManagerListing.images.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {imageManagerListing.images.map((image) => (
+                    <div
+                      key={image.id}
+                      className="grid min-w-0 gap-1 rounded-md border bg-background p-1 dark:bg-card/35"
+                    >
+                      <button
+                        aria-label="معاينة صورة الإعلان"
+                        className="relative aspect-square overflow-hidden rounded bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-slate-900"
+                        onClick={() =>
+                          setImagePreviewState({
+                            listingId: imageManagerListing.id,
+                            imageId: image.id,
+                          })
+                        }
+                        type="button"
+                      >
+                        {image.url ? (
+                          <img
+                            alt=""
+                            className="h-full w-full object-contain"
+                            decoding="async"
+                            loading="lazy"
+                            src={image.url}
+                          />
+                        ) : (
+                          <span className="grid h-full place-items-center">
+                            <ImageIcon className="size-5 text-muted-foreground" />
+                          </span>
+                        )}
+                        {image.isPrimary && (
+                          <span className="absolute right-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            رئيسية
+                          </span>
+                        )}
+                      </button>
+                      <div className="grid grid-cols-2 gap-1">
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="size-8 rounded-md"
+                          disabled={image.isPrimary}
+                          loading={updatingImageId === image.id}
+                          onClick={() =>
+                            void setPrimaryListingImage(imageManagerListing, image)
+                          }
+                          aria-label="تعيين كصورة رئيسية"
+                        >
+                          <Star className="size-3.5" />
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="size-8 rounded-md text-red-600 hover:text-red-700"
+                          loading={updatingImageId === image.id}
+                          onClick={() => {
+                            setImageDeleteError(null);
+                            setPendingImageDelete({
+                              listing: imageManagerListing,
+                              image,
+                            });
+                          }}
+                          aria-label="حذف الصورة"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-36 place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+                  لا توجد صور لهذا الإعلان
+                </div>
+              )}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
       <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
@@ -1328,40 +1652,95 @@ export default function AccountListingsPage() {
                           ? pendingListingControl.action
                           : null;
                       const isListingControlPending = Boolean(pendingControlAction);
-                      const activeImageUploadProgress =
-                        imageUploadProgress?.listingId === listing.id
-                          ? imageUploadProgress
-                          : null;
-                      const imageUploadPercent = activeImageUploadProgress
-                        ? Math.round(
-                            (activeImageUploadProgress.current /
-                              Math.max(activeImageUploadProgress.total, 1)) *
-                              100,
-                          )
-                        : 0;
+                      const primaryImage =
+                        listing.images.find((image) => image.isPrimary) ??
+                        listing.images[0] ??
+                        null;
+                      const imageCount = listing.images.length;
 
                       return (
-                      <article key={listing.id} className="grid min-w-0 border-b border-slate-200/70 py-3 [contain-intrinsic-size:220px] [content-visibility:auto] last:border-b-0 dark:border-white/10">
-                      <div className="min-w-0">
-                        <div className="grid gap-2 px-2 py-1 sm:px-3">
-                          <div className="flex min-w-0 items-center justify-between gap-2">
-                            <h3 className="truncate text-sm font-bold">{listing.title}</h3>
-                          <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                      <article key={listing.id} className="grid min-w-0 gap-3 rounded-md border border-slate-200/75 bg-white/88 p-2.5 shadow-sm [contain-intrinsic-size:220px] [content-visibility:auto] dark:border-white/10 dark:bg-card/72 sm:p-3">
+                      <div className="grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                        <button
+                          aria-label={primaryImage ? 'معاينة صور الإعلان' : 'إدارة صور الإعلان'}
+                          className="group relative aspect-[4/3] min-w-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 text-start shadow-sm outline-none transition hover:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:bg-slate-900"
+                          onClick={() => {
+                            if (primaryImage) {
+                              setImagePreviewState({
+                                listingId: listing.id,
+                                imageId: primaryImage.id,
+                              });
+                              return;
+                            }
+
+                            setImageManagerListingId(listing.id);
+                          }}
+                          type="button"
+                        >
+                          {listing.image ? (
+                            <img
+                              alt={listing.title}
+                              className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                              decoding="async"
+                              loading="lazy"
+                              src={listing.image}
+                            />
+                          ) : (
+                            <span className="grid h-full place-items-center text-slate-400">
+                              <ImageIcon className="size-8" />
+                            </span>
+                          )}
+                          <span className="absolute right-2 top-2 rounded bg-blue-600 px-2 py-1 text-[11px] font-bold text-white shadow-sm">
                             {listing.status}
                           </span>
+                          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-slate-950/78 px-2 py-1 text-[11px] font-semibold text-white shadow-sm">
+                            <ImageIcon className="size-3.5" />
+                            {formatImageCount(imageCount)}
+                          </span>
+                        </button>
+                        <div className="grid min-w-0 content-start gap-2">
+                          <div className="grid min-w-0 gap-1">
+                            <div className="flex min-w-0 items-start justify-between gap-2">
+                              <h3 className="line-clamp-2 text-sm font-bold leading-6 text-slate-950 dark:text-card-foreground">
+                                {listing.title}
+                              </h3>
+                              <span className="shrink-0 text-sm font-extrabold text-slate-950 dark:text-card-foreground">
+                                {listing.price}
+                              </span>
+                            </div>
+                            <p className="line-clamp-1 text-xs leading-5 text-muted-foreground">
+                              {listing.description || 'لا يوجد وصف'}
+                            </p>
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                              <span className="truncate">{listing.category}</span>
+                              <span className="inline-flex min-w-0 items-center gap-1">
+                                <MapPin className="size-3.5 shrink-0" />
+                                <span className="truncate">{listing.city}</span>
+                              </span>
+                            </div>
                           </div>
-                          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{listing.description}</p>
+                          <div className="grid grid-cols-3 rounded-md border border-slate-200/70 bg-slate-50/80 text-center text-[11px] text-muted-foreground dark:border-white/10 dark:bg-slate-950/20">
+                            <span className="grid gap-0.5 border-l border-slate-200/70 px-1.5 py-2 dark:border-white/10">
+                              <Eye className="mx-auto size-4 text-slate-500 dark:text-slate-300" />
+                              <strong className="text-xs text-slate-950 dark:text-card-foreground">{listing.views}</strong>
+                              <span>مشاهدة</span>
+                            </span>
+                            <span className="grid gap-0.5 border-l border-slate-200/70 px-1.5 py-2 dark:border-white/10">
+                              <MessageCircle className="mx-auto size-4 text-slate-500 dark:text-slate-300" />
+                              <strong className="text-xs text-slate-950 dark:text-card-foreground">{listing.messageCount}</strong>
+                              <span>رسائل</span>
+                            </span>
+                            <span className="grid gap-0.5 px-1.5 py-2">
+                              <Heart className="mx-auto size-4 text-slate-500 dark:text-slate-300" />
+                              <strong className="text-xs text-slate-950 dark:text-card-foreground">{listing.favoriteCount}</strong>
+                              <span>حفظ</span>
+                            </span>
+                          </div>
                           {listing.rawStatus === 'draft' && (
                             <div className="rounded-md border border-amber-300/70 bg-amber-50 px-2.5 py-2 text-[11px] font-bold leading-5 text-amber-800 dark:border-amber-300/30 dark:bg-amber-400/10 dark:text-amber-100">
                               مسودة - غير منشور. لن يظهر الإعلان للعملاء حتى تضغط نشر الإعلان وتوافق على اتفاقية الرسوم.
                             </div>
                           )}
-                          <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                            <span className="truncate font-semibold text-slate-950 dark:text-card-foreground">{listing.price}</span>
-                            <span className="truncate">{listing.city}</span>
-                            <span className="truncate">{listing.category}</span>
-                            <span className="truncate">{listing.stats}</span>
-                          </div>
                         </div>
                       </div>
                       {editingListingId === listing.id && (
@@ -1513,79 +1892,7 @@ export default function AccountListingsPage() {
                           </div>
                         </div>
                       )}
-                      {listing.images.length > 0 && (
-                        <div className="grid min-w-0 gap-2 border-t border-slate-200/60 px-2 py-3 dark:border-white/10 sm:px-3">
-                          <div className="text-xs font-semibold text-muted-foreground">
-                            صور الإعلان
-                          </div>
-                          <div className="grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-                            {listing.images.map((image) => (
-                              <div
-                                key={image.id}
-                                className="grid min-w-0 gap-1 rounded-md bg-white/55 p-1 dark:bg-card/35"
-                              >
-                                <div className="relative aspect-square overflow-hidden rounded bg-slate-100 dark:bg-slate-900">
-                                  {image.url ? (
-                                    <>
-                                      <img
-                                        alt=""
-                                        className="h-full w-full object-contain"
-                                        decoding="async"
-                                        loading="lazy"
-                                        onError={(event) => {
-                                          event.currentTarget.hidden = true;
-                                          event.currentTarget.nextElementSibling?.removeAttribute('hidden');
-                                        }}
-                                        src={image.url}
-                                      />
-                                      <div hidden className="grid h-full place-items-center">
-                                        <ImageIcon className="size-5 text-slate-400" />
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="grid h-full place-items-center">
-                                      <ImageIcon className="size-5 text-slate-400" />
-                                    </div>
-                                  )}
-                                  {image.isPrimary && (
-                                    <span className="absolute right-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                      رئيسية
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-1">
-                                  <Button
-                                    size="icon-sm"
-                                    variant="outline"
-                                    className="size-8 rounded-md"
-                                    loading={updatingImageId === image.id}
-                                    onClick={() =>
-                                      void setPrimaryListingImage(listing, image)
-                                    }
-                                    aria-label="تعيين كصورة رئيسية"
-                                  >
-                                    <Star className="size-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="icon-sm"
-                                    variant="outline"
-                                    className="size-8 rounded-md text-red-600 hover:text-red-700"
-                                    loading={updatingImageId === image.id}
-                                    onClick={() => {
-                                      setImageDeleteError(null);
-                                      setPendingImageDelete({ listing, image });
-                                    }}
-                                    aria-label="حذف الصورة"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/60 px-2 py-2 dark:border-white/10 sm:grid-cols-3 sm:px-3 xl:grid-cols-8">
+                      <div className="grid grid-cols-2 gap-1.5 border-t border-slate-200/60 pt-2 dark:border-white/10 sm:grid-cols-3 xl:grid-cols-8">
                         {listing.rawStatus === 'published' && (
                           <Button asChild size="sm" variant="outline" className="rounded-md">
                             <Link href={`/listings/${listing.id}?source=account-listings`}>
@@ -1607,54 +1914,18 @@ export default function AccountListingsPage() {
                           تعديل
                         </Button>
                         )}
-                        <Button asChild size="sm" variant="outline" className="rounded-md">
-                          <label data-loading={uploadingListingId === listing.id || undefined}>
-                            <Upload className="size-3.5" />
-                            {uploadingListingId === listing.id
-                              ? activeImageUploadProgress?.current
-                                ? `جاري تحميل ${activeImageUploadProgress.current} من ${activeImageUploadProgress.total}`
-                                : 'جاري تجهيز الصور...'
-                              : 'تحميل الصور'}
-                            <input
-                              accept="image/*"
-                              className="sr-only"
-                              disabled={uploadingListingId === listing.id}
-                              multiple
-                              name={`listing-${listing.id}-image`}
-                              onChange={(event) => {
-                                const files = Array.from(event.currentTarget.files ?? []);
-                                void uploadListingImage(listing, files);
-                                event.currentTarget.value = '';
-                              }}
-                              type="file"
-                            />
-                          </label>
-                        </Button>
-                        {uploadingListingId === listing.id && (
-                          <div className="col-span-full grid gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-3 py-2 text-[11px] font-medium text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
-                            <div className="flex items-center justify-between gap-3">
-                              <span>
-                                {activeImageUploadProgress?.current
-                                  ? `رفع الصور ${activeImageUploadProgress.current} / ${activeImageUploadProgress.total}`
-                                  : 'تجهيز الصور للرفع'}
-                              </span>
-                              <span>{activeImageUploadProgress ? imageUploadPercent + '%' : '...'}</span>
-                            </div>
-                            <div
-                              aria-hidden="true"
-                              className="upload-progress-track"
-                              data-indeterminate={!activeImageUploadProgress || undefined}
-                            >
-                              <div
-                                className="upload-progress-fill"
-                                style={{
-                                  width: activeImageUploadProgress
-                                    ? `${imageUploadPercent}%`
-                                    : '45%',
-                                }}
-                              />
-                            </div>
-                          </div>
+                        {canEditListing(listing) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-md"
+                            loading={uploadingListingId === listing.id}
+                            loadingText="جاري رفع الصور..."
+                            onClick={() => setImageManagerListingId(listing.id)}
+                          >
+                            <Images className="size-3.5" />
+                            إدارة الصور
+                          </Button>
                         )}
                         {canPublishListing(listing) && (
                         <Button

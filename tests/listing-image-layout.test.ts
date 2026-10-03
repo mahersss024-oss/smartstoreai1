@@ -109,20 +109,25 @@ test('R2 orphan image audit is dry-run only', async () => {
   assert.doesNotMatch(source, /purge_cache/);
 });
 
-test('account listing image manager uses thumbnails without a large preview', async () => {
+test('account listing cards show one primary thumbnail and move the full grid to image management', async () => {
   const source = await readFile(
     new URL('../app/account/listings/page.tsx', import.meta.url),
     'utf8',
   );
 
   assert.doesNotMatch(source, /aspect-\[16\/10\] w-full/);
-  assert.doesNotMatch(source, /src=\{listing\.image\}/);
+  assert.match(source, /src=\{listing\.image\}/);
+  assert.match(source, /const primaryImage =/);
+  assert.match(source, /const imageCount = listing\.images\.length/);
+  assert.match(source, /formatImageCount\(imageCount\)/);
+  assert.match(source, /imageManagerListing\.images\.map\(\(image\) =>/);
+  assert.match(source, /previewImageUrl/);
   assert.doesNotMatch(source, /md:row-start-1 md:aspect-square md:self-start/);
   assert.doesNotMatch(
     source,
     /md:row-start-1 md:h-full md:min-h-40/,
   );
-  assert.match(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8/);
+  assert.doesNotMatch(source, /grid max-w-full grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8/);
   assert.match(source, /className="h-full w-full object-contain"/);
   assert.doesNotMatch(source, /overflow-x-auto/);
   assert.doesNotMatch(source, /xl:grid xl:grid-cols-2 xl:overflow-visible/);
@@ -146,8 +151,9 @@ test('customer listing pages avoid large framed containers for scalable lists', 
     'utf8',
   );
 
-  assert.match(accountListings, /border-b border-slate-200\/70 py-3/);
-  assert.match(accountListings, /last:border-b-0 dark:border-white\/10/);
+  assert.match(accountListings, /rounded-md border border-slate-200\/75 bg-white\/88/);
+  assert.match(accountListings, /\[contain-intrinsic-size:220px\]/);
+  assert.match(accountListings, /dark:border-white\/10 dark:bg-card\/72/);
   assert.match(listingDetails, /grid items-start gap-4 px-1 py-3/);
   assert.match(accountPage, /grid gap-2 px-1 py-3 sm:px-2/);
   assert.match(followsPage, /items-center gap-3 border-b border-slate-200\/70 p-3/);
