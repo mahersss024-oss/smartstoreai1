@@ -53,7 +53,8 @@ test('similar listing follows are persisted and matched using comparable listing
   assert.match(pushNotifications, /tag: `similar:listing:\$\{listing\.id\}`/);
   assert.match(realtimeEvents, /listing_notification_created/);
   assert.match(notificationsPage, /listing_notification_created/);
-  assert.match(pushSettings, /listing_notification_created/);
+  assert.match(pushSettings, /scheduleIdleTask/);
+  assert.doesNotMatch(pushSettings, /listing_notification_created/);
 });
 
 test('similar listing follows appear inside the account follow list', () => {
