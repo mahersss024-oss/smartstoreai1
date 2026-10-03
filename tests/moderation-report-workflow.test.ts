@@ -15,7 +15,11 @@ test('admin moderation exposes a complete listing report workflow', async () => 
   assert.match(source, /action === 'delete_listing' \? 'delete' : 'reject'/);
   assert.match(source, /action === 'dismiss' \? 'dismiss' : 'review'/);
   assert.match(source, /بقي البلاغ مفتوحًا/);
-  assert.match(source, /window\.confirm\(confirmationMessage\)/);
+  assert.match(source, /<ActionConfirmDialog/);
+  assert.match(source, /pendingModerationConfirm/);
+  assert.match(source, /setPendingModerationConfirm\(\{/);
+  assert.match(source, /onConfirm:\s*\(\) =>/);
+  assert.doesNotMatch(source, /window\.confirm\(confirmationMessage\)/);
 });
 
 test('admin moderation exposes a complete conversation report workflow', async () => {
