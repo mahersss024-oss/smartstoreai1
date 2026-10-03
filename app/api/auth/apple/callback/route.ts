@@ -11,6 +11,11 @@ import {
   verifyAppleIdentityToken,
 } from '@/lib/auth/apple';
 import {
+  createMobileAuthCallbackUrl,
+  createMobileAuthTicket,
+  parseMobileAuthState,
+} from '@/lib/auth/mobile-oauth';
+import {
   clearOauthStateCookie,
   commissionPolicyVersion,
   commissionAgreementVersion,
@@ -202,9 +207,10 @@ async function handleAppleCallback(request: Request) {
   }
 
   const { code, idToken, name, state } = callbackParams;
+  const mobileState = parseMobileAuthState(state);
   const storedState = getOauthState(request);
 
-  if (!code || !idToken || !state || !storedState || state !== storedState) {
+  if (!code || !idToken || !state || (!mobileState && (!storedState || state !== storedState))) {
     return new Response('Invalid Apple sign-in state.', { status: 400 });
   }
 
@@ -291,6 +297,15 @@ async function handleAppleCallback(request: Request) {
     return new Response('Apple registration could not be completed.', {
       status: 502,
     });
+  }
+
+  if (mobileState) {
+    const response = NextResponse.redirect(
+      createMobileAuthCallbackUrl(createMobileAuthTicket(registeredUser)),
+    );
+
+    response.headers.append('Set-Cookie', clearOauthStateCookie());
+    return response;
   }
 
   return redirectToHome(request, createSessionCookie(registeredUser));

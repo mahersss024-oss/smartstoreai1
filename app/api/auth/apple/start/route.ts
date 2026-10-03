@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAppleClientId, isAppleAuthConfigured } from '@/lib/auth/apple';
+import { createMobileAuthState, isMobileAppRequest } from '@/lib/auth/mobile-oauth';
 import {
   createOauthState,
   createOauthStateCookie,
@@ -33,7 +34,9 @@ export async function GET(request: Request) {
     });
   }
 
-  const state = createOauthState();
+  const state = isMobileAppRequest(request)
+    ? createMobileAuthState()
+    : createOauthState();
   const callbackUrl = new URL(
     '/api/auth/apple/callback',
     getAppBaseUrl(request),

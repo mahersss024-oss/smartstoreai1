@@ -67,12 +67,16 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(startRoute, /auth_apple_start/);
   assert.match(startRoute, /Apple sign-in is temporarily unavailable/);
   assert.doesNotMatch(startRoute, /Apple OAuth is not configured/);
+  assert.match(startRoute, /isMobileAppRequest\(request\)/);
+  assert.match(startRoute, /createMobileAuthState\(\)/);
   assert.match(startRoute, /response_mode', 'form_post'/);
   assert.match(startRoute, /createOauthStateCookie/);
   assert.match(startRoute, /sameSite:\s*'None'/);
   assert.match(startRoute, /secure:\s*true/);
   assert.match(callbackRoute, /appleid\.apple\.com\/auth\/token/);
   assert.match(callbackRoute, /verifyAppleIdentityToken/);
+  assert.match(callbackRoute, /parseMobileAuthState\(state\)/);
+  assert.match(callbackRoute, /createMobileAuthCallbackUrl\(createMobileAuthTicket\(registeredUser\)\)/);
   assert.match(callbackRoute, /getOauthState/);
   assert.match(callbackRoute, /enforceApiRateLimit/);
   assert.match(callbackRoute, /auth_apple_callback/);
