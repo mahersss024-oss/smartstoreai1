@@ -1,6 +1,5 @@
 version: 1.0
 runtime: nodejs22
-runtime-version: 22
 
 build:
   commands:
