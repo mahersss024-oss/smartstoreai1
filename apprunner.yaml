@@ -42,4 +42,4 @@ run:
       value: https://rjkg7cwsg8.eu-central-1.awsapprunner.com
   secrets:
     - name: DATABASE_URL
-      value-from: arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:smartstore/DATABASE_URL::
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:smartstore/DATABASE_URL::"
