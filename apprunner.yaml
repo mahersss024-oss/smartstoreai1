@@ -38,3 +38,8 @@ run:
       value: "60000"
     - name: SMARTSTORE_OBJECT_STORAGE_REGION
       value: auto
+    - name: NEXT_PUBLIC_APP_URL
+      value: https://rjkg7cwsg8.eu-central-1.awsapprunner.com
+  secrets:
+    - name: DATABASE_URL
+      value-from: arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe
