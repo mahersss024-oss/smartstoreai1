@@ -1,0 +1,41 @@
+version: 1.0
+runtime: nodejs22
+runtime-version: 22
+
+build:
+  commands:
+    pre-build:
+      - corepack enable
+      - corepack prepare pnpm@10.32.1 --activate
+      - pnpm install --frozen-lockfile
+    build:
+      - pnpm build
+
+run:
+  command: node scripts/start.mjs
+  network:
+    port: 3000
+    env: PORT
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: SMARTSTORE_MARKETPLACE_STORE
+      value: database
+    - name: SMARTSTORE_HEALTH_INCLUDE_METRICS
+      value: "0"
+    - name: SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP
+      value: "0"
+    - name: DEEPSEEK_MODEL
+      value: deepseek-flash
+    - name: DEEPSEEK_SEARCH_MODEL
+      value: deepseek-flash
+    - name: DEEPSEEK_VISION_MODEL
+      value: deepseek-flash
+    - name: SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS
+      value: "100"
+    - name: SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS
+      value: "2000"
+    - name: SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS
+      value: "60000"
+    - name: SMARTSTORE_OBJECT_STORAGE_REGION
+      value: auto
