@@ -18,28 +18,112 @@ run:
   env:
     - name: NODE_ENV
       value: production
+    - name: NEXT_PUBLIC_APP_URL
+      value: https://rjkg7cwsg8.eu-central-1.awsapprunner.com
     - name: SMARTSTORE_MARKETPLACE_STORE
       value: database
     - name: SMARTSTORE_HEALTH_INCLUDE_METRICS
       value: "0"
     - name: SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP
       value: "0"
-    - name: DEEPSEEK_MODEL
-      value: deepseek-flash
-    - name: DEEPSEEK_SEARCH_MODEL
-      value: deepseek-flash
-    - name: DEEPSEEK_VISION_MODEL
-      value: deepseek-flash
     - name: SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS
       value: "100"
     - name: SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS
       value: "2000"
     - name: SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS
       value: "60000"
-    - name: SMARTSTORE_OBJECT_STORAGE_REGION
-      value: auto
-    - name: NEXT_PUBLIC_APP_URL
-      value: https://rjkg7cwsg8.eu-central-1.awsapprunner.com
+    - name: SMARTSTORE_MAX_IMAGES_PER_LISTING
+      value: "8"
+    - name: SMARTSTORE_MAX_LISTINGS_PER_SELLER
+      value: "100"
+    - name: SMARTSTORE_PUBLIC_CACHE_REDIS_TIMEOUT_MS
+      value: "1500"
   secrets:
     - name: DATABASE_URL
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:DATABASE_URL::"
+
+    - name: AUTH_SECRET
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:AUTH_SECRET::"
+    - name: GOOGLE_CLIENT_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:GOOGLE_CLIENT_ID::"
+    - name: GOOGLE_CLIENT_SECRET
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:GOOGLE_CLIENT_SECRET::"
+    - name: APPLE_CLIENT_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:APPLE_CLIENT_ID::"
+    - name: APPLE_TEAM_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:APPLE_TEAM_ID::"
+    - name: APPLE_KEY_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:APPLE_KEY_ID::"
+    - name: APPLE_PRIVATE_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:APPLE_PRIVATE_KEY::"
+
+    - name: SMARTSTORE_ADMIN_EMAILS
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_ADMIN_EMAILS::"
+
+    - name: DEEPSEEK_API_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_API_KEY::"
+    - name: DEEPSEEK_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_MODEL::"
+    - name: DEEPSEEK_CHAT_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_CHAT_MODEL::"
+    - name: DEEPSEEK_SCOPE_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_SCOPE_MODEL::"
+    - name: DEEPSEEK_SEARCH_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_SEARCH_MODEL::"
+    - name: DEEPSEEK_MODERATION_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_MODERATION_MODEL::"
+    - name: DEEPSEEK_VISION_MODEL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:DEEPSEEK_VISION_MODEL::"
+
+    - name: SMARTSTORE_IMAGE_STORAGE
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_IMAGE_STORAGE::"
+    - name: SMARTSTORE_OBJECT_STORAGE_ENDPOINT
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_ENDPOINT::"
+    - name: SMARTSTORE_OBJECT_STORAGE_BUCKET
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_BUCKET::"
+    - name: SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID::"
+    - name: SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY::"
+    - name: SMARTSTORE_OBJECT_STORAGE_REGION
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_REGION::"
+    - name: SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL::"
+
+    - name: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME::"
+    - name: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NUMBER::"
+    - name: SMARTSTORE_COMMISSION_ALRAJHI_IBAN
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_ALRAJHI_IBAN::"
+    - name: SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_SNB_ACCOUNT_NAME::"
+    - name: SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_SNB_ACCOUNT_NUMBER::"
+    - name: SMARTSTORE_COMMISSION_SNB_IBAN
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_SNB_IBAN::"
+    - name: SMARTSTORE_COMMISSION_STC_PAY_NAME
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_STC_PAY_NAME::"
+    - name: SMARTSTORE_COMMISSION_STC_PAY_NUMBER
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_STC_PAY_NUMBER::"
+    - name: SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_STC_PAY_ACCOUNT::"
+
+    - name: SMARTSTORE_VAPID_PUBLIC_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_VAPID_PUBLIC_KEY::"
+    - name: SMARTSTORE_VAPID_PRIVATE_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_VAPID_PRIVATE_KEY::"
+    - name: SMARTSTORE_VAPID_SUBJECT
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_VAPID_SUBJECT::"
+
+    - name: SMARTSTORE_RATE_LIMIT_BACKEND
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_RATE_LIMIT_BACKEND::"
+    - name: UPSTASH_REDIS_REST_URL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:UPSTASH_REDIS_REST_URL::"
+    - name: UPSTASH_REDIS_REST_TOKEN
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:UPSTASH_REDIS_REST_TOKEN::"
+
+    - name: CLOUDFLARE_API_TOKEN
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:CLOUDFLARE_API_TOKEN::"
+    - name: CLOUDFLARE_ZONE_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:CLOUDFLARE_ZONE_ID::"
