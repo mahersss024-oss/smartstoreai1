@@ -585,59 +585,59 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <section className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <Megaphone className="size-5" />
+            <section className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <Megaphone className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">إعلاناتي</span>
-                  <span className="text-xs leading-5 text-muted-foreground">إدارة إعلاناتك المنشورة</span>
-                </span>
-              </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <MessageCircle className="size-5" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">محادثاتي</span>
-                  <span className="text-xs leading-5 text-muted-foreground">مراسلاتك مع المعلنين</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">إعلاناتي</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">إدارة إعلاناتك</span>
                 </span>
               </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
-                  <Heart className="size-5" />
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <MessageCircle className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">المفضلة</span>
-                  <span className="text-xs leading-5 text-muted-foreground">الإعلانات المحفوظة لديك</span>
-                </span>
-              </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
-                  <Bell className="size-5" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">الإشعارات</span>
-                  <span className="text-xs leading-5 text-muted-foreground">إدارة إشعاراتك وتنبيهاتك</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">محادثاتي</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">مراسلاتك</span>
                 </span>
               </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  <UserPlus className="size-5" />
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
+                  <Heart className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">قائمة المتابعة</span>
-                  <span className="text-xs leading-5 text-muted-foreground">المعلنين والتنبيهات المتابعة</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">المفضلة</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المحفوظات</span>
                 </span>
               </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
-                <span className="grid size-9 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
-                  <Percent className="size-5" />
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
+                  <Bell className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-sm font-bold">رسوم المنصة</span>
-                  <span className="text-xs leading-5 text-muted-foreground">تفاصيل الرسوم والعمولات</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">الإشعارات</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">تنبيهاتك</span>
+                </span>
+              </Link>
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                  <UserPlus className="size-4" />
+                </span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">قائمة المتابعة</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المعلنين</span>
+                </span>
+              </Link>
+              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
+                <span className="grid size-8 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
+                  <Percent className="size-4" />
+                </span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-xs font-bold leading-5">رسوم المنصة</span>
+                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">العمولات</span>
                 </span>
               </Link>
             </section>
@@ -824,54 +824,56 @@ export default function AccountPage() {
               )}
             </section>
 
-            <section className="grid gap-2">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm dark:border-white/10 dark:bg-card/72">
-                <span className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <Settings className="size-6" />
+            <section className="grid gap-1.5">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72">
+                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <Settings className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">المظهر</span>
-                  <span className="text-sm leading-6 text-muted-foreground">الوضع الحالي يتغير مباشرة</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-sm font-bold">المظهر</span>
+                  <span className="text-xs leading-5 text-muted-foreground">الوضع الحالي يتغير مباشرة</span>
                 </span>
                 <ThemeToggle language="ar" variant="switch" />
               </div>
 
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/terms" prefetch={false}>
-                <span className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <FileText className="size-6" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">الشروط والأحكام</span>
-                  <span className="text-sm leading-6 text-muted-foreground">اطلع على شروط استخدام المنصة</span>
-                </span>
-              </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/privacy" prefetch={false}>
-                <span className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <ShieldCheck className="size-6" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">سياسة الخصوصية</span>
-                  <span className="text-sm leading-6 text-muted-foreground">كيفية حماية بياناتك الشخصية</span>
-                </span>
-              </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/listing-policy" prefetch={false}>
-                <span className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <Megaphone className="size-6" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">سياسة الإعلانات</span>
-                  <span className="text-sm leading-6 text-muted-foreground">قواعد نشر الإعلانات في سوق حمد</span>
-                </span>
-              </Link>
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commission-policy" prefetch={false}>
-                <span className="grid size-12 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
-                  <Percent className="size-6" />
-                </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">سياسة رسوم المنصة</span>
-                  <span className="text-sm leading-6 text-muted-foreground">تفاصيل رسوم المنصة والعمولات</span>
-                </span>
-              </Link>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/terms" prefetch={false}>
+                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <FileText className="size-4" />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="text-xs font-bold leading-5">الشروط</span>
+                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">الأحكام</span>
+                  </span>
+                </Link>
+                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/privacy" prefetch={false}>
+                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <ShieldCheck className="size-4" />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="text-xs font-bold leading-5">الخصوصية</span>
+                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">بياناتك</span>
+                  </span>
+                </Link>
+                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/listing-policy" prefetch={false}>
+                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                    <Megaphone className="size-4" />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="text-xs font-bold leading-5">الإعلانات</span>
+                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">القواعد</span>
+                  </span>
+                </Link>
+                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commission-policy" prefetch={false}>
+                  <span className="grid size-8 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
+                    <Percent className="size-4" />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="text-xs font-bold leading-5">الرسوم</span>
+                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">العمولات</span>
+                  </span>
+                </Link>
+              </div>
             </section>
 
             {isAdmin && (
