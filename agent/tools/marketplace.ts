@@ -158,6 +158,12 @@ const updateListingDetailsInputSchema = listingDetailsInputSchema
   .partial()
   .extend({
     listingId: z.string().min(1).optional(),
+    confirmedPriceChange: z
+      .boolean()
+      .describe(
+        'Set true only after the seller explicitly confirms the requested price change.',
+      )
+      .optional(),
   });
 
 type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
@@ -188,6 +194,13 @@ function normalizeListingDetailsInput(
       ...(material ? { material } : {}),
       ...(brand ? { brand } : {}),
     },
+  };
+}
+
+function confirmationRequired(message: string) {
+  return {
+    status: 'needs_confirmation' as const,
+    message,
   };
 }
 
@@ -536,11 +549,17 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. Price changes and destructive actions must be confirmed by the user before using this tool.',
+        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. For price changes, set confirmedPriceChange=true only after explicit seller confirmation.',
       inputSchema: updateListingDetailsInputSchema,
-      execute: async ({ listingId, ...updates }) => {
+      execute: async ({ listingId, confirmedPriceChange, ...updates }) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (updates.price !== undefined && confirmedPriceChange !== true) {
+          return confirmationRequired(
+            'Confirm the price change explicitly before updating the listing price.',
+          );
         }
 
         const targetListing = await getCurrentEditableSellerListing({
@@ -604,6 +623,61 @@ export function createMarketplaceTools(
           };
         }
 
+        const targetListing = await getListing(listingId);
+
+        if (!targetListing || targetListing.sellerId !== session.user.id) {
+          return {
+            status: 'not_found',
+            message: 'Listing was not found or is not owned by this user.',
+          };
+        }
+
+        const listingText = buildListingText(targetListing);
+        let imageCompliance: Awaited<
+          ReturnType<typeof checkImageMarketplaceCompliance>
+        >;
+
+        try {
+          imageCompliance = await checkImageMarketplaceCompliance({
+            messages: buildImageReviewMessages(
+              options.latestUploadedImages,
+              listingText,
+            ),
+            userRequest: listingText,
+            language: 'ar',
+            expectedCategory: targetListing.category,
+            listingText,
+            reviewMode: 'primary_only',
+          });
+        } catch {
+          return {
+            status: 'image_review_unavailable',
+            message:
+              'The uploaded image could not be reviewed or saved. Try again before attaching it to the listing.',
+            listing: targetListing,
+          };
+        }
+
+        if (imageCompliance.decision === 'block') {
+          return {
+            status: 'blocked',
+            message:
+              'The uploaded image is blocked by Saudi marketplace and Islamic compliance policy. It was not saved.',
+            listing: targetListing,
+            compliance: imageCompliance,
+          };
+        }
+
+        if (imageCompliance.decision === 'needs_review') {
+          return {
+            status: 'needs_review',
+            message:
+              'The uploaded image needs manual review before it can be attached.',
+            listing: targetListing,
+            compliance: imageCompliance,
+          };
+        }
+
         const listing = await saveUploadedListingImagesForSeller({
           listingId,
           sellerId: session.user.id,
@@ -630,10 +704,21 @@ export function createMarketplaceTools(
       inputSchema: z.object({
         listingId: z.string().min(1),
         imageId: z.string().min(1),
+        confirmed: z
+          .boolean()
+          .describe(
+            'Set true only after the seller explicitly confirms deleting this listing image.',
+          ),
       }),
-      execute: async ({ listingId, imageId }) => {
+      execute: async ({ listingId, imageId, confirmed }) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (confirmed !== true) {
+          return confirmationRequired(
+            'Confirm image deletion explicitly before deleting the listing image.',
+          );
         }
 
         const listing = await deleteListingImageForSeller(
@@ -662,10 +747,21 @@ export function createMarketplaceTools(
       inputSchema: z.object({
         listingId: z.string().min(1),
         imageId: z.string().min(1),
+        confirmed: z
+          .boolean()
+          .describe(
+            'Set true only after the seller explicitly confirms making this the primary listing image.',
+          ),
       }),
-      execute: async ({ listingId, imageId }) => {
+      execute: async ({ listingId, imageId, confirmed }) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (confirmed !== true) {
+          return confirmationRequired(
+            'Confirm the primary image change explicitly before updating the listing image.',
+          );
         }
 
         const listing = await setPrimaryListingImageForSeller(
@@ -694,10 +790,21 @@ export function createMarketplaceTools(
       inputSchema: z.object({
         listingId: z.string().min(1).optional(),
         status: z.enum(['paused', 'sold', 'deleted']),
+        confirmed: z
+          .boolean()
+          .describe(
+            'Set true only after the seller explicitly confirms this pause, sold, or delete action.',
+          ),
       }),
-      execute: async ({ listingId, status }) => {
+      execute: async ({ listingId, status, confirmed }) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (confirmed !== true) {
+          return confirmationRequired(
+            'Confirm this listing status action explicitly before I change the listing.',
+          );
         }
 
         const targetListing = await getCurrentSellerListingForStatusAction({
@@ -796,10 +903,21 @@ export function createMarketplaceTools(
           'other',
         ]),
         details: z.string().min(2).max(1000).optional(),
+        confirmed: z
+          .boolean()
+          .describe(
+            'Set true only after the user explicitly confirms submitting this report.',
+          ),
       }),
-      execute: async ({ listingId, reason, details }) => {
+      execute: async ({ listingId, reason, details, confirmed }) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (confirmed !== true) {
+          return confirmationRequired(
+            'Confirm that you want to submit this report before I send it for moderation review.',
+          );
         }
 
         return reportListing(listingId, session.user, reason, details);

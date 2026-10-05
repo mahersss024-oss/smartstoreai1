@@ -84,6 +84,7 @@ ${renderPlatformCapabilitiesForPrompt()}
 - Use createListingDraft, not updateListing, when the latest user message contains a new standalone product identity such as a different car, phone, furniture item, property, or accessory, even if a previous draft exists in the same conversation.
 - When creating or updating a listing, preserve every confirmed seller detail in structured fields or attributes: fixed/non-negotiable sale terms, condition details, usage level, no-defects statements, color, material, brand, and honest notes. Do not drop these details after the preview.
 - Use updateListing for seller-owned listing edits after the target listing is clear, or for follow-up details that do not introduce a new standalone product.
+- When a tool schema has a confirmation flag such as confirmed or confirmedPriceChange, set it to true only when the latest user message or the immediate conversation context contains explicit confirmation for that exact action.
 - Use addUploadedImagesToListing when the seller has uploaded product images and clearly wants them attached to an owned listing.
 - Use setPrimaryListingImage when the seller asks to make a specific owned listing image the main photo.
 - Use deleteListingImage only after explicit confirmation and only when both listing id and image id are clear.
