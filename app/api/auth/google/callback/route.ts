@@ -28,6 +28,7 @@ import { prisma } from '@/lib/db/prisma';
 type GoogleTokenResponse = {
   access_token?: string;
   error?: string;
+  error_description?: string;
 };
 
 type GoogleUserInfo = {
@@ -185,7 +186,10 @@ export async function GET(request: Request) {
         grant_type: 'authorization_code',
       }),
     });
-  } catch {
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.warn(`[google_auth] token_exchange_request_failed=${errorName}`);
+
     return new Response('Google token exchange failed.', { status: 502 });
   }
 
@@ -194,6 +198,17 @@ export async function GET(request: Request) {
     | null;
 
   if (!tokenResponse.ok || !tokenJson?.access_token) {
+    const providerError =
+      typeof tokenJson?.error === 'string' ? tokenJson.error : 'unknown';
+    const providerDescription =
+      typeof tokenJson?.error_description === 'string'
+        ? tokenJson.error_description.replace(/[\r\n]+/g, ' ').slice(0, 180)
+        : 'none';
+
+    console.warn(
+      `[google_auth] token_exchange_failed status=${tokenResponse.status} error=${providerError} description=${providerDescription}`,
+    );
+
     return new Response('Google token exchange failed.', { status: 502 });
   }
 
