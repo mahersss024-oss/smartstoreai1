@@ -19,7 +19,7 @@ run:
     - name: NODE_ENV
       value: production
     - name: NEXT_PUBLIC_APP_URL
-      value: https://rjkg7cwsg8.eu-central-1.awsapprunner.com
+      value: https://souqhamad.com
     - name: SMARTSTORE_MARKETPLACE_STORE
       value: database
     - name: SMARTSTORE_HEALTH_INCLUDE_METRICS
