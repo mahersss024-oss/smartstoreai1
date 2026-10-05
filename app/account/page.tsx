@@ -562,23 +562,23 @@ export default function AccountPage() {
           </section>
         ) : (
           <div className="mx-auto grid gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-2 lg:pb-6 w-full max-w-[28rem] sm:max-w-[30rem] lg:max-w-none">
-            <section className="rounded-md border border-slate-200/70 bg-white/82 p-4 shadow-sm dark:border-white/10 dark:bg-card/72">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+            <section className="rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm sm:p-3 dark:border-white/10 dark:bg-card/72">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-16 dark:bg-blue-400/10 dark:text-blue-200">
                   <SellerAvatar
                     alt={session.user?.name ?? 'حساب سوق حمد'}
                     onPictureError={clearBrokenProfilePicture}
                     picture={visibleProfilePicture}
                   />
                 </div>
-                <div className="grid min-w-0 flex-1 gap-2">
+                <div className="grid min-w-0 flex-1 gap-1">
                   {isAdmin && (
-                    <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                      <ShieldCheck className="size-3.5" />
+                    <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                      <ShieldCheck className="size-3" />
                       {administrativeRoleLabel}
                     </span>
                   )}
-                  <h2 className="truncate text-2xl font-black text-slate-950 dark:text-card-foreground">
+                  <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl dark:text-card-foreground">
                     {session.user?.name ?? 'عميل سوق حمد'}
                   </h2>
                 </div>
@@ -586,8 +586,8 @@ export default function AccountPage() {
             </section>
 
             <section className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Megaphone className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -595,8 +595,8 @@ export default function AccountPage() {
                   <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">إدارة إعلاناتك</span>
                 </span>
               </Link>
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <MessageCircle className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -604,8 +604,8 @@ export default function AccountPage() {
                   <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">مراسلاتك</span>
                 </span>
               </Link>
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
                   <Heart className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -613,8 +613,8 @@ export default function AccountPage() {
                   <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المحفوظات</span>
                 </span>
               </Link>
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
                   <Bell className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -622,8 +622,8 @@ export default function AccountPage() {
                   <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">تنبيهاتك</span>
                 </span>
               </Link>
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   <UserPlus className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -631,8 +631,8 @@ export default function AccountPage() {
                   <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المعلنين</span>
                 </span>
               </Link>
-              <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
-                <span className="grid size-8 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
+              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
+                <span className="grid size-7 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
                   <Percent className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
@@ -644,7 +644,7 @@ export default function AccountPage() {
 
             <section className="grid gap-2">
               <button
-                className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
                 onClick={() => {
                   const nextOpen = !isProfileEditorOpen;
                   if (nextOpen) {
@@ -657,12 +657,12 @@ export default function AccountPage() {
                 }}
                 type="button"
               >
-                <span className="grid size-12 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <User className="size-6" />
+                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <User className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">الملف الشخصي</span>
-                  <span className="text-sm leading-6 text-muted-foreground">الاسم، الصورة، رقم الجوال</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-sm font-bold">الملف الشخصي</span>
+                  <span className="text-xs leading-5 text-muted-foreground">الاسم، الصورة، رقم الجوال</span>
                 </span>
               </button>
 
@@ -825,7 +825,7 @@ export default function AccountPage() {
             </section>
 
             <section className="grid gap-1.5">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2 shadow-sm dark:border-white/10 dark:bg-card/72">
                 <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Settings className="size-4" />
                 </span>
@@ -837,8 +837,8 @@ export default function AccountPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/terms" prefetch={false}>
-                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/terms" prefetch={false}>
+                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                     <FileText className="size-4" />
                   </span>
                   <span className="grid min-w-0 gap-0.5">
@@ -846,8 +846,8 @@ export default function AccountPage() {
                     <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">الأحكام</span>
                   </span>
                 </Link>
-                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/privacy" prefetch={false}>
-                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/privacy" prefetch={false}>
+                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                     <ShieldCheck className="size-4" />
                   </span>
                   <span className="grid min-w-0 gap-0.5">
@@ -855,8 +855,8 @@ export default function AccountPage() {
                     <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">بياناتك</span>
                   </span>
                 </Link>
-                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/listing-policy" prefetch={false}>
-                  <span className="grid size-8 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/listing-policy" prefetch={false}>
+                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                     <Megaphone className="size-4" />
                   </span>
                   <span className="grid min-w-0 gap-0.5">
@@ -864,8 +864,8 @@ export default function AccountPage() {
                     <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">القواعد</span>
                   </span>
                 </Link>
-                <Link className="grid min-h-[4.75rem] place-items-center gap-1.5 rounded-md border border-slate-200/70 bg-white/82 p-2 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commission-policy" prefetch={false}>
-                  <span className="grid size-8 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
+                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commission-policy" prefetch={false}>
+                  <span className="grid size-7 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
                     <Percent className="size-4" />
                   </span>
                   <span className="grid min-w-0 gap-0.5">
