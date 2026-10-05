@@ -571,19 +571,17 @@ export function aggregateImageComplianceDecisions(
     decisions.map((decision) => decision.detectedProduct),
   );
   const hasMultipleDetectedCategories = detectedCategories.length > 1;
-  const shouldReviewMixedImages =
+  const hasMixedAllowedProducts =
     decisions.length > 1 && !blockingDecision && hasMultipleDetectedCategories;
-  const aggregatedDecision = shouldReviewMixedImages
-    ? 'needs_review'
-    : finalDecision;
-  const aggregatedCategoryMatch = shouldReviewMixedImages
-    ? 'mismatch'
+  const aggregatedDecision = finalDecision;
+  const aggregatedCategoryMatch = hasMixedAllowedProducts
+    ? 'unclear'
     : categoryMatch;
   const reasons = [
     ...(decisions.length > 1
       ? [`inspected_${decisions.length}_images`]
       : []),
-    ...(shouldReviewMixedImages ? ['multiple_distinct_products_in_images'] : []),
+    ...(hasMixedAllowedProducts ? ['multiple_distinct_products_in_images'] : []),
     ...decisions.flatMap((decision) => decision.reasons),
   ];
 
@@ -654,8 +652,12 @@ Classify every attached marketplace product image before the chat assistant resp
 Multi-image rule:
 - Inspect every attached image, not only the first image.
 - If any attached image contains a prohibited product or prohibited content, the final decision must be block.
-- If any attached image is unclear, regulated, sensitive, or mismatches the expected category/listing text, the final decision must be needs_review unless another image requires block.
-- Use allow only when all attached images are ordinary lawful marketplace products and all reasonably match the expected listing context.
+- If any attached image is regulated, sensitive, prohibited-adjacent, or clearly mismatches a single expected category/listing text, the final decision must be needs_review unless another image requires block.
+- Do not use needs_review merely because the image is low quality, dim, slightly blurry, distant, partially cropped, or has a busy background when an ordinary lawful product is still recognizable.
+- Use needs_review for clarity only when the product cannot be identified at all, the image is blank/black/corrupt, or the visible item cannot be reasonably understood.
+- If multiple attached images show different ordinary lawful products and the user appears to be asking for multiple listings or has not supplied a single expected category, do not treat that as a policy violation. Use allow, set detected_category to "multiple" when appropriate, and include "multiple_distinct_products_in_images" in reasons.
+- If the user supplied one expected category/listing text and a visible image clearly belongs to a different category, use needs_review unless the visible product is prohibited, then use block.
+- Use allow when all attached images are ordinary lawful marketplace products and any quality issues still leave the product recognizable.
 - Mention the number of inspected images in reasons when there is more than one image.
 
 Use Saudi prohibited/restricted goods policy examples, including ZATCA traveler/customs examples such as intoxicants, narcotics, immoral media, counterfeit currency, fireworks, prohibited chewing smoke, tear gas, weapons, ammunition, secret-camera products, electric shocks, radar detectors, unregistered sexual tonics/abortion pills/herbs/lotions, sexual tools/devices, and eavesdropping devices.
@@ -672,7 +674,7 @@ Block if the image or described product appears to include:
 - hidden surveillance or secret-camera devices
 - products clearly offensive to Islamic values or illegal to trade in Saudi Arabia
 
-Use needs_review for uncertainty, partial visibility, regulated products, tobacco/vape, medicines, prescriptions, telecom/radio devices, drones, financial accounts, chemicals, cosmetics with unclear compliance, or anything that might require manual approval.
+Use needs_review for uncertainty about legality/compliance, regulated products, tobacco/vape, medicines, prescriptions, telecom/radio devices, drones, financial accounts, chemicals, cosmetics with unclear compliance, or anything that might require manual approval. Do not classify ordinary recognizable products as needs_review only because the photo quality could be better.
 
 Weapon-like distinction:
 - A real firearm, live ammunition, or dangerous weapon must be block.
@@ -683,7 +685,7 @@ Weapon-like distinction:
 Also compare the visible product against the expected category/listing text supplied by the user or system:
 - category_match="match" if the visible product reasonably matches the expected category.
 - category_match="mismatch" if the visible product is clearly a different category, such as a weapon image for a phone listing or alcohol image for a furniture listing.
-- category_match="unclear" if the image is too partial, blurry, or no expected category was supplied.
+- category_match="unclear" if no expected category was supplied, if multiple different allowed products are visible, or if the image is too unclear to identify the product.
 - If category_match is mismatch, use needs_review unless the visible product is prohibited, then use block.
 
 Use allow only for ordinary lawful marketplace products and listings.

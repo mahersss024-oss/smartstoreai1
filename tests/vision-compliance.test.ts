@@ -371,7 +371,7 @@ test('aggregates multi-image compliance using the strictest decision', () => {
   assert.ok(decision.reasons.includes('inspected_2_images'));
 });
 
-test('routes mixed product images in one listing to manual review', () => {
+test('allows mixed ordinary product images while flagging separate products', () => {
   const decision = aggregateImageComplianceDecisions([
     {
       decision: 'allow',
@@ -393,8 +393,8 @@ test('routes mixed product images in one listing to manual review', () => {
     },
   ]);
 
-  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.decision, 'allow');
   assert.equal(decision.detectedCategory, 'multiple');
-  assert.equal(decision.categoryMatch, 'mismatch');
+  assert.equal(decision.categoryMatch, 'unclear');
   assert.ok(decision.reasons.includes('multiple_distinct_products_in_images'));
 });

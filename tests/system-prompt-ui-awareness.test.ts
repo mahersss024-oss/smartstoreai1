@@ -38,3 +38,10 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /call the search tool first/);
   assert.match(systemPrompt, /after visible matches exist/);
 });
+
+test('system prompt accepts recognizable imperfect images and separates distinct products', () => {
+  assert.match(systemPrompt, /product is recognizable/);
+  assert.match(systemPrompt, /This does not relax prohibited-product/);
+  assert.match(systemPrompt, /Different standalone products should become separate draft listings/);
+  assert.match(systemPrompt, /whether the images are for one product or separate listings/);
+});
