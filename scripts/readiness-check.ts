@@ -19,7 +19,7 @@ const defaultDeepseekQueueTimeoutMs = 60_000;
 const defaultObjectStorageTimeoutMs = 30_000;
 const defaultRateLimitRedisTimeoutMs = 2_000;
 const defaultPushTimeoutMs = 10_000;
-const productionAppHosts = new Set(['www.smartstore-ai.com', 'smartstore-ai.com']);
+const productionAppHosts = new Set(['www.souqhamad.com', 'souqhamad.com']);
 
 function present(env: Env, key: string) {
   return Boolean(env[key]?.trim());

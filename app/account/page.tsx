@@ -561,7 +561,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : (
-          <div className="mx-auto grid w-full max-w-[28rem] gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:max-w-[30rem] sm:px-2 lg:max-w-none lg:pb-6">
+          <div className="mx-auto grid gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-2 lg:pb-6 w-full max-w-[28rem] sm:max-w-[30rem] lg:max-w-none">
             <section className="rounded-md border border-slate-200/70 bg-white/82 p-4 shadow-sm dark:border-white/10 dark:bg-card/72">
               <div className="flex min-w-0 items-center gap-4">
                 <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">

@@ -161,7 +161,7 @@ export function MobileBottomNavigation() {
 
   return (
     <nav
-      className={`marketplace-bottom-nav fixed bottom-[calc(0.45rem+env(safe-area-inset-bottom))] left-1/2 right-auto z-50 w-[calc(100%-1.5rem)] max-w-[28rem] -translate-x-1/2 overflow-visible rounded-full border px-3 py-1.5 transition-all duration-200 lg:hidden ${
+      className={`marketplace-bottom-nav fixed inset-x-3 bottom-[calc(0.45rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-[28rem] overflow-visible rounded-full border px-3 py-1.5 transition-all duration-200 lg:hidden ${
         isKeyboardOpen
           ? 'pointer-events-none translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'

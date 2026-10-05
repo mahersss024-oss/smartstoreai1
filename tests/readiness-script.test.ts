@@ -8,7 +8,7 @@ const productionEnv = {
   AUTH_SECRET: 'x'.repeat(40),
   DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/smartstore',
   DEEPSEEK_API_KEY: 'deepseek-key',
-  NEXT_PUBLIC_APP_URL: 'https://www.smartstore-ai.com',
+  NEXT_PUBLIC_APP_URL: 'https://www.souqhamad.com',
   GOOGLE_CLIENT_ID: 'google-client',
   GOOGLE_CLIENT_SECRET: 'google-secret',
   SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS: '100',
@@ -25,7 +25,7 @@ const productionEnv = {
   SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'object-access-key',
   SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'object-secret-key',
   SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
-  SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.smartstore-ai.com',
+  SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.souqhamad.com',
 } satisfies Record<string, string>;
 
 test('readiness fails production when durable store dependencies are missing', () => {
