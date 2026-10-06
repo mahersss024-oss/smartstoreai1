@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 
 const maxCreateListingRequestBytes = 64 * 1024;
 const publicListingsCacheSeconds = 30;
-const publicListingsStaleWhileRevalidateSeconds = 120;
+const publicListingsStaleWhileRevalidateSeconds = 60;
 
 const createListingSchema = z.object({
   category: z.string().min(2).max(80),

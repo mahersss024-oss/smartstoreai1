@@ -878,7 +878,7 @@ test('public marketplace listings route uses production-friendly edge cache', ()
   const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
 
   assert.match(route, /const publicListingsCacheSeconds = 30/);
-  assert.match(route, /const publicListingsStaleWhileRevalidateSeconds = 120/);
+  assert.match(route, /const publicListingsStaleWhileRevalidateSeconds = 60/);
   assert.match(route, /ttlSeconds: publicListingsCacheSeconds/);
   assert.match(route, /edgeMaxAgeSeconds: publicListingsCacheSeconds/);
   assert.match(
