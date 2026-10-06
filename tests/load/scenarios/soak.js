@@ -1,0 +1,19 @@
+import publicReadFlow, { handleSummary } from './public-read.js';
+
+export const options = {
+  scenarios: {
+    soak_read_mix: {
+      executor: 'constant-vus',
+      vus: Number(__ENV.K6_MAX_VUS || 500),
+      duration: __ENV.K6_DURATION || '30m',
+    },
+  },
+  thresholds: {
+    http_req_failed: ['rate<0.02'],
+    smartstore_endpoint_errors: ['rate<0.02'],
+    http_req_duration: ['p(95)<2500', 'p(99)<5000'],
+  },
+};
+
+export { handleSummary };
+export default publicReadFlow;
