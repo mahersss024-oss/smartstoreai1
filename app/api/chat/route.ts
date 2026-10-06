@@ -1460,7 +1460,7 @@ export async function POST(request: Request) {
             } ${userRequest}`,
           ),
         listingText: adaptiveIntent.normalizedRequest ?? userRequest,
-        reviewMode: 'primary_only',
+        reviewMode: 'all_images',
       });
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';

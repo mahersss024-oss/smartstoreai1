@@ -117,3 +117,17 @@ test('chat route keeps buyer search responses on the real agent path', () => {
   assert.match(route, /chatAgentGenerationTimeoutMs/);
   assert.match(route, /abortSignal: signal/);
 });
+
+test('chat route inspects all uploaded images before assistant reasoning', () => {
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
+    'utf8',
+  );
+  const chatVisionReview = route.slice(
+    route.indexOf('imageComplianceDecision = await checkImageMarketplaceCompliance({'),
+    route.indexOf('if (imageComplianceDecision.decision ==='),
+  );
+
+  assert.match(chatVisionReview, /reviewMode: 'all_images'/);
+  assert.doesNotMatch(chatVisionReview, /reviewMode: 'primary_only'/);
+});
