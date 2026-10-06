@@ -1,6 +1,6 @@
 import { group } from 'k6';
 
-import { assertSafeReadScenario } from '../config/environment.js';
+import { assertSafeReadScenario, loadEnv } from '../config/environment.js';
 import { configuredListingId, searchTerm } from '../data/flows.js';
 import { parseJson, think, timedGet } from '../helpers/http.js';
 import { handleSummary } from '../helpers/summary.js';
@@ -12,8 +12,8 @@ export const options = {
     page_navigation_flow: {
       executor: 'ramping-vus',
       stages: [
-        { duration: '30s', target: Math.min(Number(__ENV.K6_MAX_VUS || 25), 25) },
-        { duration: __ENV.K6_DURATION || '3m', target: Number(__ENV.K6_MAX_VUS || 25) },
+        { duration: '30s', target: Math.min(loadEnv.maxVus, 25) },
+        { duration: loadEnv.duration, target: loadEnv.maxVus },
         { duration: '30s', target: 0 },
       ],
     },

@@ -57,7 +57,7 @@ pnpm test:browser
 Useful overrides:
 
 ```bash
-K6_MAX_VUS=250 K6_DURATION=10m pnpm test:stress
+SMARTSTORE_LOAD_MAX_VUS=250 SMARTSTORE_LOAD_DURATION=10m pnpm test:stress
 K6_LISTING_IDS=abc,def pnpm test:pages
 K6_SEARCH_TERMS=camry,iphone pnpm test:load
 ```

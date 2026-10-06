@@ -15,8 +15,8 @@ export const options = {
     chat_read_like_flow: {
       executor: 'ramping-vus',
       stages: [
-        { duration: '30s', target: Math.min(Number(__ENV.K6_MAX_VUS || 10), 10) },
-        { duration: __ENV.K6_DURATION || '2m', target: Number(__ENV.K6_MAX_VUS || 10) },
+        { duration: '30s', target: Math.min(loadEnv.maxVus, 10) },
+        { duration: loadEnv.duration, target: loadEnv.maxVus },
         { duration: '30s', target: 0 },
       ],
     },

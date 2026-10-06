@@ -6,6 +6,9 @@ import { loadEnv, url } from '../config/environment.js';
 
 export const endpointDuration = new Trend('smartstore_endpoint_duration', true);
 export const endpointErrors = new Rate('smartstore_endpoint_errors');
+export const endpointClientErrors = new Rate('smartstore_endpoint_client_errors');
+export const endpointServerErrors = new Rate('smartstore_endpoint_server_errors');
+export const endpointRateLimited = new Rate('smartstore_endpoint_rate_limited');
 export const imageDuration = new Trend('smartstore_image_duration', true);
 export const imageErrors = new Rate('smartstore_image_errors');
 
@@ -35,6 +38,13 @@ export function timedGet(path, name, params = {}) {
   endpointErrors.add(response.status >= 400 || response.status === 0, {
     endpoint: name,
   });
+  endpointClientErrors.add(response.status >= 400 && response.status < 500, {
+    endpoint: name,
+  });
+  endpointServerErrors.add(response.status >= 500 || response.status === 0, {
+    endpoint: name,
+  });
+  endpointRateLimited.add(response.status === 429, { endpoint: name });
   check(response, {
     [`${name} status < 400`]: (res) => res.status < 400,
   });
@@ -56,6 +66,13 @@ export function timedPost(path, name, body, params = {}) {
   endpointErrors.add(response.status >= 400 || response.status === 0, {
     endpoint: name,
   });
+  endpointClientErrors.add(response.status >= 400 && response.status < 500, {
+    endpoint: name,
+  });
+  endpointServerErrors.add(response.status >= 500 || response.status === 0, {
+    endpoint: name,
+  });
+  endpointRateLimited.add(response.status === 429, { endpoint: name });
   check(response, {
     [`${name} status < 400`]: (res) => res.status < 400,
   });

@@ -26,6 +26,17 @@ const env = {
   K6_REPORT_FILE: process.env.K6_REPORT_FILE || `tests/load/reports/${reportName}`,
 };
 
+if (env.K6_MAX_VUS && !env.SMARTSTORE_LOAD_MAX_VUS) {
+  env.SMARTSTORE_LOAD_MAX_VUS = env.K6_MAX_VUS;
+}
+
+if (env.K6_DURATION && !env.SMARTSTORE_LOAD_DURATION) {
+  env.SMARTSTORE_LOAD_DURATION = env.K6_DURATION;
+}
+
+delete env.K6_MAX_VUS;
+delete env.K6_DURATION;
+
 const result = spawnSync('k6', ['run', scenarioPath, ...passthroughArgs], {
   cwd: process.cwd(),
   env,

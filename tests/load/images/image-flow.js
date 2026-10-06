@@ -1,6 +1,6 @@
 import { group } from 'k6';
 
-import { assertSafeReadScenario } from '../config/environment.js';
+import { assertSafeReadScenario, loadEnv } from '../config/environment.js';
 import { parseJson, think, timedGet, timedImageGet } from '../helpers/http.js';
 import { handleSummary } from '../helpers/summary.js';
 
@@ -11,8 +11,8 @@ export const options = {
     image_delivery: {
       executor: 'ramping-vus',
       stages: [
-        { duration: '30s', target: Math.min(Number(__ENV.K6_MAX_VUS || 50), 50) },
-        { duration: __ENV.K6_DURATION || '3m', target: Number(__ENV.K6_MAX_VUS || 50) },
+        { duration: '30s', target: Math.min(loadEnv.maxVus, 50) },
+        { duration: loadEnv.duration, target: loadEnv.maxVus },
         { duration: '30s', target: 0 },
       ],
     },

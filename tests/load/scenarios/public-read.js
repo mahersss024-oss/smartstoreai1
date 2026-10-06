@@ -1,6 +1,6 @@
 import { group } from 'k6';
 
-import { assertSafeReadScenario } from '../config/environment.js';
+import { assertSafeReadScenario, loadEnv } from '../config/environment.js';
 import { city, configuredListingId, searchTerm } from '../data/flows.js';
 import { parseJson, think, timedGet, timedImageGet } from '../helpers/http.js';
 import { handleSummary } from '../helpers/summary.js';
@@ -12,8 +12,8 @@ export const options = {
     marketplace_read_mix: {
       executor: 'ramping-vus',
       stages: [
-        { duration: '1m', target: Math.min(Number(__ENV.K6_MAX_VUS || 50), 50) },
-        { duration: __ENV.K6_DURATION || '5m', target: Number(__ENV.K6_MAX_VUS || 50) },
+        { duration: '1m', target: Math.min(loadEnv.maxVus, 50) },
+        { duration: loadEnv.duration, target: loadEnv.maxVus },
         { duration: '1m', target: 0 },
       ],
       gracefulRampDown: '30s',

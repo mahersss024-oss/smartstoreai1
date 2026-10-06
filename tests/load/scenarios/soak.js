@@ -1,11 +1,12 @@
 import publicReadFlow, { handleSummary } from './public-read.js';
+import { loadEnv } from '../config/environment.js';
 
 export const options = {
   scenarios: {
     soak_read_mix: {
       executor: 'constant-vus',
-      vus: Number(__ENV.K6_MAX_VUS || 500),
-      duration: __ENV.K6_DURATION || '30m',
+      vus: loadEnv.maxVus,
+      duration: loadEnv.duration || '30m',
     },
   },
   thresholds: {

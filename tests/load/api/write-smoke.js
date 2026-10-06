@@ -1,7 +1,7 @@
 import { group } from 'k6';
 import { randomString } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
-import { assertSafeWriteScenario } from '../config/environment.js';
+import { assertSafeWriteScenario, loadEnv } from '../config/environment.js';
 import { timedPost } from '../helpers/http.js';
 import { handleSummary } from '../helpers/summary.js';
 
@@ -11,8 +11,8 @@ export const options = {
   scenarios: {
     staging_write_smoke: {
       executor: 'constant-vus',
-      vus: Math.min(Number(__ENV.K6_MAX_VUS || 5), 25),
-      duration: __ENV.K6_DURATION || '1m',
+      vus: Math.min(loadEnv.maxVus, 25),
+      duration: loadEnv.duration,
     },
   },
   thresholds: {

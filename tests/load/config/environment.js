@@ -25,8 +25,8 @@ export function listEnv(name, fallback) {
 export const loadEnv = {
   baseUrl: requiredEnv('K6_BASE_URL', 'http://127.0.0.1:3000').replace(/\/$/, ''),
   environment: requiredEnv('K6_ENV', 'local').toLowerCase(),
-  maxVus: numberEnv('K6_MAX_VUS', 50),
-  duration: requiredEnv('K6_DURATION', '5m'),
+  maxVus: numberEnv('SMARTSTORE_LOAD_MAX_VUS', numberEnv('K6_MAX_VUS', 50)),
+  duration: requiredEnv('SMARTSTORE_LOAD_DURATION', requiredEnv('K6_DURATION', '5m')),
   stage: requiredEnv('K6_STAGE', 'light').toLowerCase(),
   sessionCookie: requiredEnv('K6_SESSION_COOKIE'),
   ownerSessionCookie: requiredEnv('K6_OWNER_SESSION_COOKIE'),

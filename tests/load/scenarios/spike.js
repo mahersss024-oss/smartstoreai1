@@ -1,6 +1,7 @@
 import publicReadFlow, { handleSummary } from './public-read.js';
+import { loadEnv } from '../config/environment.js';
 
-const maxVus = Number(__ENV.K6_MAX_VUS || 1000);
+const maxVus = loadEnv.maxVus || 1000;
 
 export const options = {
   scenarios: {
