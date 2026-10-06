@@ -1,6 +1,12 @@
 import { checkRateLimit } from '@/lib/rate-limit';
 
-function getClientId(request: Request) {
+export function getApiRateLimitClientId(request: Request) {
+  const cloudflareIp = request.headers.get('cf-connecting-ip')?.trim();
+
+  if (cloudflareIp) {
+    return cloudflareIp;
+  }
+
   const forwardedFor = request.headers.get('x-forwarded-for');
   const firstForwardedIp = forwardedFor?.split(',')[0]?.trim();
 
@@ -23,7 +29,9 @@ export async function enforceApiRateLimit(
 ) {
   const retryAfterSeconds = await checkRateLimit({
     namespace: input.namespace,
-    clientId: input.actorId ? `user:${input.actorId}` : getClientId(request),
+    clientId: input.actorId
+      ? `user:${input.actorId}`
+      : getApiRateLimitClientId(request),
     maxRequests: input.maxRequests,
     windowMs: input.windowMs,
   });

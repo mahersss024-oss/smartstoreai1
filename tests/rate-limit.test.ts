@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { getApiRateLimitClientId } from '@/lib/api/rate-limit';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 function readProjectFile(...segments: string[]) {
@@ -32,6 +33,29 @@ test('rate limit is scoped by namespace and client', async () => {
   assert.equal(first, null);
   assert.equal(typeof second, 'number');
   assert.equal(otherNamespace, null);
+});
+
+test('api rate limit prefers Cloudflare client IP over spoofable forwarded headers', () => {
+  const request = new Request('https://souqhamad.com/api/marketplace/listings', {
+    headers: {
+      'cf-connecting-ip': '203.0.113.10',
+      'x-forwarded-for': '198.51.100.99, 198.51.100.100',
+      'x-real-ip': '198.51.100.77',
+    },
+  });
+
+  assert.equal(getApiRateLimitClientId(request), '203.0.113.10');
+});
+
+test('api rate limit falls back to the first forwarded IP outside Cloudflare', () => {
+  const request = new Request('https://localhost/api/marketplace/listings', {
+    headers: {
+      'x-forwarded-for': '198.51.100.99, 198.51.100.100',
+      'x-real-ip': '198.51.100.77',
+    },
+  });
+
+  assert.equal(getApiRateLimitClientId(request), '198.51.100.99');
 });
 
 test('falls back to memory rate limiting when redis stalls', async () => {
