@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 import type { RealtimeEvent, RealtimeEventType } from './events';
 
 type RealtimeResyncReason = 'event' | 'fallback' | 'online' | 'visible';
 
 type UseSmartstoreRealtimeOptions = {
+  connectDelayMs?: number;
   enabled?: boolean;
   eventTypes?: RealtimeEventType[];
   fallbackIntervalMs?: number;
@@ -42,6 +44,7 @@ function parseRealtimeEvent(raw: string): RealtimeEvent | null {
 }
 
 export function useSmartstoreRealtime({
+  connectDelayMs = 0,
   enabled = true,
   eventTypes,
   fallbackIntervalMs = 4000,
@@ -105,6 +108,7 @@ export function useSmartstoreRealtime({
     let eventSource: EventSource | null = null;
     let disposed = false;
     let fallbackTimerId: number | null = null;
+    let cancelDeferredConnect = () => {};
     let resyncInFlight = false;
     let latestEventId: number | null = lastEventIdRef.current;
 
@@ -265,16 +269,21 @@ export function useSmartstoreRealtime({
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('online', onOnline);
 
-    connect();
+    if (connectDelayMs > 0) {
+      cancelDeferredConnect = scheduleIdleTask(connect, connectDelayMs);
+    } else {
+      connect();
+    }
 
     return () => {
       disposed = true;
+      cancelDeferredConnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('online', onOnline);
       stopFallbackPolling();
       closeConnection();
     };
-  }, [enabled, fallbackIntervalMs, eventTypesKey]);
+  }, [connectDelayMs, enabled, fallbackIntervalMs, eventTypesKey]);
 
   return {
     connectionState,

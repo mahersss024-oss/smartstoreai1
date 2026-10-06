@@ -85,6 +85,7 @@ import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
+import { scheduleIdleTask } from '@/lib/client-idle-task';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -3233,8 +3234,9 @@ export default function Page() {
     }
 
     if (session.authenticated) {
-      void refreshFavoriteListingIds();
-      return;
+      return scheduleIdleTask(() => {
+        void refreshFavoriteListingIds();
+      }, 1800);
     }
 
     setFavoriteListingIds(new Set());
@@ -3296,6 +3298,7 @@ export default function Page() {
   ]);
 
   useSmartstoreRealtime({
+    connectDelayMs: 2500,
     enabled: true,
     fallbackIntervalMs: 4000,
     eventTypes: [
