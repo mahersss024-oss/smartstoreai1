@@ -1752,7 +1752,7 @@ function ListingCardView({
 }
 
 function AssistantMessageFrame({
-  avatar = 'bot',
+  avatar = 'hamad',
   children,
 }: {
   avatar?: 'bot' | 'hamad';
@@ -4949,7 +4949,7 @@ export default function Page() {
                         })}
                         {isLoading && (
                           <Message from="assistant">
-                            <AssistantMessageFrame avatar="hamad">
+                            <AssistantMessageFrame avatar="bot">
                               <MessageContent>
                                 <SearchStatusIndicator language="ar" mode="thinking" />
                               </MessageContent>
