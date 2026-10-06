@@ -62,5 +62,7 @@ test('chat prompts use the centralized platform capability map', () => {
   assert.match(marketplaceSystemInstructions, /Treat marketplace tool outputs as the source of truth/);
   assert.match(marketplaceSystemInstructions, /instead of inventing a successful result/);
   assert.match(marketplaceSystemInstructions, /confirmation flag such as confirmed or confirmedPriceChange/);
+  assert.match(marketplaceSystemInstructions, /multiple_distinct_products_in_images/);
+  assert.match(marketplaceSystemInstructions, /one bundled listing or separate listings/);
   assert.doesNotMatch(marketplaceSystemInstructions, /Use openMarketplaceConversation/);
 });

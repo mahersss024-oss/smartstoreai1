@@ -42,6 +42,7 @@ test('system prompt guides signed-in users through platform account help safely'
 test('system prompt accepts recognizable imperfect images and separates distinct products', () => {
   assert.match(systemPrompt, /product is recognizable/);
   assert.match(systemPrompt, /This does not relax prohibited-product/);
-  assert.match(systemPrompt, /Different standalone products should become separate draft listings/);
-  assert.match(systemPrompt, /whether the images are for one product or separate listings/);
+  assert.match(systemPrompt, /Different standalone products must not be merged into one listing/);
+  assert.match(systemPrompt, /multiple_distinct_products_in_images/);
+  assert.match(systemPrompt, /one bundled listing or separate listings/);
 });
