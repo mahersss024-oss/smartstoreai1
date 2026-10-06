@@ -157,22 +157,20 @@ test('admin api permissions match the intended authority levels', () => {
     ['app', 'api', 'admin', 'overview', 'route.ts'],
     ['app', 'api', 'admin', 'users', 'route.ts'],
     ['app', 'api', 'admin', 'users', '[userId]', 'route.ts'],
-    ['app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'],
     ['app', 'api', 'admin', 'audit-log', 'route.ts'],
+    ['app', 'api', 'admin', 'commissions', 'route.ts'],
+    ['app', 'api', 'admin', 'commissions', '[commissionId]', 'route.ts'],
+    ['app', 'api', 'admin', 'maintenance', 'route.ts'],
+    ['app', 'api', 'admin', 'site-message', 'route.ts'],
   ];
   const moderatorRoutes = [
     ['app', 'api', 'admin', 'listings', 'route.ts'],
+    ['app', 'api', 'admin', 'listings', '[listingId]', 'route.ts'],
     ['app', 'api', 'admin', 'moderation', 'route.ts'],
     ['app', 'api', 'admin', 'moderation', 'listings', '[listingId]', 'route.ts'],
     ['app', 'api', 'admin', 'moderation', 'reports', '[reportId]', 'route.ts'],
     ['app', 'api', 'admin', 'moderation', 'user-reports', '[reportId]', 'route.ts'],
     ['app', 'api', 'moderator', 'overview', 'route.ts'],
-  ];
-  const ownerOnlyRoutes = [
-    ['app', 'api', 'admin', 'commissions', 'route.ts'],
-    ['app', 'api', 'admin', 'commissions', '[commissionId]', 'route.ts'],
-    ['app', 'api', 'admin', 'maintenance', 'route.ts'],
-    ['app', 'api', 'admin', 'site-message', 'route.ts'],
   ];
 
   for (const routeSegments of adminOnlyRoutes) {
@@ -185,12 +183,6 @@ test('admin api permissions match the intended authority levels', () => {
     const route = readProjectFile(...routeSegments);
     assert.match(route, /hasVerifiedModeratorAccess/);
     assert.match(route, /(admin_required|auth_required)/);
-  }
-
-  for (const routeSegments of ownerOnlyRoutes) {
-    const route = readProjectFile(...routeSegments);
-    assert.match(route, /hasPlatformOwnerAccess/);
-    assert.match(route, /owner_required/);
   }
 });
 
@@ -220,7 +212,7 @@ test('customer mutation apis are scoped to the authenticated user', () => {
   }
 });
 
-test('cloud storage deletions stay behind owner or listing-owner checks', () => {
+test('cloud storage deletions stay behind moderator/admin or listing-owner checks', () => {
   const adminListingRoute = readProjectFile(
     'app',
     'api',
@@ -247,9 +239,9 @@ test('cloud storage deletions stay behind owner or listing-owner checks', () => 
     'route.ts',
   );
 
-  assert.match(adminListingRoute, /hasVerifiedAdminAccess/);
+  assert.match(adminListingRoute, /hasVerifiedModeratorAccess/);
   assert.match(adminListingRoute, /deleteStoredListingImagesBestEffort/);
-  assert.match(maintenanceRoute, /hasPlatformOwnerAccess/);
+  assert.match(maintenanceRoute, /hasVerifiedAdminAccess/);
   assert.match(maintenanceRoute, /deleteStoredListingImagesBestEffort/);
   assert.match(imageRoute, /getAuthSession/);
   assert.match(imageRoute, /session\.user\.id/);
@@ -293,7 +285,7 @@ test('admin users api is server-side admin protected and audited', () => {
   assert.match(updateRoute, /update_user/);
   assert.match(updateRoute, /delete_user/);
   assert.match(updateRoute, /adminAuditLog\.create/);
-  assert.match(updateRoute, /requestedMode === 'permanent' && !isOwner/);
+  assert.match(updateRoute, /requestedMode === 'permanent' && !hasOwnerLevelAdminAccess/);
   assert.match(updateRoute, /account_must_be_disabled_first/);
   assert.match(updateRoute, /deleteUserImagesBestEffort/);
   assert.match(updateRoute, /deleteListingObject/);
@@ -309,7 +301,7 @@ test('admin listing mutations are server-side protected and rate limited', () =>
     'route.ts',
   );
 
-  assert.match(listingRoute, /hasVerifiedAdminAccess/);
+  assert.match(listingRoute, /hasVerifiedModeratorAccess/);
   assert.match(listingRoute, /enforceApiRateLimit/);
   assert.match(listingRoute, /admin_listing_mutation/);
   assert.match(listingRoute, /adminAuditLog\.create/);
@@ -407,7 +399,7 @@ test('admin commission, moderation, and maintenance mutations are rate limited',
   assert.match(maintenanceRoute, /admin_maintenance_cleanup/);
 });
 
-test('closed moderation reports can be deleted only through admin-protected routes', () => {
+test('closed moderation reports can be deleted only through moderator-protected routes', () => {
   const listingReportRoute = readProjectFile(
     'app',
     'api',
@@ -429,7 +421,7 @@ test('closed moderation reports can be deleted only through admin-protected rout
 
   for (const route of [listingReportRoute, conversationReportRoute]) {
     assert.match(route, /export async function DELETE/);
-    assert.match(route, /hasVerifiedAdminAccess/);
+    assert.match(route, /hasVerifiedModeratorAccess/);
     assert.match(route, /report\.status === 'open'/);
     assert.match(route, /report_must_be_closed/);
     assert.match(route, /adminAuditLog\.create/);
@@ -576,7 +568,7 @@ test('destructive admin maintenance cleanup is disabled by default in production
   );
 });
 
-test('maintenance cleanup is restricted to the platform owner', async () => {
+test('maintenance cleanup admits appointed admins before request validation', async () => {
   await withMaintenanceEnv(
     {
       NODE_ENV: 'production',
@@ -592,13 +584,13 @@ test('maintenance cleanup is restricted to the platform owner', async () => {
       assert.ok(response);
       const body = (await response.json()) as { error?: string };
 
-      assert.equal(response.status, 403);
-      assert.equal(body.error, 'owner_required');
+      assert.equal(response.status, 400);
+      assert.equal(body.error, 'confirmation_required');
     },
   );
 });
 
-test('the owner account cannot be demoted or deleted by appointed admins', () => {
+test('the configured owner account remains protected from appointed admins', () => {
   const updateRoute = readProjectFile(
     'app',
     'api',
@@ -610,15 +602,15 @@ test('the owner account cannot be demoted or deleted by appointed admins', () =>
 
   assert.match(updateRoute, /owner_account_protected/);
   assert.match(updateRoute, /owner_required/);
-  assert.match(updateRoute, /cannot_delete_admin/);
+  assert.match(updateRoute, /cannot_delete_self/);
   assert.match(updateRoute, /soft_deleted/);
   assert.match(updateRoute, /deletedAt/);
 });
 
-test('the users page hides role changes and protects the owner account', () => {
+test('the users page lets owner-level admins change roles and protects the owner account', () => {
   const page = readProjectFile('app', 'admin', 'users', 'page.tsx');
 
-  assert.match(page, /adminAccessRole === 'owner'/);
+  assert.match(page, /adminAccessRole === 'owner' \|\| adminAccessRole === 'admin'/);
   assert.match(page, /canChangeRole/);
   assert.match(page, /isOwnerAccount/);
   assert.match(page, /حساب مالك المنصة محميّ/);
@@ -663,10 +655,11 @@ test('scoped admin roles are enforced consistently by pages and APIs', () => {
   assert.match(dashboard, /href: '\/admin\/commissions'/);
   assert.match(dashboard, /visible: isOwner/);
   assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
-  assert.match(commissionsRoute, /hasPlatformOwnerAccess/);
-  assert.match(commissionRoute, /hasPlatformOwnerAccess/);
+  assert.match(commissionsRoute, /hasVerifiedAdminAccess/);
+  assert.match(commissionRoute, /hasVerifiedAdminAccess/);
   assert.match(usersPage, /\.\.\.\(isOwner \? \{ role: draft\.role \} : \{\}\)/);
-  assert.match(userRoute, /!isOwner\s*&&\s*parsed\.data\.role/);
+  assert.match(userRoute, /hasOwnerLevelAdminAccess = await hasVerifiedAdminAccess/);
+  assert.match(userRoute, /parsed\.data\.role !== undefined && !hasOwnerLevelAdminAccess/);
 });
 
 test('soft-deleted accounts remain visible to the owner and lose API access', () => {
