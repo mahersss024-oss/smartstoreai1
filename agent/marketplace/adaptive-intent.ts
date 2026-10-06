@@ -15,7 +15,20 @@ import { classifyMarketplaceIntent } from './policy';
 import { parseMarketplaceSearchQuery } from './search';
 import type { MarketplaceIntent } from './types';
 
-const adaptiveIntentTimeoutMs = 8_000;
+function readTimeoutMs(envKey: string, fallbackMs: number) {
+  const value = Number.parseInt(process.env[envKey] ?? '', 10);
+
+  if (!Number.isFinite(value)) {
+    return fallbackMs;
+  }
+
+  return Math.min(60_000, Math.max(1_000, value));
+}
+
+const adaptiveIntentTimeoutMs = readTimeoutMs(
+  'SMARTSTORE_ADAPTIVE_INTENT_TIMEOUT_MS',
+  15_000,
+);
 
 const adaptiveExecutionValues = [
   'answer',

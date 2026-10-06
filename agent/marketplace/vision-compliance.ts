@@ -4,7 +4,20 @@ import { z } from 'zod';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AppLanguage } from '@/app/i18n';
 
-const imageComplianceTimeoutMs = 18_000;
+function readTimeoutMs(envKey: string, fallbackMs: number) {
+  const value = Number.parseInt(process.env[envKey] ?? '', 10);
+
+  if (!Number.isFinite(value)) {
+    return fallbackMs;
+  }
+
+  return Math.min(120_000, Math.max(5_000, value));
+}
+
+const imageComplianceTimeoutMs = readTimeoutMs(
+  'SMARTSTORE_IMAGE_COMPLIANCE_TIMEOUT_MS',
+  30_000,
+);
 const imageComplianceMaxAttempts = 2;
 const imageComplianceRetryDelayMs = 700;
 

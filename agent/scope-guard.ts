@@ -4,8 +4,21 @@ import { z } from 'zod';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AppLanguage } from '@/app/i18n';
 
-const scopeTimeoutMs = 8_000;
-const outputScopeTimeoutMs = 8_000;
+function readTimeoutMs(envKey: string, fallbackMs: number) {
+  const value = Number.parseInt(process.env[envKey] ?? '', 10);
+
+  if (!Number.isFinite(value)) {
+    return fallbackMs;
+  }
+
+  return Math.min(60_000, Math.max(1_000, value));
+}
+
+const scopeTimeoutMs = readTimeoutMs('SMARTSTORE_SCOPE_GUARD_TIMEOUT_MS', 15_000);
+const outputScopeTimeoutMs = readTimeoutMs(
+  'SMARTSTORE_OUTPUT_SCOPE_GUARD_TIMEOUT_MS',
+  15_000,
+);
 
 const scopeDecisionSchema = z.object({
   decision: z.enum(['ALLOW', 'BLOCK', 'PARTIAL', 'UNCLEAR']),
