@@ -16,6 +16,7 @@ import {
 } from 'react';
 import { DefaultChatTransport, type ChatStatus, type FileUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -64,7 +65,6 @@ import {
 } from '@chat-elements/prompt-input';
 import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
-import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
@@ -75,7 +75,6 @@ import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
-import { prepareUploadableImageFiles } from '@/lib/client-image-normalization';
 import {
   getAssistantResultListings,
   getCanLoadMoreExploreListings,
@@ -97,6 +96,14 @@ import {
 import { cn } from '@/lib/utils';
 import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
+
+const CommissionAgreementDialog = dynamic(
+  () =>
+    import('@/components/commission-agreement-dialog').then(
+      (module) => module.CommissionAgreementDialog,
+    ),
+  { ssr: false },
+);
 
 type LocationSettings = {
   country: 'SA';
@@ -208,6 +215,14 @@ function writeHomeAssistantRuntimeState(state: HomeAssistantRuntimeState) {
 
 function clearHomeAssistantRuntimeState() {
   homeAssistantRuntimeState = null;
+}
+
+async function prepareUploadableImageFilesOnDemand(files: File[]) {
+  const { prepareUploadableImageFiles } = await import(
+    '@/lib/client-image-normalization'
+  );
+
+  return prepareUploadableImageFiles(files);
 }
 
 function isSafeListingId(value: string | null): value is string {
@@ -2008,7 +2023,7 @@ export default function Page() {
 
     const preparation = {
       source: selectedImages,
-      promise: prepareUploadableImageFiles(selectedImages),
+      promise: prepareUploadableImageFilesOnDemand(selectedImages),
     };
     manualListingImagePreparationRef.current = preparation;
     void preparation.promise.then(
@@ -3613,7 +3628,7 @@ export default function Page() {
     const preparedImagesPromise =
       existingPreparation && existingPreparation.source === manualListingImages
         ? existingPreparation.promise
-        : prepareUploadableImageFiles(selectedImages);
+        : prepareUploadableImageFilesOnDemand(selectedImages);
 
     try {
       const response = await fetch('/api/marketplace/listings', {
@@ -3993,12 +4008,14 @@ export default function Page() {
       )}
       dir="rtl"
     >
-      <CommissionAgreementDialog
-        mode="publish"
-        onCancel={() => setIsManualPublishAgreementOpen(false)}
-        onConfirm={confirmManualPublishAgreement}
-        open={isManualPublishAgreementOpen}
-      />
+      {isManualPublishAgreementOpen && (
+        <CommissionAgreementDialog
+          mode="publish"
+          onCancel={() => setIsManualPublishAgreementOpen(false)}
+          onConfirm={confirmManualPublishAgreement}
+          open={isManualPublishAgreementOpen}
+        />
+      )}
       <div
         className={cn(
           'mx-auto grid h-full min-h-0 max-w-7xl gap-2 px-1.5 py-2 sm:px-3 md:px-4 lg:gap-3 lg:px-6 lg:py-3',
