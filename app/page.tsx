@@ -1751,11 +1751,35 @@ function ListingCardView({
   );
 }
 
-function AssistantMessageFrame({ children }: { children: ReactNode }) {
+function AssistantMessageFrame({
+  avatar = 'bot',
+  children,
+}: {
+  avatar?: 'bot' | 'hamad';
+  children: ReactNode;
+}) {
+  const isHamadAvatar = avatar === 'hamad';
+
   return (
     <div className="flex w-full items-start gap-2">
-      <div className="mt-1 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full border border-sky-400/20 bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70">
-        <Bot className="size-3.5" />
+      <div
+        className={cn(
+          'mt-1 grid shrink-0 place-items-center overflow-hidden rounded-full border bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70',
+          isHamadAvatar
+            ? 'size-10 border-sky-400/45 shadow-md shadow-sky-500/20'
+            : 'size-7 border-sky-400/20',
+        )}
+      >
+        {isHamadAvatar ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className="size-full rounded-full object-cover"
+            src="/hamad-assistant-avatar.webp"
+          />
+        ) : (
+          <Bot className="size-3.5" />
+        )}
       </div>
       <div className="min-w-0 flex-1 text-right">{children}</div>
     </div>
@@ -4925,7 +4949,7 @@ export default function Page() {
                         })}
                         {isLoading && (
                           <Message from="assistant">
-                            <AssistantMessageFrame>
+                            <AssistantMessageFrame avatar="hamad">
                               <MessageContent>
                                 <SearchStatusIndicator language="ar" mode="thinking" />
                               </MessageContent>
