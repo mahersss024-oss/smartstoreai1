@@ -4949,7 +4949,7 @@ export default function Page() {
                         })}
                         {isLoading && (
                           <Message from="assistant">
-                            <AssistantMessageFrame avatar="bot">
+                            <AssistantMessageFrame>
                               <MessageContent>
                                 <SearchStatusIndicator language="ar" mode="thinking" />
                               </MessageContent>
