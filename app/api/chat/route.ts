@@ -101,7 +101,6 @@ const supportedChatImageMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/gif',
 ]);
 
 function hasDeepseekApiKey() {

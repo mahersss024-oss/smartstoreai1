@@ -34,7 +34,6 @@ const supportedMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/gif',
 ]);
 const maxImageBytes = 12 * 1024 * 1024;
 const maxImageUploadRequestBytes = maxImageBytes + 1024 * 1024;

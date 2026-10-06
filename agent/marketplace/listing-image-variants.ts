@@ -73,18 +73,6 @@ export function detectListingImageMimeType(data: Uint8Array) {
     return 'image/webp' as const;
   }
 
-  if (
-    data.length >= 6 &&
-    data[0] === 0x47 &&
-    data[1] === 0x49 &&
-    data[2] === 0x46 &&
-    data[3] === 0x38 &&
-    (data[4] === 0x37 || data[4] === 0x39) &&
-    data[5] === 0x61
-  ) {
-    return 'image/gif' as const;
-  }
-
   return null;
 }
 
@@ -141,7 +129,7 @@ async function readSecureMetadata(input: {
     );
   }
 
-  if ((metadata.pages ?? 1) > 1 || detectedMediaType === 'image/gif') {
+  if ((metadata.pages ?? 1) > 1) {
     throw new ListingImageSecurityError(
       'animated_image_not_allowed',
       'Animated listing images are not accepted.',

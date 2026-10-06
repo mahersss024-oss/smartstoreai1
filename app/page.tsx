@@ -4291,7 +4291,7 @@ export default function Page() {
                     <span>الصور</span>
                     <label className="group grid min-h-36 cursor-pointer place-items-center rounded-md border-2 border-dashed border-blue-400/70 bg-blue-50/35 px-4 py-5 text-center transition duration-150 ease-out active:scale-[0.99] active:border-blue-500 active:bg-blue-50 hover:border-blue-500/80 hover:bg-blue-50/55 dark:border-blue-400/45 dark:bg-blue-400/5 dark:hover:border-blue-300/70">
                       <input
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp"
                         className="sr-only"
                         multiple
                         type="file"
@@ -4994,7 +4994,7 @@ export default function Page() {
                 onPointerDown={handleChatInputPointerDown}
               >
                 <PromptInput
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   allowAttachments
                   className="mx-auto max-w-[52rem]"
                   dir="ltr"

@@ -107,7 +107,6 @@ function getExtension(mediaType: string, fileName?: string) {
     'image/jpeg': 'jpg',
     'image/png': 'png',
     'image/webp': 'webp',
-    'image/gif': 'gif',
   };
   const extension = fileName ? path.extname(fileName).replace('.', '') : '';
 

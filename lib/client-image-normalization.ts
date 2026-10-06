@@ -8,10 +8,9 @@ const uploadSafeImageMimeTypes = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
 ]);
 const imageFileNamePattern =
-  /\.(avif|bmp|gif|heic|heif|jfif|jpe?g|png|svg|tiff?|webp)$/i;
+  /\.(jfif|jpe?g|png|webp)$/i;
 
 function getNormalizedImageSize(
   width: number,

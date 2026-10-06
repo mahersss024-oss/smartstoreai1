@@ -688,7 +688,7 @@ export default function AccountPage() {
                               ? 'تغيير صورة العرض'
                               : 'رفع صورة العرض'}
                           <input
-                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            accept="image/jpeg,image/png,image/webp"
                             className="sr-only"
                             disabled={isUploadingProfilePicture || isRemovingProfilePicture}
                             name="profilePictureFile"

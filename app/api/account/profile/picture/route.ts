@@ -24,7 +24,6 @@ const supportedMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/gif',
 ]);
 const maxProfileImageBytes = 4 * 1024 * 1024;
 const maxProfileImageRequestBytes = maxProfileImageBytes + 256 * 1024;
