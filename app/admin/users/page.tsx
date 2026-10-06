@@ -96,7 +96,7 @@ export default function AdminUsersPage() {
     adminAccessRole,
     verifyAdminAccess,
   } = useAdminAccess('admin');
-  const isOwner = adminAccessRole === 'owner';
+  const isOwner = adminAccessRole === 'owner' || adminAccessRole === 'admin';
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);

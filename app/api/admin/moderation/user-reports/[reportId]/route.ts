@@ -3,10 +3,7 @@ import { z } from 'zod';
 import { setUserReportModerationStatus } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import {
-  hasVerifiedAdminAccess,
-  hasVerifiedModeratorAccess,
-} from '@/lib/auth/authorization';
+import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
@@ -64,7 +61,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
-  if (!(await hasVerifiedAdminAccess(session))) {
+  if (!(await hasVerifiedModeratorAccess(session))) {
     return Response.json({ error: 'admin_required' }, { status: 403 });
   }
 

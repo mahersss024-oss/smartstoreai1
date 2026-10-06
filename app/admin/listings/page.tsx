@@ -498,7 +498,9 @@ function AdminListingsPageContent() {
     },
   });
   const canManageListings =
-    adminAccessRole === 'owner' || adminAccessRole === 'admin';
+    adminAccessRole === 'owner' ||
+    adminAccessRole === 'admin' ||
+    adminAccessRole === 'moderator';
 
   const updateDraft = useCallback(
     (listingId: string, updates: Partial<ListingDraft>) => {

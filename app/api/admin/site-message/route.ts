@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasPlatformOwnerAccess } from '@/lib/auth/authorization';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { primarySiteMessageId } from '@/lib/site-message';
@@ -20,7 +20,7 @@ const updateSchema = z.object({
 async function requireOwner(request: Request) {
   const session = getAuthSession(request);
   if (!session) return { response: Response.json({ error: 'auth_required' }, { status: 401 }) };
-  if (!(await hasPlatformOwnerAccess(session))) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return { response: Response.json({ error: 'owner_required' }, { status: 403 }) };
   }
   return { session };

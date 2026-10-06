@@ -6,7 +6,6 @@ import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import {
   hasVerifiedAdminAccess,
-  isPlatformOwner,
 } from '@/lib/auth/authorization';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
 import { getAuthSession, isConfiguredAdminEmail } from '@/lib/auth/session';
@@ -191,9 +190,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const isOwner = isPlatformOwner(session);
+  const hasOwnerLevelAdminAccess = await hasVerifiedAdminAccess(session);
 
-  if (parsed.data.role !== undefined && !isOwner) {
+  if (parsed.data.role !== undefined && !hasOwnerLevelAdminAccess) {
     return Response.json(
       {
         error: 'owner_required',
@@ -203,7 +202,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  if (parsed.data.accountStatus !== undefined && !isOwner) {
+  if (parsed.data.accountStatus !== undefined && !hasOwnerLevelAdminAccess) {
     return Response.json(
       {
         error: 'owner_required',
@@ -232,21 +231,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       {
         error: 'cannot_downgrade_self',
         message: 'The active admin cannot remove their own admin role.',
-      },
-      { status: 409, headers: noStoreHeaders },
-    );
-  }
-
-  if (
-    !isOwner &&
-    parsed.data.role !== undefined &&
-    existing.role === 'admin' &&
-    parsed.data.role !== 'admin'
-  ) {
-    return Response.json(
-      {
-        error: 'cannot_demote_admin',
-        message: 'Appointed admins cannot be demoted by another admin.',
       },
       { status: 409, headers: noStoreHeaders },
     );
@@ -421,20 +405,9 @@ export async function DELETE(request: Request, context: RouteContext) {
     );
   }
 
-  // Appointed admins may not delete other appointed admins.
-  if (!isPlatformOwner(session) && existing.role === 'admin') {
-    return Response.json(
-      {
-        error: 'cannot_delete_admin',
-        message: 'Appointed admins cannot delete other admins.',
-      },
-      { status: 409, headers: noStoreHeaders },
-    );
-  }
+  const hasOwnerLevelAdminAccess = await hasVerifiedAdminAccess(session);
 
-  const isOwner = isPlatformOwner(session);
-
-  if (requestedMode === 'permanent' && !isOwner) {
+  if (requestedMode === 'permanent' && !hasOwnerLevelAdminAccess) {
     return Response.json(
       {
         error: 'owner_required',

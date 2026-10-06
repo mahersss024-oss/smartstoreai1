@@ -657,7 +657,9 @@ export default function AdminModerationPage() {
     Boolean(queue.pagination?.reports.hasMore) ||
     Boolean(queue.pagination?.userReports.hasMore);
   const canDeleteReports =
-    adminAccessRole === 'owner' || adminAccessRole === 'admin';
+    adminAccessRole === 'owner' ||
+    adminAccessRole === 'admin' ||
+    adminAccessRole === 'moderator';
 
   const refreshQueue = useCallback(async (page = 1) => {
     setIsLoading(true);

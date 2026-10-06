@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasPlatformOwnerAccess } from '@/lib/auth/authorization';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!(await hasPlatformOwnerAccess(session))) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'owner_required' }, { status: 403 });
   }
 
@@ -99,7 +99,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!(await hasPlatformOwnerAccess(session))) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'owner_required' }, { status: 403 });
   }
 

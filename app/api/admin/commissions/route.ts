@@ -1,6 +1,6 @@
 import { listAdminCommissionsPage } from '@/agent/marketplace/repository';
 import { noStoreHeaders } from '@/lib/api/no-store';
-import { hasPlatformOwnerAccess } from '@/lib/auth/authorization';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
 
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'auth_required' }, { status: 401 });
   }
 
-  if (!(await hasPlatformOwnerAccess(session))) {
+  if (!(await hasVerifiedAdminAccess(session))) {
     return Response.json({ error: 'owner_required' }, { status: 403 });
   }
 

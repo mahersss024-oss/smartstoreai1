@@ -11,9 +11,10 @@ import { prisma } from '@/lib/db/prisma';
  *
  * - `owner`: the platform owner, identified by the server-side
  *   `SMARTSTORE_ADMIN_EMAILS` environment variable. Grants every capability.
- * - `admin`: an appointed administrator. Manages content and (soft) deletes
- *   user accounts, but cannot touch maintenance, commissions or roles.
- * - `moderator`: an appointed moderator. Content review only.
+ * - `admin`: an appointed administrator with owner-level admin capabilities,
+ *   except the configured owner account remains protected.
+ * - `moderator`: an appointed moderator. Full listing, review, and report
+ *   management only.
  * - `user`: a regular account.
  */
 export type VerifiedRole = 'owner' | 'admin' | 'moderator' | 'user';
@@ -77,13 +78,9 @@ export async function getVerifiedRoleForSession(
   }
 }
 
-/** The platform owner only. */
+/** Platform owner-level access: configured owner or appointed admin. */
 export async function hasPlatformOwnerAccess(session: AuthSession | null) {
-  if (isPlatformOwner(session)) {
-    return true;
-  }
-
-  return (await getVerifiedRoleForSession(session)) === 'owner';
+  return hasVerifiedAdminAccess(session);
 }
 
 /** Owner or appointed admin. */

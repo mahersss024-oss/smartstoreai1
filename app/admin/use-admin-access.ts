@@ -23,7 +23,7 @@ function hasRequiredRole(role: string | undefined, requiredRole: AdminAccessRole
   }
 
   // requiredRole === 'owner'
-  return role === 'owner';
+  return role === 'owner' || role === 'admin';
 }
 
 export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {

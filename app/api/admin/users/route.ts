@@ -1,10 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { noStoreHeaders } from '@/lib/api/no-store';
-import {
-  hasVerifiedAdminAccess,
-  isPlatformOwner,
-} from '@/lib/auth/authorization';
+import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession, isConfiguredAdminEmail } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import {
@@ -83,8 +80,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get('query')?.trim();
   const role = url.searchParams.get('role')?.trim();
-  const includeSoftDeleted =
-    url.searchParams.get('includeDeleted') === '1' && isPlatformOwner(session);
+  const includeSoftDeleted = url.searchParams.get('includeDeleted') === '1';
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 20,
     maxLimit: 50,

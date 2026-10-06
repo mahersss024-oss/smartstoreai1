@@ -41,7 +41,7 @@ export default function AdminHomePage() {
     void verifyAdminAccess();
   }, [verifyAdminAccess]);
 
-  const isOwner = adminAccessRole === 'owner';
+  const isOwner = adminAccessRole === 'owner' || adminAccessRole === 'admin';
   const isModeratorOnly = adminAccessRole === 'moderator';
   const canManageUsers =
     adminAccessRole === 'owner' || adminAccessRole === 'admin';
