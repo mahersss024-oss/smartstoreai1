@@ -21,6 +21,8 @@ import { parsePaginationFromRequest } from '@/lib/pagination';
 export const dynamic = 'force-dynamic';
 
 const maxCreateListingRequestBytes = 64 * 1024;
+const publicListingsCacheSeconds = 30;
+const publicListingsStaleWhileRevalidateSeconds = 120;
 
 const createListingSchema = z.object({
   category: z.string().min(2).max(80),
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
     pagination.limit,
   ].join(':');
   const payload = await getOrSetPublicJsonCache(cacheKey, {
-    ttlSeconds: 10,
+    ttlSeconds: publicListingsCacheSeconds,
     load: async () => {
       const listings = await listMarketplaceListings({
         query,
@@ -86,8 +88,8 @@ export async function GET(request: Request) {
 
   return Response.json(payload, {
     headers: createPublicCacheHeaders({
-      edgeMaxAgeSeconds: 10,
-      staleWhileRevalidateSeconds: 30,
+      edgeMaxAgeSeconds: publicListingsCacheSeconds,
+      staleWhileRevalidateSeconds: publicListingsStaleWhileRevalidateSeconds,
     }),
   });
 }

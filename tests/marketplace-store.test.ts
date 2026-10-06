@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
@@ -35,6 +37,10 @@ import {
   unblockConversationUser,
   updateCommissionSaleAmountForSeller,
 } from '@/agent/marketplace/store';
+
+function readProjectFile(...segments: string[]) {
+  return readFileSync(join(process.cwd(), ...segments), 'utf8');
+}
 
 test('creates an allowed marketplace listing draft', () => {
   const listing = createListingDraft({
@@ -866,6 +872,19 @@ test('paginates published marketplace listings', () => {
   assert.equal(firstPage.length, 10);
   assert.equal(secondPage.length, 10);
   assert.equal(secondPage.some((listing) => firstPageIds.has(listing.id)), false);
+});
+
+test('public marketplace listings route uses production-friendly edge cache', () => {
+  const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
+
+  assert.match(route, /const publicListingsCacheSeconds = 30/);
+  assert.match(route, /const publicListingsStaleWhileRevalidateSeconds = 120/);
+  assert.match(route, /ttlSeconds: publicListingsCacheSeconds/);
+  assert.match(route, /edgeMaxAgeSeconds: publicListingsCacheSeconds/);
+  assert.match(
+    route,
+    /staleWhileRevalidateSeconds: publicListingsStaleWhileRevalidateSeconds/,
+  );
 });
 
 test('hides deleted seller listings from account views', () => {
