@@ -1601,8 +1601,11 @@ function ListingCardView({
                 fallbackSrcs={listing.imageFallbacks}
                 fallback={listingImageFallback}
                 fetchPriority={prioritizeImage ? 'high' : 'auto'}
+                height={320}
                 loading={prioritizeImage ? 'eager' : 'lazy'}
+                sizes="(min-width: 640px) 116px, 100px"
                 src={listing.image}
+                width={320}
               />
             </>
           ) : (
@@ -1670,8 +1673,11 @@ function ListingCardView({
               fallbackSrcs={listing.imageFallbacks}
               fallback={listingImageFallback}
               fetchPriority={prioritizeImage ? 'high' : 'auto'}
+              height={200}
               loading={prioritizeImage ? 'eager' : 'lazy'}
+              sizes="(min-width: 640px) 184px, 50vw"
               src={listing.image}
+              width={320}
             />
           </>
         ) : (
@@ -4011,7 +4017,15 @@ export default function Page() {
           <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-                <img alt="سوق حمد" className="size-8 object-cover" src="/hamad-market-logo.jpeg" />
+                <img
+                  alt="سوق حمد"
+                  className="size-8 object-cover"
+                  decoding="async"
+                  fetchPriority="high"
+                  height={32}
+                  src="/hamad-market-logo.webp"
+                  width={32}
+                />
               </div>
             </div>
 
@@ -4736,7 +4750,7 @@ export default function Page() {
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
-                    prioritizeImage={index < 4}
+                    prioritizeImage={index < 2}
                     variant="horizontal"
                   />
                 ))}
