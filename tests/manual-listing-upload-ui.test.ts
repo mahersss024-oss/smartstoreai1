@@ -4,7 +4,10 @@ import test from 'node:test';
 
 test('manual listing image picker uses the custom upload surface', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  const uploadInputIndex = page.indexOf('accept="image/*"', page.indexOf('manualListingForm.description'));
+  const uploadInputIndex = page.indexOf(
+    'accept="image/jpeg,image/png,image/webp"',
+    page.indexOf('manualListingForm.description'),
+  );
   const uploadSurface = page.slice(uploadInputIndex - 900, uploadInputIndex + 5200);
 
   assert.match(uploadSurface, /className="sr-only"/);
