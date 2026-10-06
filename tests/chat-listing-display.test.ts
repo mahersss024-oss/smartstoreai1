@@ -138,7 +138,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /manual-listing-image-upload/);
   assert.match(homePage, /typeof crypto\.randomUUID === 'function'/);
   assert.match(homePage, /crypto\.getRandomValues\(bytes\)/);
-    assert.match(homePage, /prepareUploadableImageFiles\(selectedImages\)/);
+    assert.match(homePage, /prepareUploadableImageFilesOnDemand\(selectedImages\)/);
     assert.match(
       homePage,
       /'جاري تجهيز ' \+ manualListingImages\.length \+ ' صور للرفع\.\.\.'/,
