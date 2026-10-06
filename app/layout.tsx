@@ -288,6 +288,13 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
         <link
+          rel="preload"
+          href="/hamad-market-logo.webp"
+          as="image"
+          type="image/webp"
+          fetchPriority="high"
+        />
+        <link
           rel="apple-touch-startup-image"
           href="/splash?size=1170x2532"
           media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
