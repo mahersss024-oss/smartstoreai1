@@ -119,9 +119,9 @@ export function LegalPolicyPage({
             {' '}
             <a
               className="inline-flex h-9 items-center font-bold text-blue-700 underline dark:text-blue-300"
-              href="mailto:mahersss024@gmail.com"
+              href="mailto:support@souqhamad.com"
             >
-              mahersss024@gmail.com
+              support@souqhamad.com
             </a>
           </p>
         </section>
