@@ -5,6 +5,7 @@ import { Bell, BellOff } from 'lucide-react';
 
 import { Button } from '@ui/button';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
+import { detectAppPlatform, isInsideNativeApp } from '@/lib/native/app-bridge';
 
 type PushConfigResponse = {
   configured: boolean;
@@ -26,6 +27,18 @@ type PushState =
 
 const notificationsReadEventName = 'smartstore:notifications-read';
 const notificationsChangedEventName = 'smartstore:notifications-changed';
+const nativePushStatusEventName = 'smartstore:native-push-status';
+
+type NativePushStatus = {
+  supported?: boolean;
+  platform?: 'android' | 'ios' | string;
+  permission?: 'granted' | 'denied' | 'default' | string;
+  active?: boolean;
+};
+
+type NativePushWindow = Window & {
+  SouqHamadNativePush?: NativePushStatus;
+};
 
 function base64UrlToUint8Array(value: string) {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
@@ -54,6 +67,23 @@ function detectPushPlatform() {
   return 'web';
 }
 
+function getNativePushStatus(): NativePushStatus | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return (window as NativePushWindow).SouqHamadNativePush ?? null;
+}
+
+function isNativePushShell() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const platform = detectAppPlatform();
+  return isInsideNativeApp() && (platform === 'android' || platform === 'ios');
+}
+
 export function PushNotificationSettings({
   variant = 'panel',
 }: {
@@ -79,6 +109,23 @@ export function PushNotificationSettings({
   }, []);
 
   const refreshStatus = useCallback(async () => {
+    if (isNativePushShell()) {
+      const nativeStatus = getNativePushStatus();
+
+      if (nativeStatus?.permission === 'denied') {
+        setState('blocked');
+        return;
+      }
+
+      if (nativeStatus?.active || nativeStatus?.permission === 'granted') {
+        setState('active');
+        return;
+      }
+
+      setState('inactive');
+      return;
+    }
+
     if (!isSupported) {
       setState('unsupported');
       return;
@@ -120,6 +167,22 @@ export function PushNotificationSettings({
 
     void refreshStatus();
   }, [refreshStatus, variant]);
+
+  useEffect(() => {
+    if (!isNativePushShell()) {
+      return;
+    }
+
+    const onNativePushStatus = () => {
+      void refreshStatus();
+    };
+
+    window.addEventListener(nativePushStatusEventName, onNativePushStatus);
+
+    return () => {
+      window.removeEventListener(nativePushStatusEventName, onNativePushStatus);
+    };
+  }, [refreshStatus]);
 
   const refreshUnreadCount = useCallback(async () => {
     if (variant !== 'icon') {
@@ -175,6 +238,20 @@ export function PushNotificationSettings({
   }, [refreshUnreadCount, variant]);
 
   const enableNotifications = useCallback(async () => {
+    if (isNativePushShell()) {
+      const nativeStatus = getNativePushStatus();
+
+      if (nativeStatus?.permission === 'denied') {
+        setState('blocked');
+        setNotice('ط§ظ„ط¥ط´ط¹ط§ط±ط§طھ ظ…ظˆظ‚ظˆظپط© ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ†ط¸ط§ظ….');
+        return;
+      }
+
+      setState(nativeStatus?.active || nativeStatus?.permission === 'granted' ? 'active' : 'inactive');
+      setNotice('ط¥ط´ط¹ط§ط±ط§طھ ط§ظ„طھط·ط¨ظٹظ‚ طھط¹ظ…ظ„ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ†ط¸ط§ظ….');
+      return;
+    }
+
     if (!isSupported || !publicKey) {
       return;
     }
@@ -227,6 +304,12 @@ export function PushNotificationSettings({
   }, [isSupported, publicKey]);
 
   const disableNotifications = useCallback(async () => {
+    if (isNativePushShell()) {
+      setState('active');
+      setNotice('ظٹظ…ظƒظ† ط¥ظٹظ‚ط§ظپ ط¥ط´ط¹ط§ط±ط§طھ ط§ظ„طھط·ط¨ظٹظ‚ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ Android.');
+      return;
+    }
+
     if (!isSupported) {
       return;
     }
