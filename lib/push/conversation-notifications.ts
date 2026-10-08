@@ -7,6 +7,7 @@ import type {
   ConversationMessage,
 } from '@/agent/marketplace/types';
 
+import { sendNativePushToUser } from './native-push';
 import { sendWebPush } from './web-push';
 
 type NotifyConversationMessageInput = {
@@ -55,30 +56,25 @@ export async function notifyConversationMessage({
     return;
   }
 
-  const subscriptions = await listActiveSubscriptionsForUser(recipientId);
-
-  if (subscriptions.length === 0) {
-    return;
-  }
-
   const title = senderName?.trim()
     ? `رسالة جديدة من ${senderName.trim()}`
     : 'رسالة جديدة في سوق حمد';
-  const body = buildMessagePreview(message.body);
-  const url = `/conversations/${conversation.id}`;
+  const pushMessage = {
+    title,
+    body: buildMessagePreview(message.body),
+    url: `/conversations/${conversation.id}`,
+    tag: `conversation:${conversation.id}`,
+  };
+  const subscriptions = await listActiveSubscriptionsForUser(recipientId);
 
-  await Promise.all(
-    subscriptions.map(async (subscription) => {
-      const result = await sendWebPush(subscription, {
-        title,
-        body,
-        url,
-        tag: `conversation:${conversation.id}`,
-      });
+  await Promise.all([
+    ...subscriptions.map(async (subscription) => {
+      const result = await sendWebPush(subscription, pushMessage);
 
       if (!result.ok && result.expired) {
         await deactivateSubscriptionById(subscription.id);
       }
     }),
-  );
+    sendNativePushToUser(recipientId, pushMessage),
+  ]);
 }

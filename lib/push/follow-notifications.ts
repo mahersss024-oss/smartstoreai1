@@ -3,6 +3,7 @@ import {
   listActiveSubscriptionsForUser,
 } from '@/agent/marketplace/push-subscriptions';
 
+import { sendNativePushToUser } from './native-push';
 import { sendWebPush } from './web-push';
 
 type PublishedListingNotification = {
@@ -47,24 +48,24 @@ export async function notifySellerFollowersOfPublishedListing({
       subscriptions: await listActiveSubscriptionsForUser(userId),
     })),
   );
-  const body = buildListingNotificationBody(listing);
-  const url = `/listings/${encodeURIComponent(listing.id)}?source=follow`;
+  const pushMessage = {
+    title: 'إعلان جديد من بائع تتابعه',
+    body: buildListingNotificationBody(listing),
+    url: `/listings/${encodeURIComponent(listing.id)}?source=follow`,
+    tag: `follow:listing:${listing.id}`,
+  };
 
   await Promise.all(
-    subscriptionsByUser.flatMap(({ subscriptions }) =>
-      subscriptions.map(async (subscription) => {
-        const result = await sendWebPush(subscription, {
-          title: 'إعلان جديد من بائع تتابعه',
-          body,
-          url,
-          tag: `follow:listing:${listing.id}`,
-        });
+    subscriptionsByUser.flatMap(({ userId, subscriptions }) => [
+      ...subscriptions.map(async (subscription) => {
+        const result = await sendWebPush(subscription, pushMessage);
 
         if (!result.ok && result.expired) {
           await deactivateSubscriptionById(subscription.id);
         }
       }),
-    ),
+      sendNativePushToUser(userId, pushMessage),
+    ]),
   );
 }
 
@@ -86,23 +87,23 @@ export async function notifySimilarListingFollowersOfPublishedListing({
       subscriptions: await listActiveSubscriptionsForUser(userId),
     })),
   );
-  const body = buildListingNotificationBody(listing);
-  const url = `/listings/${encodeURIComponent(listing.id)}?source=similar-follow`;
+  const pushMessage = {
+    title: 'إعلان مشابه جديد',
+    body: buildListingNotificationBody(listing),
+    url: `/listings/${encodeURIComponent(listing.id)}?source=similar-follow`,
+    tag: `similar:listing:${listing.id}`,
+  };
 
   await Promise.all(
-    subscriptionsByUser.flatMap(({ subscriptions }) =>
-      subscriptions.map(async (subscription) => {
-        const result = await sendWebPush(subscription, {
-          title: 'إعلان مشابه جديد',
-          body,
-          url,
-          tag: `similar:listing:${listing.id}`,
-        });
+    subscriptionsByUser.flatMap(({ userId, subscriptions }) => [
+      ...subscriptions.map(async (subscription) => {
+        const result = await sendWebPush(subscription, pushMessage);
 
         if (!result.ok && result.expired) {
           await deactivateSubscriptionById(subscription.id);
         }
       }),
-    ),
+      sendNativePushToUser(userId, pushMessage),
+    ]),
   );
 }
