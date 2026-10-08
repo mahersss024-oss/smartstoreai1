@@ -45,8 +45,48 @@ function assertProductionDatabaseStoreMode() {
   process.exit(1);
 }
 
+function shouldRunDatabaseMigrations() {
+  const value = process.env.SMARTSTORE_RUN_DB_MIGRATIONS_ON_START?.trim();
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
+function runDatabaseMigrations() {
+  return new Promise((resolve, reject) => {
+    const prismaBin =
+      process.platform === 'win32'
+        ? 'node_modules\\.bin\\prisma.cmd'
+        : 'node_modules/.bin/prisma';
+    const migration = spawn(prismaBin, ['migrate', 'deploy'], {
+      env: process.env,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    migration.on('error', reject);
+    migration.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(
+        new Error(
+          signal
+            ? `[startup] prisma migrate deploy exited with signal ${signal}.`
+            : `[startup] prisma migrate deploy exited with code ${code}.`,
+        ),
+      );
+    });
+  });
+}
+
 assertSupportedNodeVersion();
 assertProductionDatabaseStoreMode();
+
+if (shouldRunDatabaseMigrations()) {
+  console.log('[startup] applying database migrations...');
+  await runDatabaseMigrations();
+}
 
 const port = process.env.PORT || '3000';
 const shutdownGraceMs = Number.parseInt(

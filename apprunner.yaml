@@ -38,6 +38,8 @@ run:
       value: "100"
     - name: SMARTSTORE_PUBLIC_CACHE_REDIS_TIMEOUT_MS
       value: "1500"
+    - name: SMARTSTORE_RUN_DB_MIGRATIONS_ON_START
+      value: "1"
   secrets:
     - name: DATABASE_URL
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:DATABASE_URL::"
