@@ -5,7 +5,11 @@ import { Bell, BellOff } from 'lucide-react';
 
 import { Button } from '@ui/button';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
-import { detectAppPlatform, isInsideNativeApp } from '@/lib/native/app-bridge';
+import {
+  detectAppPlatform,
+  isInsideNativeApp,
+  postToNative,
+} from '@/lib/native/app-bridge';
 
 type PushConfigResponse = {
   configured: boolean;
@@ -240,15 +244,13 @@ export function PushNotificationSettings({
   const enableNotifications = useCallback(async () => {
     if (isNativePushShell()) {
       const nativeStatus = getNativePushStatus();
-
-      if (nativeStatus?.permission === 'denied') {
-        setState('blocked');
-        setNotice('ط§ظ„ط¥ط´ط¹ط§ط±ط§طھ ظ…ظˆظ‚ظˆظپط© ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ†ط¸ط§ظ….');
-        return;
-      }
-
-      setState(nativeStatus?.active || nativeStatus?.permission === 'granted' ? 'active' : 'inactive');
-      setNotice('ط¥ط´ط¹ط§ط±ط§طھ ط§ظ„طھط·ط¨ظٹظ‚ طھط¹ظ…ظ„ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ†ط¸ط§ظ….');
+      postToNative({ type: 'open-notification-settings' });
+      setState(
+        nativeStatus?.active || nativeStatus?.permission === 'granted'
+          ? 'active'
+          : 'blocked',
+      );
+      setNotice('افتح إعدادات إشعارات التطبيق لتغيير السماح أو الإيقاف.');
       return;
     }
 
@@ -305,8 +307,8 @@ export function PushNotificationSettings({
 
   const disableNotifications = useCallback(async () => {
     if (isNativePushShell()) {
-      setState('active');
-      setNotice('ظٹظ…ظƒظ† ط¥ظٹظ‚ط§ظپ ط¥ط´ط¹ط§ط±ط§طھ ط§ظ„طھط·ط¨ظٹظ‚ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ Android.');
+      postToNative({ type: 'open-notification-settings' });
+      setNotice('افتح إعدادات إشعارات التطبيق لتغيير السماح أو الإيقاف.');
       return;
     }
 
@@ -343,7 +345,7 @@ export function PushNotificationSettings({
     state === 'working' ||
     state === 'unsupported' ||
     state === 'not_configured' ||
-    state === 'blocked';
+    (state === 'blocked' && !isNativePushShell());
   const isActive = state === 'active';
   const buttonText =
     state === 'checking'

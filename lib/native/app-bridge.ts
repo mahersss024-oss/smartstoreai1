@@ -12,6 +12,7 @@ export type AppBridgeOutboundMessage =
   | { type: 'share'; url: string; title?: string }
   | { type: 'haptic'; style: 'light' | 'medium' | 'heavy' | 'success' }
   | { type: 'open-external'; url: string }
+  | { type: 'open-notification-settings' }
   | { type: 'set-theme'; theme: 'light' | 'dark' };
 
 export type AppBridgeInboundMessage =
