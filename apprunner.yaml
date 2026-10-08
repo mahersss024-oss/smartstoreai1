@@ -115,6 +115,12 @@ run:
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_VAPID_PRIVATE_KEY::"
     - name: SMARTSTORE_VAPID_SUBJECT
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_VAPID_SUBJECT::"
+    - name: FIREBASE_PROJECT_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:FIREBASE_PROJECT_ID::"
+    - name: FIREBASE_CLIENT_EMAIL
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:FIREBASE_CLIENT_EMAIL::"
+    - name: FIREBASE_PRIVATE_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:FIREBASE_PRIVATE_KEY::"
 
     - name: SMARTSTORE_RATE_LIMIT_BACKEND
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_RATE_LIMIT_BACKEND::"
