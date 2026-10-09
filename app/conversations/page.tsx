@@ -17,6 +17,10 @@ import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import {
+  readClientPageCache,
+  writeClientPageCache,
+} from '@/lib/client-page-cache';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import {
@@ -71,6 +75,11 @@ type PaginationMeta = {
   limit: number;
   hasMore: boolean;
   nextPage: number | null;
+};
+
+type ConversationsCachePayload = {
+  conversations: ConversationRecord[];
+  pagination?: PaginationMeta | null;
 };
 
 function formatUpdatedAt(value: string) {
@@ -134,8 +143,13 @@ function isMessageReadBy(
   );
 }
 
+function getConversationsCacheKey(userId: string) {
+  return `smartstore:page-cache:v1:conversations:${userId}`;
+}
+
 export default function ConversationsPage() {
   const { isSessionLoading, session } = useAuthSession();
+  const sessionUserId = session.user?.id;
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [conversationsPagination, setConversationsPagination] =
     useState<PaginationMeta | null>(null);
@@ -177,8 +191,10 @@ export default function ConversationsPage() {
       );
 
       if (!conversationsResponse.ok) {
-        setConversations([]);
-        setConversationsPagination(null);
+        if (showLoading) {
+          setConversations([]);
+          setConversationsPagination(null);
+        }
         return;
       }
 
@@ -192,12 +208,22 @@ export default function ConversationsPage() {
           : [...currentConversations, ...(payload.conversations ?? [])],
       );
       setConversationsPagination(payload.pagination ?? null);
+
+      if (page === 1 && sessionUserId) {
+        writeClientPageCache<ConversationsCachePayload>(
+          getConversationsCacheKey(sessionUserId),
+          {
+            conversations: payload.conversations ?? [],
+            pagination: payload.pagination ?? null,
+          },
+        );
+      }
     } finally {
       if (showLoading) {
         setIsLoading(false);
       }
     }
-  }, [session.authenticated]);
+  }, [session.authenticated, sessionUserId]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -225,7 +251,19 @@ export default function ConversationsPage() {
     queueMicrotask(() => {
       if (!cancelled) {
         if (session.authenticated) {
-          void refreshConversations(1);
+          const cachedPayload = sessionUserId
+            ? readClientPageCache<ConversationsCachePayload>(
+                getConversationsCacheKey(sessionUserId),
+              )
+            : null;
+
+          if (cachedPayload) {
+            setConversations(cachedPayload.conversations ?? []);
+            setConversationsPagination(cachedPayload.pagination ?? null);
+            setIsLoading(false);
+          }
+
+          void refreshConversations(1, { showLoading: !cachedPayload });
           return;
         }
 
@@ -238,7 +276,12 @@ export default function ConversationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSessionLoading, refreshConversations, session.authenticated]);
+  }, [
+    isSessionLoading,
+    refreshConversations,
+    session.authenticated,
+    sessionUserId,
+  ]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,

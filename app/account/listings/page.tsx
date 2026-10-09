@@ -36,6 +36,10 @@ import { ListingShareButton } from '@/components/listing-share-button';
 import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import {
+  readClientPageCache,
+  writeClientPageCache,
+} from '@/lib/client-page-cache';
 import { queueUploadableImagePreparation } from '@/lib/client-image-normalization';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -121,6 +125,11 @@ type PaginationMeta = {
   limit: number;
   hasMore: boolean;
   nextPage: number | null;
+};
+
+type AccountListingsCachePayload = {
+  listings: ApiListingRecord[];
+  pagination?: PaginationMeta | null;
 };
 
 type ListingEditNotice = {
@@ -383,6 +392,10 @@ function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
 }
 
+function getAccountListingsCacheKey(userId: string) {
+  return `smartstore:page-cache:v1:account-listings:${userId}`;
+}
+
 function createEditFormFromListing(listing: ListingCard): ListingEditForm {
   return {
     title: listing.title,
@@ -401,6 +414,7 @@ function createEditFormFromListing(listing: ListingCard): ListingEditForm {
 export default function AccountListingsPage() {
   const router = useRouter();
   const { isSessionLoading, session, setSession } = useAuthSession();
+  const sessionUserId = session.user?.id;
   const [listings, setListings] = useState<ListingCard[]>([]);
   const [listingsPagination, setListingsPagination] =
     useState<PaginationMeta | null>(null);
@@ -458,9 +472,16 @@ export default function AccountListingsPage() {
 
     return nextListing;
   }, []);
-  const refreshListings = useCallback(async (page = 1) => {
+  const refreshListings = useCallback(async (
+    page = 1,
+    options?: { showLoading?: boolean },
+  ) => {
     await Promise.resolve();
-    setIsListingsLoading(true);
+    const showLoading = options?.showLoading ?? true;
+
+    if (showLoading) {
+      setIsListingsLoading(true);
+    }
 
     try {
       const response = await fetch(
@@ -471,20 +492,37 @@ export default function AccountListingsPage() {
         listings?: ApiListingRecord[];
         pagination?: PaginationMeta | null;
       } = response.ok ? await response.json() : { listings: [] };
+
+      if (!response.ok && page === 1 && !showLoading) {
+        return;
+      }
+
       const nextListings = payload.listings?.map(listingRecordToCard) ?? [];
 
       setListings((currentListings) =>
         page === 1 ? nextListings : [...currentListings, ...nextListings],
       );
       setListingsPagination(payload.pagination ?? null);
+
+      if (page === 1 && sessionUserId) {
+        writeClientPageCache<AccountListingsCachePayload>(
+          getAccountListingsCacheKey(sessionUserId),
+          {
+            listings: payload.listings ?? [],
+            pagination: payload.pagination ?? null,
+          },
+        );
+      }
     } catch {
-      if (page === 1) {
+      if (page === 1 && showLoading) {
         setListings([]);
       }
     } finally {
-      setIsListingsLoading(false);
+      if (showLoading) {
+        setIsListingsLoading(false);
+      }
     }
-  }, []);
+  }, [sessionUserId]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -520,14 +558,26 @@ export default function AccountListingsPage() {
 
     queueMicrotask(() => {
       if (!cancelled) {
-        void refreshListings();
+        const cachedPayload = sessionUserId
+          ? readClientPageCache<AccountListingsCachePayload>(
+              getAccountListingsCacheKey(sessionUserId),
+            )
+          : null;
+
+        if (cachedPayload) {
+          setListings((cachedPayload.listings ?? []).map(listingRecordToCard));
+          setListingsPagination(cachedPayload.pagination ?? null);
+          setIsListingsLoading(false);
+        }
+
+        void refreshListings(1, { showLoading: !cachedPayload });
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshListings, session.authenticated]);
+  }, [refreshListings, session.authenticated, sessionUserId]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,

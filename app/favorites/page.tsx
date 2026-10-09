@@ -9,6 +9,10 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import {
+  readClientPageCache,
+  writeClientPageCache,
+} from '@/lib/client-page-cache';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -40,6 +44,11 @@ type PaginationMeta = {
   limit: number;
   hasMore: boolean;
   nextPage: number | null;
+};
+
+type FavoritesCachePayload = {
+  favorites: FavoriteRecord[];
+  pagination?: PaginationMeta | null;
 };
 
 const missingListingImageDataUrl =
@@ -107,8 +116,13 @@ function formatListingRelativeTime(value: string | undefined) {
   }).format(new Date(timestamp));
 }
 
+function getFavoritesCacheKey(userId: string) {
+  return `smartstore:page-cache:v1:favorites:${userId}`;
+}
+
 export default function FavoritesPage() {
   const { isSessionLoading, session } = useAuthSession();
+  const sessionUserId = session.user?.id;
   const [favorites, setFavorites] = useState<FavoriteRecord[]>([]);
   const [favoritesPagination, setFavoritesPagination] =
     useState<PaginationMeta | null>(null);
@@ -118,8 +132,15 @@ export default function FavoritesPage() {
     [favorites],
   );
 
-  const refreshFavorites = useCallback(async (page = 1) => {
-    setIsLoading(true);
+  const refreshFavorites = useCallback(async (
+    page = 1,
+    options?: { showLoading?: boolean },
+  ) => {
+    const showLoading = options?.showLoading ?? true;
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
 
     try {
       if (!session.authenticated) {
@@ -136,8 +157,10 @@ export default function FavoritesPage() {
       );
 
       if (!favoritesResponse.ok) {
-        setFavorites([]);
-        setFavoritesPagination(null);
+        if (showLoading) {
+          setFavorites([]);
+          setFavoritesPagination(null);
+        }
         return;
       }
 
@@ -151,10 +174,22 @@ export default function FavoritesPage() {
           : [...currentFavorites, ...(payload.favorites ?? [])],
       );
       setFavoritesPagination(payload.pagination ?? null);
+
+      if (page === 1 && sessionUserId) {
+        writeClientPageCache<FavoritesCachePayload>(
+          getFavoritesCacheKey(sessionUserId),
+          {
+            favorites: payload.favorites ?? [],
+            pagination: payload.pagination ?? null,
+          },
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
-  }, [session.authenticated]);
+  }, [session.authenticated, sessionUserId]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -182,7 +217,19 @@ export default function FavoritesPage() {
     queueMicrotask(() => {
       if (!cancelled) {
         if (session.authenticated) {
-          void refreshFavorites();
+          const cachedPayload = sessionUserId
+            ? readClientPageCache<FavoritesCachePayload>(
+                getFavoritesCacheKey(sessionUserId),
+              )
+            : null;
+
+          if (cachedPayload) {
+            setFavorites(cachedPayload.favorites ?? []);
+            setFavoritesPagination(cachedPayload.pagination ?? null);
+            setIsLoading(false);
+          }
+
+          void refreshFavorites(1, { showLoading: !cachedPayload });
           return;
         }
 
@@ -195,7 +242,7 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSessionLoading, refreshFavorites, session.authenticated]);
+  }, [isSessionLoading, refreshFavorites, session.authenticated, sessionUserId]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,

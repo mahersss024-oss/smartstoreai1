@@ -8,6 +8,10 @@ import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import {
+  readClientPageCache,
+  writeClientPageCache,
+} from '@/lib/client-page-cache';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 
@@ -30,6 +34,10 @@ type NotificationsPayload = {
 const notificationsReadEventName = 'smartstore:notifications-read';
 const notificationsChangedEventName = 'smartstore:notifications-changed';
 
+function getNotificationsCacheKey(userId: string) {
+  return `smartstore:page-cache:v1:notifications:${userId}`;
+}
+
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat('ar-SA', {
     dateStyle: 'medium',
@@ -39,6 +47,7 @@ function formatNotificationTime(value: string) {
 
 export default function NotificationsPage() {
   const { isSessionLoading, session } = useAuthSession();
+  const sessionUserId = session.user?.id;
   const [payload, setPayload] = useState<NotificationsPayload>({
     notifications: [],
     unreadCount: 0,
@@ -58,8 +67,14 @@ export default function NotificationsPage() {
     message: string;
   } | null>(null);
 
-  const refreshNotifications = useCallback(async () => {
-    setIsLoading(true);
+  const refreshNotifications = useCallback(async (options?: {
+    showLoading?: boolean;
+  }) => {
+    const showLoading = options?.showLoading ?? true;
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
 
     try {
       if (!session.authenticated) {
@@ -75,11 +90,21 @@ export default function NotificationsPage() {
         return;
       }
 
-      setPayload((await response.json()) as NotificationsPayload);
+      const nextPayload = (await response.json()) as NotificationsPayload;
+      setPayload(nextPayload);
+
+      if (sessionUserId) {
+        writeClientPageCache<NotificationsPayload>(
+          getNotificationsCacheKey(sessionUserId),
+          nextPayload,
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
-  }, [session.authenticated]);
+  }, [session.authenticated, sessionUserId]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -91,14 +116,36 @@ export default function NotificationsPage() {
       return;
     }
 
-    void refreshNotifications();
-  }, [isSessionLoading, refreshNotifications]);
+    if (session.authenticated) {
+      const cachedPayload = sessionUserId
+        ? readClientPageCache<NotificationsPayload>(
+            getNotificationsCacheKey(sessionUserId),
+          )
+        : null;
+
+      if (cachedPayload) {
+        setPayload(cachedPayload);
+        setIsLoading(false);
+      }
+
+      void refreshNotifications({ showLoading: !cachedPayload });
+      return;
+    }
+
+    setPayload({ notifications: [], unreadCount: 0 });
+    setIsLoading(false);
+  }, [
+    isSessionLoading,
+    refreshNotifications,
+    session.authenticated,
+    sessionUserId,
+  ]);
 
   useSmartstoreRealtime({
     enabled: session.authenticated,
     fallbackIntervalMs: 5000,
     eventTypes: ['follow_listing_published', 'listing_notification_created'],
-    onResync: refreshNotifications,
+    onResync: () => refreshNotifications({ showLoading: false }),
   });
 
   const markAllRead = useCallback(async () => {
@@ -189,6 +236,12 @@ export default function NotificationsPage() {
       }
 
       setPayload({ notifications: [], unreadCount: 0 });
+      if (sessionUserId) {
+        writeClientPageCache<NotificationsPayload>(
+          getNotificationsCacheKey(sessionUserId),
+          { notifications: [], unreadCount: 0 },
+        );
+      }
       window.dispatchEvent(new Event(notificationsChangedEventName));
       setActionNotice({
         tone: 'success',
@@ -199,7 +252,7 @@ export default function NotificationsPage() {
       setIsDeletingAll(false);
       setIsDeleteAllConfirmOpen(false);
     }
-  }, [payload.notifications.length]);
+  }, [payload.notifications.length, sessionUserId]);
 
   useEffect(() => {
     if (
