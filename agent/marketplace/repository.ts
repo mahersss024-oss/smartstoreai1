@@ -869,6 +869,7 @@ function toConversationRecord(
     name?: string;
     picture?: string;
     lastActiveAt?: string;
+    deletedAt?: string;
   };
   buyer?: {
     id: string;
@@ -876,6 +877,7 @@ function toConversationRecord(
     name?: string;
     picture?: string;
     lastActiveAt?: string;
+    deletedAt?: string;
   };
 } {
   return {
@@ -918,6 +920,8 @@ function toConversationRecord(
           picture: conversation.seller.picture ?? undefined,
           lastActiveAt:
             conversation.seller.lastActiveAt?.toISOString() ?? undefined,
+          deletedAt:
+            conversation.seller.deletedAt?.toISOString() ?? undefined,
         }
       : undefined,
     buyer: conversation.buyer
@@ -928,6 +932,8 @@ function toConversationRecord(
           picture: conversation.buyer.picture ?? undefined,
           lastActiveAt:
             conversation.buyer.lastActiveAt?.toISOString() ?? undefined,
+          deletedAt:
+            conversation.buyer.deletedAt?.toISOString() ?? undefined,
         }
       : undefined,
   };
@@ -1164,6 +1170,7 @@ export async function getPublicSellerProfile(
         phoneNumber: true,
         role: true,
         createdAt: true,
+        deletedAt: true,
       },
     }),
     prisma.listing.findMany({
@@ -1196,7 +1203,7 @@ export async function getPublicSellerProfile(
     }),
   ]);
 
-  if (!seller) {
+  if (!seller || seller.deletedAt) {
     return null;
   }
 
@@ -1355,7 +1362,7 @@ export async function listAccountFollows(actor: Actor) {
 
   const [followingRecords, followerRecords, similarListingFollowRecords] = await Promise.all([
     prisma.sellerFollow.findMany({
-      where: { followerId: userId },
+      where: { followerId: userId, seller: { deletedAt: null } },
       include: {
         seller: {
           select: {
@@ -1368,7 +1375,7 @@ export async function listAccountFollows(actor: Actor) {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.sellerFollow.findMany({
-      where: { sellerId: userId },
+      where: { sellerId: userId, follower: { deletedAt: null } },
       include: {
         follower: {
           select: {
@@ -2903,6 +2910,7 @@ export async function listUserConversations(userId: string) {
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       buyer: {
@@ -2912,6 +2920,7 @@ export async function listUserConversations(userId: string) {
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       listing: {
@@ -2967,6 +2976,7 @@ export async function listUserConversationsPage(
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       buyer: {
@@ -2976,6 +2986,7 @@ export async function listUserConversationsPage(
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       listing: {
@@ -3017,6 +3028,7 @@ export async function getConversationForUser(
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       buyer: {
@@ -3026,6 +3038,7 @@ export async function getConversationForUser(
           name: true,
           picture: true,
           lastActiveAt: true,
+          deletedAt: true,
         },
       },
       listing: {

@@ -79,6 +79,7 @@ type ConversationParticipant = {
   name?: string;
   picture?: string;
   lastActiveAt?: string;
+  deletedAt?: string;
 };
 
 type ConversationRecord = {
@@ -524,9 +525,12 @@ export default function ConversationPage() {
     getParticipantDisplayName(otherParticipant) ||
     getParticipantFallbackName(otherParticipantId);
   const otherParticipantPresence = getParticipantPresence(otherParticipant);
-  const otherParticipantProfileHref = otherParticipantId
+  const canOpenOtherParticipantProfile = Boolean(
+    otherParticipantId && !otherParticipant?.deletedAt,
+  );
+  const otherParticipantProfileHref = canOpenOtherParticipantProfile && otherParticipantId
     ? `/sellers/${encodeURIComponent(otherParticipantId)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
-    : '/conversations';
+    : null;
   const displayListing =
     entryListing && entryListing.sellerId === conversation?.sellerId
       ? entryListing
@@ -1405,26 +1409,38 @@ export default function ConversationPage() {
           <section className="customer-conversation-card flex h-full min-h-0 flex-col overflow-hidden rounded-none bg-white dark:bg-card sm:rounded-md">
             <div className="flex shrink-0 items-center justify-between gap-3 px-2 py-2 lg:px-1 lg:py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <Link
-                  href={otherParticipantProfileHref}
-                  className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm transition hover:opacity-85 active:scale-95 dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100"
-                >
-                  {otherParticipant?.picture ? (
-                    <SellerAvatar
-                      alt={otherParticipantName}
-                      picture={otherParticipant.picture}
-                    />
-                  ) : (
-                    <span>{getParticipantInitial(otherParticipantName)}</span>
-                  )}
-                </Link>
-                <div className="min-w-0">
+                {otherParticipantProfileHref ? (
                   <Link
                     href={otherParticipantProfileHref}
-                    className="block truncate text-sm font-bold transition hover:opacity-85"
+                    className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 text-sm font-black text-blue-700 shadow-sm transition hover:opacity-85 active:scale-95 dark:border-blue-300/20 dark:bg-blue-400/10 dark:text-blue-100"
                   >
-                    {otherParticipantName}
+                    {otherParticipant?.picture ? (
+                      <SellerAvatar
+                        alt={otherParticipantName}
+                        picture={otherParticipant.picture}
+                      />
+                    ) : (
+                      <span>{getParticipantInitial(otherParticipantName)}</span>
+                    )}
                   </Link>
+                ) : (
+                  <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-black text-slate-500 shadow-sm dark:border-white/10 dark:bg-slate-800 dark:text-slate-300">
+                    <span>{getParticipantInitial(otherParticipantName)}</span>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  {otherParticipantProfileHref ? (
+                    <Link
+                      href={otherParticipantProfileHref}
+                      className="block truncate text-sm font-bold transition hover:opacity-85"
+                    >
+                      {otherParticipantName}
+                    </Link>
+                  ) : (
+                    <h1 className="truncate text-sm font-bold">
+                      {otherParticipant?.deletedAt ? 'حساب محذوف' : otherParticipantName}
+                    </h1>
+                  )}
                   <p
                     className={`mt-0.5 flex items-center gap-1 truncate text-xs ${
                       otherParticipantPresence.online

@@ -68,6 +68,7 @@ type ConversationParticipant = {
   name?: string;
   picture?: string;
   lastActiveAt?: string;
+  deletedAt?: string;
 };
 
 type PaginationMeta = {

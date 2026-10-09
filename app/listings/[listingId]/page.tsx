@@ -638,7 +638,9 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   const isOwnListing = session?.user.id === listing.sellerId;
   const sellerProfile = await getPublicSellerProfile(listing.sellerId);
   const returnHref = getListingReturnHref(resolvedSearchParams);
-  const sellerProfileHref = getSellerProfileHref(listing.sellerId, listing.id);
+  const sellerProfileHref = sellerProfile
+    ? getSellerProfileHref(listing.sellerId, listing.id)
+    : returnHref;
   const candidateSimilarListings = await listMarketplaceListings({
     category: listing.category,
     city: listing.city,
