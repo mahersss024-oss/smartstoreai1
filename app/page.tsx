@@ -4769,7 +4769,7 @@ export default function Page() {
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
-                    prioritizeImage={!isNativeApp && index < 2}
+                    prioritizeImage={index < 2}
                     variant="horizontal"
                   />
                 ))}
