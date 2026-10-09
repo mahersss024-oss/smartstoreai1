@@ -1369,6 +1369,27 @@ function ListingChatLinkCard({
   href: string;
   listing?: ListingCard;
 }) {
+  if (!listing) {
+    return (
+      <div className="my-2 grid gap-2 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-right text-amber-950 shadow-sm dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-50">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-amber-700 dark:text-amber-200">
+              إعلان غير متاح
+            </div>
+            <div className="mt-1 text-sm font-bold">لا يمكن فتح هذا الإعلان</div>
+            <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
+              قد يكون الإعلان محذوفًا أو موقوفًا عن النشر أو لم يعد منشورًا.
+            </div>
+          </div>
+          <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-amber-100 text-amber-700 shadow-sm shadow-amber-950/10 dark:bg-amber-900/40 dark:text-amber-200">
+            <Megaphone className="size-5" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Link
       className="my-2 grid gap-2 rounded-md border border-blue-200 bg-blue-50/80 p-3 text-right text-blue-950 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-50 dark:hover:border-blue-300/40"

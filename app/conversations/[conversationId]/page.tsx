@@ -65,6 +65,7 @@ type ConversationListing = {
   price?: number | 'bid' | 'negotiable';
   city?: string;
   category: string;
+  status?: string;
   images?: Array<{
     displayUrl?: string;
     originalUrl?: string;
@@ -151,6 +152,23 @@ function getListingImage(listing: ConversationListing | null) {
     image?.originalUrl ??
     missingListingImageDataUrl
   );
+}
+
+function isListingPubliclyOpenable(listing: ConversationListing | null | undefined) {
+  return listing?.status === 'published';
+}
+
+function getUnavailableListingLabel(status: string | undefined) {
+  const labels: Record<string, string> = {
+    deleted: 'الإعلان محذوف',
+    paused: 'الإعلان موقوف عن النشر',
+    sold: 'الإعلان مباع',
+    rejected: 'الإعلان غير منشور',
+    pending: 'الإعلان قيد المراجعة',
+    draft: 'الإعلان غير منشور',
+  };
+
+  return labels[status ?? ''] ?? 'الإعلان غير متاح';
 }
 
 function getParticipantFallbackName(participantId?: string | null) {
@@ -513,7 +531,9 @@ export default function ConversationPage() {
     entryListing && entryListing.sellerId === conversation?.sellerId
       ? entryListing
       : conversation?.listing;
-  const conversationListingHref = displayListing
+  const canOpenDisplayListing = isListingPubliclyOpenable(displayListing);
+  const unavailableListingLabel = getUnavailableListingLabel(displayListing?.status);
+  const conversationListingHref = displayListing && canOpenDisplayListing
     ? `/listings/${encodeURIComponent(displayListing.id)}?source=conversation&conversationId=${encodeURIComponent(conversationId)}`
     : null;
   const visibleMessages = useMemo(
@@ -1481,9 +1501,9 @@ export default function ConversationPage() {
 
             <div className="shrink-0 border-t bg-white px-3 py-2 dark:bg-card lg:hidden">
               <div className="flex items-center gap-2">
-                {displayListing ? (
+                {displayListing && conversationListingHref ? (
                   <Link
-                    href={conversationListingHref ?? '/conversations'}
+                    href={conversationListingHref}
                     className="size-12 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                   >
                     <ResilientImage
@@ -1517,9 +1537,9 @@ export default function ConversationPage() {
                     <Megaphone className="size-3.5" />
                     الإعلان
                   </div>
-                  {displayListing ? (
+                  {displayListing && conversationListingHref ? (
                     <Link
-                      href={conversationListingHref ?? '/conversations'}
+                      href={conversationListingHref}
                       className="block truncate text-xs font-bold transition hover:text-blue-600"
                     >
                       {displayListing.title ?? 'إعلان غير متاح'}
@@ -1530,6 +1550,11 @@ export default function ConversationPage() {
                   <p className="mt-0.5 truncate text-xs font-bold text-blue-700">
                     {formatPrice(displayListing?.price)}
                   </p>
+                  {displayListing && !conversationListingHref && (
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      {unavailableListingLabel}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1784,9 +1809,9 @@ export default function ConversationPage() {
 
           <aside className="hidden h-fit gap-4 px-1 py-3 lg:grid">
             <div className="flex items-start gap-3">
-              {displayListing ? (
+              {displayListing && conversationListingHref ? (
                 <Link
-                  href={conversationListingHref ?? '/conversations'}
+                  href={conversationListingHref}
                   className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                 >
                   <ResilientImage
@@ -1820,9 +1845,9 @@ export default function ConversationPage() {
                   <Megaphone className="size-4" />
                   الإعلان
                 </div>
-                {displayListing ? (
+                {displayListing && conversationListingHref ? (
                   <Link
-                    href={conversationListingHref ?? '/conversations'}
+                    href={conversationListingHref}
                     className="line-clamp-2 text-sm font-bold leading-6 transition hover:text-blue-600"
                   >
                     {displayListing.title ?? 'إعلان غير متاح'}
@@ -1835,6 +1860,11 @@ export default function ConversationPage() {
                 <p className="mt-1 text-sm font-bold text-blue-700">
                   {formatPrice(displayListing?.price)}
                 </p>
+                {displayListing && !conversationListingHref && (
+                  <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    {unavailableListingLabel}
+                  </p>
+                )}
                 <p className="mt-1 text-sm text-muted-foreground">
                   {displayListing?.city ?? 'السعودية'}
                 </p>

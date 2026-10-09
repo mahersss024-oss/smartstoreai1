@@ -1295,6 +1295,7 @@ export async function listAccountFollows(actor: Actor) {
   if (!shouldUseDatabaseStore()) {
     const similarListingFollows = [...memorySimilarListingFollows.values()]
       .filter((follow) => follow.userId === userId)
+      .filter((follow) => memoryStore.getListing(follow.listingId)?.status === 'published')
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .map((follow) => {
         const listing = memoryStore.getListing(follow.listingId);
@@ -1380,7 +1381,7 @@ export async function listAccountFollows(actor: Actor) {
       orderBy: { createdAt: 'desc' },
     }),
     marketplacePrisma.similarListingFollow.findMany({
-      where: { userId },
+      where: { userId, listing: { status: 'published' } },
       include: {
         listing: {
           include: {
@@ -4247,11 +4248,13 @@ export async function shareSellerContact(conversationId: string, actor: Actor) {
 
 export async function listUserFavorites(userId: string) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.listUserFavorites(userId);
+    return memoryStore
+      .listUserFavorites(userId)
+      .filter((favorite) => favorite.listing?.status === 'published');
   }
 
   const favorites = await prisma.favorite.findMany({
-    where: { userId },
+    where: { userId, listing: { status: 'published' } },
     include: {
       listing: {
         include: {
@@ -4280,13 +4283,14 @@ export async function listUserFavoritesPage(
     return toPaginatedResponse(
       memoryStore
         .listUserFavorites(userId)
+        .filter((favorite) => favorite.listing?.status === 'published')
         .slice(pagination.skip, pagination.skip + pagination.take),
       pagination,
     );
   }
 
   const favorites = await prisma.favorite.findMany({
-    where: { userId },
+    where: { userId, listing: { status: 'published' } },
     include: {
       listing: {
         include: {
