@@ -6,7 +6,7 @@ import test from 'node:test';
 test('service worker displays and routes push notifications', () => {
   const source = readFileSync(join(process.cwd(), 'public', 'sw.js'), 'utf8');
 
-  assert.match(source, /smartstore-shell-v3/);
+  assert.match(source, /smartstore-shell-v4/);
   assert.match(source, /addEventListener\('push'/);
   assert.match(source, /showNotification/);
   assert.match(source, /icon: '\/icon\.png'/);
@@ -22,6 +22,18 @@ test('service worker bypasses image requests so PWA media loads through the brow
   assert.doesNotMatch(source, /content-type'\)\?\.startsWith\('image\/'\)/);
 });
 
+test('service worker has a resilient offline navigation fallback', () => {
+  const source = readFileSync(join(process.cwd(), 'public', 'sw.js'), 'utf8');
+
+  assert.match(source, /const OFFLINE_HTML = `/);
+  assert.match(source, /function offlineResponse\(\)/);
+  assert.match(source, /request\.mode === 'navigate'/);
+  assert.match(source, /event\.preloadResponse/);
+  assert.match(source, /navigationPreload\?\.enable/);
+  assert.match(source, /cached \?\? offlineResponse\(\)/);
+  assert.match(source, /cache\.put\(OFFLINE_URL, offlineResponse\(\)\)/);
+});
+
 test('service worker registration bypasses browser cache and checks for updates', () => {
   const source = readFileSync(
     join(process.cwd(), 'components', 'service-worker-registrar.tsx'),
@@ -30,6 +42,7 @@ test('service worker registration bypasses browser cache and checks for updates'
 
   assert.match(source, /updateViaCache: 'none'/);
   assert.match(source, /registration\.update\(\)/);
+  assert.doesNotMatch(source, /window\.addEventListener\('load'/);
 });
 
 test('notifications page exposes push notifications as the opt-in setting', () => {

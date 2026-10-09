@@ -16,23 +16,10 @@ export function ServiceWorkerRegistrar() {
       return;
     }
 
-    const register = () => {
-      void navigator.serviceWorker
-        .register('/sw.js', { updateViaCache: 'none' })
-        .then((registration) => registration.update())
-        .catch(() => undefined);
-    };
-
-    if (document.readyState === 'complete') {
-      register();
-      return;
-    }
-
-    window.addEventListener('load', register, { once: true });
-
-    return () => {
-      window.removeEventListener('load', register);
-    };
+    void navigator.serviceWorker
+      .register('/sw.js', { updateViaCache: 'none' })
+      .then((registration) => registration.update())
+      .catch(() => undefined);
   }, []);
 
   return null;
