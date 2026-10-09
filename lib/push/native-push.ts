@@ -20,6 +20,14 @@ type FirebaseServiceAccountConfig = {
   privateKey: string;
 };
 
+type ApnsConfig = {
+  teamId: string;
+  keyId: string;
+  privateKey: string;
+  bundleId: string;
+  useSandbox: boolean;
+};
+
 type FirebaseAccessToken = {
   token: string;
   expiresAt: number;
@@ -80,8 +88,31 @@ function getFirebaseServiceAccountConfig(): FirebaseServiceAccountConfig | null 
   };
 }
 
+function getApnsConfig(): ApnsConfig | null {
+  const teamId = process.env.APNS_TEAM_ID?.trim();
+  const keyId = process.env.APNS_KEY_ID?.trim();
+  const privateKey =
+    process.env.APNS_PRIVATE_KEY?.trim() || process.env.APNS_AUTH_KEY?.trim();
+  const bundleId = process.env.APNS_BUNDLE_ID?.trim() || 'com.souqhamad.app';
+  const useSandbox =
+    process.env.APNS_USE_SANDBOX?.trim().toLowerCase() === 'true' ||
+    process.env.APNS_USE_SANDBOX?.trim() === '1';
+
+  if (!teamId || !keyId || !privateKey || !bundleId) {
+    return null;
+  }
+
+  return {
+    teamId,
+    keyId,
+    privateKey: decodePrivateKey(privateKey),
+    bundleId,
+    useSandbox,
+  };
+}
+
 export function isNativePushConfigured() {
-  return Boolean(getFirebaseServiceAccountConfig());
+  return Boolean(getFirebaseServiceAccountConfig() || getApnsConfig());
 }
 
 function createServiceAccountJwt(config: FirebaseServiceAccountConfig) {
@@ -216,6 +247,103 @@ async function sendFirebaseMessage(
   }
 }
 
+function createApnsJwt(config: ApnsConfig) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'ES256', kid: config.keyId };
+  const claims = {
+    iss: config.teamId,
+    iat: now,
+  };
+  const unsigned = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(
+    JSON.stringify(claims),
+  )}`;
+  const signature = createSign('SHA256')
+    .update(unsigned)
+    .sign({
+      key: config.privateKey,
+      dsaEncoding: 'ieee-p1363',
+    });
+
+  return `${unsigned}.${base64UrlEncode(signature)}`;
+}
+
+function isExpiredApnsReason(reason: string | undefined) {
+  return (
+    reason === 'BadDeviceToken' ||
+    reason === 'DeviceTokenNotForTopic' ||
+    reason === 'Unregistered'
+  );
+}
+
+async function sendApnsMessage(
+  token: string,
+  message: NativePushMessage,
+): Promise<NativePushSendResult> {
+  const config = getApnsConfig();
+
+  if (!config) {
+    return { ok: false, reason: 'apns_not_configured' };
+  }
+
+  try {
+    const host = config.useSandbox
+      ? 'https://api.sandbox.push.apple.com'
+      : 'https://api.push.apple.com';
+    const response = await fetchWithTimeout(
+      `${host}/3/device/${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `bearer ${createApnsJwt(config)}`,
+          'Content-Type': 'application/json; charset=utf-8',
+          'apns-topic': config.bundleId,
+          'apns-push-type': 'alert',
+          'apns-priority': '10',
+          'apns-expiration': '0',
+        },
+        body: JSON.stringify({
+          aps: {
+            alert: {
+              title: message.title,
+              body: message.body,
+            },
+            sound: 'default',
+            category: message.tag,
+          },
+          url: message.url ?? '/',
+          tag: message.tag ?? '',
+        }),
+      },
+      getNativePushTimeoutMs(),
+    );
+
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    let reason: string | undefined;
+
+    try {
+      const payload = (await response.json()) as { reason?: string };
+      reason = payload.reason;
+    } catch {
+      reason = undefined;
+    }
+
+    return {
+      ok: false,
+      status: response.status,
+      reason: reason ? `apns_${reason}` : `apns_failed_${response.status}`,
+      expired: response.status === 410 || isExpiredApnsReason(reason),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : 'UnknownError',
+    };
+  }
+}
+
 export async function sendNativePushToUser(
   userId: string,
   message: NativePushMessage,
@@ -228,7 +356,10 @@ export async function sendNativePushToUser(
 
   await Promise.all(
     tokens.map(async (record) => {
-      const result = await sendFirebaseMessage(record.token, message);
+      const result =
+        record.platform === 'ios'
+          ? await sendApnsMessage(record.token, message)
+          : await sendFirebaseMessage(record.token, message);
 
       if (!result.ok && result.expired) {
         await deactivateMobilePushToken(record.token, userId);
