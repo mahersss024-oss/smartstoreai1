@@ -24,6 +24,30 @@ const policyLinks = [
   { href: '/privacy', label: 'سياسة الخصوصية' },
 ];
 
+const SUPPORT_EMAIL = 'support@souqhamad.com';
+
+function renderPolicyText(text: string) {
+  const parts = text.split(SUPPORT_EMAIL);
+
+  if (parts.length === 1) {
+    return text;
+  }
+
+  return parts.map((part, index) => (
+    <span key={`${part}-${index}`}>
+      {part}
+      {index < parts.length - 1 && (
+        <a
+          className="font-bold text-blue-700 underline dark:text-blue-300"
+          href={`mailto:${SUPPORT_EMAIL}`}
+        >
+          {SUPPORT_EMAIL}
+        </a>
+      )}
+    </span>
+  ));
+}
+
 export function LegalPolicyPage({
   title,
   eyebrow,
@@ -91,7 +115,7 @@ export function LegalPolicyPage({
               <h2 className="text-lg font-bold">{section.title}</h2>
               {section.body && (
                 <p className="text-sm leading-8 text-muted-foreground">
-                  {section.body}
+                  {renderPolicyText(section.body)}
                 </p>
               )}
               {section.items && (
@@ -119,9 +143,9 @@ export function LegalPolicyPage({
             {' '}
             <a
               className="inline-flex h-9 items-center font-bold text-blue-700 underline dark:text-blue-300"
-              href="mailto:support@souqhamad.com"
+              href={`mailto:${SUPPORT_EMAIL}`}
             >
-              support@souqhamad.com
+              {SUPPORT_EMAIL}
             </a>
           </p>
         </section>
