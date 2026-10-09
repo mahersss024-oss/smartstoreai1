@@ -82,6 +82,7 @@ import {
 } from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { useAppBridge } from '@/hooks/use-app-bridge';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
@@ -1897,6 +1898,7 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
 };
 
 export default function Page() {
+  const { isNativeApp } = useAppBridge();
   const router = useRouter();
   const chatTransport = useMemo(
     () =>
@@ -2984,7 +2986,7 @@ export default function Page() {
     }
 
     params.set('page', String(page));
-    params.set('limit', '24');
+    params.set('limit', isNativeApp ? '12' : '24');
 
     const endpoint = `/api/marketplace/listings?${params.toString()}`;
 
@@ -3045,7 +3047,7 @@ export default function Page() {
           setIsLoadingListings(false);
         }
       });
-  }, [activeMarketCity, marketplaceSearchQuery]);
+  }, [activeMarketCity, isNativeApp, marketplaceSearchQuery]);
 
   const refreshFavoriteListingIds = useCallback(() => {
     return fetch('/api/marketplace/me/favorites?page=1&limit=48', {
@@ -4767,7 +4769,7 @@ export default function Page() {
                     onAsk={sendStarter}
                     onFavorite={favoriteListing}
                     onOpen={openListing}
-                    prioritizeImage={index < 2}
+                    prioritizeImage={!isNativeApp && index < 2}
                     variant="horizontal"
                   />
                 ))}
