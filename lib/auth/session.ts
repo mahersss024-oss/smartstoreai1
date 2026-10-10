@@ -18,6 +18,7 @@ export type AuthSession = {
 const sessionCookieName = 'smartstore_session';
 const oauthStateCookieName = 'smartstore_oauth_state';
 const commissionAgreementCookieName = 'smartstore_commission_agreement';
+const oauthStateMaxAgeSeconds = 60 * 10;
 export const platformAgreementVersion = 'platform-agreement-2026-09-16-v1';
 export const termsVersion = 'terms-2026-09-16-v1';
 export const privacyPolicyVersion = 'privacy-2026-09-16-v1';
@@ -277,7 +278,66 @@ export function isModeratorSession(session: AuthSession | null) {
 }
 
 export function createOauthState() {
-  return randomBytes(24).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const state = {
+    nonce: randomBytes(24).toString('base64url'),
+    issuedAt: now,
+    expiresAt: now + oauthStateMaxAgeSeconds,
+  };
+  const payload = base64UrlEncode(JSON.stringify(state));
+  const signature = signPayload(`oauth-state:${payload}`);
+
+  return `state:${payload}.${signature}`;
+}
+
+export function parseOauthState(value: string | null | undefined) {
+  if (!value?.startsWith('state:')) {
+    return null;
+  }
+
+  const [payload, signature] = value.slice('state:'.length).split('.');
+
+  if (
+    !payload ||
+    !signature ||
+    !safeEqual(signPayload(`oauth-state:${payload}`), signature)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(base64UrlDecode(payload)) as Partial<{
+      nonce: string;
+      expiresAt: number;
+    }>;
+
+    if (
+      !parsed.nonce ||
+      typeof parsed.expiresAt !== 'number' ||
+      parsed.expiresAt <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function isOauthStateValid(
+  state: string | null | undefined,
+  storedState: string | undefined,
+) {
+  if (!state) {
+    return false;
+  }
+
+  if (storedState && state === storedState) {
+    return true;
+  }
+
+  return Boolean(parseOauthState(state));
 }
 
 export function createOauthStateCookie(
@@ -288,7 +348,7 @@ export function createOauthStateCookie(
   } = {},
 ) {
   return serializeCookie(oauthStateCookieName, encodeURIComponent(state), {
-    maxAge: 60 * 10,
+    maxAge: oauthStateMaxAgeSeconds,
     sameSite: options.sameSite,
     secure: options.secure,
   });

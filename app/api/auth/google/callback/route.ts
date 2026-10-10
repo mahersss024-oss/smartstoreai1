@@ -15,6 +15,7 @@ import {
   privacyPolicyVersion,
   termsVersion,
   getOauthState,
+  isOauthStateValid,
   type AuthSessionUser,
 } from '@/lib/auth/session';
 import {
@@ -159,7 +160,7 @@ export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
-  if (!code || !state || (!mobileState && (!storedState || state !== storedState))) {
+  if (!code || !state || (!mobileState && !isOauthStateValid(state, storedState))) {
     if (isMobileStateAttempt) {
       return redirectToMobileAuthError('google_invalid_state');
     }

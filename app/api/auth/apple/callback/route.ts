@@ -28,6 +28,7 @@ import {
   privacyPolicyVersion,
   termsVersion,
   getOauthState,
+  isOauthStateValid,
   type AuthSessionUser,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
@@ -211,7 +212,7 @@ async function handleAppleCallback(request: Request) {
   const mobileState = parseMobileAuthState(state);
   const storedState = getOauthState(request);
 
-  if (!code || !idToken || !state || (!mobileState && (!storedState || state !== storedState))) {
+  if (!code || !idToken || !state || (!mobileState && !isOauthStateValid(state, storedState))) {
     return new Response('Invalid Apple sign-in state.', { status: 400 });
   }
 

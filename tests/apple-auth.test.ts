@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { GET as startGoogleAuth } from '@/app/api/auth/google/start/route';
-import { createCommissionAgreementCookie } from '@/lib/auth/session';
+import {
+  createCommissionAgreementCookie,
+  createOauthState,
+  isOauthStateValid,
+  parseOauthState,
+} from '@/lib/auth/session';
 import { createAppleClientSecret, isAppleAuthConfigured } from '@/lib/auth/apple';
 
 function readProjectFile(...segments: string[]) {
@@ -124,7 +129,18 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.match(callbackRoute, /normalizeAuthEmail\(userInfo\.email\)/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
+  assert.match(callbackRoute, /isOauthStateValid\(state, storedState\)/);
   assert.doesNotMatch(callbackRoute, /new Response\('Google token exchange failed\.'/);
+});
+
+test('oauth state can be verified without relying on callback cookies', () => {
+  const state = createOauthState();
+
+  assert.match(state, /^state:[^.]+\.[^.]+$/);
+  assert.ok(parseOauthState(state));
+  assert.equal(isOauthStateValid(state, undefined), true);
+  assert.equal(isOauthStateValid(state, 'different-cookie-state'), true);
+  assert.equal(isOauthStateValid(`${state}tampered`, undefined), false);
 });
 
 test('google auth start uses the configured سوق حمد callback url', async () => {
