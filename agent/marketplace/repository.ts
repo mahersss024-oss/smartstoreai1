@@ -245,6 +245,7 @@ type DatabaseConversationRecord = {
     name: string | null;
     picture: string | null;
     lastActiveAt: Date | null;
+    deletedAt: Date | null;
   } | null;
   buyer?: {
     id: string;
@@ -252,6 +253,7 @@ type DatabaseConversationRecord = {
     name: string | null;
     picture: string | null;
     lastActiveAt: Date | null;
+    deletedAt: Date | null;
   } | null;
 };
 
