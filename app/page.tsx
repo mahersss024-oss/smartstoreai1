@@ -1369,7 +1369,79 @@ function ListingChatLinkCard({
   href: string;
   listing?: ListingCard;
 }) {
-  if (!listing) {
+  const listingId = useMemo(() => getListingIdFromHref(href), [href]);
+  const [verifiedListing, setVerifiedListing] = useState<ListingCard | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<
+    'idle' | 'checking' | 'available' | 'unavailable'
+  >('idle');
+  const effectiveListing = listing ?? verifiedListing ?? undefined;
+
+  useEffect(() => {
+    if (listing || !listingId) {
+      setVerifiedListing(null);
+      setVerificationStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+    setVerifiedListing(null);
+    setVerificationStatus('checking');
+
+    fetch(`/api/marketplace/listings/${encodeURIComponent(listingId)}`, {
+      credentials: 'same-origin',
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        const payload = (await response.json().catch(() => null)) as {
+          listing?: ApiListingRecord;
+        } | null;
+
+        return payload?.listing ? listingRecordToCard(payload.listing) : null;
+      })
+      .then((fetchedListing) => {
+        if (cancelled) {
+          return;
+        }
+
+        setVerifiedListing(fetchedListing);
+        setVerificationStatus(fetchedListing ? 'available' : 'unavailable');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVerificationStatus('unavailable');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listing, listingId]);
+
+  if (!effectiveListing && verificationStatus === 'checking') {
+    return (
+      <div className="my-2 grid gap-2 rounded-md border border-blue-200 bg-blue-50/80 p-3 text-right text-blue-950 shadow-sm dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-50">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-blue-700 dark:text-blue-200">
+              جار التحقق من الإعلان
+            </div>
+            <div className="mt-1 text-sm font-bold">نتأكد من حالة رابط الإعلان</div>
+            <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
+              إذا كان الإعلان منشورًا سيظهر زر الفتح تلقائيًا.
+            </div>
+          </div>
+          <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-blue-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-blue-900/40 dark:text-blue-200">
+            <Loader2 className="size-5 animate-spin" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!effectiveListing) {
     return (
       <div className="my-2 grid gap-2 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-right text-amber-950 shadow-sm dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-50">
         <div className="flex items-start justify-between gap-3">
@@ -1406,16 +1478,16 @@ function ListingChatLinkCard({
           </div>
         </div>
         <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-slate-900 dark:text-blue-200">
-          {listing?.image ? (
+          {effectiveListing.image ? (
             <>
               <ResilientImage
-                alt={listing.title}
+                alt={effectiveListing.title}
                 className="h-full w-full object-contain"
                 decoding="async"
-                fallbackSrcs={listing.imageFallbacks}
+                fallbackSrcs={effectiveListing.imageFallbacks}
                 fallback={<Megaphone className="size-5" />}
                 loading="lazy"
-                src={listing.image}
+                src={effectiveListing.image}
               />
             </>
           ) : (
