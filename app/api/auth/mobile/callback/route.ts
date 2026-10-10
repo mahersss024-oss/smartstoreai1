@@ -18,8 +18,13 @@ export async function GET(request: Request) {
   }
 
   const callbackUrl = createMobileAuthCallbackUrl(ticket).toString();
-  const callbackJson = JSON.stringify(callbackUrl);
-  const callbackHtml = escapeHtml(callbackUrl);
+  const isAndroid = /\bAndroid\b/i.test(request.headers.get('user-agent') ?? '');
+  const androidIntentUrl =
+    `intent://auth?${new URLSearchParams({ ticket }).toString()}` +
+    '#Intent;scheme=smartstore;package=com.souqhamad.app;end';
+  const launchUrl = isAndroid ? androidIntentUrl : callbackUrl;
+  const launchJson = JSON.stringify(launchUrl);
+  const launchHtml = escapeHtml(launchUrl);
 
   return new Response(
     `<!doctype html>
@@ -40,13 +45,13 @@ export async function GET(request: Request) {
   <main>
     <h1>جاري العودة إلى التطبيق</h1>
     <p>إذا لم يفتح التطبيق تلقائيًا، اضغط زر العودة.</p>
-    <a href="${callbackHtml}">العودة إلى التطبيق</a>
+    <a href="${launchHtml}">العودة إلى التطبيق</a>
   </main>
   <script>
     try {
       history.replaceState(null, '', '/');
     } catch (_) {}
-    location.replace(${callbackJson});
+    location.replace(${launchJson});
   </script>
 </body>
 </html>`,
