@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAppleClientId, isAppleAuthConfigured } from '@/lib/auth/apple';
-import { createMobileAuthState, isMobileAppRequest } from '@/lib/auth/mobile-oauth';
+import {
+  appendMobileClientParam,
+  createMobileAuthState,
+  isMobileAuthRequest,
+} from '@/lib/auth/mobile-oauth';
 import {
   createOauthState,
   createOauthStateCookie,
@@ -21,9 +25,20 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
+  const isMobileAuth = isMobileAuthRequest(request);
+
   if (!hasCommissionAgreement(request)) {
+    const agreementUrl = new URL(
+      '/commission-agreement?provider=apple',
+      getAppBaseUrl(request),
+    );
+
+    if (isMobileAuth) {
+      appendMobileClientParam(agreementUrl);
+    }
+
     return NextResponse.redirect(
-      new URL('/commission-agreement?provider=apple', getAppBaseUrl(request)),
+      agreementUrl,
     );
   }
 
@@ -34,7 +49,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const state = isMobileAppRequest(request)
+  const state = isMobileAuth
     ? createMobileAuthState()
     : createOauthState();
   const callbackUrl = new URL(

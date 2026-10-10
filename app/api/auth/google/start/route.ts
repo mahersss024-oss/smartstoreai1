@@ -5,7 +5,11 @@ import {
   createOauthStateCookie,
   hasCommissionAgreement,
 } from '@/lib/auth/session';
-import { createMobileAuthState, isMobileAppRequest } from '@/lib/auth/mobile-oauth';
+import {
+  appendMobileClientParam,
+  createMobileAuthState,
+  isMobileAuthRequest,
+} from '@/lib/auth/mobile-oauth';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 
@@ -20,9 +24,20 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
+  const isMobileAuth = isMobileAuthRequest(request);
+
   if (!hasCommissionAgreement(request)) {
+    const agreementUrl = new URL(
+      '/commission-agreement?provider=google',
+      getAppBaseUrl(request),
+    );
+
+    if (isMobileAuth) {
+      appendMobileClientParam(agreementUrl);
+    }
+
     return NextResponse.redirect(
-      new URL('/commission-agreement?provider=google', getAppBaseUrl(request)),
+      agreementUrl,
     );
   }
 
@@ -35,7 +50,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const oauthState = isMobileAppRequest(request)
+  const oauthState = isMobileAuth
     ? createMobileAuthState()
     : createOauthState();
   const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));

@@ -67,7 +67,7 @@ test('apple auth routes use Apple OAuth endpoints and callback state', () => {
   assert.match(startRoute, /auth_apple_start/);
   assert.match(startRoute, /Apple sign-in is temporarily unavailable/);
   assert.doesNotMatch(startRoute, /Apple OAuth is not configured/);
-  assert.match(startRoute, /isMobileAppRequest\(request\)/);
+  assert.match(startRoute, /isMobileAuthRequest\(request\)/);
   assert.match(startRoute, /createMobileAuthState\(\)/);
   assert.match(startRoute, /response_mode', 'form_post'/);
   assert.match(startRoute, /createOauthStateCookie/);
@@ -154,6 +154,48 @@ test('google auth start uses the configured سوق حمد callback url', async (
     restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
     restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
   }
+});
+
+test('google auth start accepts explicit mobile client marker', async () => {
+  const previous = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+  };
+
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.NEXT_PUBLIC_APP_URL = 'https://souqhamad.com';
+
+  try {
+    const response = await startGoogleAuth(
+      new Request('https://souqhamad.com/api/auth/google/start?client=mobile', {
+        headers: {
+          cookie: createCommissionAgreementCookie(),
+        },
+      }),
+    );
+    const location = response.headers.get('location');
+
+    assert.ok(location);
+    assert.match(new URL(location).searchParams.get('state') ?? '', /^mobile:/);
+  } finally {
+    restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
+    restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
+  }
+});
+
+test('mobile auth marker is preserved through commission agreement', () => {
+  const startRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'google',
+    'start',
+    'route.ts',
+  );
+  const agreementPage = readProjectFile('app', 'commission-agreement', 'page.tsx');
+
+  assert.match(startRoute, /appendMobileClientParam\(agreementUrl\)/);
+  assert.match(agreementPage, /client=mobile/);
 });
 
 test('home login control offers Google and Apple choices', () => {

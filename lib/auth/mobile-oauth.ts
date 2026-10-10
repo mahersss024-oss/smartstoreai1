@@ -67,6 +67,18 @@ export function isMobileAppRequest(request: Request) {
     ?.includes(mobileUserAgentMarker) ?? false;
 }
 
+export function isMobileAuthRequest(request: Request) {
+  const url = new URL(request.url);
+
+  return url.searchParams.get('client') === 'mobile' || isMobileAppRequest(request);
+}
+
+export function appendMobileClientParam(url: URL) {
+  url.searchParams.set('client', 'mobile');
+
+  return url;
+}
+
 export function createMobileAuthState() {
   const now = Math.floor(Date.now() / 1000);
   const state: MobileAuthState = {
