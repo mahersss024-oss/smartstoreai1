@@ -164,7 +164,8 @@ export async function GET(request: Request) {
       return redirectToMobileAuthError('google_invalid_state');
     }
 
-    return new Response('Invalid Google sign-in state.', { status: 400 });
+    console.warn('[google_auth] invalid_state');
+    return redirectToHome(request);
   }
 
   const rateLimitResponse = await enforceApiRateLimit(request, {
@@ -207,7 +208,7 @@ export async function GET(request: Request) {
       return redirectToMobileAuthError('google_token_exchange_failed');
     }
 
-    return new Response('Google token exchange failed.', { status: 502 });
+    return redirectToHome(request);
   }
 
   const tokenJson = (await tokenResponse.json().catch(() => null)) as
@@ -234,11 +235,7 @@ export async function GET(request: Request) {
       );
     }
 
-    if (providerError === 'invalid_grant') {
-      return redirectToHome(request);
-    }
-
-    return new Response('Google token exchange failed.', { status: 502 });
+    return redirectToHome(request);
   }
 
   let userInfoResponse: Response;

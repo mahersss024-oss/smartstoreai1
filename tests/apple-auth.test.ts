@@ -124,6 +124,7 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.match(callbackRoute, /normalizeAuthEmail\(userInfo\.email\)/);
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
+  assert.doesNotMatch(callbackRoute, /new Response\('Google token exchange failed\.'/);
 });
 
 test('google auth start uses the configured سوق حمد callback url', async () => {
