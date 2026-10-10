@@ -210,7 +210,9 @@ test('assistant message renderer turns listing links into a listing card inside 
   assert.match(homePage, /function ListingChatLinkCard/);
   assert.match(homePage, /<Link[\s\S]*href=\{href\}/);
   assert.match(homePage, /listing\?: ListingCard/);
-  assert.match(homePage, /listing\?\.image/);
+  assert.match(homePage, /effectiveListing\.image/);
+  assert.match(homePage, /api\/marketplace\/listings/);
+  assert.match(homePage, /listingRecordToCard\(payload\.listing\)/);
   assert.match(homePage, /maxChatListingCardsPerMessage = 3/);
   assert.match(homePage, /renderedListingCardCount < maxChatListingCardsPerMessage/);
   assert.match(homePage, /moreChatListingsGuidance/);
