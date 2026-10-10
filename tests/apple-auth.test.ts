@@ -175,6 +175,35 @@ test('google auth start uses the configured سوق حمد callback url', async (
   }
 });
 
+test('google auth start uses mobile state inside the native wrapper', async () => {
+  const previous = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+  };
+
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.NEXT_PUBLIC_APP_URL = 'https://souqhamad.com';
+
+  try {
+    const response = await startGoogleAuth(
+      new Request('https://souqhamad.com/api/auth/google/start', {
+        headers: {
+          cookie: createCommissionAgreementCookie(),
+          'user-agent': 'SouqHamadCapacitor Android/1.0.19',
+        },
+      }),
+    );
+    const location = response.headers.get('location');
+
+    assert.ok(location);
+    assert.match(new URL(location).searchParams.get('state') ?? '', /^mobile:/);
+    assert.equal(response.headers.get('set-cookie'), null);
+  } finally {
+    restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
+    restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
+  }
+});
+
 test('home login control offers Google and Apple choices', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
