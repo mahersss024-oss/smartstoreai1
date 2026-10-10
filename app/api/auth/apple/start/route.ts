@@ -4,11 +4,6 @@ import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAppleClientId, isAppleAuthConfigured } from '@/lib/auth/apple';
 import {
-  appendMobileClientParam,
-  createMobileAuthState,
-  isMobileAuthRequest,
-} from '@/lib/auth/mobile-oauth';
-import {
   createOauthState,
   createOauthStateCookie,
   hasCommissionAgreement,
@@ -25,20 +20,9 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const isMobileAuth = isMobileAuthRequest(request);
-
   if (!hasCommissionAgreement(request)) {
-    const agreementUrl = new URL(
-      '/commission-agreement?provider=apple',
-      getAppBaseUrl(request),
-    );
-
-    if (isMobileAuth) {
-      appendMobileClientParam(agreementUrl);
-    }
-
     return NextResponse.redirect(
-      agreementUrl,
+      new URL('/commission-agreement?provider=apple', getAppBaseUrl(request)),
     );
   }
 
@@ -49,9 +33,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const state = isMobileAuth
-    ? createMobileAuthState()
-    : createOauthState();
+  const state = createOauthState();
   const callbackUrl = new URL(
     '/api/auth/apple/callback',
     getAppBaseUrl(request),

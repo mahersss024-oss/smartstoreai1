@@ -41,12 +41,8 @@ export default function CommissionAgreementPage() {
         new URLSearchParams(window.location.search).get('provider') === 'apple'
           ? 'apple'
           : 'google';
-      const isMobileClient =
-        new URLSearchParams(window.location.search).get('client') === 'mobile';
 
-      router.push(
-        `/api/auth/${provider}/start${isMobileClient ? '?client=mobile' : ''}`,
-      );
+      router.push(`/api/auth/${provider}/start`);
     } finally {
       setIsLoading(false);
     }

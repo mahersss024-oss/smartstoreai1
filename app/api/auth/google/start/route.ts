@@ -5,11 +5,6 @@ import {
   createOauthStateCookie,
   hasCommissionAgreement,
 } from '@/lib/auth/session';
-import {
-  appendMobileClientParam,
-  createMobileAuthState,
-  isMobileAuthRequest,
-} from '@/lib/auth/mobile-oauth';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 
@@ -24,20 +19,9 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const isMobileAuth = isMobileAuthRequest(request);
-
   if (!hasCommissionAgreement(request)) {
-    const agreementUrl = new URL(
-      '/commission-agreement?provider=google',
-      getAppBaseUrl(request),
-    );
-
-    if (isMobileAuth) {
-      appendMobileClientParam(agreementUrl);
-    }
-
     return NextResponse.redirect(
-      agreementUrl,
+      new URL('/commission-agreement?provider=google', getAppBaseUrl(request)),
     );
   }
 
@@ -50,9 +34,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const oauthState = isMobileAuth
-    ? createMobileAuthState()
-    : createOauthState();
+  const oauthState = createOauthState();
   const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 
