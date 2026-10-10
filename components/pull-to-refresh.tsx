@@ -35,6 +35,31 @@ function isTouchDevice() {
   );
 }
 
+function isNativeAppRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const nativeWindow = window as typeof window & {
+    Capacitor?: unknown;
+    SmartStoreNative?: unknown;
+    ReactNativeWebView?: unknown;
+    webkit?: {
+      messageHandlers?: Record<string, unknown>;
+    };
+  };
+  const userAgent = window.navigator.userAgent || '';
+
+  return Boolean(
+    document.documentElement.dataset.nativeApp === 'true' ||
+      userAgent.includes('SouqHamadCapacitor') ||
+      nativeWindow.Capacitor ||
+      nativeWindow.SmartStoreNative ||
+      nativeWindow.ReactNativeWebView ||
+      nativeWindow.webkit?.messageHandlers?.smartstore,
+  );
+}
+
 export function PullToRefresh() {
   const router = useRouter();
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -49,6 +74,12 @@ export function PullToRefresh() {
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     window.dispatchEvent(new CustomEvent('smartstore:pull-refresh'));
+
+    if (isNativeAppRuntime()) {
+      window.setTimeout(() => window.location.reload(), 120);
+      return;
+    }
+
     router.refresh();
     await new Promise((resolve) => window.setTimeout(resolve, 700));
     setIsRefreshing(false);
