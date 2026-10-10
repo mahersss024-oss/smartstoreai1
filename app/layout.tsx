@@ -18,6 +18,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
 import { NativeAppBridge } from "@/components/native-app-bridge";
+import { OpenInAppBanner } from "@/components/open-in-app-banner";
 import { AuthSessionProvider } from "@/hooks/use-auth-session";
 
 const themeStorageKey = "theme";
@@ -350,6 +351,7 @@ export default function RootLayout({
         <ServiceWorkerRegistrar />
         <NativeAppBridge />
         <AuthSessionProvider>
+          <OpenInAppBanner />
           {children}
           <PullToRefresh />
           <PwaInstallPrompt />

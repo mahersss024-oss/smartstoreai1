@@ -5,6 +5,20 @@ import { getAppBaseUrl } from '@/lib/app-url';
 import { parseMobileAuthTicket } from '@/lib/auth/mobile-oauth';
 import { createSessionCookie, parseSignedSession } from '@/lib/auth/session';
 
+function normalizeNextPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return '/';
+  }
+
+  try {
+    const url = new URL(value, 'https://souqhamad.com');
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return '/';
+  }
+}
+
 export async function GET(request: Request) {
   const rateLimitResponse = await enforceApiRateLimit(request, {
     namespace: 'auth_mobile_exchange',
@@ -24,7 +38,9 @@ export async function GET(request: Request) {
     return new Response('Invalid mobile sign-in ticket.', { status: 400 });
   }
 
-  const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
+  const response = NextResponse.redirect(
+    new URL(normalizeNextPath(url.searchParams.get('next')), getAppBaseUrl(request)),
+  );
   response.headers.append('Set-Cookie', createSessionCookie(session.user));
 
   return response;

@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+
+test('open in app banner is mobile-only and dismissible', () => {
+  const component = readFileSync(
+    join(process.cwd(), 'components', 'open-in-app-banner.tsx'),
+    'utf8',
+  );
+  const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
+
+  assert.match(component, /isInsideNativeApp/);
+  assert.match(component, /detectMobilePlatform/);
+  assert.match(component, /localStorage\.getItem\(dismissedKey\)/);
+  assert.match(component, /localStorage\.setItem\(dismissedKey, '1'\)/);
+  assert.match(component, /aria-label="إغلاق شريط فتح التطبيق"/);
+  assert.match(component, /\/api\/auth\/mobile\/open/);
+  assert.match(layout, /<OpenInAppBanner \/>/);
+});
+
+test('mobile open endpoint creates safe app links without exposing long sessions', () => {
+  const route = readFileSync(
+    join(process.cwd(), 'app', 'api', 'auth', 'mobile', 'open', 'route.ts'),
+    'utf8',
+  );
+  const exchangeRoute = readFileSync(
+    join(process.cwd(), 'app', 'api', 'auth', 'mobile', 'exchange', 'route.ts'),
+    'utf8',
+  );
+
+  assert.match(route, /createMobileAuthTicket/);
+  assert.match(route, /com\.souqhamad\.app/);
+  assert.match(route, /play\.google\.com\/store\/apps\/details/);
+  assert.match(route, /NEXT_PUBLIC_IOS_APP_STORE_URL/);
+  assert.match(route, /function normalizeNextPath/);
+  assert.match(route, /value\.startsWith\('\/\/'\)/);
+  assert.match(route, /noStoreHeaders/);
+  assert.match(exchangeRoute, /normalizeNextPath/);
+  assert.match(exchangeRoute, /url\.searchParams\.get\('next'\)/);
+});
