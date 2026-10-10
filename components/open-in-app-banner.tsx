@@ -104,7 +104,7 @@ export function OpenInAppBanner() {
   };
 
   return (
-    <div className="sticky inset-x-0 top-0 z-[50] bg-white/90 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur md:hidden">
+    <div className="relative z-[10] bg-white/90 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-sky-200/80 bg-white/95 px-3 py-2 text-slate-900 shadow-lg shadow-sky-950/10">
         <button
           type="button"

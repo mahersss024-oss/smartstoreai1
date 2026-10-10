@@ -16,6 +16,7 @@ test('open in app banner is mobile-only and dismissible', () => {
   assert.match(component, /localStorage\.setItem\(dismissedKey, '1'\)/);
   assert.match(component, /aria-label="إغلاق شريط فتح التطبيق"/);
   assert.match(component, /\/api\/auth\/mobile\/open/);
+  assert.doesNotMatch(component, /className="[^"]*(?:fixed|sticky)[^"]*"/);
   assert.match(layout, /<OpenInAppBanner \/>/);
 });
 
