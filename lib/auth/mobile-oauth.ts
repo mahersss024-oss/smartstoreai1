@@ -167,6 +167,13 @@ export function createMobileAuthCallbackUrl(ticket: string) {
   return callbackUrl;
 }
 
+export function createMobileAuthBridgeUrl(ticket: string, baseUrl: string) {
+  const callbackUrl = new URL('/api/auth/mobile/callback', baseUrl);
+  callbackUrl.searchParams.set('ticket', ticket);
+
+  return callbackUrl;
+}
+
 export function createMobileAuthErrorCallbackUrl(error: string) {
   const callbackUrl = new URL(`${mobileCallbackScheme}://${mobileCallbackHost}`);
   callbackUrl.searchParams.set('error', error);

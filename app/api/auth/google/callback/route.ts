@@ -18,7 +18,7 @@ import {
   type AuthSessionUser,
 } from '@/lib/auth/session';
 import {
-  createMobileAuthCallbackUrl,
+  createMobileAuthBridgeUrl,
   createMobileAuthErrorCallbackUrl,
   createMobileAuthTicket,
   parseMobileAuthState,
@@ -316,7 +316,10 @@ export async function GET(request: Request) {
 
   if (mobileState) {
     const response = NextResponse.redirect(
-      createMobileAuthCallbackUrl(createMobileAuthTicket(registeredUser)),
+      createMobileAuthBridgeUrl(
+        createMobileAuthTicket(registeredUser),
+        getAppBaseUrl(request),
+      ),
     );
 
     response.headers.append('Set-Cookie', clearOauthStateCookie());
