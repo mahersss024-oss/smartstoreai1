@@ -209,6 +209,10 @@ export async function GET(request: Request) {
       `[google_auth] token_exchange_failed status=${tokenResponse.status} error=${providerError} description=${providerDescription}`,
     );
 
+    if (providerError === 'invalid_grant') {
+      return redirectToHome(request);
+    }
+
     return new Response('Google token exchange failed.', { status: 502 });
   }
 
