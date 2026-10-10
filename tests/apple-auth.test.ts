@@ -130,6 +130,8 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /isOauthStateValid\(state, storedState\)/);
+  assert.match(callbackRoute, /duplicate_callback_recovered=true/);
+  assert.match(callbackRoute, /rememberGoogleAuthCodeSession\(code, sessionCookie\)/);
   assert.doesNotMatch(callbackRoute, /new Response\('Google token exchange failed\.'/);
 });
 

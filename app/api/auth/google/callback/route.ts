@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -40,6 +41,48 @@ type GoogleUserInfo = {
   name?: string;
   picture?: string;
 };
+
+const recentGoogleAuthCodeMaxAgeMs = 5 * 60 * 1000;
+const recentGoogleAuthCodeSessions = new Map<
+  string,
+  { expiresAt: number; sessionCookie: string }
+>();
+
+function getGoogleAuthCodeFingerprint(code: string) {
+  return createHash('sha256').update(code).digest('base64url');
+}
+
+function pruneRecentGoogleAuthCodes() {
+  const now = Date.now();
+
+  for (const [fingerprint, cached] of recentGoogleAuthCodeSessions) {
+    if (cached.expiresAt <= now) {
+      recentGoogleAuthCodeSessions.delete(fingerprint);
+    }
+  }
+}
+
+function rememberGoogleAuthCodeSession(code: string, sessionCookie: string) {
+  pruneRecentGoogleAuthCodes();
+  recentGoogleAuthCodeSessions.set(getGoogleAuthCodeFingerprint(code), {
+    expiresAt: Date.now() + recentGoogleAuthCodeMaxAgeMs,
+    sessionCookie,
+  });
+}
+
+function getRememberedGoogleAuthCodeSession(code: string) {
+  pruneRecentGoogleAuthCodes();
+
+  const cached = recentGoogleAuthCodeSessions.get(
+    getGoogleAuthCodeFingerprint(code),
+  );
+
+  if (!cached) {
+    return null;
+  }
+
+  return cached.sessionCookie;
+}
 
 function redirectToHome(request: Request, cookie?: string) {
   const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
@@ -228,6 +271,15 @@ export async function GET(request: Request) {
       `[google_auth] token_exchange_failed status=${tokenResponse.status} error=${providerError} description=${providerDescription}`,
     );
 
+    if (providerError === 'invalid_grant') {
+      const rememberedSessionCookie = getRememberedGoogleAuthCodeSession(code);
+
+      if (rememberedSessionCookie && !mobileState) {
+        console.warn('[google_auth] duplicate_callback_recovered=true');
+        return redirectToHome(request, rememberedSessionCookie);
+      }
+    }
+
     if (mobileState) {
       return redirectToMobileAuthError(
         providerError === 'invalid_grant'
@@ -324,5 +376,8 @@ export async function GET(request: Request) {
     return response;
   }
 
-  return redirectToHome(request, createSessionCookie(registeredUser));
+  const sessionCookie = createSessionCookie(registeredUser);
+  rememberGoogleAuthCodeSession(code, sessionCookie);
+
+  return redirectToHome(request, sessionCookie);
 }
