@@ -5,6 +5,9 @@ import { RefreshCw } from 'lucide-react';
 
 const pullThreshold = 72;
 const maxPullDistance = 96;
+const pullStartMaxY = 104;
+const pullIntentMinDistance = 14;
+const horizontalIntentRatio = 0.4;
 
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) {
@@ -17,7 +20,12 @@ function isInteractiveTarget(target: EventTarget | null) {
         'input',
         'textarea',
         'select',
+        'a',
+        'button',
+        'summary',
         '[contenteditable="true"]',
+        '[role="button"]',
+        '[role="link"]',
         '[role="slider"]',
         '[data-radix-popper-content-wrapper]',
         '.smartstore-ai-bubble',
@@ -66,6 +74,11 @@ export function PullToRefresh() {
       }
 
       const touch = event.touches[0];
+      if (touch.clientY > pullStartMaxY) {
+        startPointRef.current = null;
+        return;
+      }
+
       startPointRef.current = { x: touch.clientX, y: touch.clientY };
     };
 
@@ -80,7 +93,10 @@ export function PullToRefresh() {
       const deltaX = touch.clientX - startPoint.x;
       const deltaY = touch.clientY - startPoint.y;
 
-      if (deltaY <= 0 || Math.abs(deltaX) > deltaY * 0.75) {
+      if (
+        deltaY < pullIntentMinDistance ||
+        Math.abs(deltaX) > deltaY * horizontalIntentRatio
+      ) {
         setPullDistance(0);
         return;
       }

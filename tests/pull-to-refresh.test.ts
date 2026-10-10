@@ -16,6 +16,12 @@ test('pull to refresh is touch scoped and avoids global touch blocking', () => {
   assert.match(source, /input/);
   assert.match(source, /textarea/);
   assert.match(source, /select/);
+  assert.match(source, /'a'/);
+  assert.match(source, /'button'/);
+  assert.match(source, /\[role="button"\]/);
+  assert.match(source, /pullStartMaxY/);
+  assert.match(source, /pullIntentMinDistance/);
+  assert.match(source, /horizontalIntentRatio/);
   assert.match(source, /smartstore:pull-refresh/);
   assert.match(source, /window\.location\.reload\(\)/);
   assert.doesNotMatch(source, /router\.refresh\(\)/);
