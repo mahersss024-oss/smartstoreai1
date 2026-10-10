@@ -166,3 +166,10 @@ export function createMobileAuthCallbackUrl(ticket: string) {
 
   return callbackUrl;
 }
+
+export function createMobileAuthErrorCallbackUrl(error: string) {
+  const callbackUrl = new URL(`${mobileCallbackScheme}://${mobileCallbackHost}`);
+  callbackUrl.searchParams.set('error', error);
+
+  return callbackUrl;
+}

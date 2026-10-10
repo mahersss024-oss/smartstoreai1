@@ -19,6 +19,7 @@ import {
 } from '@/lib/auth/session';
 import {
   createMobileAuthCallbackUrl,
+  createMobileAuthErrorCallbackUrl,
   createMobileAuthTicket,
   parseMobileAuthState,
 } from '@/lib/auth/mobile-oauth';
@@ -47,6 +48,13 @@ function redirectToHome(request: Request, cookie?: string) {
   }
 
   response.headers.append('Set-Cookie', clearOauthStateCookie());
+  return response;
+}
+
+function redirectToMobileAuthError(error: string) {
+  const response = NextResponse.redirect(createMobileAuthErrorCallbackUrl(error));
+  response.headers.append('Set-Cookie', clearOauthStateCookie());
+
   return response;
 }
 
@@ -146,11 +154,16 @@ export async function GET(request: Request) {
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const mobileState = parseMobileAuthState(state);
+  const isMobileStateAttempt = state?.startsWith('mobile:') ?? false;
   const storedState = getOauthState(request);
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
   if (!code || !state || (!mobileState && (!storedState || state !== storedState))) {
+    if (isMobileStateAttempt) {
+      return redirectToMobileAuthError('google_invalid_state');
+    }
+
     return new Response('Invalid Google sign-in state.', { status: 400 });
   }
 
@@ -190,6 +203,10 @@ export async function GET(request: Request) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[google_auth] token_exchange_request_failed=${errorName}`);
 
+    if (mobileState) {
+      return redirectToMobileAuthError('google_token_exchange_failed');
+    }
+
     return new Response('Google token exchange failed.', { status: 502 });
   }
 
@@ -209,6 +226,14 @@ export async function GET(request: Request) {
       `[google_auth] token_exchange_failed status=${tokenResponse.status} error=${providerError} description=${providerDescription}`,
     );
 
+    if (mobileState) {
+      return redirectToMobileAuthError(
+        providerError === 'invalid_grant'
+          ? 'google_sign_in_expired'
+          : 'google_token_exchange_failed',
+      );
+    }
+
     if (providerError === 'invalid_grant') {
       return redirectToHome(request);
     }
@@ -226,6 +251,10 @@ export async function GET(request: Request) {
       },
     );
   } catch {
+    if (mobileState) {
+      return redirectToMobileAuthError('google_profile_failed');
+    }
+
     return new Response('Google account email could not be verified.', {
       status: 502,
     });
@@ -241,6 +270,10 @@ export async function GET(request: Request) {
     !userInfo.email ||
     userInfo.email_verified === false
   ) {
+    if (mobileState) {
+      return redirectToMobileAuthError('google_profile_failed');
+    }
+
     return new Response('Google account email could not be verified.', {
       status: 502,
     });
@@ -260,6 +293,10 @@ export async function GET(request: Request) {
     const errorMessage = error instanceof Error ? error.message : 'UnknownError';
 
     if (errorMessage === 'ACCOUNT_SOFT_DELETED') {
+      if (mobileState) {
+        return redirectToMobileAuthError('account_deactivated');
+      }
+
       return new Response('This account has been deactivated.', {
         status: 403,
       });
@@ -267,6 +304,10 @@ export async function GET(request: Request) {
 
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.error(`[google_auth] registration_failed=${errorName}`);
+
+    if (mobileState) {
+      return redirectToMobileAuthError('google_registration_failed');
+    }
 
     return new Response('Google registration could not be completed.', {
       status: 502,
