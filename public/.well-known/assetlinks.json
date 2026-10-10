@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.souqhamad.app",
+      "sha256_cert_fingerprints": [
+        "3A:0A:A0:AD:75:8A:D0:9A:32:DF:70:96:9A:B2:A2:E0:BD:C3:55:DE:40:03:AD:33:6F:54:16:39:E5:0C:4F:BC"
+      ]
+    }
+  }
+]
