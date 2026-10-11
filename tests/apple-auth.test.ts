@@ -135,6 +135,42 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.doesNotMatch(callbackRoute, /new Response\('Google token exchange failed\.'/);
 });
 
+test('google native auth verifies id tokens and issues the existing session cookie', () => {
+  const googleAuth = readProjectFile('lib', 'auth', 'google.ts');
+  const nativeRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'google',
+    'native',
+    'route.ts',
+  );
+  const nativeConfigRoute = readProjectFile(
+    'app',
+    'api',
+    'auth',
+    'google',
+    'native-config',
+    'route.ts',
+  );
+
+  assert.match(googleAuth, /verifyGoogleIdentityToken/);
+  assert.match(googleAuth, /https:\/\/www\.googleapis\.com\/oauth2\/v3\/certs/);
+  assert.match(googleAuth, /createVerify\('RSA-SHA256'\)/);
+  assert.match(googleAuth, /payload\.iss !== googleIssuer/);
+  assert.match(googleAuth, /isAudienceValid\(payload\.aud\)/);
+  assert.match(googleAuth, /payload\.exp <= Math\.floor\(Date\.now\(\) \/ 1000\)/);
+  assert.match(googleAuth, /persistGoogleUserRegistration/);
+  assert.match(nativeRoute, /verifyGoogleIdentityToken\(idToken\)/);
+  assert.match(nativeRoute, /createSessionCookie\(registeredUser\)/);
+  assert.match(nativeRoute, /hasCommissionAgreement\(request\)/);
+  assert.match(nativeRoute, /rejectOversizedRequest/);
+  assert.match(nativeRoute, /auth_google_native/);
+  assert.match(nativeConfigRoute, /getGoogleNativeClientId/);
+  assert.doesNotMatch(nativeRoute, /GOOGLE_CLIENT_SECRET/);
+  assert.doesNotMatch(googleAuth, /GOOGLE_CLIENT_SECRET/);
+});
+
 test('oauth state can be verified without relying on callback cookies', () => {
   const state = createOauthState();
 
