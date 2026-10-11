@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Smartphone, X } from 'lucide-react';
+import Image from 'next/image';
 
 import { isInsideNativeApp } from '@/lib/native/app-bridge';
 
 type MobilePlatform = 'android' | 'ios';
-
-const dismissedKey = 'souq-hamad-open-app-banner-dismissed-v1';
 
 function detectMobilePlatform(): MobilePlatform | null {
   const userAgent = navigator.userAgent;
@@ -42,21 +40,12 @@ export function OpenInAppBanner() {
       return;
     }
 
-    if (window.localStorage.getItem(dismissedKey) === '1') {
-      return;
-    }
-
     setPlatform(mobilePlatform);
   }, []);
 
   if (!platform) {
     return null;
   }
-
-  const closeBanner = () => {
-    window.localStorage.setItem(dismissedKey, '1');
-    setPlatform(null);
-  };
 
   const openInApp = async () => {
     if (isOpening) {
@@ -104,31 +93,31 @@ export function OpenInAppBanner() {
   };
 
   return (
-    <div className="relative z-[10] bg-white/90 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur md:hidden">
-      <div className="mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-sky-200/80 bg-white/95 px-3 py-2 text-slate-900 shadow-lg shadow-sky-950/10">
-        <button
-          type="button"
-          onClick={closeBanner}
-          className="grid size-8 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-          aria-label="إغلاق شريط فتح التطبيق"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
+    <div className="relative z-[10] border-b border-slate-200/80 bg-white/95 px-3 py-2 text-slate-950 backdrop-blur md:hidden">
+      <div className="mx-auto flex max-w-md items-center gap-3">
+        <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-[#013e51]">
+          <Image
+            alt="سوق حمد"
+            className="h-full w-full object-contain"
+            height={48}
+            src="/hamad-market-logo.jpeg"
+            width={48}
+          />
+        </div>
+        <div className="min-w-0 flex-1 text-right">
+          <span className="block truncate text-sm font-bold leading-5">سوق حمد</span>
+          <span className="block truncate text-xs leading-5 text-slate-500">
+            تجربة أفضل عبر التطبيق
+          </span>
+        </div>
         <button
           type="button"
           onClick={openInApp}
           disabled={isOpening}
-          className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl bg-sky-50 px-3 py-2 text-right transition hover:bg-sky-100 disabled:opacity-70"
+          className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-70"
+          aria-label="فتح سوق حمد في التطبيق"
         >
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-bold">فتح في التطبيق</span>
-            <span className="block truncate text-xs text-slate-500">
-              تجربة أسرع مع نفس حسابك
-            </span>
-          </span>
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sky-500 text-white">
-            <Smartphone className="size-4" aria-hidden="true" />
-          </span>
+          فتح
         </button>
       </div>
     </div>

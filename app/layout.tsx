@@ -13,7 +13,6 @@ import {
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { SiteMessageBanner } from "@/components/site-message-banner";
 import { SiteMessageHomeOnly } from "@/components/site-message-home-only";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
@@ -66,11 +65,6 @@ export const metadata: Metadata = {
     images: ["/hamad-market-logo.jpeg"],
   },
   manifest: "/manifest.webmanifest?v=souq-hamad-20261001",
-  appleWebApp: {
-    capable: true,
-    title: "سوق حمد",
-    statusBarStyle: "default",
-  },
   formatDetection: {
     telephone: false,
   },
@@ -354,7 +348,6 @@ export default function RootLayout({
           <OpenInAppBanner />
           {children}
           <PullToRefresh />
-          <PwaInstallPrompt />
           <MobileBottomNavigation />
         </AuthSessionProvider>
       </body>

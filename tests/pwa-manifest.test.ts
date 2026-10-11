@@ -5,10 +5,10 @@ import manifest from '@/app/manifest';
 
 const requiredIconSizes = ['180x180', '512x512'];
 
-test('exposes a valid installable web manifest', () => {
+test('web manifest stays browser-first instead of installable pwa mode', () => {
   const result = manifest();
 
-  assert.equal(result.display, 'standalone');
+  assert.equal(result.display, 'browser');
   assert.equal(result.start_url, '/');
   assert.equal(result.scope, '/');
   assert.equal(result.dir, 'rtl');
@@ -19,7 +19,7 @@ test('exposes a valid installable web manifest', () => {
   assert.ok(result.background_color);
 });
 
-test('manifest declares required install icons with correct dimensions', () => {
+test('manifest keeps safe root-relative icon metadata', () => {
   const result = manifest();
   const icons = result.icons ?? [];
   const sizes = icons.map((icon) => icon.sizes);
@@ -30,11 +30,6 @@ test('manifest declares required install icons with correct dimensions', () => {
       `manifest is missing an icon sized ${requiredSize}`,
     );
   }
-
-  assert.ok(
-    icons.some((icon) => icon.purpose === 'maskable'),
-    'manifest must include a maskable icon for Android install',
-  );
 
   for (const icon of icons) {
     assert.ok(icon.src.startsWith('/'), 'icon src must be a root-relative path');

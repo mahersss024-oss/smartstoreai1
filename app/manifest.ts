@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: appConfig.metadata.description,
     start_url: '/',
     scope: '/',
-    display: 'standalone',
+    display: 'browser',
     orientation: 'portrait',
     dir: 'rtl',
     lang: 'ar',

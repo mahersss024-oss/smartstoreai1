@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-test('open in app banner is mobile-only and dismissible', () => {
+test('open in app banner is mobile-only and persistent', () => {
   const component = readFileSync(
     join(process.cwd(), 'components', 'open-in-app-banner.tsx'),
     'utf8',
@@ -12,12 +12,16 @@ test('open in app banner is mobile-only and dismissible', () => {
 
   assert.match(component, /isInsideNativeApp/);
   assert.match(component, /detectMobilePlatform/);
-  assert.match(component, /localStorage\.getItem\(dismissedKey\)/);
-  assert.match(component, /localStorage\.setItem\(dismissedKey, '1'\)/);
-  assert.match(component, /aria-label="إغلاق شريط فتح التطبيق"/);
+  assert.doesNotMatch(component, /dismissedKey/);
+  assert.doesNotMatch(component, /localStorage/);
+  assert.doesNotMatch(component, /aria-label="إغلاق شريط فتح التطبيق"/);
+  assert.match(component, /\/hamad-market-logo\.jpeg/);
+  assert.match(component, /تجربة أفضل عبر التطبيق/);
+  assert.match(component, /aria-label="فتح سوق حمد في التطبيق"/);
   assert.match(component, /\/api\/auth\/mobile\/open/);
   assert.doesNotMatch(component, /className="[^"]*(?:fixed|sticky)[^"]*"/);
   assert.match(layout, /<OpenInAppBanner \/>/);
+  assert.doesNotMatch(layout, /PwaInstallPrompt/);
 });
 
 test('mobile open endpoint creates safe app links without exposing long sessions', () => {
