@@ -23,3 +23,15 @@ test('privacy policy describes service providers without naming vendors', () => 
   assert.match(privacyPage, /مزودي خدمة موثوقين/);
   assert.doesNotMatch(privacyPage, /DeepSeek|Cloudinary|Render|Google|Apple/);
 });
+
+test('home and policy navigation keep legal links concise and discoverable', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+  const legalPolicyPage = readProjectFile('components', 'legal-policy-page.tsx');
+
+  assert.match(homePage, /الشروط والسياسات/);
+  assert.doesNotMatch(homePage, /سياسة الإعلانات\s*<\/Link>/);
+  assert.doesNotMatch(homePage, /رسوم المنصة\s*<\/Link>/);
+
+  assert.match(legalPolicyPage, /href: '\/delete-account'/);
+  assert.match(legalPolicyPage, /label: 'حذف الحساب'/);
+});

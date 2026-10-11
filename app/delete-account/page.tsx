@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { DeleteAccountAction } from '@/components/delete-account-action';
 import { LegalPolicyPage } from '@/components/legal-policy-page';
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   },
 };
 
-const updatedAt = '9 أكتوبر 2026';
+const updatedAt = '12 أكتوبر 2026';
 
 const sections = [
   {
@@ -69,6 +70,8 @@ export default function DeleteAccountPage() {
       description="توضح هذه الصفحة طريقة طلب حذف حسابك في سوق حمد وما يحدث للبيانات المرتبطة بالحساب بعد تقديم الطلب."
       updatedAt={updatedAt}
       sections={sections}
-    />
+    >
+      <DeleteAccountAction />
+    </LegalPolicyPage>
   );
 }

@@ -4154,13 +4154,7 @@ export default function Page() {
 
             <nav className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground xl:flex">
               <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/terms" prefetch={false}>
-                الشروط
-              </Link>
-              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/listing-policy" prefetch={false}>
-                سياسة الإعلانات
-              </Link>
-              <Link className="inline-flex h-8 items-center rounded-md px-2 hover:bg-accent hover:text-foreground" href="/commission-policy" prefetch={false}>
-                رسوم المنصة
+                الشروط والسياسات
               </Link>
             </nav>
 

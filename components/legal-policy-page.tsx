@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import type { ReactNode } from 'react';
 
 import { Button } from '@ui/button';
 
@@ -15,6 +16,7 @@ type LegalPolicyPageProps = {
   description: string;
   updatedAt: string;
   sections: LegalSection[];
+  children?: ReactNode;
 };
 
 const policyLinks = [
@@ -22,6 +24,7 @@ const policyLinks = [
   { href: '/listing-policy', label: 'سياسة الإعلانات' },
   { href: '/commission-policy', label: 'سياسة رسوم المنصة' },
   { href: '/privacy', label: 'سياسة الخصوصية' },
+  { href: '/delete-account', label: 'حذف الحساب' },
 ];
 
 const SUPPORT_EMAIL = 'support@souqhamad.com';
@@ -54,6 +57,7 @@ export function LegalPolicyPage({
   description,
   updatedAt,
   sections,
+  children,
 }: LegalPolicyPageProps) {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -131,6 +135,8 @@ export function LegalPolicyPage({
             </section>
           ))}
         </div>
+
+        {children}
 
         <section className="rounded-md border border-amber-500/30 bg-amber-50 p-4 text-sm leading-7 text-amber-950 dark:bg-amber-400/10 dark:text-amber-100">
           هذه الصفحات توضح قواعد تشغيل سوق حمد للمستخدمين. يمكن تحديثها عند تطوير الخدمة أو تغير المتطلبات النظامية.

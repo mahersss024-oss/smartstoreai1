@@ -175,12 +175,16 @@ test('home marketplace renders assistant search as a separate active layer', () 
 test('home auxiliary links avoid route prefetch during normal browsing', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
-  for (const href of ['/terms', '/listing-policy', '/commission-policy', '/account']) {
+  for (const href of ['/terms', '/account']) {
     assert.match(
       homePage,
       new RegExp(`href="${href.replace(/\//g, '\\/')}"[\\s\\S]{0,80}prefetch=\\{false\\}`),
     );
   }
+
+  assert.match(homePage, /الشروط والسياسات/);
+  assert.doesNotMatch(homePage, /href="\/listing-policy"[\s\S]{0,80}prefetch=\{false\}/);
+  assert.doesNotMatch(homePage, /href="\/commission-policy"[\s\S]{0,80}prefetch=\{false\}/);
 });
 
 test('city selection supports search after opening everywhere it is used', () => {

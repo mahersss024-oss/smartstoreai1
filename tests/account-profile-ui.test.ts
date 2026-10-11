@@ -101,6 +101,27 @@ test('logout stays only at the bottom of the main account page', () => {
   assert.doesNotMatch(homePage, /\/api\/auth\/logout/);
 });
 
+test('delete account page contains the final guarded delete action', () => {
+  const deletePage = readFileSync(join(process.cwd(), 'app', 'delete-account', 'page.tsx'), 'utf8');
+  const deleteAction = readFileSync(
+    join(process.cwd(), 'components', 'delete-account-action.tsx'),
+    'utf8',
+  );
+  const policyPage = readFileSync(
+    join(process.cwd(), 'components', 'legal-policy-page.tsx'),
+    'utf8',
+  );
+
+  assert.match(deletePage, /<DeleteAccountAction \/>/);
+  assert.match(policyPage, /children\?: ReactNode/);
+  assert.match(deleteAction, /fetch\('\/api\/account\/profile', \{\s*method: 'DELETE'/);
+  assert.match(deleteAction, /type="checkbox"/);
+  assert.match(deleteAction, /disabled=\{!acknowledged\}/);
+  assert.match(deleteAction, /<ActionConfirmDialog/);
+  assert.match(deleteAction, /تأكيد حذف الحساب/);
+  assert.match(deleteAction, /router\.replace\('\/'\)/);
+});
+
 test('account hub options use the same row layout as profile settings', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
 
