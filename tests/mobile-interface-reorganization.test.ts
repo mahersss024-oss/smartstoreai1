@@ -61,16 +61,17 @@ test('mobile navigation and conversation alert avoid eager cold-load work', () =
   assert.doesNotMatch(alertHook, /queueMicrotask\(\(\) => \{\s*if \(!cancelled\) \{\s*if \(currentUserId\)/);
 });
 
-test('account page exposes former more links without changing routes', () => {
+test('account page condenses policy links without changing customer routes', () => {
   const page = readProjectFile('app', 'account', 'page.tsx');
 
   assert.match(page, /الملف الشخصي/);
   assert.match(page, /variant="switch"/);
   assert.doesNotMatch(page, /الخدمات والإعدادات/);
+  assert.match(page, /الشروط والسياسات/);
   assert.match(page, /href="\/terms"/);
-  assert.match(page, /href="\/privacy"/);
-  assert.match(page, /href="\/listing-policy"/);
-  assert.match(page, /href="\/commission-policy"/);
+  assert.doesNotMatch(page, /href="\/privacy"/);
+  assert.doesNotMatch(page, /href="\/listing-policy"/);
+  assert.doesNotMatch(page, /href="\/commission-policy"/);
 });
 
 test('customer section pages keep headers stable while content scrolls', () => {

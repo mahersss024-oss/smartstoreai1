@@ -71,10 +71,7 @@ test('account hub links do not prefetch every customer section on page load', ()
     '/account/follows',
     '/commissions',
     '/terms',
-    '/privacy',
     '/delete-account',
-    '/listing-policy',
-    '/commission-policy',
     '/admin',
   ];
 
@@ -84,6 +81,11 @@ test('account hub links do not prefetch every customer section on page load', ()
       new RegExp(`href="${href.replace(/\//g, '\\/')}"\\s+prefetch=\\{false\\}`),
     );
   }
+
+  assert.match(page, /الشروط والسياسات/);
+  assert.doesNotMatch(page, /href="\/privacy"\s+prefetch=\{false\}/);
+  assert.doesNotMatch(page, /href="\/listing-policy"\s+prefetch=\{false\}/);
+  assert.doesNotMatch(page, /href="\/commission-policy"\s+prefetch=\{false\}/);
 });
 
 test('logout stays only at the bottom of the main account page', () => {

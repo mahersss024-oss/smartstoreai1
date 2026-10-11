@@ -766,44 +766,19 @@ export default function AccountPage() {
                 <ThemeToggle language="ar" variant="switch" />
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/terms" prefetch={false}>
-                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                    <FileText className="size-4" />
-                  </span>
-                  <span className="grid min-w-0 gap-0.5">
-                    <span className="text-xs font-bold leading-5">الشروط</span>
-                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">الأحكام</span>
-                  </span>
-                </Link>
-                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/privacy" prefetch={false}>
-                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                    <ShieldCheck className="size-4" />
-                  </span>
-                  <span className="grid min-w-0 gap-0.5">
-                    <span className="text-xs font-bold leading-5">الخصوصية</span>
-                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">بياناتك</span>
-                  </span>
-                </Link>
-                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/listing-policy" prefetch={false}>
-                  <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                    <Megaphone className="size-4" />
-                  </span>
-                  <span className="grid min-w-0 gap-0.5">
-                    <span className="text-xs font-bold leading-5">الإعلانات</span>
-                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">القواعد</span>
-                  </span>
-                </Link>
-                <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commission-policy" prefetch={false}>
-                  <span className="grid size-7 place-items-center rounded-md bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
-                    <Percent className="size-4" />
-                  </span>
-                  <span className="grid min-w-0 gap-0.5">
-                    <span className="text-xs font-bold leading-5">الرسوم</span>
-                    <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">العمولات</span>
-                  </span>
-                </Link>
-              </div>
+              <Link
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                href="/terms"
+                prefetch={false}
+              >
+                <span className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <FileText className="size-5" />
+                </span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-sm font-black">الشروط والسياسات</span>
+                </span>
+                <ArrowRight className="size-4 rotate-180" />
+              </Link>
             </section>
 
             {isAdmin && (
