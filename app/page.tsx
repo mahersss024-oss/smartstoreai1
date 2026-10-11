@@ -83,6 +83,7 @@ import {
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useAppBridge } from '@/hooks/use-app-bridge';
+import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
@@ -1262,30 +1263,37 @@ function formatListingRelativeTime(value: string | undefined) {
 }
 
 function SignInCard({ text }: { text: string }) {
+  const authProviders = useAuthProviderVisibility();
+
   return (
     <div className="grid gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-right text-blue-950 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-50">
       <div className="flex items-start gap-2">
         <ShieldCheck className="mt-1 size-4 shrink-0 text-blue-700 dark:text-blue-300" />
         <p className="text-sm leading-7">{text.replace(authRequiredMarker, '').trim()}</p>
       </div>
-      <Button asChild className="h-10 w-full justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
-        <a href="/api/auth/google/start">
-          <GoogleMark className="size-5" />
-          <span>المتابعة باستخدام Google</span>
-        </a>
-      </Button>
-      <Button asChild className="h-10 w-full justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
-        <a href="/api/auth/apple/start">
-          <AppleMark className="size-5" />
-          <span>المتابعة باستخدام Apple</span>
-        </a>
-      </Button>
+      {authProviders.google ? (
+        <Button asChild className="h-10 w-full justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
+          <a href="/api/auth/google/start">
+            <GoogleMark className="size-5" />
+            <span>المتابعة باستخدام Google</span>
+          </a>
+        </Button>
+      ) : null}
+      {authProviders.apple ? (
+        <Button asChild className="h-10 w-full justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
+          <a href="/api/auth/apple/start">
+            <AppleMark className="size-5" />
+            <span>المتابعة باستخدام Apple</span>
+          </a>
+        </Button>
+      ) : null}
     </div>
   );
 }
 
 function AuthProviderMenu() {
   const [open, setOpen] = useState(false);
+  const authProviders = useAuthProviderVisibility();
 
   return (
     <DropdownMenu dir="rtl" open={open} onOpenChange={setOpen}>
@@ -1310,18 +1318,22 @@ function AuthProviderMenu() {
           اختر طريقة الدخول
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
-          <a href="/api/auth/google/start">
-            <span>دخول Google</span>
-            <GoogleMark className="size-5" />
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
-          <a href="/api/auth/apple/start">
-            <span>دخول Apple</span>
-            <AppleMark className="size-5 text-foreground" />
-          </a>
-        </DropdownMenuItem>
+        {authProviders.google ? (
+          <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
+            <a href="/api/auth/google/start">
+              <span>دخول Google</span>
+              <GoogleMark className="size-5" />
+            </a>
+          </DropdownMenuItem>
+        ) : null}
+        {authProviders.apple ? (
+          <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
+            <a href="/api/auth/apple/start">
+              <span>دخول Apple</span>
+              <AppleMark className="size-5 text-foreground" />
+            </a>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -15,6 +15,7 @@ import {
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -107,6 +108,7 @@ function createClientIdempotencyKey(scope: string) {
 export default function CommissionsPage() {
   const [targetListingId, setTargetListingId] = useState<string | null>(null);
   const { isSessionLoading, session } = useAuthSession();
+  const authProviders = useAuthProviderVisibility();
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<
     CommissionPaymentMethod[]
@@ -357,18 +359,22 @@ export default function CommissionsPage() {
             <div className="grid max-w-md gap-4">
               <Receipt className="mx-auto size-12 text-blue-600" />
               <h2 className="text-xl font-bold">سجل الدخول لعرض رسوم المنصة</h2>
-              <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
-                <a href="/api/auth/google/start">
-                  <GoogleMark className="size-5" />
-                  دخول Google
-                </a>
-              </Button>
-              <Button asChild className="justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
-                <a href="/api/auth/apple/start">
-                  <AppleMark className="size-5" />
-                  دخول Apple
-                </a>
-              </Button>
+              {authProviders.google ? (
+                <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
+                  <a href="/api/auth/google/start">
+                    <GoogleMark className="size-5" />
+                    دخول Google
+                  </a>
+                </Button>
+              ) : null}
+              {authProviders.apple ? (
+                <Button asChild className="justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
+                  <a href="/api/auth/apple/start">
+                    <AppleMark className="size-5" />
+                    دخول Apple
+                  </a>
+                </Button>
+              ) : null}
             </div>
           </section>
         ) : (

@@ -30,6 +30,7 @@ import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { SellerAvatar } from '@/components/seller-avatar';
 import type { AuthUser } from '@/hooks/use-auth-session';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { countContactPhoneCandidates } from '@/lib/auth/contact-profile';
 import { Button } from '@ui/button';
 
@@ -45,6 +46,7 @@ export default function AccountPage() {
     session,
     setSession,
   } = useAuthSession();
+  const authProviders = useAuthProviderVisibility();
   const [profileName, setProfileName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
   const [profilePicturePreview, setProfilePicturePreview] = useState('');
@@ -546,18 +548,22 @@ export default function AccountPage() {
               <div>
                 <h2 className="text-xl font-bold">سجل الدخول لعرض حسابك</h2>
               </div>
-              <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
-                <a href="/api/auth/google/start">
-                  <GoogleMark className="size-5" />
-                  دخول Google
-                </a>
-              </Button>
-              <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
-                <a href="/api/auth/apple/start">
-                  <AppleMark className="size-5" />
-                  دخول Apple
-                </a>
-              </Button>
+              {authProviders.google ? (
+                <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
+                  <a href="/api/auth/google/start">
+                    <GoogleMark className="size-5" />
+                    دخول Google
+                  </a>
+                </Button>
+              ) : null}
+              {authProviders.apple ? (
+                <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
+                  <a href="/api/auth/apple/start">
+                    <AppleMark className="size-5" />
+                    دخول Apple
+                  </a>
+                </Button>
+              ) : null}
             </div>
           </section>
         ) : (

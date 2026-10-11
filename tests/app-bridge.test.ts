@@ -55,3 +55,18 @@ test('native bridge accepts android viewport inset updates', () => {
   assert.match(hook, /--native-status-bar-inset/);
   assert.match(hook, /Math\.min\(message\.statusBarInset, 96\)/);
 });
+
+test('auth provider visibility is gated by the native wrapper before platform', () => {
+  const hook = readFileSync(
+    join(process.cwd(), 'hooks', 'use-auth-provider-visibility.ts'),
+    'utf8',
+  );
+
+  assert.match(hook, /isInsideNativeApp\(\)/);
+  assert.match(hook, /detectAppPlatform\(\)/);
+  assert.match(hook, /platform === 'android'/);
+  assert.match(hook, /google: true, apple: false/);
+  assert.match(hook, /platform === 'ios'/);
+  assert.match(hook, /google: false, apple: true/);
+  assert.match(hook, /google: true, apple: true/);
+});

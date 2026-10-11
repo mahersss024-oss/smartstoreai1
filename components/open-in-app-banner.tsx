@@ -100,7 +100,7 @@ export function OpenInAppBanner() {
             alt="سوق حمد"
             className="h-full w-full object-contain"
             height={48}
-            src="/hamad-market-logo.jpeg"
+            src="/hamad-market-logo.webp"
             width={48}
           />
         </div>
