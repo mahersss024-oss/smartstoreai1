@@ -827,11 +827,8 @@ export default function AccountPage() {
                 <span className="grid size-10 place-items-center rounded-md bg-red-100 text-red-700 dark:bg-red-300/15 dark:text-red-100">
                   <Trash2 className="size-5" />
                 </span>
-                <span className="grid min-w-0 gap-1">
+                <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-black">حذف الحساب</span>
-                  <span className="text-xs leading-5 text-red-700/80 dark:text-red-100/80">
-                    يفتح صفحة الشرح والتأكيد قبل أي طلب حذف
-                  </span>
                 </span>
                 <ArrowRight className="size-4 rotate-180" />
               </Link>

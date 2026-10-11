@@ -53,7 +53,7 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
   assert.match(page, /href="\/delete-account"/);
-  assert.match(page, /يفتح صفحة الشرح والتأكيد قبل أي طلب حذف/);
+  assert.doesNotMatch(page, /يفتح صفحة الشرح والتأكيد قبل أي طلب حذف/);
   assert.doesNotMatch(page, /deleteAccount/);
   assert.match(page, /countContactPhoneCandidates/);
   assert.doesNotMatch(page, /grid gap-3 rounded-md border bg-white p-4 shadow-sm/);
