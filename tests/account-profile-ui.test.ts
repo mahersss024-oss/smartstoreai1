@@ -52,7 +52,9 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
-  assert.match(page, /deleteAccount/);
+  assert.match(page, /href="\/delete-account"/);
+  assert.match(page, /يفتح صفحة الشرح والتأكيد قبل أي طلب حذف/);
+  assert.doesNotMatch(page, /deleteAccount/);
   assert.match(page, /countContactPhoneCandidates/);
   assert.doesNotMatch(page, /grid gap-3 rounded-md border bg-white p-4 shadow-sm/);
   assert.doesNotMatch(page, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
@@ -70,6 +72,7 @@ test('account hub links do not prefetch every customer section on page load', ()
     '/commissions',
     '/terms',
     '/privacy',
+    '/delete-account',
     '/listing-policy',
     '/commission-policy',
     '/admin',
@@ -81,6 +84,21 @@ test('account hub links do not prefetch every customer section on page load', ()
       new RegExp(`href="${href.replace(/\//g, '\\/')}"\\s+prefetch=\\{false\\}`),
     );
   }
+});
+
+test('logout stays only at the bottom of the main account page', () => {
+  const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const accountListingsPage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'listings', 'page.tsx'),
+    'utf8',
+  );
+  const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
+
+  assert.match(accountPage, /fetch\('\/api\/auth\/logout'/);
+  assert.match(accountPage, /<LogOut className="size-4" \/>/);
+  assert.match(accountPage, /href="\/delete-account"[\s\S]*onClick=\{handleLogout\}/);
+  assert.doesNotMatch(accountListingsPage, /\/api\/auth\/logout/);
+  assert.doesNotMatch(homePage, /\/api\/auth\/logout/);
 });
 
 test('account hub options use the same row layout as profile settings', () => {

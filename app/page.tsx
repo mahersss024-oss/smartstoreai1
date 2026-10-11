@@ -29,7 +29,6 @@ import {
   Heart,
   ImageIcon,
   Loader2,
-  LogOut,
   MapPin,
   MessageCircle,
   Search,
@@ -1302,6 +1301,7 @@ function AuthProviderMenu() {
           size="sm"
           className="rounded-md bg-blue-600 hover:bg-blue-700"
           data-testid="auth-provider-trigger"
+          aria-label="تسجيل الدخول"
           onClick={() => setOpen(true)}
           onPointerUp={() => setOpen(true)}
         >
@@ -1315,7 +1315,7 @@ function AuthProviderMenu() {
         data-testid="auth-provider-menu"
       >
         <DropdownMenuLabel className="text-right text-xs text-muted-foreground">
-          اختر طريقة الدخول
+          الدخول إلى حسابك
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {authProviders.google ? (
@@ -2017,7 +2017,7 @@ export default function Page() {
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: chatTransport,
   });
-  const { isSessionLoading, session, setSession } = useAuthSession();
+  const { isSessionLoading, session } = useAuthSession();
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
   const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
@@ -4041,14 +4041,6 @@ export default function Page() {
     );
   }, []);
 
-  const handleLogout = useCallback(() => {
-    void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-      clearHomeAssistantRuntimeState();
-      setSession({ authenticated: false, user: null });
-      setFavoriteListingIds(new Set());
-    });
-  }, [setSession]);
-
   const loadMoreListings = useCallback(() => {
     if (!canLoadMoreListings || isLoadingListings) {
       return;
@@ -4178,18 +4170,12 @@ export default function Page() {
               ) : null}
               <ThemeToggle language="ar" />
               {session.authenticated ? (
-                <>
-                  <Button asChild variant="outline" size="sm" className="hidden rounded-md lg:inline-flex">
-                    <Link href="/account" onClick={closeAssistantForNavigation} prefetch={false}>
-                      <User className="size-4" />
-                      حسابي
-                    </Link>
-                  </Button>
-                  <Button variant="outline" size="sm" className="rounded-md" onClick={handleLogout}>
-                    <LogOut className="size-4" />
-                    خروج
-                  </Button>
-                </>
+                <Button asChild variant="outline" size="sm" className="rounded-md px-2 sm:px-3">
+                  <Link href="/account" onClick={closeAssistantForNavigation} prefetch={false}>
+                    <User className="size-4" />
+                    <span className="hidden sm:inline">حسابي</span>
+                  </Link>
+                </Button>
               ) : (
                 <AuthProviderMenu />
               )}

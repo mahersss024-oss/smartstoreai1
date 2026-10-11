@@ -59,9 +59,8 @@ export default function AccountPage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isRemovingProfilePicture, setIsRemovingProfilePicture] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [pendingAccountConfirm, setPendingAccountConfirm] = useState<
-    'remove_picture' | 'delete_account' | null
+    'remove_picture' | null
   >(null);
   const clearingBrokenProfilePictureRef = useRef(false);
 
@@ -415,55 +414,6 @@ export default function AccountPage() {
     }
   }, [profilePicture, profilePicturePreview, setSession]);
 
-  const deleteAccount = useCallback(async () => {
-    setPendingAccountConfirm(null);
-    setIsDeletingAccount(true);
-    setProfileNotice(null);
-
-    try {
-      const response = await fetch('/api/account/profile', {
-        method: 'DELETE',
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        message?: string;
-        error?: string;
-      } | null;
-
-      if (response.status === 401) {
-        router.push('/api/auth/google/start');
-        return;
-      }
-
-      if (!response.ok) {
-        setProfileNotice({
-          tone: 'danger',
-          message:
-            payload?.message ??
-            payload?.error ??
-            'تعذر حذف الحساب الآن. حاول مرة أخرى.',
-        });
-        return;
-      }
-
-      setSession({ authenticated: false, user: null });
-      setProfileName('');
-      setProfilePicture('');
-      setProfilePicturePreview('');
-      setProfilePhone('');
-      setSavedProfileName('');
-      setSavedProfilePhone('');
-      setIsEditingProfilePhone(false);
-      router.push('/');
-    } catch {
-      setProfileNotice({
-        tone: 'danger',
-        message: 'تعذر حذف الحساب الآن. تحقق من الاتصال ثم حاول مرة أخرى.',
-      });
-    } finally {
-      setIsDeletingAccount(false);
-    }
-  }, [router, setSession]);
-
   return (
     <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <FloatingActionNotice
@@ -473,37 +423,19 @@ export default function AccountPage() {
         tone={profileNotice?.tone ?? 'info'}
       />
       <ActionConfirmDialog
-        confirmLabel={
-          pendingAccountConfirm === 'delete_account'
-            ? 'حذف الحساب'
-            : 'إزالة الصورة'
-        }
-        description={
-          pendingAccountConfirm === 'delete_account'
-            ? 'سيتم حذف الإعلانات والمحادثات والبيانات المرتبطة بهذا الحساب من المنصة.'
-            : 'سيتم إزالة صورة العرض من حسابك.'
-        }
-        loading={
-          pendingAccountConfirm === 'delete_account'
-            ? isDeletingAccount
-            : isRemovingProfilePicture
-        }
+        confirmLabel="إزالة الصورة"
+        description="سيتم إزالة صورة العرض من حسابك."
+        loading={isRemovingProfilePicture}
         loadingText="جاري التنفيذ..."
         onCancel={() => setPendingAccountConfirm(null)}
         onConfirm={() => {
-          if (pendingAccountConfirm === 'delete_account') {
-            void deleteAccount();
-          } else if (pendingAccountConfirm === 'remove_picture') {
+          if (pendingAccountConfirm === 'remove_picture') {
             void removeProfilePicture();
           }
         }}
         open={Boolean(pendingAccountConfirm)}
-        title={
-          pendingAccountConfirm === 'delete_account'
-            ? 'تأكيد حذف الحساب'
-            : 'تأكيد إزالة الصورة'
-        }
-        tone={pendingAccountConfirm === 'delete_account' ? 'danger' : 'default'}
+        title="تأكيد إزالة الصورة"
+        tone="default"
       />
       <div className="smartstore-stable-content mx-auto grid max-w-[28rem] gap-4 px-3 py-4 sm:max-w-[30rem] sm:px-5 sm:py-5 lg:max-w-4xl lg:px-6">
         <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
@@ -517,14 +449,6 @@ export default function AccountPage() {
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">حسابي</h1>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {session.authenticated && (
-              <Button variant="outline" size="sm" className="rounded-md px-2 sm:px-3" onClick={handleLogout}>
-                <LogOut className="size-4" />
-                خروج
-              </Button>
-            )}
           </div>
         </header>
 
@@ -894,24 +818,31 @@ export default function AccountPage() {
               </Link>
             )}
 
-            <section className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-red-300/70 bg-red-50/70 p-3 text-red-800 shadow-sm dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-100">
-              <span className="grid size-12 place-items-center rounded-md bg-red-100 text-red-700 dark:bg-red-300/15 dark:text-red-100">
-                <Trash2 className="size-6" />
-              </span>
-              <span className="grid min-w-0 gap-1">
-                <span className="text-base font-black">حذف الحساب</span>
-                <span className="text-sm leading-6 text-red-700/80 dark:text-red-100/80">
-                  هذا الخيار يحذف بيانات الحساب المرتبطة بالمنصة ويخرجك من الجلسة الحالية
+            <section className="grid gap-2 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm dark:border-white/10 dark:bg-card/72">
+              <Link
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-red-200/80 bg-red-50/70 p-3 text-red-800 transition hover:border-red-300 dark:border-red-400/25 dark:bg-red-400/10 dark:text-red-100"
+                href="/delete-account"
+                prefetch={false}
+              >
+                <span className="grid size-10 place-items-center rounded-md bg-red-100 text-red-700 dark:bg-red-300/15 dark:text-red-100">
+                  <Trash2 className="size-5" />
                 </span>
-              </span>
+                <span className="grid min-w-0 gap-1">
+                  <span className="text-sm font-black">حذف الحساب</span>
+                  <span className="text-xs leading-5 text-red-700/80 dark:text-red-100/80">
+                    يفتح صفحة الشرح والتأكيد قبل أي طلب حذف
+                  </span>
+                </span>
+                <ArrowRight className="size-4 rotate-180" />
+              </Link>
               <Button
-                className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
-                disabled={isDeletingAccount}
-                onClick={() => setPendingAccountConfirm('delete_account')}
+                className="h-11 justify-center gap-2 rounded-md"
+                onClick={handleLogout}
                 type="button"
                 variant="outline"
               >
-                {isDeletingAccount ? 'جار الحذف...' : 'حذف'}
+                <LogOut className="size-4" />
+                خروج
               </Button>
             </section>
           </div>

@@ -12,7 +12,6 @@ import {
   Heart,
   ImageIcon,
   Images,
-  LogOut,
   MapPin,
   Megaphone,
   MessageCircle,
@@ -414,7 +413,7 @@ function createEditFormFromListing(listing: ListingCard): ListingEditForm {
 
 export default function AccountListingsPage() {
   const router = useRouter();
-  const { isSessionLoading, session, setSession } = useAuthSession();
+  const { isSessionLoading, session } = useAuthSession();
   const authProviders = useAuthProviderVisibility();
   const sessionUserId = session.user?.id;
   const [listings, setListings] = useState<ListingCard[]>([]);
@@ -633,14 +632,6 @@ export default function AccountListingsPage() {
       return refreshListings(1);
     },
   });
-
-  const handleLogout = useCallback(() => {
-    void fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-      setListings([]);
-      setListingsPagination(null);
-      setSession({ authenticated: false, user: null });
-    });
-  }, [setSession]);
 
   const executeListingControl = useCallback(
     (listing: ListingCard, action: ListingControlAction) => {
@@ -1612,14 +1603,6 @@ export default function AccountListingsPage() {
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">إعلاناتي</h1>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {session.authenticated && (
-              <Button variant="outline" size="sm" className="rounded-md px-2 sm:px-3" onClick={handleLogout}>
-                <LogOut className="size-4" />
-                خروج
-              </Button>
-            )}
           </div>
         </header>
 

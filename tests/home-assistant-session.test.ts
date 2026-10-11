@@ -205,12 +205,13 @@ test('mobile bottom navigation highlights conversations when a new message arriv
   assert.match(alertHook, /pathname\.startsWith\('\/conversations'\)/);
 });
 
-test('tablet keeps account access in the bottom navigation instead of the top header', () => {
+test('home header keeps account access available on mobile and wider screens', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
   assert.match(homePage, /href="\/account" onClick=\{closeAssistantForNavigation\}/);
-  assert.match(homePage, /className="hidden rounded-md lg:inline-flex"/);
-  assert.doesNotMatch(homePage, /className="hidden rounded-md sm:inline-flex"[\s\S]*href="\/account"/);
+  assert.match(homePage, /className="rounded-md px-2 sm:px-3"/);
+  assert.match(homePage, /<span className="hidden sm:inline">حسابي<\/span>/);
+  assert.doesNotMatch(homePage, /className="hidden rounded-md lg:inline-flex"/);
 });
 
 test('home assistant starter search is generic instead of a fixed car city example', () => {
