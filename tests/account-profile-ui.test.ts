@@ -52,6 +52,12 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
+  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(session\.user\.id\)\}`\}/);
+  assert.match(page, /session\.user\?\.id \? \(/);
+  assert.doesNotMatch(page, /صفحة المعلن/);
+  assert.doesNotMatch(page, /grid grid-cols-2 gap-1\.5 sm:grid-cols-3/);
+  assert.doesNotMatch(page, /min-h-16 place-items-center/);
+  assert.doesNotMatch(page, /إدارة إعلاناتك|مراسلاتك|المحفوظات|تنبيهاتك|العمولات/);
   assert.match(page, /href="\/delete-account"/);
   assert.doesNotMatch(page, /يفتح صفحة الشرح والتأكيد قبل أي طلب حذف/);
   assert.doesNotMatch(page, /deleteAccount/);
@@ -133,8 +139,9 @@ test('account hub options use the same row layout as profile settings', () => {
   assert.match(page, /href="\/notifications" prefetch=\{false\}/);
   assert.match(page, /href="\/account\/follows" prefetch=\{false\}/);
   assert.match(page, /href="\/commissions" prefetch=\{false\}/);
-  assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)\] items-center gap-3/);
-  assert.match(page, /grid size-12 place-items-center rounded-md/);
+  assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)_auto\] items-center gap-3/);
+  assert.match(page, /grid size-9 place-items-center rounded-md/);
+  assert.match(page, /ArrowRight className="size-4 rotate-180 text-muted-foreground"/);
   assert.doesNotMatch(page, /grid grid-cols-2 gap-2/);
   assert.doesNotMatch(page, /grid min-h-24 gap-2 rounded-md/);
 }

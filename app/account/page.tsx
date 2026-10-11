@@ -492,89 +492,117 @@ export default function AccountPage() {
           </section>
         ) : (
           <div className="mx-auto grid gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-2 lg:pb-6 w-full max-w-[28rem] sm:max-w-[30rem] lg:max-w-none">
-            <section className="rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm sm:p-3 dark:border-white/10 dark:bg-card/72">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-16 dark:bg-blue-400/10 dark:text-blue-200">
+            {session.user?.id ? (
+              <Link
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                href={`/sellers/${encodeURIComponent(session.user.id)}`}
+                prefetch={false}
+              >
+                <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-14 dark:bg-blue-400/10 dark:text-blue-200">
                   <SellerAvatar
                     alt={session.user?.name ?? 'حساب سوق حمد'}
                     onPictureError={clearBrokenProfilePicture}
                     picture={visibleProfilePicture}
                   />
-                </div>
-                <div className="grid min-w-0 flex-1 gap-1">
+                </span>
+                <span className="grid min-w-0 gap-1">
                   {isAdmin && (
                     <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                       <ShieldCheck className="size-3" />
                       {administrativeRoleLabel}
                     </span>
                   )}
-                  <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl dark:text-card-foreground">
+                  <span className="truncate text-base font-bold text-slate-950 sm:text-lg dark:text-card-foreground">
                     {session.user?.name ?? 'عميل سوق حمد'}
-                  </h2>
+                  </span>
+                </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
+              </Link>
+            ) : (
+              <section className="rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-14 dark:bg-blue-400/10 dark:text-blue-200">
+                    <SellerAvatar
+                      alt={session.user?.name ?? 'حساب سوق حمد'}
+                      onPictureError={clearBrokenProfilePicture}
+                      picture={visibleProfilePicture}
+                    />
+                  </div>
+                  <div className="grid min-w-0 flex-1 gap-1">
+                    {isAdmin && (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                        <ShieldCheck className="size-3" />
+                        {administrativeRoleLabel}
+                      </span>
+                    )}
+                    <h2 className="truncate text-base font-bold text-slate-950 sm:text-lg dark:text-card-foreground">
+                      {session.user?.name ?? 'عميل سوق حمد'}
+                    </h2>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
-            <section className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+            <section className="grid gap-1.5">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Megaphone className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">إعلاناتي</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">إدارة إعلاناتك</span>
+                  <span className="text-sm font-bold">إعلاناتي</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/conversations" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <MessageCircle className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">محادثاتي</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">مراسلاتك</span>
+                  <span className="text-sm font-bold">محادثاتي</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/favorites" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-200">
                   <Heart className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">المفضلة</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المحفوظات</span>
+                  <span className="text-sm font-bold">المفضلة</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/notifications" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
                   <Bell className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">الإشعارات</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">تنبيهاتك</span>
+                  <span className="text-sm font-bold">الإشعارات</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/follows" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   <UserPlus className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">قائمة المتابعة</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">المعلنين</span>
+                  <span className="text-sm font-bold">قائمة المتابعة</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
-              <Link className="grid min-h-16 place-items-center gap-1 rounded-md border border-slate-200/70 bg-white/82 p-1.5 text-center shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
-                <span className="grid size-7 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/commissions" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-100">
                   <Percent className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-xs font-bold leading-5">رسوم المنصة</span>
-                  <span className="line-clamp-1 text-[11px] leading-4 text-muted-foreground">العمولات</span>
+                  <span className="text-sm font-bold">رسوم المنصة</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
             </section>
 
             <section className="grid gap-2">
               <button
-                className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
                 onClick={() => {
                   const nextOpen = !isProfileEditorOpen;
                   if (nextOpen) {
@@ -592,8 +620,8 @@ export default function AccountPage() {
                 </span>
                 <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-bold">الملف الشخصي</span>
-                  <span className="text-xs leading-5 text-muted-foreground">الاسم، الصورة، رقم الجوال</span>
                 </span>
+                <ArrowRight className={`size-4 text-muted-foreground transition ${isProfileEditorOpen ? '-rotate-90' : 'rotate-180'}`} />
               </button>
 
               {isProfileEditorOpen && (
@@ -755,57 +783,56 @@ export default function AccountPage() {
             </section>
 
             <section className="grid gap-1.5">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200/70 bg-white/82 p-2 shadow-sm dark:border-white/10 dark:bg-card/72">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72">
                 <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                   <Settings className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-bold">المظهر</span>
-                  <span className="text-xs leading-5 text-muted-foreground">الوضع الحالي يتغير مباشرة</span>
                 </span>
                 <ThemeToggle language="ar" variant="switch" />
               </div>
 
               <Link
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-3 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
                 href="/terms"
                 prefetch={false}
               >
-                <span className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  <FileText className="size-5" />
+                <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                  <FileText className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-sm font-black">الشروط والسياسات</span>
+                  <span className="text-sm font-bold">الشروط والسياسات</span>
                 </span>
-                <ArrowRight className="size-4 rotate-180" />
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
             </section>
 
             {isAdmin && (
-              <Link className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-emerald-300/70 bg-emerald-50/70 p-3 text-emerald-800 shadow-sm transition hover:border-emerald-400 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-100" href="/admin" prefetch={false}>
-                <span className="grid size-12 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-100">
-                  <Settings className="size-6" />
+              <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-emerald-300/70 bg-emerald-50/70 p-2.5 text-emerald-800 shadow-sm transition hover:border-emerald-400 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-100" href="/admin" prefetch={false}>
+                <span className="grid size-9 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-100">
+                  <Settings className="size-4" />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <span className="text-base font-black">لوحة الإدارة</span>
-                  <span className="text-sm leading-6 text-emerald-700/80 dark:text-emerald-100/80">إدارة المستخدمين والإعلانات وإعدادات المنصة</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="text-sm font-bold">لوحة الإدارة</span>
                 </span>
+                <ArrowRight className="size-4 rotate-180 text-emerald-700/70 dark:text-emerald-100/70" />
               </Link>
             )}
 
             <section className="grid gap-2 rounded-md border border-slate-200/70 bg-white/82 p-3 shadow-sm dark:border-white/10 dark:bg-card/72">
               <Link
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-red-200/80 bg-red-50/70 p-3 text-red-800 transition hover:border-red-300 dark:border-red-400/25 dark:bg-red-400/10 dark:text-red-100"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-red-200/80 bg-red-50/70 p-2.5 text-red-800 transition hover:border-red-300 dark:border-red-400/25 dark:bg-red-400/10 dark:text-red-100"
                 href="/delete-account"
                 prefetch={false}
               >
-                <span className="grid size-10 place-items-center rounded-md bg-red-100 text-red-700 dark:bg-red-300/15 dark:text-red-100">
-                  <Trash2 className="size-5" />
+                <span className="grid size-9 place-items-center rounded-md bg-red-100 text-red-700 dark:bg-red-300/15 dark:text-red-100">
+                  <Trash2 className="size-4" />
                 </span>
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="text-sm font-black">حذف الحساب</span>
+                  <span className="text-sm font-bold">حذف الحساب</span>
                 </span>
-                <ArrowRight className="size-4 rotate-180" />
+                <ArrowRight className="size-4 rotate-180 text-red-700/70 dark:text-red-100/70" />
               </Link>
               <Button
                 className="h-11 justify-center gap-2 rounded-md"
