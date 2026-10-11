@@ -42,7 +42,6 @@ export function ListingShareButton({
     const shareTitle = title?.trim() || 'سوق حمد';
 
     if (isInsideNativeApp() && postToNative({ type: 'share', url: listingUrl, title: shareTitle })) {
-      setStatus('shared');
       return;
     }
 
