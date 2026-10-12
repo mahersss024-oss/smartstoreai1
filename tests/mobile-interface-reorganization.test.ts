@@ -82,9 +82,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
   const pages = [
     readProjectFile('app', 'account', 'page.tsx'),
     readProjectFile('app', 'account', 'listings', 'page.tsx'),
-    readProjectFile('app', 'favorites', 'page.tsx'),
     readProjectFile('app', 'conversations', 'page.tsx'),
   ];
+  const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
   const styles = readProjectFile('app', 'globals.css');
 
   for (const page of pages) {
@@ -92,6 +92,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
     assert.match(page, /smartstore-stable-content/);
     assert.match(page, /smartstore-stable-header/);
   }
+
+  assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 
   assert.match(styles, /\.smartstore-stable-page/);
   assert.match(styles, /\.smartstore-stable-header/);
@@ -135,9 +138,9 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
   const customerPages = [
     readProjectFile('app', 'account', 'page.tsx'),
     readProjectFile('app', 'account', 'listings', 'page.tsx'),
-    readProjectFile('app', 'favorites', 'page.tsx'),
     readProjectFile('app', 'conversations', 'page.tsx'),
   ];
+  const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
 
   assert.match(layout, /<body className="overflow-x-hidden/);
   assert.doesNotMatch(layout, /<body className="[^"]*overflow-hidden/);
@@ -150,6 +153,9 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
     assert.match(page, /min-h-screen/);
     assert.doesNotMatch(page, /overflow-hidden bg-\[#e8edf3\]/);
   }
+
+  assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });
 
 test('customer market pages avoid heavy nested card styling', () => {
