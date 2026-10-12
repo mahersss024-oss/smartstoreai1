@@ -228,7 +228,7 @@ export default function AdminMaintenancePage() {
 
         if (payload?.error === 'maintenance_cleanup_disabled') {
           setNotice(
-            'التنظيف معطل في بيئة الإنتاج. فعّل المتغير SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP=1 ثم أعد تشغيل الخادم.',
+            'التنظيف معطل دائمًا في بيئة الإنتاج لحماية استقرار الخادم.',
           );
           return;
         }

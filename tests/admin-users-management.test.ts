@@ -586,7 +586,7 @@ test('destructive admin maintenance cleanup is disabled by default in production
   );
 });
 
-test('maintenance cleanup admits appointed admins before request validation', async () => {
+test('production maintenance cleanup stays disabled even when the legacy env flag is enabled', async () => {
   await withMaintenanceEnv(
     {
       NODE_ENV: 'production',
@@ -602,8 +602,8 @@ test('maintenance cleanup admits appointed admins before request validation', as
       assert.ok(response);
       const body = (await response.json()) as { error?: string };
 
-      assert.equal(response.status, 400);
-      assert.equal(body.error, 'confirmation_required');
+      assert.equal(response.status, 403);
+      assert.equal(body.error, 'maintenance_cleanup_disabled');
     },
   );
 });

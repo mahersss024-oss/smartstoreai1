@@ -154,10 +154,7 @@ async function requireAdmin(request: Request) {
 }
 
 function isDestructiveMaintenanceEnabled() {
-  return (
-    process.env.NODE_ENV !== 'production' ||
-    process.env.SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP === '1'
-  );
+  return process.env.NODE_ENV !== 'production';
 }
 
 export async function GET(request: Request) {
@@ -193,7 +190,7 @@ export async function POST(request: Request) {
       {
         error: 'maintenance_cleanup_disabled',
         message:
-          'Destructive maintenance cleanup is disabled in production.',
+          'Destructive maintenance cleanup is permanently disabled in production.',
       },
       { status: 403 },
     );
