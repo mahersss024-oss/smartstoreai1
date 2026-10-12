@@ -472,6 +472,8 @@ test('admin maintenance keeps routine cleanup away from customer and financial d
   assert.match(maintenanceRoute, /closed_reports/);
   assert.match(maintenanceRoute, /closed_user_reports/);
   assert.match(maintenanceRoute, /search_state/);
+  assert.match(maintenanceRoute, /searchStateCleanupMaxAgeMs/);
+  assert.doesNotMatch(maintenanceRoute, /database\.apiIdempotencyKey\.deleteMany/);
   assert.doesNotMatch(maintenanceRoute, /prisma\.commission\.deleteMany/);
   assert.doesNotMatch(maintenanceRoute, /prisma\.conversation\.deleteMany/);
   assert.doesNotMatch(maintenanceRoute, /prisma\.userBlock\.deleteMany/);

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
 const maxMaintenanceCleanupRequestBytes = 4 * 1024;
+const searchStateCleanupMaxAgeMs = 24 * 60 * 60 * 1000;
 
 const cleanupSchema = z.object({
   scope: z.enum([
@@ -92,15 +93,18 @@ async function runCleanup(
   }
 
   if (scope === 'search_state') {
-    const [searchStates, idempotencyKeys] = await Promise.all([
-      database.marketplaceSearchState.deleteMany(),
-      database.apiIdempotencyKey.deleteMany(),
-    ]);
+    const searchStates = await database.marketplaceSearchState.deleteMany({
+      where: {
+        updatedAt: {
+          lt: new Date(Date.now() - searchStateCleanupMaxAgeMs),
+        },
+      },
+    });
 
     return {
       deleted: {
         searchStates: searchStates.count,
-        idempotencyKeys: idempotencyKeys.count,
+        idempotencyKeys: 0,
       },
       images: [],
     };
