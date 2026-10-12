@@ -79,22 +79,18 @@ test('account page condenses policy links without changing customer routes', () 
 });
 
 test('customer section pages keep headers stable while content scrolls', () => {
-  const pages = [
-    readProjectFile('app', 'account', 'page.tsx'),
-    readProjectFile('app', 'conversations', 'page.tsx'),
-  ];
+  const accountPage = readProjectFile('app', 'account', 'page.tsx');
   const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
+  const conversationsPage = readProjectFile('app', 'conversations', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
   const styles = readProjectFile('app', 'globals.css');
 
-  for (const page of pages) {
-    assert.match(page, /smartstore-stable-page/);
-    assert.match(page, /smartstore-stable-content/);
-    assert.match(page, /smartstore-stable-header/);
-  }
-
+  assert.match(accountPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?min-h-0[\s\S]*?flex-1[\s\S]*?overflow-y-auto[\s\S]*?overscroll-contain/);
   assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
+  assert.match(conversationsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(conversationsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 
@@ -137,11 +133,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
 test('web customer pages keep touchpad scrolling inside the page shell', () => {
   const layout = readProjectFile('app', 'layout.tsx');
   const styles = readProjectFile('app', 'globals.css');
-  const customerPages = [
-    readProjectFile('app', 'account', 'page.tsx'),
-    readProjectFile('app', 'conversations', 'page.tsx'),
-  ];
+  const accountPage = readProjectFile('app', 'account', 'page.tsx');
   const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
+  const conversationsPage = readProjectFile('app', 'conversations', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
 
   assert.match(layout, /<body className="overflow-x-hidden/);
@@ -151,13 +145,12 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
   assert.match(styles, /body:has\(main\.smartstore-stable-page\)/);
   assert.match(styles, /\.smartstore-stable-page,[\s\S]*?overflow-y: auto;/);
 
-  for (const page of customerPages) {
-    assert.match(page, /min-h-screen/);
-    assert.doesNotMatch(page, /overflow-hidden bg-\[#e8edf3\]/);
-  }
-
+  assert.match(accountPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?min-h-0[\s\S]*?flex-1[\s\S]*?overflow-y-auto[\s\S]*?overscroll-contain/);
   assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
+  assert.match(conversationsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(conversationsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });

@@ -177,7 +177,7 @@ test('customer listing pages avoid large framed containers for scalable lists', 
   assert.match(accountListings, /\[contain-intrinsic-size:220px\]/);
   assert.match(accountListings, /dark:border-white\/10 dark:bg-card\/72/);
   assert.match(listingDetails, /grid items-start gap-4 px-1 py-3/);
-  assert.match(accountPage, /grid gap-3 px-1 pb-\[calc\(6\.75rem\+env\(safe-area-inset-bottom\)\)\] pt-3 sm:px-2 lg:pb-6/);
+  assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?grid[\s\S]*?flex-1[\s\S]*?pb-\[calc\(6\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(followsPage, /items-center gap-3 border-b border-slate-200\/70 p-3/);
   assert.doesNotMatch(accountListings, /rounded-md border bg-white\/60 py-3/);
   assert.doesNotMatch(listingDetails, /rounded-md border bg-white\/60 px-3 py-3/);

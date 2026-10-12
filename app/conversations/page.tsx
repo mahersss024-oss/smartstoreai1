@@ -378,7 +378,7 @@ export default function ConversationsPage() {
   }, [refreshConversations]);
 
   return (
-    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <FloatingActionNotice
         message={conversationNotice?.message}
         onDismiss={() => setConversationNotice(null)}
@@ -403,8 +403,8 @@ export default function ConversationsPage() {
         title="تأكيد حذف المحادثة"
         tone="danger"
       />
-      <div className="smartstore-stable-content mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -418,7 +418,7 @@ export default function ConversationsPage() {
         </header>
 
         {(isSessionLoading || isLoading) && !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
+          <section className="grid min-h-0 flex-1 place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
@@ -427,7 +427,7 @@ export default function ConversationsPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
+          <section className="grid min-h-0 flex-1 place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <ShieldCheck className="mx-auto size-12 text-blue-600" />
               <div>
@@ -453,7 +453,7 @@ export default function ConversationsPage() {
           </section>
         ) : (
           <>
-<section className="bg-white p-1 dark:bg-card sm:p-2">
+            <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-1 dark:bg-card sm:p-2">
 
               {isLoading && conversations.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">

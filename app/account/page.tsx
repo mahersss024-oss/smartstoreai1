@@ -414,7 +414,7 @@ export default function AccountPage() {
   }, [profilePicture, profilePicturePreview, setSession]);
 
   return (
-    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <FloatingActionNotice
         message={profileNotice?.message}
         onDismiss={() => setProfileNotice(null)}
@@ -436,8 +436,8 @@ export default function AccountPage() {
         title="تأكيد إزالة الصورة"
         tone="default"
       />
-      <div className="smartstore-stable-content mx-auto grid max-w-[28rem] gap-4 px-3 py-4 sm:max-w-[30rem] sm:px-5 sm:py-5 lg:max-w-4xl lg:px-6">
-        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[28rem] flex-col gap-4 px-3 py-4 sm:max-w-[30rem] sm:px-5 sm:py-5 lg:max-w-4xl lg:px-6">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/">
               <ArrowRight className="size-4" />
@@ -449,7 +449,7 @@ export default function AccountPage() {
         </header>
 
         {isSessionLoading ? (
-          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
+          <section className="grid min-h-0 flex-1 place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -460,7 +460,7 @@ export default function AccountPage() {
             </div>
           </section>
         ) : !session.authenticated ? (
-          <section className="grid min-h-[32rem] place-items-center p-6 text-center">
+          <section className="grid min-h-0 flex-1 place-items-center p-6 text-center">
             <div className="grid max-w-md gap-4">
               <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                 <ShieldCheck className="size-7" />
@@ -487,10 +487,10 @@ export default function AccountPage() {
             </div>
           </section>
         ) : (
-          <div className="mx-auto grid gap-3 px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-2 lg:pb-6 w-full max-w-[28rem] sm:max-w-[30rem] lg:max-w-none">
+          <>
             {session.user?.id ? (
               <Link
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
+                className="mx-auto grid w-full max-w-[28rem] shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72 sm:max-w-[30rem] lg:max-w-none"
                 href="/account/seller-profile"
                 prefetch={false}
               >
@@ -512,10 +512,9 @@ export default function AccountPage() {
                     {session.user?.name ?? 'عميل سوق حمد'}
                   </span>
                 </span>
-                <ArrowRight className="size-4 rotate-180 text-muted-foreground" />
               </Link>
             ) : (
-              <section className="rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72">
+              <section className="mx-auto w-full max-w-[28rem] shrink-0 rounded-md border border-slate-200/70 bg-white/82 p-2.5 shadow-sm dark:border-white/10 dark:bg-card/72 sm:max-w-[30rem] lg:max-w-none">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-14 dark:bg-blue-400/10 dark:text-blue-200">
                     <SellerAvatar
@@ -539,6 +538,7 @@ export default function AccountPage() {
               </section>
             )}
 
+            <div className="marketplace-listings-scroll mx-auto grid min-h-0 w-full max-w-[28rem] flex-1 gap-3 overflow-y-auto overscroll-contain px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] sm:max-w-[30rem] sm:px-2 lg:max-w-none lg:pb-6">
             <section className="grid gap-1.5">
               <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
                 <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -841,6 +841,7 @@ export default function AccountPage() {
               </Button>
             </section>
           </div>
+          </>
         )}
       </div>
     </main>

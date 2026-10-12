@@ -154,6 +154,11 @@ test('delete account page contains the final guarded delete action', () => {
 
 test('account hub options use the same row layout as profile settings', () => {
   const page = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const profileCardHrefIndex = page.indexOf('href="/account/seller-profile"');
+  const profileCard = page.slice(
+    page.lastIndexOf('<Link', profileCardHrefIndex),
+    page.indexOf('</Link>', profileCardHrefIndex),
+  );
 
   assert.match(page, /href="\/account\/listings" prefetch=\{false\}/);
   assert.match(page, /href="\/conversations" prefetch=\{false\}/);
@@ -164,6 +169,8 @@ test('account hub options use the same row layout as profile settings', () => {
   assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)_auto\] items-center gap-3/);
   assert.match(page, /grid size-9 place-items-center rounded-md/);
   assert.match(page, /ArrowRight className="size-4 rotate-180 text-muted-foreground"/);
+  assert.match(profileCard, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(profileCard, /ArrowRight/);
   assert.doesNotMatch(page, /grid grid-cols-2 gap-2/);
   assert.doesNotMatch(page, /grid min-h-24 gap-2 rounded-md/);
 }
