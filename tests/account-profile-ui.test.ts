@@ -52,7 +52,7 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /سيظهر تنبيه أمان بدون منع الإرسال/);
   assert.match(page, /editProfilePhone/);
   assert.match(page, /deleteProfilePhone/);
-  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(session\.user\.id\)\}`\}/);
+  assert.match(page, /href="\/account\/seller-profile"/);
   assert.match(page, /session\.user\?\.id \? \(/);
   assert.doesNotMatch(page, /صفحة المعلن/);
   assert.doesNotMatch(page, /grid grid-cols-2 gap-1\.5 sm:grid-cols-3/);
@@ -65,6 +65,25 @@ test('account page exposes official contact profile settings', () => {
   assert.doesNotMatch(page, /grid gap-3 rounded-md border bg-white p-4 shadow-sm/);
   assert.doesNotMatch(page, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
   assert.doesNotMatch(page, /flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white/);
+});
+
+test('account seller profile summarizes the owner profile without listing cards', () => {
+  const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
+  const sellerProfilePage = readFileSync(
+    join(process.cwd(), 'app', 'account', 'seller-profile', 'page.tsx'),
+    'utf8',
+  );
+
+  assert.match(accountPage, /href="\/account\/seller-profile"/);
+  assert.match(sellerProfilePage, /getAuthSession/);
+  assert.match(sellerProfilePage, /getPublicSellerProfile\(session\.user\.id\)/);
+  assert.match(sellerProfilePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(sellerProfilePage, /<SellerProfileIdentity compact sellerId=\{session\.user\.id\} sellerName=\{sellerName\}/);
+  assert.match(sellerProfilePage, /الإعلانات المنشورة/);
+  assert.match(sellerProfilePage, /عدد التقييمات/);
+  assert.match(sellerProfilePage, /بدون بطاقات إعلان/);
+  assert.doesNotMatch(sellerProfilePage, /seller\.listings\.map/);
+  assert.doesNotMatch(sellerProfilePage, /getSellerListingHref/);
 });
 
 test('account hub links do not prefetch every customer section on page load', () => {

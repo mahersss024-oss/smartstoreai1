@@ -495,7 +495,7 @@ export default function AccountPage() {
             {session.user?.id ? (
               <Link
                 className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
-                href={`/sellers/${encodeURIComponent(session.user.id)}`}
+                href="/account/seller-profile"
                 prefetch={false}
               >
                 <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-50 text-blue-700 sm:size-14 dark:bg-blue-400/10 dark:text-blue-200">

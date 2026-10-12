@@ -69,7 +69,7 @@ test('account page condenses policy links without changing customer routes', () 
   assert.doesNotMatch(page, /الخدمات والإعدادات/);
   assert.match(page, /الشروط والسياسات/);
   assert.match(page, /href="\/terms"/);
-  assert.match(page, /href=\{`\/sellers\/\$\{encodeURIComponent\(session\.user\.id\)\}`\}/);
+  assert.match(page, /href="\/account\/seller-profile"/);
   assert.match(page, /رسوم المنصة/);
   assert.doesNotMatch(page, /grid grid-cols-2 gap-1\.5 sm:grid-cols-3/);
   assert.doesNotMatch(page, /min-h-16 place-items-center/);
