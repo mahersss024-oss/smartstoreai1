@@ -94,8 +94,12 @@ test('home notification bell is shown only to signed-in users and defers checks 
   assert.match(settings, /const toggleNotifications = useCallback/);
   assert.match(settings, /variant === 'icon' && state === 'checking'/);
   assert.match(settings, /onClick=\{\(\) => void toggleNotifications\(\)\}/);
-  assert.doesNotMatch(iconAutoStatusEffect, /scheduleIdleTask/);
-  assert.doesNotMatch(iconAutoUnreadEffect, /scheduleIdleTask/);
+  assert.match(settings, /const iconStatusRefreshDelayMs = 45_000/);
+  assert.match(settings, /const iconUnreadRefreshDelayMs = 60_000/);
+  assert.match(iconAutoStatusEffect, /window\.setTimeout/);
+  assert.match(iconAutoStatusEffect, /iconStatusRefreshDelayMs/);
+  assert.match(iconAutoUnreadEffect, /window\.setTimeout/);
+  assert.match(iconAutoUnreadEffect, /iconUnreadRefreshDelayMs/);
   assert.match(settings, /unreadCount > 0/);
   assert.match(settings, /smartstore:notifications-read/);
   assert.doesNotMatch(settings, /scheduleIdleTask/);

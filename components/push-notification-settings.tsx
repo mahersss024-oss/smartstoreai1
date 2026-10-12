@@ -31,6 +31,8 @@ type PushState =
 const notificationsReadEventName = 'smartstore:notifications-read';
 const notificationsChangedEventName = 'smartstore:notifications-changed';
 const nativePushStatusEventName = 'smartstore:native-push-status';
+const iconStatusRefreshDelayMs = 45_000;
+const iconUnreadRefreshDelayMs = 60_000;
 
 type NativePushStatus = {
   supported?: boolean;
@@ -163,7 +165,13 @@ export function PushNotificationSettings({
 
   useEffect(() => {
     if (variant === 'icon') {
-      return;
+      const timeoutId = window.setTimeout(() => {
+        void refreshStatus();
+      }, iconStatusRefreshDelayMs);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
 
     void refreshStatus();
@@ -209,7 +217,13 @@ export function PushNotificationSettings({
 
   useEffect(() => {
     if (variant === 'icon') {
-      return;
+      const timeoutId = window.setTimeout(() => {
+        void refreshUnreadCount();
+      }, iconUnreadRefreshDelayMs);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
 
     void refreshUnreadCount();
