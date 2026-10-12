@@ -81,9 +81,9 @@ test('account page condenses policy links without changing customer routes', () 
 test('customer section pages keep headers stable while content scrolls', () => {
   const pages = [
     readProjectFile('app', 'account', 'page.tsx'),
-    readProjectFile('app', 'account', 'listings', 'page.tsx'),
     readProjectFile('app', 'conversations', 'page.tsx'),
   ];
+  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
   const styles = readProjectFile('app', 'globals.css');
 
@@ -93,6 +93,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
     assert.match(page, /smartstore-stable-header/);
   }
 
+  assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 
@@ -137,9 +139,9 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
   const styles = readProjectFile('app', 'globals.css');
   const customerPages = [
     readProjectFile('app', 'account', 'page.tsx'),
-    readProjectFile('app', 'account', 'listings', 'page.tsx'),
     readProjectFile('app', 'conversations', 'page.tsx'),
   ];
+  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
 
   assert.match(layout, /<body className="overflow-x-hidden/);
@@ -154,6 +156,8 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
     assert.doesNotMatch(page, /overflow-hidden bg-\[#e8edf3\]/);
   }
 
+  assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });

@@ -1225,7 +1225,7 @@ export default function AccountListingsPage() {
   const previewImageUrl = previewImage?.previewUrl ?? previewImage?.url ?? null;
 
   return (
-    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <CommissionAgreementDialog
         mode="publish"
         onCancel={() => setPendingPublishListing(null)}
@@ -1590,8 +1590,8 @@ export default function AccountListingsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-      <div className="smartstore-stable-content mx-auto grid max-w-4xl gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-5">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
@@ -1642,7 +1642,7 @@ export default function AccountListingsPage() {
           </section>
         ) : (
           <>
-            <section className="flex flex-wrap items-center justify-start gap-3 px-1 py-3 sm:px-4">
+            <section className="flex shrink-0 flex-wrap items-center justify-start gap-3 px-1 py-3 sm:px-4">
               <div className="flex flex-wrap gap-2">
                 <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
                   <Link href="/">
@@ -1680,7 +1680,7 @@ export default function AccountListingsPage() {
             />
 
             <section
-              className="scroll-mt-24 px-1 py-3 sm:px-4"
+              className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-3 sm:px-4"
               id="account-listings"
             >
               {isListingsLoading && listings.length === 0 ? (
