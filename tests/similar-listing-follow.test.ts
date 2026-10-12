@@ -53,7 +53,8 @@ test('similar listing follows are persisted and matched using comparable listing
   assert.match(pushNotifications, /tag: `similar:listing:\$\{listing\.id\}`/);
   assert.match(realtimeEvents, /listing_notification_created/);
   assert.match(notificationsPage, /listing_notification_created/);
-  assert.match(pushSettings, /scheduleIdleTask/);
+  assert.match(pushSettings, /iconUnreadRefreshDelayMs = 60_000/);
+  assert.match(pushSettings, /window\.setTimeout/);
   assert.doesNotMatch(pushSettings, /listing_notification_created/);
 });
 
