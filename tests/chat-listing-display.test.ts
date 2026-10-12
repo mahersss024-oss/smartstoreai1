@@ -167,6 +167,14 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /decoding="async"/);
   assert.match(homePage, /\[content-visibility:auto\]/);
   assert.match(homePage, /\[contain-intrinsic-size:126px\]/);
+  assert.match(homePage, /const isCardInteractionDisabled = hasListingImage && isListingImagePending/);
+  assert.match(homePage, /data-image-loading=\{isCardInteractionDisabled \|\| undefined\}/);
+  assert.match(homePage, /tabIndex=\{isCardInteractionDisabled \? -1 : 0\}/);
+  assert.match(homePage, /disabled=\{isCardInteractionDisabled\}/);
+  assert.match(homePage, /onLoad=\{markListingImageReady\}/);
+  assert.match(homePage, /<ListingImageFallback onReady=\{markListingImageReady\} \/>/);
+  assert.match(globalCss, /marketplace-listing-card\[data-image-loading="true"\]::after/);
+  assert.match(globalCss, /marketplace-card-image-shimmer/);
   assert.match(globalCss, /smart-assistant-results-panel-in/);
   assert.match(globalCss, /smart-assistant-result-card-in/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);

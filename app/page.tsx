@@ -1628,6 +1628,21 @@ function isRenderableUserBubblePart(part: UIMessage['parts'][number]) {
   return true;
 }
 
+function ListingImageFallback({ onReady }: { onReady?: () => void }) {
+  useEffect(() => {
+    onReady?.();
+  }, [onReady]);
+
+  return (
+    <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+      <div className="grid gap-1">
+        <ImageIcon className="mx-auto size-5" />
+        <span>لا توجد صورة حقيقية</span>
+      </div>
+    </div>
+  );
+}
+
 function ListingCardView({
   listing,
   isFavorite,
@@ -1653,14 +1668,18 @@ function ListingCardView({
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
 }) {
-  const listingImageFallback = (
-    <div className="grid h-full w-full place-items-center bg-slate-100 text-center text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-      <div className="grid gap-1">
-        <ImageIcon className="mx-auto size-5" />
-        <span>لا توجد صورة حقيقية</span>
-      </div>
-    </div>
-  );
+  const hasListingImage = Boolean(listing.image);
+  const [isListingImagePending, setIsListingImagePending] =
+    useState(hasListingImage);
+  const isCardInteractionDisabled = hasListingImage && isListingImagePending;
+  const markListingImageReady = useCallback(() => {
+    setIsListingImagePending(false);
+  }, []);
+
+  useEffect(() => {
+    setIsListingImagePending(hasListingImage);
+  }, [hasListingImage, listing.image]);
+
   const askToCompareListing = () => {
     onAsk(
       listing.id
@@ -1676,22 +1695,36 @@ function ListingCardView({
         className={cn(
           'marketplace-listing-card group relative grid w-full min-w-0 cursor-pointer grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]',
           '[contain-intrinsic-size:126px] [content-visibility:auto]',
+          isCardInteractionDisabled &&
+            'cursor-wait hover:border-slate-200 hover:bg-white dark:hover:bg-card',
           className,
         )}
-        onClick={() => onOpen(listing)}
+        aria-disabled={isCardInteractionDisabled || undefined}
+        data-image-loading={isCardInteractionDisabled || undefined}
+        onClick={() => {
+          if (isCardInteractionDisabled) {
+            return;
+          }
+
+          onOpen(listing);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
+            if (isCardInteractionDisabled) {
+              return;
+            }
             onOpen(listing);
           }
         }}
         role="button"
         style={style}
-        tabIndex={0}
+        tabIndex={isCardInteractionDisabled ? -1 : 0}
       >
         <Button
           size="icon-sm"
           variant="outline"
+          disabled={isCardInteractionDisabled}
           className={cn(
             'absolute left-1.5 top-1.5 z-10 size-7 rounded-md p-0 shadow-sm ring-1 sm:left-2 sm:top-2 sm:size-8',
             isSmartResult
@@ -1701,6 +1734,9 @@ function ListingCardView({
           aria-label="مقارنة الإعلان"
           onClick={(event) => {
             event.stopPropagation();
+            if (isCardInteractionDisabled) {
+              return;
+            }
             askToCompareListing();
           }}
         >
@@ -1720,10 +1756,11 @@ function ListingCardView({
                 className="h-full w-full object-cover"
                 decoding="async"
                 fallbackSrcs={listing.imageFallbacks}
-                fallback={listingImageFallback}
+                fallback={<ListingImageFallback onReady={markListingImageReady} />}
                 fetchPriority={prioritizeImage ? 'high' : 'auto'}
                 height={320}
                 loading={prioritizeImage ? 'eager' : 'lazy'}
+                onLoad={markListingImageReady}
                 sizes="(min-width: 640px) 116px, 100px"
                 src={listing.image}
                 width={320}
@@ -1771,18 +1808,31 @@ function ListingCardView({
       className={cn(
         'marketplace-listing-card relative w-full min-w-0 cursor-pointer overflow-hidden rounded-md border bg-white shadow-sm transition hover:border-blue-400 hover:shadow-md focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-card sm:max-w-[11.5rem]',
         '[contain-intrinsic-size:320px] [content-visibility:auto]',
+        isCardInteractionDisabled &&
+          'cursor-wait hover:border-border hover:shadow-sm',
         className,
       )}
-      onClick={() => onOpen(listing)}
+      aria-disabled={isCardInteractionDisabled || undefined}
+      data-image-loading={isCardInteractionDisabled || undefined}
+      onClick={() => {
+        if (isCardInteractionDisabled) {
+          return;
+        }
+
+        onOpen(listing);
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
+          if (isCardInteractionDisabled) {
+            return;
+          }
           onOpen(listing);
         }
       }}
       role="button"
       style={style}
-      tabIndex={0}
+      tabIndex={isCardInteractionDisabled ? -1 : 0}
     >
       <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-900">
         {listing.image ? (
@@ -1792,10 +1842,11 @@ function ListingCardView({
               className="h-full w-full object-contain"
               decoding="async"
               fallbackSrcs={listing.imageFallbacks}
-              fallback={listingImageFallback}
+              fallback={<ListingImageFallback onReady={markListingImageReady} />}
               fetchPriority={prioritizeImage ? 'high' : 'auto'}
               height={200}
               loading={prioritizeImage ? 'eager' : 'lazy'}
+              onLoad={markListingImageReady}
               sizes="(min-width: 640px) 184px, 50vw"
               src={listing.image}
               width={320}
@@ -1813,6 +1864,7 @@ function ListingCardView({
         <Button
           size="icon-sm"
           variant="ghost"
+          disabled={isCardInteractionDisabled}
           className={cn(
             'absolute right-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white sm:right-2 sm:top-2 sm:size-8',
             isFavorite
@@ -1823,6 +1875,9 @@ function ListingCardView({
           aria-pressed={isFavorite}
           onClick={(event) => {
             event.stopPropagation();
+            if (isCardInteractionDisabled) {
+              return;
+            }
             onFavorite(listing);
           }}
         >
@@ -1832,10 +1887,14 @@ function ListingCardView({
         <Button
           size="icon-sm"
           variant="outline"
+          disabled={isCardInteractionDisabled}
           className="absolute left-1.5 top-1.5 size-7 rounded-md border-sky-200 bg-white/95 p-0 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 sm:left-2 sm:top-2 sm:size-8"
           aria-label="مقارنة الإعلان"
           onClick={(event) => {
             event.stopPropagation();
+            if (isCardInteractionDisabled) {
+              return;
+            }
             askToCompareListing();
           }}
         >
@@ -1865,8 +1924,12 @@ function ListingCardView({
           <Button
             size="sm"
             className="h-7 w-full rounded-md bg-blue-600 text-[11px] hover:bg-blue-700"
+            disabled={isCardInteractionDisabled}
             onClick={(event) => {
               event.stopPropagation();
+              if (isCardInteractionDisabled) {
+                return;
+              }
               onOpen(listing);
             }}
           >

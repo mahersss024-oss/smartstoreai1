@@ -7,6 +7,7 @@ import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Megaphone } from 'lucide-
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ResilientImage } from '@/components/resilient-image';
+import { ListingCardLink } from '@/components/listing-card-link';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -357,11 +358,12 @@ export default function FavoritesPage() {
               <div className="grid gap-4">
                 <div className="grid gap-1.5">
                   {favorites.map((favorite) => (
-                    <Link
+                    <ListingCardLink
                       key={favorite.id}
                       className="grid w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
                       href={`/listings/${favorite.listingId}?source=favorites`}
                       prefetch={false}
+                      waitForImage={Boolean(getListingImage(favorite.listing))}
                     >
                       <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
                         <ResilientImage
@@ -408,7 +410,7 @@ export default function FavoritesPage() {
                           {formatPrice(favorite.listing?.price)}
                         </span>
                       </div>
-                    </Link>
+                    </ListingCardLink>
                   ))}
                 </div>
                 <div ref={favoritesLoadMoreRef} className="h-px" />

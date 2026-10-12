@@ -220,7 +220,7 @@ export function SellerProfileActions({
       : 'success';
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2 sm:justify-items-end">
       <FloatingActionNotice
         message={notice}
         onDismiss={() => setNotice('')}
@@ -230,7 +230,7 @@ export function SellerProfileActions({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={isFollowing ? 'default' : 'outline'}
-          className="rounded-md"
+          className="h-9 rounded-md px-3 text-xs"
           disabled={!canFollow || isFollowingLoading}
           onClick={toggleFollow}
         >
@@ -239,7 +239,7 @@ export function SellerProfileActions({
         </Button>
         <Button
           variant="outline"
-          className="rounded-md"
+          className="h-9 rounded-md px-3 text-xs"
           disabled={isReporting}
           onClick={reportSeller}
         >
@@ -247,17 +247,17 @@ export function SellerProfileActions({
           {isReporting ? 'جار الإبلاغ...' : 'إبلاغ'}
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <span>{followerCount} متابع</span>
         <span>{ratingCount} تقييم</span>
         <span>{ratingAverage.toFixed(1)} / 5</span>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((value) => (
           <button
             key={value}
             type="button"
-            className="rounded-md p-1 text-blue-600 transition hover:bg-blue-500/10 disabled:opacity-50"
+            className="rounded-md p-0.5 text-blue-600 transition hover:bg-blue-500/10 disabled:opacity-50"
             disabled={!canRate || isRatingLoading}
             title={`تقييم ${value}`}
             onClick={() => rate(value)}

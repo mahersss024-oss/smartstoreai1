@@ -15,6 +15,7 @@ import {
 } from '@/agent/marketplace/repository';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
+import { ListingCardLink } from '@/components/listing-card-link';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { SellerProfileActions } from './seller-profile-actions';
 import { SellerProfileIdentity } from './seller-profile-identity';
@@ -195,9 +196,10 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
   }
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="mx-auto grid h-full min-h-0 max-w-5xl gap-2 px-1.5 py-2 sm:px-3 md:px-4 lg:px-6 lg:py-3">
+        <section className="marketplace-panel flex min-h-0 flex-col overflow-hidden rounded-md border bg-white shadow-2xl shadow-slate-950/10 dark:bg-card">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href={returnHref}>
@@ -214,10 +216,10 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           </div>
         </header>
 
-        <section className="overflow-hidden bg-white dark:bg-card">
-          <div className="h-28 bg-[linear-gradient(135deg,#0f766e,#0f172a_55%,#1d4ed8)] sm:h-36" />
-          <div className="-mt-12 grid gap-4 px-4 pb-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-end sm:px-6">
-            <div className="grid size-24 place-items-center overflow-hidden rounded-md border-4 border-white bg-[#0f766e] text-3xl font-bold text-white shadow-sm dark:border-card">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:p-4">
+        <section className="marketplace-home-controls shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card">
+          <div className="grid gap-3 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-4">
+            <div className="grid size-16 place-items-center overflow-hidden rounded-md border border-white/80 bg-[#0f766e] text-xl font-bold text-white shadow-sm dark:border-white/10 sm:size-18">
               <SellerAvatar
                 alt={seller.name}
                 className="size-full object-cover"
@@ -226,15 +228,15 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
             </div>
 
             <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-2xl font-bold">{seller.name}</h2>
-                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="truncate text-lg font-bold sm:text-xl">{seller.name}</h2>
+                <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   <BadgeCheck className="size-3.5" />
                   معلن موثق داخل سوق حمد
                 </span>
               </div>
               <SellerProfileIdentity sellerId={seller.id} sellerName={seller.name} />
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>{formatJoinDate(seller.joinedAt)}</span>
                 <span>{seller.publishedListingCount} إعلان منشور</span>
               </div>
@@ -250,22 +252,24 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           </div>
         </section>
 
-        <section className="grid min-w-0 gap-3">
-          <div className="flex items-center justify-between gap-3 px-1 py-2">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 pt-3">
+          <div className="shrink-0 flex items-center justify-between gap-3 px-1 py-1">
             <h2 className="text-base font-bold">إعلانات المعلن</h2>
             <span className="text-xs font-semibold text-muted-foreground">
               {seller.publishedListingCount} إعلان منشور
             </span>
           </div>
 
+          <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-1">
           {seller.listings.length ? (
             <div className="grid min-w-0 gap-1.5">
               {seller.listings.map((listing) => (
-                <Link
+                <ListingCardLink
                   key={listing.id}
                   href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
                   prefetch={false}
                   className="group grid min-w-0 max-w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                  waitForImage={Boolean(getPrimaryImageUrl(listing))}
                 >
                   <div
                     className="aspect-square shrink-0 overflow-hidden bg-[#0b1220]"
@@ -321,7 +325,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                       {formatCondition(listing.condition)}
                     </span>
                   </div>
-                </Link>
+                </ListingCardLink>
               ))}
             </div>
           ) : (
@@ -329,6 +333,9 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
               لا توجد إعلانات منشورة لهذا المعلن حاليًا.
             </p>
           )}
+          </div>
+        </section>
+        </div>
         </section>
       </div>
     </main>
