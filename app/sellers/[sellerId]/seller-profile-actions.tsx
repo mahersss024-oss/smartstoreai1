@@ -220,17 +220,17 @@ export function SellerProfileActions({
       : 'success';
 
   return (
-    <div className="grid gap-2 sm:justify-items-end">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
       <FloatingActionNotice
         message={notice}
         onDismiss={() => setNotice('')}
         open={Boolean(notice)}
         tone={noticeTone}
       />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Button
           variant={isFollowing ? 'default' : 'outline'}
-          className="h-9 rounded-md px-3 text-xs"
+          className="h-8 rounded-md px-2.5 text-xs"
           disabled={!canFollow || isFollowingLoading}
           onClick={toggleFollow}
         >
@@ -239,7 +239,7 @@ export function SellerProfileActions({
         </Button>
         <Button
           variant="outline"
-          className="h-9 rounded-md px-3 text-xs"
+          className="h-8 rounded-md px-2.5 text-xs"
           disabled={isReporting}
           onClick={reportSeller}
         >
@@ -247,7 +247,7 @@ export function SellerProfileActions({
           {isReporting ? 'جار الإبلاغ...' : 'إبلاغ'}
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <span>{followerCount} متابع</span>
         <span>{ratingCount} تقييم</span>
         <span>{ratingAverage.toFixed(1)} / 5</span>

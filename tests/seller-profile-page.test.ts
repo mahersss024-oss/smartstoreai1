@@ -62,18 +62,20 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
   assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
   assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
-  assert.match(page, /sm:grid-cols-\[auto_minmax\(0,1fr\)_auto\] sm:items-center/);
-  assert.match(page, /grid size-16 place-items-center/);
+  assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)\] gap-2 p-2\.5/);
+  assert.match(page, /grid size-12 place-items-center/);
+  assert.match(page, /<SellerProfileIdentity compact sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
+  assert.match(page, /col-span-2 flex min-w-0 flex-wrap items-center justify-between/);
   assert.doesNotMatch(page, /h-28 bg-\[linear-gradient/);
   assert.doesNotMatch(page, /-mt-12 grid gap-4/);
   assert.doesNotMatch(page, /grid size-24 place-items-center/);
-  assert.match(page, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
-  assert.match(page, /sm:grid-cols-\[7\.25rem_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(page, /معلن موثق داخل سوق حمد/);
+  assert.match(page, /grid-cols-\[clamp\(6\.25rem,28vw,7\.25rem\)_minmax\(0,1fr\)\]/);
   assert.match(page, /formatListingRelativeTime/);
   assert.match(page, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
   assert.match(page, /className="aspect-square shrink-0 overflow-hidden/);
-  assert.match(page, /width: 'clamp\(6\.25rem, 28vw, 7\.25rem\)'/);
-  assert.match(page, /maxWidth: 'clamp\(6\.25rem, 28vw, 7\.25rem\)'/);
+  assert.match(page, /maxWidth: '100%'/);
+  assert.match(page, /width: '100%'/);
   assert.match(page, /objectFit: 'cover'/);
   assert.match(page, /line-clamp-2 text-\[13px\] font-bold/);
   assert.match(page, /إعلانات المعلن/);
@@ -85,8 +87,10 @@ test('public seller profile shows a copyable seller identifier', () => {
   const page = readSource('app/sellers/[sellerId]/page.tsx');
   const identity = readSource('app/sellers/[sellerId]/seller-profile-identity.tsx');
 
-  assert.match(page, /<SellerProfileIdentity sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
+  assert.match(page, /<SellerProfileIdentity compact sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
   assert.match(identity, /sellerHandle = useMemo\(\(\) => `@\$\{sellerId\}`/);
+  assert.match(identity, /compact = false/);
+  assert.match(identity, /!compact && \(/);
   assert.match(identity, /getPublicSellerUrl\(sellerId\)/);
   assert.match(identity, /value=\{profileUrl\}/);
   assert.doesNotMatch(identity, /window\.location\.href/);

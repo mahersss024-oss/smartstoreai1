@@ -17,6 +17,7 @@ import {
 } from '@ui/dialog';
 
 type SellerProfileIdentityProps = {
+  compact?: boolean;
   sellerId: string;
   sellerName: string;
 };
@@ -39,6 +40,7 @@ async function copyText(value: string) {
 }
 
 export function SellerProfileIdentity({
+  compact = false,
   sellerId,
   sellerName,
 }: SellerProfileIdentityProps) {
@@ -82,12 +84,12 @@ export function SellerProfileIdentity({
   }
 
   return (
-    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       <Dialog>
         <DialogTrigger asChild>
           <Button
             aria-label="باركود ملف المعلن"
-            className="size-8 shrink-0 rounded-md text-blue-600"
+            className="size-7 shrink-0 rounded-md text-blue-600"
             size="icon-sm"
             title="باركود ملف المعلن"
             type="button"
@@ -142,24 +144,28 @@ export function SellerProfileIdentity({
           </div>
         </DialogContent>
       </Dialog>
-      <span className="min-w-0 select-all truncate font-semibold" dir="ltr" title={sellerId}>
-        {sellerHandle}
-      </span>
-      <Button
-        aria-label="نسخ معرف المستخدم"
-        className="size-8 shrink-0 rounded-md"
-        onClick={() => void copySellerId()}
-        size="icon-sm"
-        title="نسخ معرف المستخدم"
-        type="button"
-        variant="outline"
-      >
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-        <span className="sr-only">{copied ? 'تم النسخ' : 'نسخ'}</span>
-      </Button>
+      {!compact && (
+        <>
+          <span className="min-w-0 select-all truncate font-semibold" dir="ltr" title={sellerId}>
+            {sellerHandle}
+          </span>
+          <Button
+            aria-label="نسخ معرف المستخدم"
+            className="size-7 shrink-0 rounded-md"
+            onClick={() => void copySellerId()}
+            size="icon-sm"
+            title="نسخ معرف المستخدم"
+            type="button"
+            variant="outline"
+          >
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            <span className="sr-only">{copied ? 'تم النسخ' : 'نسخ'}</span>
+          </Button>
+        </>
+      )}
       <Button
         aria-label="مشاركة ملف المعلن"
-        className="size-8 shrink-0 rounded-md"
+        className="size-7 shrink-0 rounded-md"
         onClick={() => void shareSellerProfile()}
         size="icon-sm"
         title="مشاركة ملف المعلن"

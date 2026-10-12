@@ -217,8 +217,8 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:p-4">
         <section className="marketplace-home-controls shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card">
-          <div className="grid gap-3 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-4">
-            <div className="grid size-16 place-items-center overflow-hidden rounded-md border border-white/80 bg-[#0f766e] text-xl font-bold text-white shadow-sm dark:border-white/10 sm:size-18">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-3">
+            <div className="grid size-12 place-items-center overflow-hidden rounded-md border border-white/80 bg-[#0f766e] text-base font-bold text-white shadow-sm dark:border-white/10 sm:size-14">
               <SellerAvatar
                 alt={seller.name}
                 className="size-full object-cover"
@@ -228,26 +228,28 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
 
             <div className="min-w-0">
               <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
-                <h2 className="truncate text-lg font-bold sm:text-xl">{seller.name}</h2>
+                <h2 className="truncate text-base font-bold sm:text-lg">{seller.name}</h2>
                 <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   <BadgeCheck className="size-3.5" />
-                  معلن موثق داخل سوق حمد
+                  موثق
                 </span>
               </div>
-              <SellerProfileIdentity sellerId={seller.id} sellerName={seller.name} />
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>{formatJoinDate(seller.joinedAt)}</span>
                 <span>{seller.publishedListingCount} إعلان منشور</span>
               </div>
             </div>
 
-            <SellerProfileActions
-              sellerId={seller.id}
-              sellerName={seller.name}
-              initialFollowerCount={seller.followerCount}
-              initialRatingAverage={seller.ratingAverage}
-              initialRatingCount={seller.ratingCount}
-            />
+            <div className="col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:justify-end">
+              <SellerProfileIdentity compact sellerId={seller.id} sellerName={seller.name} />
+              <SellerProfileActions
+                sellerId={seller.id}
+                sellerName={seller.name}
+                initialFollowerCount={seller.followerCount}
+                initialRatingAverage={seller.ratingAverage}
+                initialRatingCount={seller.ratingCount}
+              />
+            </div>
           </div>
         </section>
 
@@ -267,15 +269,15 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                   key={listing.id}
                   href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
                   prefetch={false}
-                  className="group grid min-w-0 max-w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                  className="group grid min-w-0 max-w-full grid-cols-[clamp(6.25rem,28vw,7.25rem)_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
                 >
                   <div
                     className="aspect-square shrink-0 overflow-hidden bg-[#0b1220]"
                     style={{
-                      maxWidth: 'clamp(6.25rem, 28vw, 7.25rem)',
+                      maxWidth: '100%',
                       minHeight: 'clamp(6.25rem, 28vw, 7.25rem)',
                       overflow: 'hidden',
-                      width: 'clamp(6.25rem, 28vw, 7.25rem)',
+                      width: '100%',
                     }}
                   >
                     <img
