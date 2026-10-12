@@ -7,17 +7,20 @@ function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
 
-test('home listing cards render saved favorites as filled blue hearts', () => {
+test('home listing cards avoid eager favorite state requests', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
-  assert.match(homePage, /favoriteListingIds/);
-  assert.match(homePage, /isFavorite=\{Boolean/);
-  assert.match(homePage, /sellerId\?: string/);
-  assert.match(homePage, /isOwnListing=\{Boolean/);
-  assert.match(homePage, /!\s*isOwnListing &&/);
-  assert.match(homePage, /aria-pressed=\{isFavorite\}/);
-  assert.match(homePage, /fill-current/);
-  assert.match(homePage, /\/api\/marketplace\/me\/favorites\?page=1&limit=48/);
+  assert.doesNotMatch(homePage, /favoriteListingIds/);
+  assert.doesNotMatch(homePage, /refreshFavoriteListingIds/);
+  assert.doesNotMatch(homePage, /isFavorite=\{Boolean/);
+  assert.doesNotMatch(homePage, /onFavorite=\{favoriteListing\}/);
+  assert.doesNotMatch(homePage, /isOwnListing=\{Boolean/);
+  assert.doesNotMatch(homePage, /aria-pressed=\{isFavorite\}/);
+  assert.doesNotMatch(homePage, /<Heart/);
+  assert.doesNotMatch(
+    homePage,
+    /\/api\/marketplace\/me\/favorites\?page=1&limit=48/,
+  );
 });
 
 test('listing details favorite action fills the heart after saving', () => {

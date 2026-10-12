@@ -156,7 +156,8 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /shadow-cyan-400\/35/);
   assert.match(homePage, /drop-shadow-\[0_0_6px_rgba\(34,211,238,0\.85\)\]/);
   assert.doesNotMatch(homePage, /absolute left-9 top-1\.5/);
-  assert.match(homePage, /absolute right-1\.5 top-1\.5 size-7/);
+  assert.doesNotMatch(homePage, /absolute right-1\.5 top-1\.5 size-7/);
+  assert.doesNotMatch(homePage, /aria-label="حفظ الإعلان"/);
   assert.match(homePage, /askToCompareListing\(\);/);
   assert.match(homePage, /relative aspect-square min-h-\[6\.25rem\] bg-slate-100/);
   assert.match(homePage, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);

@@ -26,7 +26,6 @@ import {
   Bot,
   Clock3,
   Download,
-  Heart,
   ImageIcon,
   Loader2,
   MapPin,
@@ -85,7 +84,6 @@ import { useAppBridge } from '@/hooks/use-app-bridge';
 import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
-import { scheduleIdleTask } from '@/lib/client-idle-task';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -170,10 +168,6 @@ type ListingsResponsePayload = {
     hasMore?: boolean;
     nextPage?: number | null;
   };
-};
-
-type FavoriteListingRecord = {
-  listingId: string;
 };
 
 type ClientIntentKind =
@@ -1641,11 +1635,8 @@ function ListingImageFallback() {
 
 function ListingCardView({
   listing,
-  isFavorite,
-  isOwnListing,
   className,
   onAsk,
-  onFavorite,
   onOpen,
   prioritizeImage = false,
   isSmartResult = false,
@@ -1653,12 +1644,9 @@ function ListingCardView({
   variant = 'grid',
 }: {
   listing: ListingCard;
-  isFavorite: boolean;
-  isOwnListing: boolean;
   className?: string;
   isSmartResult?: boolean;
   onAsk: (prompt: string, listing?: ListingCard) => void;
-  onFavorite: (listing: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
   prioritizeImage?: boolean;
   style?: CSSProperties;
@@ -1811,26 +1799,6 @@ function ListingCardView({
               <span>لا توجد صورة حقيقية</span>
             </div>
           </div>
-        )}
-        {!isOwnListing && (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className={cn(
-            'absolute right-1.5 top-1.5 size-7 rounded-md border border-white/80 bg-white/95 shadow-sm ring-1 ring-slate-950/5 hover:bg-white sm:right-2 sm:top-2 sm:size-8',
-            isFavorite
-              ? 'text-blue-600 hover:text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-300/20 dark:hover:bg-blue-500/20'
-              : 'text-blue-600 hover:text-blue-700 dark:border-white/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 dark:hover:text-blue-100',
-          )}
-          aria-label="حفظ الإعلان"
-          aria-pressed={isFavorite}
-          onClick={(event) => {
-            event.stopPropagation();
-            onFavorite(listing);
-          }}
-        >
-          <Heart className={cn('size-3.5 sm:size-4', isFavorite && 'fill-current')} />
-        </Button>
         )}
         <Button
           size="icon-sm"
@@ -2020,7 +1988,7 @@ export default function Page() {
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: chatTransport,
   });
-  const { isSessionLoading, session } = useAuthSession();
+  const { session } = useAuthSession();
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
   const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
@@ -2055,9 +2023,6 @@ export default function Page() {
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
     useState(false);
-  const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [listingPagination, setListingPagination] = useState({
     page: 1,
     hasMore: false,
@@ -3157,42 +3122,9 @@ export default function Page() {
       });
   }, [activeMarketCity, isNativeApp, marketplaceSearchQuery]);
 
-  const refreshFavoriteListingIds = useCallback(() => {
-    return fetch('/api/marketplace/me/favorites?page=1&limit=48', {
-      cache: 'no-store',
-    })
-      .then((response) => {
-        if (!response.ok) {
-          setFavoriteListingIds(new Set());
-          return null;
-        }
-
-        return response.json() as Promise<{
-          favorites?: FavoriteListingRecord[];
-        }>;
-      })
-      .then((payload) => {
-        if (!payload?.favorites) {
-          return;
-        }
-
-        setFavoriteListingIds(
-          new Set(
-            payload.favorites
-              .map((favorite) => favorite.listingId)
-              .filter(Boolean),
-          ),
-        );
-      })
-      .catch(() => {
-        setFavoriteListingIds(new Set());
-      });
-  }, []);
-
   useEffect(() => {
     const onPullRefresh = () => {
       void refreshMarketplaceListings(undefined, 1, { showLoading: false });
-      void refreshFavoriteListingIds();
     };
 
     window.addEventListener('smartstore:pull-refresh', onPullRefresh);
@@ -3200,7 +3132,7 @@ export default function Page() {
     return () => {
       window.removeEventListener('smartstore:pull-refresh', onPullRefresh);
     };
-  }, [refreshFavoriteListingIds, refreshMarketplaceListings]);
+  }, [refreshMarketplaceListings]);
 
   const scheduleRealtimeListingsRefresh = useCallback(() => {
     if (realtimeRefreshTimerRef.current !== null) {
@@ -3358,20 +3290,6 @@ export default function Page() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (isSessionLoading) {
-      return;
-    }
-
-    if (session.authenticated) {
-      return scheduleIdleTask(() => {
-        void refreshFavoriteListingIds();
-      }, 1800);
-    }
-
-    setFavoriteListingIds(new Set());
-  }, [isSessionLoading, refreshFavoriteListingIds, session.authenticated]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -3908,95 +3826,6 @@ export default function Page() {
       router.push(`/listings/${listing.id}`);
     },
     [router],
-  );
-
-  const favoriteListing = useCallback(
-    (listing: ListingCard) => {
-      const nextSelectedListingContext = toSelectedListingContext(listing);
-
-      if (nextSelectedListingContext) {
-        setSelectedListingContext(nextSelectedListingContext);
-      }
-
-      if (!listing.id) {
-        return;
-      }
-
-      const listingId = listing.id;
-      const wasFavorite = favoriteListingIds.has(listingId);
-
-      setFavoriteListingIds((currentIds) => {
-        const nextIds = new Set(currentIds);
-
-        if (wasFavorite) {
-          nextIds.delete(listingId);
-        } else {
-          nextIds.add(listingId);
-        }
-
-        return nextIds;
-      });
-
-      void fetch(`/api/marketplace/listings/${listing.id}/favorite`, {
-        method: 'POST',
-        headers: {
-          'Idempotency-Key': createClientIdempotencyKey('favorite-toggle'),
-        },
-      }).then((response) => {
-        if (response.status === 401) {
-          setFavoriteListingIds((currentIds) => {
-            const nextIds = new Set(currentIds);
-            nextIds.delete(listingId);
-            return nextIds;
-          });
-          router.push('/api/auth/google/start');
-          return;
-        }
-
-        if (!response.ok) {
-          setFavoriteListingIds((currentIds) => {
-            const nextIds = new Set(currentIds);
-
-            if (wasFavorite) {
-              nextIds.add(listingId);
-            } else {
-              nextIds.delete(listingId);
-            }
-
-            return nextIds;
-          });
-          return;
-        }
-
-        void response.json().then((payload: { status?: string }) => {
-          setFavoriteListingIds((currentIds) => {
-            const nextIds = new Set(currentIds);
-
-            if (payload.status === 'removed') {
-              nextIds.delete(listingId);
-            } else {
-              nextIds.add(listingId);
-            }
-
-            return nextIds;
-          });
-        });
-        void refreshMarketplaceListings();
-      }).catch(() => {
-        setFavoriteListingIds((currentIds) => {
-          const nextIds = new Set(currentIds);
-
-          if (wasFavorite) {
-            nextIds.add(listingId);
-          } else {
-            nextIds.delete(listingId);
-          }
-
-          return nextIds;
-        });
-      });
-    },
-    [favoriteListingIds, refreshMarketplaceListings, router],
   );
 
   const handleNearbyMarketplaceSearch = useCallback(() => {
@@ -4809,14 +4638,7 @@ export default function Page() {
                           key={listing.id ?? listing.title}
                           className="smart-assistant-result-card"
                           listing={listing}
-                          isFavorite={Boolean(
-                            listing.id && favoriteListingIds.has(listing.id),
-                          )}
-                          isOwnListing={Boolean(
-                            listing.sellerId && session.user?.id === listing.sellerId,
-                          )}
                           onAsk={sendStarter}
-                          onFavorite={favoriteListing}
                           onOpen={openListing}
                           isSmartResult
                           variant="horizontal"
@@ -4848,14 +4670,7 @@ export default function Page() {
                   <ListingCardView
                     key={listing.id ?? listing.title}
                     listing={listing}
-                    isFavorite={Boolean(
-                      listing.id && favoriteListingIds.has(listing.id),
-                    )}
-                    isOwnListing={Boolean(
-                      listing.sellerId && session.user?.id === listing.sellerId,
-                    )}
                     onAsk={sendStarter}
-                    onFavorite={favoriteListing}
                     onOpen={openListing}
                     prioritizeImage={index < 2}
                     variant="horizontal"
