@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Clock3, Heart, ImageIcon, MapPin, Megaphone } from 'lucide-react';
+import { ArrowRight, Clock3, Heart, ImageIcon, MapPin } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ResilientImage } from '@/components/resilient-image';
@@ -282,9 +282,9 @@ export default function FavoritesPage() {
   });
 
   return (
-    <main className="smartstore-stable-page min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="smartstore-stable-content mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="smartstore-stable-header flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">
@@ -332,8 +332,8 @@ export default function FavoritesPage() {
             </div>
           </section>
         ) : (
-          <section className="px-1 py-3 sm:px-2">
-            <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 py-3 sm:px-2">
+            <div className="favorites-saved-title mb-3 flex shrink-0 items-center gap-2 border-b border-blue-100/70 pb-2 text-sm font-bold dark:border-blue-400/10">
               <Heart className="size-4 text-blue-600" />
               إعلانات محفوظة
             </div>
@@ -350,12 +350,12 @@ export default function FavoritesPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4">
-                <div className="grid gap-1.5">
+              <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2">
+                <div className="grid max-w-4xl gap-1.5">
                   {favorites.map((favorite) => (
                     <Link
                       key={favorite.id}
-                      className="grid w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
+                      className="marketplace-listing-card grid w-full min-w-0 grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)] [contain-intrinsic-size:126px] [content-visibility:auto]"
                       href={`/listings/${favorite.listingId}?source=favorites`}
                       prefetch={false}
                     >
@@ -374,10 +374,6 @@ export default function FavoritesPage() {
                         />
                       </div>
                       <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">
-                        <div className="hidden">
-                          <Megaphone className="size-3.5 shrink-0" />
-                          <span className="truncate">إعلان محفوظ</span>
-                        </div>
                         <h3 className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-600 dark:text-emerald-300 sm:text-sm">
                           {favorite.listing?.title ?? 'إعلان غير متاح'}
                         </h3>
