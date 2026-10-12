@@ -284,13 +284,6 @@ export default function RootLayout({
         />
         <link
           rel="preload"
-          href="/hamad-market-logo.webp"
-          as="image"
-          type="image/webp"
-          fetchPriority="high"
-        />
-        <link
-          rel="preload"
           href="/hamad-assistant-avatar.webp"
           as="image"
           type="image/webp"

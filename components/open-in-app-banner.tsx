@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 import { isInsideNativeApp } from '@/lib/native/app-bridge';
 
@@ -95,15 +94,6 @@ export function OpenInAppBanner() {
   return (
     <div className="relative z-[10] border-b border-slate-200/80 bg-white/95 px-3 py-2 text-slate-950 backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center gap-3">
-        <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-[#013e51]">
-          <Image
-            alt="سوق حمد"
-            className="h-full w-full object-contain"
-            height={48}
-            src="/hamad-market-logo.webp"
-            width={48}
-          />
-        </div>
         <div className="min-w-0 flex-1 text-right">
           <span className="block truncate text-sm font-bold leading-5">سوق حمد</span>
           <span className="block truncate text-xs leading-5 text-slate-500">

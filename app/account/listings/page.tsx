@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -1597,9 +1596,6 @@ export default function AccountListingsPage() {
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
             </Link>
-            <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white dark:bg-card sm:size-10">
-              <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/hamad-market-logo.webp" />
-            </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">إعلاناتي</h1>
             </div>

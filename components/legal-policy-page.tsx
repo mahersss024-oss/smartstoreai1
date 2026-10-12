@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import type { ReactNode } from 'react';
 
 import { Button } from '@ui/button';
@@ -64,15 +63,6 @@ export function LegalPolicyPage({
       <div className="mx-auto grid w-full max-w-5xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
         <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
-              <Image
-                alt="سوق حمد"
-                className="size-10 object-cover"
-                height={40}
-                src="/hamad-market-logo.webp"
-                width={40}
-              />
-            </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {eyebrow}

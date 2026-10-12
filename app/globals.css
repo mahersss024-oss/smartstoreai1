@@ -319,6 +319,7 @@
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
+    padding-top: var(--safe-area-top);
     scroll-behavior: smooth;
     scroll-padding-bottom: var(--marketplace-bottom-nav-space);
   }
@@ -363,7 +364,7 @@
   .admin-viewport > main > div > header:first-child,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div > header:first-child {
     position: sticky;
-    top: 0;
+    top: var(--safe-area-top);
     z-index: 35;
     background: color-mix(in srgb, var(--background) 86%, transparent);
     backdrop-filter: blur(14px);

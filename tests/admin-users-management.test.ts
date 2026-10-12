@@ -31,6 +31,14 @@ test('admin pages use a stable touch viewport without disabling page scrolling',
     globalCss,
     /\.admin-viewport \[dir="ltr"\][\s\S]*overflow-wrap:\s*anywhere;/,
   );
+  assert.match(
+    globalCss,
+    /\.admin-viewport > main,[\s\S]*padding-top:\s*var\(--safe-area-top\);/,
+  );
+  assert.match(
+    globalCss,
+    /\.admin-viewport > main > div > header:first-child,[\s\S]*top:\s*var\(--safe-area-top\);/,
+  );
   assert.doesNotMatch(
     globalCss,
     /\.admin-viewport\s*\{[^}]*touch-action:\s*none;/,
@@ -94,6 +102,9 @@ test('admin access revalidation keeps the verified role stable while loading', (
 test('admin dashboard stays focused on required statistics and administrative navigation', () => {
   const dashboard = readProjectFile('app', 'admin', 'page.tsx');
   const usersPage = readProjectFile('app', 'admin', 'users', 'page.tsx');
+  const moderationPage = readProjectFile('app', 'admin', 'moderation', 'page.tsx');
+  const listingsPage = readProjectFile('app', 'admin', 'listings', 'page.tsx');
+  const commissionsPage = readProjectFile('app', 'admin', 'commissions', 'page.tsx');
 
   assert.match(dashboard, /aria-label="أقسام الإدارة"/);
   assert.match(dashboard, /المراجعة والبلاغات/);
@@ -102,6 +113,11 @@ test('admin dashboard stays focused on required statistics and administrative na
   assert.doesNotMatch(dashboard, /StatCard/);
   assert.doesNotMatch(dashboard, /StatusBlock/);
   assert.match(dashboard, /\/api\/admin\/overview/);
+  assert.match(dashboard, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(usersPage, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(moderationPage, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(listingsPage, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(commissionsPage, /\/hamad-market-logo\.webp/);
   assert.match(dashboard, /إجمالي المستخدمين/);
   assert.match(dashboard, /المستخدمون النشطون/);
   assert.match(dashboard, /الإعلانات المنشورة/);

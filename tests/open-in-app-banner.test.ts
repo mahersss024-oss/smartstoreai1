@@ -15,7 +15,7 @@ test('open in app banner is mobile-only and persistent', () => {
   assert.doesNotMatch(component, /dismissedKey/);
   assert.doesNotMatch(component, /localStorage/);
   assert.doesNotMatch(component, /aria-label="إغلاق شريط فتح التطبيق"/);
-  assert.match(component, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(component, /\/hamad-market-logo\.webp/);
   assert.match(component, /تجربة أفضل عبر التطبيق/);
   assert.match(component, /aria-label="فتح سوق حمد في التطبيق"/);
   assert.match(component, /\/api\/auth\/mobile\/open/);

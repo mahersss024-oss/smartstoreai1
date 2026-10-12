@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowLeft,
   ArrowRight,
@@ -134,8 +135,14 @@ export default function AdminHomePage() {
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-600 text-white">
-              <Megaphone className="size-5" />
+            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md bg-[#013e51]">
+              <Image
+                alt="سوق حمد"
+                className="size-10 object-cover"
+                height={40}
+                src="/hamad-market-logo.webp"
+                width={40}
+              />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">
