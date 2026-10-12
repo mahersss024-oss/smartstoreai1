@@ -189,7 +189,7 @@ test('theme toggle stays on home and account settings only', () => {
 
   assert.match(accountPage, /<ThemeToggle language="ar" variant="switch" \/>/);
   assert.match(homePage, /<ThemeToggle language="ar" \/>/);
-  assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
+  assert.doesNotMatch(homePage, /PushNotificationSettings/);
 
   for (const source of pagesWithoutThemeToggle) {
     assert.doesNotMatch(source, /ThemeToggle/);

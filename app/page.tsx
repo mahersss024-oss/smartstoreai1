@@ -66,7 +66,6 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingShareButton } from '@/components/listing-share-button';
-import { PushNotificationSettings } from '@/components/push-notification-settings';
 import { ResilientImage } from '@/components/resilient-image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -3959,15 +3958,15 @@ export default function Page() {
           {!isCompactChatView && (
           <header className="flex h-14 items-center justify-between gap-2 border-b bg-[#f7f9fc] px-2 dark:bg-background sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-              <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
+              <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-white shadow-sm">
                 <img
                   alt="سوق حمد"
-                  className="size-8 object-cover"
+                  className="size-12 object-cover"
                   decoding="async"
                   fetchPriority="high"
-                  height={32}
+                  height={48}
                   src="/hamad-market-logo.webp"
-                  width={32}
+                  width={48}
                 />
               </div>
             </div>
@@ -3986,9 +3985,6 @@ export default function Page() {
             </nav>
 
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              {session.authenticated ? (
-                <PushNotificationSettings variant="icon" />
-              ) : null}
               <ThemeToggle language="ar" />
               {session.authenticated ? (
                 <Button asChild variant="outline" size="sm" className="rounded-md px-2 sm:px-3">

@@ -74,8 +74,12 @@ test('notifications page exposes push notifications as the opt-in setting', () =
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
 
-test('home notification bell is shown only to signed-in users and defers checks until interaction', () => {
+test('home omits the notification bell while the notifications page keeps push settings', () => {
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
+  const notificationsPage = readFileSync(
+    join(process.cwd(), 'app', 'notifications', 'page.tsx'),
+    'utf8',
+  );
   const settings = readFileSync(
     join(process.cwd(), 'components', 'push-notification-settings.tsx'),
     'utf8',
@@ -87,8 +91,8 @@ test('home notification bell is shown only to signed-in users and defers checks 
     /useEffect\(\(\) => \{[\s\S]*?if \(variant === 'icon'\) \{[\s\S]*?\n  \}, \[refreshUnreadCount, variant\]\);/,
   )?.[0] ?? '';
 
-  assert.match(homePage, /session\.authenticated \? \(/);
-  assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
+  assert.doesNotMatch(homePage, /PushNotificationSettings/);
+  assert.match(notificationsPage, /<PushNotificationSettings \/>/);
   assert.doesNotMatch(settings, /import Link from 'next\/link'/);
   assert.doesNotMatch(settings, /href="\/notifications"/);
   assert.match(settings, /const toggleNotifications = useCallback/);
