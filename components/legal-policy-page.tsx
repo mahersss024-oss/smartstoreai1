@@ -69,7 +69,7 @@ export function LegalPolicyPage({
                 alt="سوق حمد"
                 className="size-10 object-cover"
                 height={40}
-                src="/hamad-market-logo.jpeg"
+                src="/hamad-market-logo.webp"
                 width={40}
               />
             </div>

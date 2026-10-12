@@ -3238,18 +3238,13 @@ export default function Page() {
       setSelectedListingContext(null);
     });
 
-    void resetAssistantSearchState()
-      .catch(() => {
-        // The first chat request also carries resetSearchState, so an offline
-        // reset call should not block the customer from opening the assistant.
-      })
-      .finally(() => {
-        if (cancelled) {
-          return;
-        }
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
 
-        setHasRestoredChat(true);
-      });
+      setHasRestoredChat(true);
+    });
 
     return () => {
       cancelled = true;

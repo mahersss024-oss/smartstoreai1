@@ -444,7 +444,7 @@ export default function AccountPage() {
               <ArrowRight className="size-4" />
             </Link>
             <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white dark:bg-card sm:size-10">
-              <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/hamad-market-logo.jpeg" />
+              <img alt="سوق حمد" className="size-9 object-cover sm:size-10" src="/hamad-market-logo.webp" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold sm:text-base">حسابي</h1>

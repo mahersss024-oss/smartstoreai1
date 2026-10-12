@@ -1400,7 +1400,7 @@ export default function ConversationPage() {
               </Link>
             </Button>
             <div className="grid size-10 place-items-center overflow-hidden rounded-md bg-white dark:bg-card">
-              <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
+              <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.webp" />
             </div>
           </div>
         </header>

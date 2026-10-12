@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 
 import { Button } from '@ui/button';
-import { scheduleIdleTask } from '@/lib/client-idle-task';
 import {
   detectAppPlatform,
   isInsideNativeApp,
@@ -164,9 +163,7 @@ export function PushNotificationSettings({
 
   useEffect(() => {
     if (variant === 'icon') {
-      return scheduleIdleTask(() => {
-        void refreshStatus();
-      });
+      return;
     }
 
     void refreshStatus();
@@ -212,9 +209,7 @@ export function PushNotificationSettings({
 
   useEffect(() => {
     if (variant === 'icon') {
-      return scheduleIdleTask(() => {
-        void refreshUnreadCount();
-      });
+      return;
     }
 
     void refreshUnreadCount();
@@ -340,13 +335,35 @@ export function PushNotificationSettings({
     }
   }, [isSupported]);
 
+  const isActive = state === 'active';
+
+  const toggleNotifications = useCallback(async () => {
+    if (variant === 'icon' && state === 'checking') {
+      await refreshStatus();
+      return;
+    }
+
+    if (isActive) {
+      await disableNotifications();
+      return;
+    }
+
+    await enableNotifications();
+  }, [
+    disableNotifications,
+    enableNotifications,
+    isActive,
+    refreshStatus,
+    state,
+    variant,
+  ]);
+
   const disabled =
-    state === 'checking' ||
+    (variant !== 'icon' && state === 'checking') ||
     state === 'working' ||
     state === 'unsupported' ||
     state === 'not_configured' ||
     (state === 'blocked' && !isNativePushShell());
-  const isActive = state === 'active';
   const buttonText =
     state === 'checking'
       ? 'جاري التحقق...'
@@ -374,9 +391,7 @@ export function PushNotificationSettings({
         aria-label={iconLabel}
         className="shrink-0"
         disabled={disabled}
-        onClick={() =>
-          void (isActive ? disableNotifications() : enableNotifications())
-        }
+        onClick={() => void toggleNotifications()}
         size="icon-sm"
         title={notice ?? iconLabel}
         type="button"
@@ -417,9 +432,7 @@ export function PushNotificationSettings({
         <Button
           className="rounded-md"
           disabled={disabled}
-          onClick={() =>
-            void (isActive ? disableNotifications() : enableNotifications())
-          }
+          onClick={() => void toggleNotifications()}
           type="button"
           variant={isActive ? 'outline' : 'default'}
         >

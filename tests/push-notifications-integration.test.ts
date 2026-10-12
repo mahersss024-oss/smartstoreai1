@@ -66,28 +66,39 @@ test('notifications page exposes push notifications as the opt-in setting', () =
   assert.match(settings, /\/api\/push\/subscribe/);
   assert.match(settings, /variant\?: 'panel' \| 'icon'/);
   assert.match(settings, /variant === 'icon'/);
-  assert.match(settings, /isActive \? disableNotifications\(\) : enableNotifications\(\)/);
+  assert.match(settings, /const toggleNotifications = useCallback/);
+  assert.match(settings, /await refreshStatus\(\)/);
   assert.match(settings, /helperText \? \(/);
   assert.doesNotMatch(settings, /تصل الإشعارات عند وصول رسالة جديدة/);
   assert.match(notificationsPage, /<PushNotificationSettings \/>/);
   assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
 });
 
-test('home notification bell is shown only to signed-in users and toggles push directly', () => {
+test('home notification bell is shown only to signed-in users and defers checks until interaction', () => {
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
   const settings = readFileSync(
     join(process.cwd(), 'components', 'push-notification-settings.tsx'),
     'utf8',
   );
+  const iconAutoStatusEffect = settings.match(
+    /useEffect\(\(\) => \{[\s\S]*?if \(variant === 'icon'\) \{[\s\S]*?\n  \}, \[refreshStatus, variant\]\);/,
+  )?.[0] ?? '';
+  const iconAutoUnreadEffect = settings.match(
+    /useEffect\(\(\) => \{[\s\S]*?if \(variant === 'icon'\) \{[\s\S]*?\n  \}, \[refreshUnreadCount, variant\]\);/,
+  )?.[0] ?? '';
 
   assert.match(homePage, /session\.authenticated \? \(/);
   assert.match(homePage, /<PushNotificationSettings variant="icon" \/>/);
   assert.doesNotMatch(settings, /import Link from 'next\/link'/);
   assert.doesNotMatch(settings, /href="\/notifications"/);
-  assert.match(settings, /onClick=\{\(\) =>\s*void \(isActive \? disableNotifications\(\) : enableNotifications\(\)\)\s*\}/);
+  assert.match(settings, /const toggleNotifications = useCallback/);
+  assert.match(settings, /variant === 'icon' && state === 'checking'/);
+  assert.match(settings, /onClick=\{\(\) => void toggleNotifications\(\)\}/);
+  assert.doesNotMatch(iconAutoStatusEffect, /scheduleIdleTask/);
+  assert.doesNotMatch(iconAutoUnreadEffect, /scheduleIdleTask/);
   assert.match(settings, /unreadCount > 0/);
   assert.match(settings, /smartstore:notifications-read/);
-  assert.match(settings, /scheduleIdleTask/);
+  assert.doesNotMatch(settings, /scheduleIdleTask/);
   assert.doesNotMatch(settings, /useSmartstoreRealtime/);
   assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
   assert.match(settings, /className="shrink-0"/);

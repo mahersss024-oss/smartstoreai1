@@ -9,10 +9,16 @@ function readProjectFile(...segments: string[]) {
 
 test('home assistant starts clean without durable chat history', () => {
   const homePage = readProjectFile('app', 'page.tsx');
+  const mountRestoreEffect = homePage.match(
+    /clearStaleStoredChatState\(\);[\s\S]*?setHasRestoredChat\(true\);[\s\S]*?return \(\) => \{/,
+  )?.[0] ?? '';
 
   assert.match(homePage, /resetAssistantSearchState/);
   assert.match(homePage, /resetSearchState/);
   assert.match(homePage, /shouldResetSearchStateRef\.current = true/);
+  assert.match(mountRestoreEffect, /clearStaleStoredChatState\(\)/);
+  assert.match(mountRestoreEffect, /setHasRestoredChat\(true\)/);
+  assert.doesNotMatch(mountRestoreEffect, /resetAssistantSearchState/);
   assert.doesNotMatch(
     homePage,
     /localStorage\.setItem\(\s*currentChatStorageKey/,
