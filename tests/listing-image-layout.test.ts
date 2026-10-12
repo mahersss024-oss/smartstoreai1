@@ -194,9 +194,8 @@ test('home marketplace prioritizes only initial viewport listing images', async 
   assert.doesNotMatch(source, /loading="eager"/);
 });
 
-test('listing cards pause navigation while their image is loading', async () => {
+test('listing cards keep normal navigation while images load', async () => {
   const sources = await Promise.all([
-    readFile(new URL('../components/listing-card-link.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/favorites/page.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/account/follows/page.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/sellers/[sellerId]/page.tsx', import.meta.url), 'utf8'),
@@ -205,7 +204,6 @@ test('listing cards pause navigation while their image is loading', async () => 
     readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
   ]);
   const [
-    listingCardLink,
     favoritesPage,
     followsPage,
     sellerPage,
@@ -214,15 +212,12 @@ test('listing cards pause navigation while their image is loading', async () => 
     globalCss,
   ] = sources;
 
-  assert.match(listingCardLink, /data-image-loading=\{isImagePending \|\| undefined\}/);
-  assert.match(listingCardLink, /event\.preventDefault\(\)/);
-  assert.match(listingCardLink, /onLoadCapture=\{\(\) => setIsImagePending\(false\)\}/);
-  assert.match(favoritesPage, /<ListingCardLink/);
-  assert.match(followsPage, /<ListingCardLink/);
-  assert.match(sellerPage, /<ListingCardLink/);
-  assert.match(listingDetailsPage, /<ListingCardLink/);
-  assert.match(homePage, /data-image-loading=\{isCardInteractionDisabled \|\| undefined\}/);
-  assert.match(globalCss, /marketplace-card-image-shimmer/);
+  assert.doesNotMatch(favoritesPage, /ListingCardLink|waitForImage|data-image-loading/);
+  assert.doesNotMatch(followsPage, /ListingCardLink|waitForImage|data-image-loading/);
+  assert.doesNotMatch(sellerPage, /ListingCardLink|waitForImage|data-image-loading/);
+  assert.doesNotMatch(listingDetailsPage, /ListingCardLink|waitForImage|data-image-loading/);
+  assert.doesNotMatch(homePage, /isCardInteractionDisabled|data-image-loading|markListingImageReady/);
+  assert.doesNotMatch(globalCss, /marketplace-card-image-shimmer|marketplace-listing-card\[data-image-loading="true"\]/);
 });
 
 test('large repeated customer lists avoid prefetching every dynamic detail route', async () => {

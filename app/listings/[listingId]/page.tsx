@@ -25,7 +25,6 @@ import type { ListingCondition } from '@/agent/marketplace/types';
 import { getAuthSession } from '@/lib/auth/session';
 import { Button } from '@ui/button';
 import { ListingShareButton } from '@/components/listing-share-button';
-import { ListingCardLink } from '@/components/listing-card-link';
 import { ResilientImage } from '@/components/resilient-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { ListingContactActions } from './contact-actions';
@@ -962,12 +961,11 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                     const imageUrl = getListingPrimaryImage(similarListing);
 
                     return (
-                      <ListingCardLink
+                      <Link
                         key={similarListing.id}
                         className="grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
                         href={getSimilarListingHref(similarListing.id, listing.id)}
                         prefetch={false}
-                        waitForImage={Boolean(imageUrl)}
                       >
                         <div className="aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900">
                           {imageUrl ? (
@@ -1005,7 +1003,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                             </span>
                           </div>
                         </div>
-                      </ListingCardLink>
+                      </Link>
                     );
                   })}
                 </div>

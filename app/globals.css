@@ -531,39 +531,6 @@
     pointer-events: none;
   }
 
-  .marketplace-listing-card[data-image-loading="true"] {
-    cursor: wait;
-  }
-
-  .marketplace-listing-card[data-image-loading="true"]::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    pointer-events: none;
-    background:
-      linear-gradient(
-        110deg,
-        transparent 0%,
-        rgb(255 255 255 / 0.26) 44%,
-        transparent 68%
-      ),
-      rgb(248 250 252 / 0.42);
-    transform: translateX(-120%);
-    animation: marketplace-card-image-shimmer 1150ms ease-in-out infinite;
-  }
-
-  .dark .marketplace-listing-card[data-image-loading="true"]::after {
-    background:
-      linear-gradient(
-        110deg,
-        transparent 0%,
-        rgb(255 255 255 / 0.12) 44%,
-        transparent 68%
-      ),
-      rgb(15 23 42 / 0.36);
-  }
-
   .marketplace-bottom-nav {
     border-color: rgb(255 255 255 / 0.32);
     background-color: rgb(255 255 255 / 0.2);
@@ -650,12 +617,6 @@
     }
   }
 
-  @keyframes marketplace-card-image-shimmer {
-    to {
-      transform: translateX(120%);
-    }
-  }
-
   @keyframes upload-progress-indeterminate {
     0% {
       transform: translateX(-120%);
@@ -691,7 +652,6 @@
     .smart-assistant-results-panel,
     .smart-assistant-result-card,
     .action-feedback-button[data-loading="true"]::after,
-    .marketplace-listing-card[data-image-loading="true"]::after,
     .upload-progress-track[data-indeterminate="true"] .upload-progress-fill {
       animation: none !important;
       transform: none !important;

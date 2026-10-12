@@ -15,7 +15,6 @@ import {
 } from '@/agent/marketplace/repository';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { Button } from '@ui/button';
-import { ListingCardLink } from '@/components/listing-card-link';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { SellerProfileActions } from './seller-profile-actions';
 import { SellerProfileIdentity } from './seller-profile-identity';
@@ -264,12 +263,11 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
           {seller.listings.length ? (
             <div className="grid min-w-0 gap-1.5">
               {seller.listings.map((listing) => (
-                <ListingCardLink
+                <Link
                   key={listing.id}
                   href={getSellerListingHref(listing.id, seller.id, resolvedSearchParams)}
                   prefetch={false}
                   className="group grid min-w-0 max-w-full grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]"
-                  waitForImage={Boolean(getPrimaryImageUrl(listing))}
                 >
                   <div
                     className="aspect-square shrink-0 overflow-hidden bg-[#0b1220]"
@@ -325,7 +323,7 @@ export default async function SellerProfilePage({ params, searchParams }: PagePr
                       {formatCondition(listing.condition)}
                     </span>
                   </div>
-                </ListingCardLink>
+                </Link>
               ))}
             </div>
           ) : (

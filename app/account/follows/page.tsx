@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ArrowRight, ImageIcon, UserPlus } from 'lucide-react';
 
 import { ResilientImage } from '@/components/resilient-image';
-import { ListingCardLink } from '@/components/listing-card-link';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -303,11 +302,10 @@ export default function AccountFollowsPage() {
                       key={`similar:${follow.listingId}`}
                       className="grid grid-cols-[5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200/70 p-3 last:border-b-0 dark:border-white/10"
                     >
-                      <ListingCardLink
+                      <Link
                         className="aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900"
                         href={encodeListingHref(follow.listingId)}
                         prefetch={false}
-                        waitForImage={Boolean(follow.image)}
                       >
                         {follow.image ? (
                           <ResilientImage
@@ -327,7 +325,7 @@ export default function AccountFollowsPage() {
                             <ImageIcon className="size-5" />
                           </span>
                         )}
-                      </ListingCardLink>
+                      </Link>
                       <Link className="min-w-0" href={encodeListingHref(follow.listingId)} prefetch={false}>
                         <h3 className="line-clamp-2 text-sm font-bold">{follow.title}</h3>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
