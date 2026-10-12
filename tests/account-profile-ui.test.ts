@@ -79,9 +79,12 @@ test('account seller profile summarizes the owner profile without listing cards'
   assert.match(sellerProfilePage, /getPublicSellerProfile\(session\.user\.id\)/);
   assert.match(sellerProfilePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(sellerProfilePage, /<SellerProfileIdentity compact sellerId=\{session\.user\.id\} sellerName=\{sellerName\}/);
+  assert.match(sellerProfilePage, /الملف الشخصي/);
+  assert.match(sellerProfilePage, /phoneNumber = seller\?\.phoneNumber \?\? session\.user\.phoneNumber/);
+  assert.match(sellerProfilePage, /رقم الجوال/);
   assert.match(sellerProfilePage, /الإعلانات المنشورة/);
   assert.match(sellerProfilePage, /عدد التقييمات/);
-  assert.match(sellerProfilePage, /بدون بطاقات إعلان/);
+  assert.doesNotMatch(sellerProfilePage, /ملفي كمعلن|ملخص عام|ملخص المعلن|بدون بطاقات إعلان/);
   assert.doesNotMatch(sellerProfilePage, /seller\.listings\.map/);
   assert.doesNotMatch(sellerProfilePage, /getSellerListingHref/);
 });

@@ -44,6 +44,7 @@ export default async function AccountSellerProfilePage() {
   const seller = await getPublicSellerProfile(session.user.id);
   const sellerName = seller?.name ?? session.user.name ?? 'عميل سوق حمد';
   const sellerPicture = seller?.picture ?? session.user.picture;
+  const phoneNumber = seller?.phoneNumber ?? session.user.phoneNumber;
   const joinedAt = seller?.joinedAt;
   const publishedListingCount = seller?.publishedListingCount ?? 0;
   const ratingCount = seller?.ratingCount ?? 0;
@@ -63,8 +64,7 @@ export default async function AccountSellerProfilePage() {
                 <img alt="سوق حمد" className="size-10 object-cover" src="/hamad-market-logo.jpeg" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-base font-bold">ملفي كمعلن</h1>
-                <p className="truncate text-xs text-muted-foreground">ملخص عام بدون بطاقات الإعلانات</p>
+                <h1 className="truncate text-base font-bold">الملف الشخصي</h1>
               </div>
             </div>
           </header>
@@ -91,6 +91,7 @@ export default async function AccountSellerProfilePage() {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{formatJoinDate(joinedAt)}</span>
                     <span>{publishedListingCount} إعلان منشور</span>
+                    {phoneNumber ? <span>رقم الجوال {phoneNumber}</span> : null}
                   </div>
                 </div>
 
@@ -101,13 +102,6 @@ export default async function AccountSellerProfilePage() {
             </section>
 
             <section className="grid min-h-0 flex-1 content-start gap-3 pt-3">
-              <div className="flex items-center justify-between gap-3 px-1 py-1">
-                <h2 className="text-base font-bold">ملخص المعلن</h2>
-                <span className="text-xs font-semibold text-muted-foreground">
-                  بدون بطاقات إعلان
-                </span>
-              </div>
-
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 text-right shadow-sm dark:border-white/10 dark:bg-card">
                   <span className="inline-flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
