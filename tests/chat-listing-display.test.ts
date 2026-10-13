@@ -267,3 +267,11 @@ test('public marketplace search supports listing id and listing links safely', (
   assert.match(store, /listing\.id\.toLowerCase\(\)\.includes/);
   assert.match(route, /const query = url\.searchParams\.get\('q'\)/);
 });
+
+test('public listings api avoids stale pagination cache for infinite scroll', () => {
+  const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
+
+  assert.match(route, /noStoreHeaders/);
+  assert.doesNotMatch(route, /getOrSetPublicJsonCache/);
+  assert.doesNotMatch(route, /createPublicCacheHeaders/);
+});

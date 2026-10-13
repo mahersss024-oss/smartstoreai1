@@ -7,7 +7,6 @@ type UseInfiniteScrollOptions = {
   isLoading: boolean;
   onLoadMore: () => void;
   rootRef?: RefObject<Element | null>;
-  rootMargin?: string;
 };
 
 const loadMoreDistancePx = 640;
@@ -33,7 +32,6 @@ export function useInfiniteScroll({
   isLoading,
   onLoadMore,
   rootRef,
-  rootMargin = '640px 0px',
 }: UseInfiniteScrollOptions): RefObject<HTMLDivElement | null> {
   const triggerRef = useRef<HTMLDivElement | null>(null);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -84,30 +82,15 @@ export function useInfiniteScroll({
       }
     };
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          requestLoadMore();
-        }
-      },
-      {
-        root: scrollRoot,
-        rootMargin,
-        threshold: 0,
-      },
-    );
-
-    observer.observe(triggerElement);
     checkScrollPosition();
     scrollTarget.addEventListener('scroll', checkScrollPosition, {
       passive: true,
     });
 
     return () => {
-      observer.disconnect();
       scrollTarget.removeEventListener('scroll', checkScrollPosition);
     };
-  }, [enabled, isLoading, rootMargin, rootRef]);
+  }, [enabled, isLoading, rootRef]);
 
   return triggerRef;
 }

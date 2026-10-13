@@ -874,17 +874,14 @@ test('paginates published marketplace listings', () => {
   assert.equal(secondPage.some((listing) => firstPageIds.has(listing.id)), false);
 });
 
-test('public marketplace listings route uses production-friendly edge cache', () => {
+test('public marketplace listings route avoids stale cache for paginated scrolling', () => {
   const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
 
-  assert.match(route, /const publicListingsCacheSeconds = 30/);
-  assert.match(route, /const publicListingsStaleWhileRevalidateSeconds = 60/);
-  assert.match(route, /ttlSeconds: publicListingsCacheSeconds/);
-  assert.match(route, /edgeMaxAgeSeconds: publicListingsCacheSeconds/);
-  assert.match(
-    route,
-    /staleWhileRevalidateSeconds: publicListingsStaleWhileRevalidateSeconds/,
-  );
+  assert.match(route, /noStoreHeaders/);
+  assert.doesNotMatch(route, /publicListingsCacheSeconds/);
+  assert.doesNotMatch(route, /publicListingsStaleWhileRevalidateSeconds/);
+  assert.doesNotMatch(route, /getOrSetPublicJsonCache/);
+  assert.doesNotMatch(route, /createPublicCacheHeaders/);
 });
 
 test('hides deleted seller listings from account views', () => {

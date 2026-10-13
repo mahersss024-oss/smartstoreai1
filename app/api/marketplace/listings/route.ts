@@ -9,10 +9,7 @@ import {
   isListingLimitReachedError,
 } from '@/agent/marketplace/listing-limits';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
-import {
-  createPublicCacheHeaders,
-  getOrSetPublicJsonCache,
-} from '@/lib/api/public-json-cache';
+import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
@@ -21,9 +18,6 @@ import { parsePaginationFromRequest } from '@/lib/pagination';
 export const dynamic = 'force-dynamic';
 
 const maxCreateListingRequestBytes = 64 * 1024;
-const publicListingsCacheSeconds = 30;
-const publicListingsStaleWhileRevalidateSeconds = 60;
-
 const createListingSchema = z.object({
   category: z.string().min(2).max(80),
   title: z.string().min(2).max(140).optional(),
@@ -56,41 +50,25 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const cacheKey = [
-    'public-listings',
-    query?.trim().toLowerCase() ?? '',
-    city?.trim().toLowerCase() ?? '',
-    pagination.page,
-    pagination.limit,
-  ].join(':');
-  const payload = await getOrSetPublicJsonCache(cacheKey, {
-    ttlSeconds: publicListingsCacheSeconds,
-    load: async () => {
-      const listings = await listMarketplaceListings({
-        query,
-        city,
-        page: pagination.page,
-        limit: pagination.limit + 1,
-      });
-      const hasMore = listings.length > pagination.limit;
-
-      return {
-        listings: listings.slice(0, pagination.limit),
-        pagination: {
-          page: pagination.page,
-          limit: pagination.limit,
-          hasMore,
-          nextPage: hasMore ? pagination.page + 1 : null,
-        },
-      };
-    },
+  const listings = await listMarketplaceListings({
+    query,
+    city,
+    page: pagination.page,
+    limit: pagination.limit + 1,
   });
+  const hasMore = listings.length > pagination.limit;
+  const payload = {
+    listings: listings.slice(0, pagination.limit),
+    pagination: {
+      page: pagination.page,
+      limit: pagination.limit,
+      hasMore,
+      nextPage: hasMore ? pagination.page + 1 : null,
+    },
+  };
 
   return Response.json(payload, {
-    headers: createPublicCacheHeaders({
-      edgeMaxAgeSeconds: publicListingsCacheSeconds,
-      staleWhileRevalidateSeconds: publicListingsStaleWhileRevalidateSeconds,
-    }),
+    headers: noStoreHeaders,
   });
 }
 
