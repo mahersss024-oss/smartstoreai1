@@ -172,6 +172,7 @@
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --native-status-bar-inset: 0px;
+    --mobile-web-app-banner-space: 0px;
     --marketplace-bottom-nav-space: calc(5rem + env(safe-area-inset-bottom));
   }
 
@@ -231,6 +232,31 @@
   html[data-native-app="true"][data-platform="android"] {
     --native-status-bar-inset: env(safe-area-inset-top, 0px);
     --safe-area-top: var(--native-status-bar-inset);
+  }
+
+  html[data-native-app="false"][data-platform="android"],
+  html[data-native-app="false"][data-platform="ios"] {
+    --mobile-web-app-banner-space: 3.5625rem;
+    --safe-area-top: calc(
+      var(--mobile-web-app-banner-space) + env(safe-area-inset-top, 0px)
+    );
+  }
+
+  html[data-native-app="false"][data-platform="android"] body,
+  html[data-native-app="false"][data-platform="ios"] body {
+    padding-top: var(--mobile-web-app-banner-space);
+  }
+
+  .open-in-app-banner {
+    height: var(--mobile-web-app-banner-space);
+  }
+
+  html[data-native-app="false"][data-platform="android"] .open-in-app-banner,
+  html[data-native-app="false"][data-platform="ios"] .open-in-app-banner {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 70;
   }
 
   html[data-native-app="true"][data-platform="android"] body > main,
@@ -296,6 +322,8 @@
   }
 
   .marketplace-shell {
+    height: calc(100dvh - var(--mobile-web-app-banner-space));
+    min-height: calc(100dvh - var(--mobile-web-app-banner-space));
     overscroll-behavior: none;
     scroll-behavior: smooth;
   }
@@ -315,8 +343,8 @@
   .smartstore-stable-page,
   .admin-viewport > main,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
-    height: 100dvh;
-    min-height: 100dvh;
+    height: calc(100dvh - var(--mobile-web-app-banner-space));
+    min-height: calc(100dvh - var(--mobile-web-app-banner-space));
     max-width: 100%;
     overflow-x: hidden;
     overflow-y: auto;
@@ -1280,7 +1308,7 @@
     /* Safety net: the overlay auto-hides via pure CSS even if JS never runs.
        The animation holds it visible, then fades it out and keeps it gone
        (forwards fill). JS only adds the "seen this session" shortcut. */
-    animation: app-welcome-lifecycle 4250ms cubic-bezier(0.22, 1, 0.36, 1)
+    animation: app-welcome-lifecycle 1720ms cubic-bezier(0.22, 1, 0.36, 1)
       forwards;
   }
 
@@ -1294,7 +1322,7 @@
   }
 
   [data-app-display="standalone"] .app-welcome {
-    animation-duration: 2720ms;
+    animation-duration: 1210ms;
     animation-name: app-welcome-standalone-lifecycle;
   }
 
@@ -1414,14 +1442,14 @@
     }
   }
 
-  /* Keeps the overlay fully visible for the reading window, then fades it out
+  /* Keeps the overlay briefly visible for the brand handoff, then fades it out
      and holds it hidden. Timings mirror lib/welcome/config.ts. */
   @keyframes app-welcome-lifecycle {
     0% {
       opacity: 1;
     }
-    /* 3.6s visible, then a 0.65s fade. */
-    85% {
+    /* 1.4s visible, then a 0.32s fade. */
+    81% {
       opacity: 1;
     }
     100% {
@@ -1434,7 +1462,7 @@
     0% {
       opacity: 1;
     }
-    81% {
+    79% {
       opacity: 1;
     }
     100% {

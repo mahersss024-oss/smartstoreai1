@@ -67,16 +67,21 @@ test('returning visits reveal the app before paint', () => {
       script.includes(`'${APP_READY_FLAG}','1'`),
     'returning visits must set the app-ready flag',
   );
+  assert.doesNotMatch(
+    script,
+    /removeChild|getElementById\('${WELCOME_ID}'\)/,
+    'the head script must not remove React-owned welcome DOM during client navigation',
+  );
 });
 
 test('welcome overlay uses a stable id and sane timings', () => {
   assert.equal(WELCOME_ID, 'smartstore-welcome');
-  assert.ok(WELCOME_VISIBLE_MS >= 3400, 'overlay should stay long enough to read');
-  assert.ok(WELCOME_VISIBLE_MS <= 4200, 'overlay should not overstay');
-  assert.ok(WELCOME_FADE_MS >= 400, 'fade should be smooth');
-  assert.ok(WELCOME_FADE_MS <= 1000, 'fade should not feel sluggish');
+  assert.ok(WELCOME_VISIBLE_MS >= 1000, 'overlay should stay long enough to register');
+  assert.ok(WELCOME_VISIBLE_MS <= 1800, 'overlay should not delay first page paint');
+  assert.ok(WELCOME_FADE_MS >= 240, 'fade should be smooth');
+  assert.ok(WELCOME_FADE_MS <= 500, 'fade should not feel sluggish');
   assert.ok(
-    WELCOME_VISIBLE_MS + WELCOME_FADE_MS <= 4500,
+    WELCOME_VISIBLE_MS + WELCOME_FADE_MS <= 2000,
     'welcome should stay intentional without blocking the app for too long',
   );
   assert.ok(
@@ -85,7 +90,7 @@ test('welcome overlay uses a stable id and sane timings', () => {
   );
   assert.ok(WELCOME_STANDALONE_FADE_MS <= WELCOME_FADE_MS);
   assert.ok(
-    WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS <= 3000,
+    WELCOME_STANDALONE_VISIBLE_MS + WELCOME_STANDALONE_FADE_MS <= 1400,
     'installed app welcome should finish quickly after the native launch screen',
   );
 });
@@ -201,7 +206,7 @@ test('welcome content fades only with the overlay background', () => {
   const globals = readFileSync(join(process.cwd(), 'app', 'globals.css'), 'utf8');
   const layout = readFileSync(join(process.cwd(), 'app', 'layout.tsx'), 'utf8');
 
-  assert.match(globals, /app-welcome-lifecycle 4250ms/);
+  assert.match(globals, /app-welcome-lifecycle 1720ms/);
   assert.match(globals, /animation: app-welcome-rise 820ms/);
   assert.match(globals, /animation-duration: 640ms/);
   assert.doesNotMatch(globals, /app-welcome-content-exit/);

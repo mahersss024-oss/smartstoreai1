@@ -41,6 +41,7 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
+  assert.match(navigation, /pathname === '\/commission-agreement'/);
 });
 
 test('mobile navigation and conversation alert avoid eager cold-load work', () => {
@@ -99,6 +100,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.admin-viewport > main/);
   assert.match(styles, /\.marketplace-home-controls/);
   assert.match(styles, /\.marketplace-listings-scroll/);
+  assert.match(styles, /--mobile-web-app-banner-space: 0px;/);
+  assert.match(styles, /html\[data-native-app="false"\]\[data-platform="android"\],[\s\S]*?--mobile-web-app-banner-space: 3\.5625rem;/);
+  assert.match(styles, /\.open-in-app-banner \{[\s\S]*?height: var\(--mobile-web-app-banner-space\);/);
   assert.match(styles, /--marketplace-bottom-nav-space: calc\(5rem \+ env\(safe-area-inset-bottom\)\);/);
   assert.match(styles, /\.marketplace-bottom-nav \{[\s\S]*?background-color: rgb\(255 255 255 \/ 0\.2\);/);
   assert.match(styles, /-webkit-backdrop-filter: blur\(28px\) saturate\(170%\);/);
@@ -110,7 +114,8 @@ test('customer section pages keep headers stable while content scrolls', () => {
     styles.indexOf('@media (pointer: coarse) and (max-width: 1023px)', styles.indexOf('.smartstore-stable-page,')),
   );
 
-  assert.match(stablePageBaseRule, /height: 100dvh;/);
+  assert.match(stablePageBaseRule, /height: calc\(100dvh - var\(--mobile-web-app-banner-space\)\);/);
+  assert.match(stablePageBaseRule, /min-height: calc\(100dvh - var\(--mobile-web-app-banner-space\)\);/);
   assert.match(stablePageBaseRule, /max-width: 100%;/);
   assert.match(stablePageBaseRule, /overflow-x: hidden;/);
   assert.match(stablePageBaseRule, /overflow-y: auto;/);
@@ -130,6 +135,10 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(readProjectFile('app', 'favorites', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.match(readProjectFile('app', 'conversations', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.match(accountListingsPage, /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
+  assert.doesNotMatch(
+    readProjectFile('app', 'page.tsx'),
+    /DropdownMenuTrigger[\s\S]{0,360}data-testid="auth-provider-trigger"/,
+  );
   assert.doesNotMatch(styles, /\.smartstore-stable-content::after/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });

@@ -83,14 +83,6 @@ import { useAppBridge } from '@/hooks/use-app-bridge';
 import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
@@ -1287,48 +1279,77 @@ function AuthProviderMenu() {
   const [open, setOpen] = useState(false);
   const authProviders = useAuthProviderVisibility();
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
+
   return (
-    <DropdownMenu dir="rtl" open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          size="sm"
-          className="rounded-md bg-blue-600 hover:bg-blue-700"
-          data-testid="auth-provider-trigger"
-          aria-label="تسجيل الدخول"
-          onClick={() => setOpen(true)}
-          onPointerUp={() => setOpen(true)}
-        >
-          <User className="size-4" />
-          دخول
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-56 border-slate-200/70 p-1.5 shadow-xl dark:border-white/10"
-        data-testid="auth-provider-menu"
+    <div className="relative" dir="rtl">
+      <Button
+        size="sm"
+        className="rounded-md bg-blue-600 hover:bg-blue-700"
+        data-testid="auth-provider-trigger"
+        aria-label="تسجيل الدخول"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
       >
-        <DropdownMenuLabel className="text-right text-xs text-muted-foreground">
-          الدخول إلى حسابك
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {authProviders.google ? (
-          <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
-            <a href="/api/auth/google/start">
+        <User className="size-4" />
+        دخول
+      </Button>
+      {open ? (
+        <div
+          className="absolute left-0 top-[calc(100%+0.45rem)] z-[85] grid w-56 gap-1 rounded-md border border-slate-200/70 bg-popover p-1.5 text-popover-foreground shadow-xl dark:border-white/10"
+          role="menu"
+          aria-label="مزودات تسجيل الدخول"
+          onMouseDown={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
+          onClick={() => setOpen(false)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setOpen(false);
+            }
+          }}
+          tabIndex={-1}
+          data-testid="auth-provider-menu"
+        >
+          <div className="px-2 py-1.5 text-right text-xs text-muted-foreground">
+            الدخول إلى حسابك
+          </div>
+          {authProviders.google ? (
+            <a
+              className="flex h-10 items-center justify-between rounded-md px-3 text-right text-sm hover:bg-accent"
+              href="/api/auth/google/start"
+              role="menuitem"
+            >
               <span>دخول Google</span>
               <GoogleMark className="size-5" />
             </a>
-          </DropdownMenuItem>
-        ) : null}
-        {authProviders.apple ? (
-          <DropdownMenuItem asChild className="h-10 justify-between rounded-md px-3 text-right">
-            <a href="/api/auth/apple/start">
+          ) : null}
+          {authProviders.apple ? (
+            <a
+              className="flex h-10 items-center justify-between rounded-md px-3 text-right text-sm hover:bg-accent"
+              href="/api/auth/apple/start"
+              role="menuitem"
+            >
               <span>دخول Apple</span>
               <AppleMark className="size-5 text-foreground" />
             </a>
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -2361,7 +2382,13 @@ export default function Page() {
       return undefined;
     }
 
-    if (!isChatInputFocused || !visualViewportFrame) {
+    const visualViewportHeight = visualViewportFrame?.height;
+    const hasKeyboardViewport =
+      typeof visualViewportHeight === 'number' &&
+      typeof window !== 'undefined' &&
+      visualViewportHeight < window.innerHeight - 24;
+
+    if (!isChatInputFocused || !visualViewportFrame || !hasKeyboardViewport) {
       return {
         blockSize: 'auto',
         bottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
@@ -2370,7 +2397,7 @@ export default function Page() {
         maxWidth: '40rem',
         minHeight: '0',
         position: 'fixed',
-        top: 'calc(env(safe-area-inset-top) + 0.5rem)',
+        top: 'calc(var(--safe-area-top) + 0.5rem)',
         width: 'calc(100% - 2rem)',
       };
     }
