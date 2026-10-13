@@ -7,7 +7,10 @@ import { useAuthSession } from '@/hooks/use-auth-session';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 const conversationAlertStorageKey = 'smartstore_conversation_alert';
+const conversationAlertLastSyncStorageKey =
+  'smartstore_conversation_alert_last_sync';
 const unreadConversationSyncIdleTimeoutMs = 2500;
+const unreadConversationSyncMinIntervalMs = 60_000;
 
 type UseConversationMessageAlertOptions = {
   userId?: string | null;
@@ -37,6 +40,14 @@ function isMessageReadBy(
   );
 }
 
+function getLastUnreadConversationSyncTime() {
+  const stored = Number(
+    window.localStorage.getItem(conversationAlertLastSyncStorageKey),
+  );
+
+  return Number.isFinite(stored) ? stored : 0;
+}
+
 export function useConversationMessageAlert({
   userId,
 }: UseConversationMessageAlertOptions = {}) {
@@ -51,7 +62,20 @@ export function useConversationMessageAlert({
       return;
     }
 
+    const now = Date.now();
+
+    if (now - getLastUnreadConversationSyncTime() < unreadConversationSyncMinIntervalMs) {
+      setHasConversationAlert(
+        window.localStorage.getItem(conversationAlertStorageKey) === '1',
+      );
+      return;
+    }
+
     try {
+      window.localStorage.setItem(
+        conversationAlertLastSyncStorageKey,
+        String(now),
+      );
       const response = await fetch('/api/marketplace/me/conversations?page=1&limit=48', {
         cache: 'no-store',
       });

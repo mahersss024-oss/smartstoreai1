@@ -58,6 +58,8 @@ test('mobile navigation and conversation alert avoid eager cold-load work', () =
   assert.doesNotMatch(navigation, /onTouchStart/);
   assert.match(alertHook, /scheduleIdleTask/);
   assert.match(alertHook, /unreadConversationSyncIdleTimeoutMs/);
+  assert.match(alertHook, /unreadConversationSyncMinIntervalMs = 60_000/);
+  assert.match(alertHook, /conversationAlertLastSyncStorageKey/);
   assert.doesNotMatch(alertHook, /useSmartstoreRealtime/);
   assert.doesNotMatch(alertHook, /queueMicrotask\(\(\) => \{\s*if \(!cancelled\) \{\s*if \(currentUserId\)/);
 });
