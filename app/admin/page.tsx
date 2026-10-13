@@ -120,7 +120,12 @@ export default function AdminHomePage() {
         { label: 'الإعلانات المنشورة', value: overview.publishedListings, icon: FileCheck2 },
         { label: 'البلاغات المفتوحة', value: overview.openReports, icon: Flag },
       ]
-    : [];
+    : [
+        { label: 'إجمالي المستخدمين', value: null, icon: Users },
+        { label: 'المستخدمون النشطون', value: null, icon: Activity },
+        { label: 'الإعلانات المنشورة', value: null, icon: FileCheck2 },
+        { label: 'البلاغات المفتوحة', value: null, icon: Flag },
+      ];
 
   return (
     <main
@@ -131,7 +136,7 @@ export default function AdminHomePage() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300/70 pb-4 dark:border-slate-700/70">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/account" aria-label="العودة إلى حسابي">
+              <Link href="/account" aria-label="العودة إلى حسابي" prefetch={false}>
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -170,17 +175,19 @@ export default function AdminHomePage() {
         {isAdminAccessAllowed && (
           <>
           {canManageUsers && (
-            <section aria-label="إحصائيات الإدارة" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <section aria-label="إحصائيات الإدارة" className="relative grid grid-cols-2 gap-3 lg:grid-cols-4">
               {statisticCards.map((statistic) => {
                 const Icon = statistic.icon;
                 return (
                   <div key={statistic.label} className="min-w-0 border-b border-slate-300/70 px-1 py-4 dark:border-slate-700/70">
                     <div className="flex items-center gap-2 text-muted-foreground"><Icon className="size-4" /><span className="truncate text-xs">{statistic.label}</span></div>
-                    <div className="mt-2 text-2xl font-bold">{new Intl.NumberFormat('ar-SA').format(statistic.value)}</div>
+                    <div className={statistic.value === null ? 'mt-2 text-2xl font-bold opacity-0' : 'mt-2 text-2xl font-bold'} aria-hidden={statistic.value === null}>
+                      {new Intl.NumberFormat('ar-SA').format(statistic.value ?? 0)}
+                    </div>
                   </div>
                 );
               })}
-              {!overview && !overviewNotice && <p className="col-span-full py-4 text-sm text-muted-foreground">جار تحميل الإحصائيات...</p>}
+              {!overview && !overviewNotice && <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-muted-foreground">جار تحميل الإحصائيات...</p>}
               {overviewNotice && <p className="col-span-full py-4 text-sm text-red-700 dark:text-red-300">{overviewNotice}</p>}
             </section>
           )}
@@ -189,6 +196,7 @@ export default function AdminHomePage() {
               <Link
                 key={section.href}
                 href={section.href}
+                prefetch={false}
                 className="group flex items-center gap-3 border-b border-slate-300/70 py-4 transition-colors last:border-b-0 hover:text-blue-700 dark:border-slate-700/70 dark:hover:text-blue-300"
               >
                 <span className="grid size-10 shrink-0 place-items-center text-blue-700 dark:text-blue-300">

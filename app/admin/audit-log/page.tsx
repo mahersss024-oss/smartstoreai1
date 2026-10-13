@@ -92,7 +92,7 @@ export default function AdminAuditLogPage() {
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300/70 pb-4 dark:border-slate-700/70">
           <div className="flex items-center gap-3">
-            <Button asChild variant="outline" size="icon"><Link href="/admin" aria-label="العودة"><ArrowRight className="size-4" /></Link></Button>
+            <Button asChild variant="outline" size="icon"><Link href="/admin" aria-label="العودة" prefetch={false}><ArrowRight className="size-4" /></Link></Button>
             <ClipboardList className="size-6 text-blue-700 dark:text-blue-300" />
             <div><h1 className="font-bold">سجل الإدارة</h1><p className="text-xs text-muted-foreground">سجل تدقيق للعمليات الإدارية الحساسة</p></div>
           </div>

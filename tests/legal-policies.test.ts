@@ -15,6 +15,12 @@ test('registration agreement explicitly accepts platform policies', () => {
   assert.match(agreementPage, /سياسة الإعلانات/);
   assert.match(agreementPage, /سياسة رسوم المنصة/);
   assert.match(agreementPage, /أقر برسوم منصة 1%/);
+  for (const href of ['/terms', '/privacy', '/listing-policy', '/commission-policy']) {
+    assert.match(
+      agreementPage,
+      new RegExp(`href="${href.replace(/\//g, '\\/')}"[\\s\\S]{0,160}prefetch=\\{false\\}`),
+    );
+  }
 });
 
 test('privacy policy describes service providers without naming vendors', () => {
@@ -34,4 +40,6 @@ test('home and policy navigation keep legal links concise and discoverable', () 
 
   assert.match(legalPolicyPage, /href: '\/delete-account'/);
   assert.match(legalPolicyPage, /label: 'حذف الحساب'/);
+  assert.match(legalPolicyPage, /<Link href="\/" prefetch=\{false\}>/);
+  assert.match(legalPolicyPage, /<Link href=\{link\.href\} prefetch=\{false\}>/);
 });

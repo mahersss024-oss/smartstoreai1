@@ -92,16 +92,16 @@ export default function CommissionAgreementPage() {
                 أقر بأنني اطلعت على شروط الاستخدام وسياسة الخصوصية وسياسة الإعلانات وسياسة رسوم المنصة، وأوافق عليها. كما أقر بأنني إذا أتممت عملية بيع منتج عن طريق سوق حمد، فإنني أوافق على دفع رسوم منصة مقدارها 1% من قيمة المنتج. لا تمنع هذه الخطوة التصفح أو السؤال، لكنها مطلوبة قبل إنشاء حساب وتنفيذ العمليات المرتبطة بالحساب.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms" prefetch={false}>
                   شروط الاستخدام
                 </Link>
-                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/privacy">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/privacy" prefetch={false}>
                   سياسة الخصوصية
                 </Link>
-                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/listing-policy">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/listing-policy" prefetch={false}>
                   سياسة الإعلانات
                 </Link>
-                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/commission-policy">
+                <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/commission-policy" prefetch={false}>
                   سياسة رسوم المنصة
                 </Link>
               </div>

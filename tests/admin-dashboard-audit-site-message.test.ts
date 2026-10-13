@@ -78,6 +78,11 @@ test('audit log is server protected, paginated, filterable and read-only', async
   assert.doesNotMatch(route, /export async function (PATCH|POST|PUT|DELETE)/);
   assert.match(page, /سجل الإدارة/);
   assert.match(page, /useAdminAccess\('admin'\)/);
+  const adminPage = await source('app/admin/page.tsx');
+  assert.match(adminPage, /value: null/);
+  assert.match(adminPage, /absolute inset-x-0 top-1\/2/);
+  assert.match(adminPage, /prefetch=\{false\}/);
+  assert.match(page, /prefetch=\{false\}/);
 });
 
 test('site message visibility honors activation and expiration', () => {

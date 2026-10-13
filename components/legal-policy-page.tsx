@@ -71,7 +71,7 @@ export function LegalPolicyPage({
             </div>
           </div>
           <Button asChild variant="outline" size="sm" className="rounded-md">
-            <Link href="/">العودة للسوق</Link>
+            <Link href="/" prefetch={false}>العودة للسوق</Link>
           </Button>
         </header>
 
@@ -94,7 +94,7 @@ export function LegalPolicyPage({
                 size="sm"
                 className="h-9 rounded-md"
               >
-                <Link href={link.href}>{link.label}</Link>
+                <Link href={link.href} prefetch={false}>{link.label}</Link>
               </Button>
             ))}
           </nav>
