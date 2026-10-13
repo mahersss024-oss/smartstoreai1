@@ -52,7 +52,7 @@ test('mobile navigation and conversation alert avoid eager cold-load work', () =
     navigation,
     /\['\/', '\/account', '\/account\/listings', '\/favorites', '\/conversations'\]\.forEach/,
   );
-  assert.doesNotMatch(navigation, /router\.prefetch/);
+  assert.match(navigation, /window\.setTimeout\(\(\) => \{[\s\S]*?router\.prefetch\(href\);[\s\S]*?\}, 1200\)/);
   assert.doesNotMatch(navigation, /prefetchNavigationTarget/);
   assert.doesNotMatch(navigation, /onPointerEnter/);
   assert.doesNotMatch(navigation, /onTouchStart/);

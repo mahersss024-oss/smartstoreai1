@@ -1185,10 +1185,10 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
     (image) => image.status === 'approved',
   );
   const imageUrls = getDurableImageUrls(
-    listing.image,
-    ...(listing.imageUrls ?? []),
     primaryImage?.thumbnailUrl,
     primaryImage?.displayUrl,
+    listing.image,
+    ...(listing.imageUrls ?? []),
     primaryImage?.originalUrl,
   );
 
@@ -1732,11 +1732,11 @@ function ListingCardView({
                 fallbackSrcs={listing.imageFallbacks}
                 fallback={<ListingImageFallback />}
                 fetchPriority={prioritizeImage ? 'high' : 'auto'}
-                height={320}
+                height={116}
                 loading={prioritizeImage ? 'eager' : 'lazy'}
                 sizes="(min-width: 640px) 116px, 100px"
                 src={listing.image}
-                width={320}
+                width={116}
               />
             </>
           ) : (
@@ -4686,7 +4686,7 @@ export default function Page() {
                     listing={listing}
                     onAsk={sendStarter}
                     onOpen={openListing}
-                    prioritizeImage={index < 2}
+                    prioritizeImage={index < 4}
                     variant="horizontal"
                   />
                 ))}

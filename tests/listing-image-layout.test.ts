@@ -188,7 +188,7 @@ test('home marketplace prioritizes only initial viewport listing images', async 
   const source = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
 
   assert.match(source, /prioritizeImage\?: boolean/);
-  assert.match(source, /prioritizeImage=\{index < 2\}/);
+  assert.match(source, /prioritizeImage=\{index < 4\}/);
   assert.match(source, /loading=\{prioritizeImage \? 'eager' : 'lazy'\}/);
   assert.match(source, /fetchPriority=\{prioritizeImage \? 'high' : 'auto'\}/);
   assert.doesNotMatch(source, /loading="eager"/);
