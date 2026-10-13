@@ -460,8 +460,10 @@ function isRetryablePrismaWriteConflict(error: unknown) {
   );
 }
 
+const maxSerializableWriteAttempts = 8;
+
 function waitForSerializableRetry(attempt: number) {
-  return new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+  return new Promise((resolve) => setTimeout(resolve, 35 * (attempt + 1)));
 }
 
 function getActorId(actor: Actor) {
@@ -2284,7 +2286,7 @@ export async function createListingDraft(
   const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
   let listing: DatabaseListingRecord | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
     try {
       listing = await prisma.$transaction(
         async (tx) => {
@@ -2323,7 +2325,10 @@ export async function createListingDraft(
       );
       break;
     } catch (error) {
-      if (!isPrismaKnownRequestError(error, 'P2034') || attempt === 2) {
+      if (
+        !isPrismaKnownRequestError(error, 'P2034') ||
+        attempt === maxSerializableWriteAttempts - 1
+      ) {
         throw error;
       }
 
@@ -2630,7 +2635,7 @@ export async function addListingImageForSeller(
 
   let listing: DatabaseListingRecord | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
     try {
       listing = await prisma.$transaction(
         async (tx) => {
@@ -2678,7 +2683,10 @@ export async function addListingImageForSeller(
       );
       break;
     } catch (error) {
-      if (!isPrismaKnownRequestError(error, 'P2034') || attempt === 2) {
+      if (
+        !isPrismaKnownRequestError(error, 'P2034') ||
+        attempt === maxSerializableWriteAttempts - 1
+      ) {
         throw error;
       }
 
@@ -4441,7 +4449,7 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
       }
     | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
     try {
       result = await prisma.$transaction(
         async (tx) => {
@@ -4515,7 +4523,10 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
       );
       break;
     } catch (error) {
-      if (!isRetryablePrismaWriteConflict(error) || attempt === 2) {
+      if (
+        !isRetryablePrismaWriteConflict(error) ||
+        attempt === maxSerializableWriteAttempts - 1
+      ) {
         throw error;
       }
 
