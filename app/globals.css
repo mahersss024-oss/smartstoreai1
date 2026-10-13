@@ -377,12 +377,9 @@
     .smartstore-stable-content,
     .admin-viewport > main > div,
     main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div {
-      padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+      padding-bottom: var(--marketplace-bottom-nav-space);
     }
 
-    .smartstore-stable-content::after,
-    .admin-viewport > main > div::after,
-    main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) > div::after,
     .marketplace-listings-scroll::after {
       content: "";
       display: block;

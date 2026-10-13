@@ -125,8 +125,9 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /main\[class\*="bg-\[#e8edf3\]"\]:not\(\.marketplace-shell\):not\(\.customer-conversation-page\)/);
   assert.match(styles, /\.smartstore-stable-page header,[\s\S]*?\.admin-viewport form,[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;/);
   assert.match(styles, /\.smartstore-stable-page \[dir="ltr"\],[\s\S]*?\.admin-viewport \[dir="ltr"\],[\s\S]*?overflow-wrap: anywhere;/);
-  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: calc\(1rem \+ env\(safe-area-inset-bottom\)\);/);
-  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?\.smartstore-stable-content::after,[\s\S]*?height: var\(--marketplace-bottom-nav-space\);/);
+  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: var\(--marketplace-bottom-nav-space\);/);
+  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?\.marketplace-listings-scroll::after[\s\S]*?height: var\(--marketplace-bottom-nav-space\);/);
+  assert.doesNotMatch(styles, /\.smartstore-stable-content::after/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
 
