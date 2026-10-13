@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('listing details keeps up to eight thumbnails and opens a full-screen lightbox', async () => {
+test('listing details keeps up to eight full-width images and opens a full-screen lightbox', async () => {
   const source = await readFile(
     new URL('../app/listings/[listingId]/listing-image-gallery.tsx', import.meta.url),
     'utf8',
@@ -60,6 +60,7 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.match(source, /displayUrl: string/);
   assert.match(source, /thumbnailUrl: string/);
   assert.match(source, /src=\{thumbnailUrl\}/);
+  assert.match(source, /src=\{displayUrl\}/);
   assert.match(source, /src=\{selectedLightboxUrl\}/);
   assert.match(source, /decoding="async"/);
   assert.match(source, /new Image\(\)/);
@@ -71,9 +72,11 @@ test('listing details keeps up to eight thumbnails and opens a full-screen light
   assert.doesNotMatch(source, /transition-transform duration-150/);
   assert.doesNotMatch(source, /className="max-h-full max-w-full object-contain"[\s\S]*src=\{selectedImage\}/);
   assert.match(source, /\{visibleImages\.length > 0 && \(/);
-  assert.match(source, /className="grid grid-cols-4 gap-1\.5 p-2 sm:p-3"/);
+  assert.match(source, /className="grid gap-3 px-1 py-2 sm:px-2"/);
+  assert.match(source, /min-h-\[min\(64dvh,34rem\)\]/);
   assert.match(source, /className="h-full w-full object-contain"/);
   assert.match(source, /bg-slate-100 transition/);
+  assert.doesNotMatch(source, /className="grid grid-cols-4 gap-1\.5 p-2 sm:p-3"/);
   assert.doesNotMatch(source, /aspect-\[16\/9\] w-full overflow-hidden/);
   assert.doesNotMatch(source, /max-h-\[18rem\]/);
   assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
@@ -176,7 +179,9 @@ test('customer listing pages avoid large framed containers for scalable lists', 
   assert.match(accountListings, /rounded-md border border-slate-200\/75 bg-white\/88/);
   assert.match(accountListings, /\[contain-intrinsic-size:220px\]/);
   assert.match(accountListings, /dark:border-white\/10 dark:bg-card\/72/);
-  assert.match(listingDetails, /grid items-start gap-4 px-1 py-3/);
+  assert.match(listingDetails, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(listingDetails, /marketplace-home-controls shrink-0/);
+  assert.match(listingDetails, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
   assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?grid[\s\S]*?flex-1[\s\S]*?pb-\[calc\(6\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(followsPage, /items-center gap-3 border-b border-slate-200\/70 p-3/);
   assert.doesNotMatch(accountListings, /rounded-md border bg-white\/60 py-3/);
@@ -199,6 +204,22 @@ test('native wrapper and browser request the same first marketplace listings pag
 
   assert.match(source, /params\.set\('limit', '24'\)/);
   assert.doesNotMatch(source, /isNativeApp \? '12' : '24'/);
+});
+
+test('home infinite scroll observes the listings scroll container', async () => {
+  const [homePage, infiniteScrollHook] = await Promise.all([
+    readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../hooks/use-infinite-scroll.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(infiniteScrollHook, /rootRef\?: RefObject<Element \| null>/);
+  assert.match(infiniteScrollHook, /function findNearestScrollRoot\(element: Element\)/);
+  assert.match(infiniteScrollHook, /\/\(auto\|scroll\|overlay\)\/\.test\(overflowY\)/);
+  assert.match(infiniteScrollHook, /rootRef\?\.current \?\? findNearestScrollRoot\(triggerElement\)/);
+  assert.match(infiniteScrollHook, /root: scrollRoot/);
+  assert.match(homePage, /marketplaceListingsScrollRef = useRef<HTMLDivElement \| null>\(null\)/);
+  assert.match(homePage, /rootRef: marketplaceListingsScrollRef/);
+  assert.match(homePage, /ref=\{marketplaceListingsScrollRef\}/);
 });
 
 test('listing cards keep normal navigation while images load', async () => {

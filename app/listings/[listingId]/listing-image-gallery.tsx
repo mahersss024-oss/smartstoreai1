@@ -334,13 +334,13 @@ export function ListingImageGallery({
 
   return (
     <section className="w-full overflow-hidden">
-      <div className="grid gap-2">
+      <div className="grid gap-3">
         {visibleImages.length > 0 && (
-          <div className="grid grid-cols-4 gap-1.5 p-2 sm:p-3">
+          <div className="grid gap-3 px-1 py-2 sm:px-2">
             {visibleImages.map((image, index) => {
               const isSelected = index === selectedImageIndex;
-              const thumbnailUrl =
-                typeof image === 'string' ? image : image.thumbnailUrl;
+              const displayUrl =
+                typeof image === 'string' ? image : image.displayUrl;
 
               return (
                 <button
@@ -351,21 +351,21 @@ export function ListingImageGallery({
                   }
                   aria-label={`${title} - فتح الصورة ${index + 1} بالحجم الكامل`}
                   aria-pressed={isSelected}
-                  className={`aspect-square overflow-hidden rounded-md bg-slate-100 transition ${
+                  className={`min-h-[min(64dvh,34rem)] overflow-hidden rounded-md bg-slate-100 transition sm:min-h-[30rem] ${
                     isSelected
-                      ? 'border-blue-600 ring-2 ring-blue-600/30'
-                      : 'hover:border-blue-400'
+                      ? 'ring-2 ring-blue-600/30'
+                      : 'hover:ring-2 hover:ring-blue-400/30'
                   }`}
                   onClick={() => openLightbox(index)}
                   type="button"
                 >
                   <ResilientImage
-                    alt=""
+                    alt={`${title} - الصورة ${index + 1}`}
                     className="h-full w-full object-contain"
                     decoding="async"
                     fallback={<ImageIcon className="size-4 text-slate-500 dark:text-slate-400" />}
                     loading={index === 0 ? 'eager' : 'lazy'}
-                    src={thumbnailUrl}
+                    src={displayUrl}
                   />
                 </button>
               );

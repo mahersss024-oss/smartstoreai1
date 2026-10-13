@@ -616,7 +616,7 @@ function getDetailSimilarListings(
     uniqueMatches.set(candidate.id, candidate);
   }
 
-  return [...uniqueMatches.values()].slice(0, 6);
+  return [...uniqueMatches.values()].slice(0, 20);
 }
 
 export default async function ListingDetailsPage({ params, searchParams }: PageProps) {
@@ -643,7 +643,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   const candidateSimilarListings = await listMarketplaceListings({
     category: listing.category,
     city: listing.city,
-    limit: 24,
+    limit: 48,
   });
   let similarListings = getDetailSimilarListings(
     listing,
@@ -653,7 +653,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   if (similarListings.length < 3) {
     const widerSimilarListings = await listMarketplaceListings({
       category: listing.category,
-      limit: 24,
+      limit: 48,
     });
 
     similarListings = getDetailSimilarListings(
@@ -724,9 +724,9 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
   const saleTerms = formatSaleTerms(listing.price, listing.attributes);
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-4xl gap-3 px-3 py-4 sm:px-5">
-        <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
+    <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="marketplace-panel mx-auto flex h-full min-h-0 max-w-4xl flex-col px-3 py-3 sm:px-5">
+        <header className="marketplace-home-controls shrink-0 border-b border-slate-300/70 px-1 py-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href={returnHref}>
@@ -740,8 +740,8 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
           </div>
         </header>
 
-        <section className="grid items-start gap-4 px-1 py-3 sm:px-2 lg:grid-cols-[minmax(0,1fr)_14rem]">
-          <div className="grid min-w-0 gap-3">
+        <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-[var(--marketplace-bottom-nav-space)] pt-3 sm:px-2">
+          <div className="mx-auto grid max-w-3xl gap-3 pb-4">
             <section className="px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">
                 <Link
@@ -773,36 +773,6 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                     </span>
                   </div>
                 </div>
-              </div>
-            </section>
-
-            <ListingImageGallery
-              images={images}
-              title={listing.title ?? 'صورة الإعلان'}
-            />
-
-            <section className="grid gap-2 px-1 py-2 sm:px-2">
-              {!isOwnListing && (
-                <ListingContactActions
-                  listingId={listing.id}
-                  sellerPhoneNumber={sellerProfile?.phoneNumber}
-                />
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                {!isOwnListing && (
-                  <ListingSafetyActions
-                    listingId={listing.id}
-                    sellerId={listing.sellerId}
-                    showReport={false}
-                  />
-                )}
-                <ListingShareButton
-                  className={`h-10 w-full rounded-md ${
-                    isOwnListing ? 'col-span-2' : ''
-                  }`}
-                  listingId={listing.id}
-                  title={listing.title ?? 'إعلان سوق حمد'}
-                />
               </div>
             </section>
 
@@ -883,26 +853,35 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
               )}
             </section>
 
-          </div>
+            <ListingImageGallery
+              images={images}
+              title={listing.title ?? 'صورة الإعلان'}
+            />
 
-          <aside className="grid h-fit gap-3">
-            <section className="px-1 py-3 sm:px-2">
-              <div className="mb-4">
-                <div className="text-xs text-muted-foreground">السعر المطلوب</div>
-                <div className="mt-1 text-xl font-bold text-blue-700">{formatPrice(listing.price)}</div>
-              </div>
+            <section className="grid gap-2 px-1 py-2 sm:px-2">
+              {!isOwnListing && (
+                <ListingContactActions
+                  listingId={listing.id}
+                  sellerPhoneNumber={sellerProfile?.phoneNumber}
+                />
+              )}
               <ListingShareButton
-                className="mb-3 hidden h-11 w-full rounded-md"
+                className="h-10 w-full rounded-md"
                 listingId={listing.id}
                 title={listing.title ?? 'إعلان سوق حمد'}
               />
-              <ListingSafetyActions
-                listingId={listing.id}
-                sellerId={listing.sellerId}
-                isOwnListing={isOwnListing}
-                showFavorite={false}
-              />
             </section>
+
+            {!isOwnListing && (
+              <section className="px-1 py-3 sm:px-2">
+                <div className="mb-3 text-sm font-bold">الإبلاغ والحفظ</div>
+                <ListingSafetyActions
+                  listingId={listing.id}
+                  sellerId={listing.sellerId}
+                  isOwnListing={isOwnListing}
+                />
+              </section>
+            )}
 
             <section className="px-1 py-3 sm:px-2">
               <div className="mb-2 text-sm font-bold">نشاط الإعلان</div>
@@ -1005,7 +984,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 </div>
               </section>
             )}
-          </aside>
+          </div>
         </section>
       </div>
     </main>

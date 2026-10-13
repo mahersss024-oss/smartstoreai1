@@ -67,7 +67,7 @@ test('listing owner details page keeps only share action visible', () => {
   assert.match(listingPage, /const isOwnListing = session\?\.user\.id === listing\.sellerId/);
   assert.match(listingPage, /!\s*isOwnListing && \(\s*<ListingContactActions/);
   assert.match(listingPage, /!\s*isOwnListing && \(/);
-  assert.match(listingPage, /isOwnListing \? 'col-span-2' : ''/);
+  assert.match(listingPage, /<ListingShareButton[\s\S]*className="h-10 w-full rounded-md"/);
   assert.match(listingPage, /isOwnListing=\{isOwnListing\}/);
   assert.match(safetyActions, /isOwnListing = false/);
   assert.match(safetyActions, /useState\(!isOwnListing\)/);

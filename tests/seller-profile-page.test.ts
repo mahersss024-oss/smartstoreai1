@@ -140,7 +140,7 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /getDetailSimilarListings/);
   assert.match(listingPage, /strictMatches = getComparableListings/);
   assert.match(listingPage, /similarListings\.length < 3/);
-  assert.match(listingPage, /slice\(0, 6\)/);
+  assert.match(listingPage, /slice\(0, 20\)/);
   assert.match(listingPage, /getSimilarListingHref\(similarListing\.id, listing\.id\)/);
   assert.match(listingPage, /source === 'listing'/);
   assert.match(listingPage, /sourceListingId/);
@@ -153,6 +153,9 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /grid grid-cols-2 gap-2 text-xs/);
   assert.match(listingPage, /rounded-md border border-border\/60 bg-background\/45 px-3 py-2/);
   assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
+  assert.match(listingPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(listingPage, /marketplace-home-controls shrink-0/);
+  assert.match(listingPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
   assert.doesNotMatch(listingPage, /relaxedMatches/);
   assert.ok(activityIndex !== -1 && latestUpdateIndex !== -1 && similarAdsIndex !== -1);
   assert.ok(activityIndex < latestUpdateIndex);

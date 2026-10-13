@@ -6,13 +6,31 @@ type UseInfiniteScrollOptions = {
   enabled: boolean;
   isLoading: boolean;
   onLoadMore: () => void;
+  rootRef?: RefObject<Element | null>;
   rootMargin?: string;
 };
+
+function findNearestScrollRoot(element: Element): Element | null {
+  let parent = element.parentElement;
+
+  while (parent && parent !== document.body && parent !== document.documentElement) {
+    const overflowY = window.getComputedStyle(parent).overflowY;
+
+    if (/(auto|scroll|overlay)/.test(overflowY)) {
+      return parent;
+    }
+
+    parent = parent.parentElement;
+  }
+
+  return null;
+}
 
 export function useInfiniteScroll({
   enabled,
   isLoading,
   onLoadMore,
+  rootRef,
   rootMargin = '640px 0px',
 }: UseInfiniteScrollOptions): RefObject<HTMLDivElement | null> {
   const triggerRef = useRef<HTMLDivElement | null>(null);
@@ -29,6 +47,8 @@ export function useInfiniteScroll({
       return;
     }
 
+    const scrollRoot = rootRef?.current ?? findNearestScrollRoot(triggerElement);
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -36,7 +56,7 @@ export function useInfiniteScroll({
         }
       },
       {
-        root: null,
+        root: scrollRoot,
         rootMargin,
         threshold: 0,
       },

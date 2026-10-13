@@ -2052,6 +2052,7 @@ export default function Page() {
   const [manualListingSubmission, setManualListingSubmission] =
     useState<ManualListingSubmission | null>(null);
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
+  const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
   const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
@@ -3925,6 +3926,7 @@ export default function Page() {
     enabled: canLoadMoreListings,
     isLoading: isLoadingListings,
     onLoadMore: loadMoreListings,
+    rootRef: marketplaceListingsScrollRef,
   });
 
   const startNewChat = useCallback(() => {
@@ -4636,6 +4638,7 @@ export default function Page() {
               </div>
 
               <div
+                ref={marketplaceListingsScrollRef}
                 className={cn(
                   'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-3 lg:pb-1',
                 )}
