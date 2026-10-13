@@ -7,7 +7,7 @@ const baseURL =
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
-  globalTimeout: 120_000,
+  globalTimeout: process.env.CI ? 300_000 : 180_000,
   expect: {
     timeout: 10_000,
   },
