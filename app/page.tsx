@@ -3098,7 +3098,7 @@ export default function Page() {
     }
 
     params.set('page', String(page));
-    params.set('limit', isNativeApp ? '12' : '24');
+    params.set('limit', '24');
 
     const endpoint = `/api/marketplace/listings?${params.toString()}`;
 

@@ -194,6 +194,13 @@ test('home marketplace prioritizes only initial viewport listing images', async 
   assert.doesNotMatch(source, /loading="eager"/);
 });
 
+test('native wrapper and browser request the same first marketplace listings page', async () => {
+  const source = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /params\.set\('limit', '24'\)/);
+  assert.doesNotMatch(source, /isNativeApp \? '12' : '24'/);
+});
+
 test('listing cards keep normal navigation while images load', async () => {
   const sources = await Promise.all([
     readFile(new URL('../app/favorites/page.tsx', import.meta.url), 'utf8'),
