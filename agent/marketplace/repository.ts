@@ -509,15 +509,22 @@ function getSimilarListingFollowKey(userId: string, listingId: string) {
   return `${userId}:${listingId}`;
 }
 
-function buildFollowNotificationBody(listing: memoryStore.ListingRecord) {
+type FollowNotificationListing = {
+  id: string;
+  sellerId: string;
+  title?: string | null;
+  city?: string | null;
+};
+
+function buildFollowNotificationBody(listing: FollowNotificationListing) {
   const title = listing.title?.trim() || 'إعلان جديد';
   const city = listing.city?.trim();
 
   return city ? `${title} في ${city}` : title;
 }
 
-async function createFollowNotificationsForListing(
-  listing: memoryStore.ListingRecord,
+export async function createFollowNotificationsForListing(
+  listing: FollowNotificationListing,
   followerIds: string[],
   options: {
     title?: string;
@@ -1269,7 +1276,10 @@ export async function getSellerFollowState(sellerId: string, follower: Actor) {
   }
 
   const [seller, existingFollow, followerCount] = await Promise.all([
-    prisma.user.findUnique({ where: { id: sellerId }, select: { id: true } }),
+    prisma.user.findFirst({
+      where: { id: sellerId, deletedAt: null },
+      select: { id: true },
+    }),
     prisma.sellerFollow.findUnique({
       where: {
         followerId_sellerId: {
@@ -1781,8 +1791,8 @@ export async function toggleSellerFollow(sellerId: string, follower: Actor) {
     };
   }
 
-  const seller = await prisma.user.findUnique({
-    where: { id: sellerId },
+  const seller = await prisma.user.findFirst({
+    where: { id: sellerId, deletedAt: null },
     select: { id: true },
   });
 
@@ -1855,7 +1865,10 @@ export async function getSellerRatingState(sellerId: string, rater: Actor) {
   }
 
   const [seller, rating, aggregate] = await Promise.all([
-    prisma.user.findUnique({ where: { id: sellerId }, select: { id: true } }),
+    prisma.user.findFirst({
+      where: { id: sellerId, deletedAt: null },
+      select: { id: true },
+    }),
     prisma.sellerRating.findUnique({
       where: {
         raterId_sellerId: {
@@ -1941,8 +1954,8 @@ export async function rateSeller(
     };
   }
 
-  const seller = await prisma.user.findUnique({
-    where: { id: sellerId },
+  const seller = await prisma.user.findFirst({
+    where: { id: sellerId, deletedAt: null },
     select: { id: true },
   });
 
@@ -2025,8 +2038,8 @@ export async function reportUserDirect(
     };
   }
 
-  const targetUser = await prisma.user.findUnique({
-    where: { id: targetUserId },
+  const targetUser = await prisma.user.findFirst({
+    where: { id: targetUserId, deletedAt: null },
     select: { id: true },
   });
 

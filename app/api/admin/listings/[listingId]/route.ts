@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
@@ -59,6 +60,8 @@ async function notifyFollowersForAdminPublishedListing(listing: {
   if (followerIds.length === 0) {
     return;
   }
+
+  await createFollowNotificationsForListing(listing, followerIds);
 
   publishRealtimeEvent({
     type: 'follow_listing_published',
