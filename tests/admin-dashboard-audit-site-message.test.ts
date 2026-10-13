@@ -78,6 +78,10 @@ test('audit log is server protected, paginated, filterable and read-only', async
   assert.doesNotMatch(route, /export async function (PATCH|POST|PUT|DELETE)/);
   assert.match(page, /سجل الإدارة/);
   assert.match(page, /useAdminAccess\('admin'\)/);
+  assert.match(page, /audit-log-loading-/);
+  assert.match(page, /min-h-\[22rem\] content-start/);
+  assert.match(page, /min-h-\[7\.5rem\]/);
+  assert.match(page, /aria-busy=\{loading\}/);
   const adminPage = await source('app/admin/page.tsx');
   assert.match(adminPage, /value: null/);
   assert.match(adminPage, /absolute inset-x-0 top-1\/2/);

@@ -141,7 +141,7 @@ async function runRegistrationAgreementFlow(page: Page) {
   await page.goto('/');
   const initialHomeVitals = await assertLoginVitals(page, 'initial home before login');
   await page.getByTestId('auth-provider-trigger').click();
-  await page.locator('a[href="/api/auth/google/start"]').first().click();
+  await page.locator('a[href="/commission-agreement?provider=google"]').first().click();
 
   await expect(page).toHaveURL(/\/commission-agreement\?provider=google$/);
   await expect(page.locator('.marketplace-bottom-nav')).toHaveCount(0);

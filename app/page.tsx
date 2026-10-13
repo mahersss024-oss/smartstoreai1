@@ -1248,6 +1248,13 @@ function formatListingRelativeTime(value: string | undefined) {
 
 function SignInCard({ text }: { text: string }) {
   const authProviders = useAuthProviderVisibility();
+  const { session } = useAuthSession();
+  const googleHref = session.commissionAgreementAccepted
+    ? '/api/auth/google/start'
+    : '/commission-agreement?provider=google';
+  const appleHref = session.commissionAgreementAccepted
+    ? '/api/auth/apple/start'
+    : '/commission-agreement?provider=apple';
 
   return (
     <div className="grid gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-right text-blue-950 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-50">
@@ -1257,7 +1264,7 @@ function SignInCard({ text }: { text: string }) {
       </div>
       {authProviders.google ? (
         <Button asChild className="h-10 w-full justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
-          <a href="/api/auth/google/start">
+          <a href={googleHref}>
             <GoogleMark className="size-5" />
             <span>المتابعة باستخدام Google</span>
           </a>
@@ -1265,7 +1272,7 @@ function SignInCard({ text }: { text: string }) {
       ) : null}
       {authProviders.apple ? (
         <Button asChild className="h-10 w-full justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
-          <a href="/api/auth/apple/start">
+          <a href={appleHref}>
             <AppleMark className="size-5" />
             <span>المتابعة باستخدام Apple</span>
           </a>
@@ -1278,6 +1285,13 @@ function SignInCard({ text }: { text: string }) {
 function AuthProviderMenu() {
   const [open, setOpen] = useState(false);
   const authProviders = useAuthProviderVisibility();
+  const { session } = useAuthSession();
+  const googleHref = session.commissionAgreementAccepted
+    ? '/api/auth/google/start'
+    : '/commission-agreement?provider=google';
+  const appleHref = session.commissionAgreementAccepted
+    ? '/api/auth/apple/start'
+    : '/commission-agreement?provider=apple';
 
   useEffect(() => {
     if (!open) {
@@ -1330,20 +1344,20 @@ function AuthProviderMenu() {
           {authProviders.google ? (
             <a
               className="flex h-10 items-center justify-between rounded-md px-3 text-right text-sm hover:bg-accent"
-              href="/api/auth/google/start"
+              href={googleHref}
               role="menuitem"
             >
-              <span>دخول Google</span>
+              <span>{session.commissionAgreementAccepted ? 'دخول Google' : 'الإقرار ثم دخول Google'}</span>
               <GoogleMark className="size-5" />
             </a>
           ) : null}
           {authProviders.apple ? (
             <a
               className="flex h-10 items-center justify-between rounded-md px-3 text-right text-sm hover:bg-accent"
-              href="/api/auth/apple/start"
+              href={appleHref}
               role="menuitem"
             >
-              <span>دخول Apple</span>
+              <span>{session.commissionAgreementAccepted ? 'دخول Apple' : 'الإقرار ثم دخول Apple'}</span>
               <AppleMark className="size-5 text-foreground" />
             </a>
           ) : null}

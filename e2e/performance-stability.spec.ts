@@ -270,11 +270,12 @@ test.describe('mobile and tablet production performance stability audit', () => 
       }
     });
 
+    await installVitalsObserver(page);
+
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
 
       for (const auditedPage of auditedPages) {
-        await installVitalsObserver(page);
         const response = await page.goto(auditedPage.path, {
           waitUntil: 'domcontentloaded',
         });

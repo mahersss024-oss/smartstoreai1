@@ -23,6 +23,7 @@ export type AuthUser = {
 
 export type AuthSessionPayload = {
   authenticated: boolean;
+  commissionAgreementAccepted?: boolean;
   user: AuthUser | null;
 };
 
@@ -35,6 +36,7 @@ type AuthSessionContextValue = {
 
 const signedOutSession: AuthSessionPayload = {
   authenticated: false,
+  commissionAgreementAccepted: false,
   user: null,
 };
 
@@ -51,6 +53,7 @@ async function fetchAuthSession(): Promise<AuthSessionPayload> {
     const payload = (await response.json()) as AuthSessionPayload;
     return {
       authenticated: Boolean(payload.authenticated && payload.user),
+      commissionAgreementAccepted: Boolean(payload.commissionAgreementAccepted),
       user: payload.authenticated ? (payload.user ?? null) : null,
     };
   } catch {
