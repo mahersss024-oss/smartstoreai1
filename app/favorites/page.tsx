@@ -350,7 +350,7 @@ export default function FavoritesPage() {
                 </div>
               </div>
             ) : (
-              <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2">
+              <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-2">
                 <div className="grid max-w-4xl gap-1.5">
                   {favorites.map((favorite) => (
                     <Link

@@ -453,7 +453,7 @@ export default function ConversationsPage() {
           </section>
         ) : (
           <>
-            <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-1 dark:bg-card sm:p-2">
+            <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-1 pb-[var(--marketplace-bottom-nav-space)] dark:bg-card sm:p-2 sm:pb-[var(--marketplace-bottom-nav-space)]">
 
               {isLoading && conversations.length === 0 ? (
                 <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">

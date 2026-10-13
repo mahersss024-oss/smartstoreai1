@@ -380,11 +380,6 @@
       padding-bottom: var(--marketplace-bottom-nav-space);
     }
 
-    .marketplace-listings-scroll::after {
-      content: "";
-      display: block;
-      height: var(--marketplace-bottom-nav-space);
-    }
   }
 
   @media (pointer: coarse) and (max-width: 1023px) {

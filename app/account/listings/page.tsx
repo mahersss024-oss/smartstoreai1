@@ -1680,7 +1680,7 @@ export default function AccountListingsPage() {
             />
 
             <section
-              className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-3 sm:px-4"
+              className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-[var(--marketplace-bottom-nav-space)] pt-3 sm:px-4"
               id="account-listings"
             >
               {isListingsLoading && listings.length === 0 ? (

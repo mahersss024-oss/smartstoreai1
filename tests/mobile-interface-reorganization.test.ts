@@ -126,7 +126,10 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.match(styles, /\.smartstore-stable-page header,[\s\S]*?\.admin-viewport form,[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;/);
   assert.match(styles, /\.smartstore-stable-page \[dir="ltr"\],[\s\S]*?\.admin-viewport \[dir="ltr"\],[\s\S]*?overflow-wrap: anywhere;/);
   assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?padding-bottom: var\(--marketplace-bottom-nav-space\);/);
-  assert.match(styles, /@media \(max-width: 1023px\)[\s\S]*?\.marketplace-listings-scroll::after[\s\S]*?height: var\(--marketplace-bottom-nav-space\);/);
+  assert.doesNotMatch(styles, /\.marketplace-listings-scroll::after/);
+  assert.match(readProjectFile('app', 'favorites', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
+  assert.match(readProjectFile('app', 'conversations', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
+  assert.match(accountListingsPage, /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.doesNotMatch(styles, /\.smartstore-stable-content::after/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
