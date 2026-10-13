@@ -10,6 +10,8 @@ type UseInfiniteScrollOptions = {
   rootMargin?: string;
 };
 
+const loadMoreDistancePx = 640;
+
 function findNearestScrollRoot(element: Element): Element | null {
   let parent = element.parentElement;
 
@@ -48,11 +50,44 @@ export function useInfiniteScroll({
     }
 
     const scrollRoot = rootRef?.current ?? findNearestScrollRoot(triggerElement);
+    const scrollTarget = scrollRoot ?? window;
+    let didRequestLoad = false;
+
+    const requestLoadMore = () => {
+      if (didRequestLoad) {
+        return;
+      }
+
+      didRequestLoad = true;
+      onLoadMoreRef.current();
+    };
+
+    const isNearScrollEnd = () => {
+      if (scrollRoot) {
+        return (
+          scrollRoot.scrollHeight - scrollRoot.scrollTop - scrollRoot.clientHeight <=
+          loadMoreDistancePx
+        );
+      }
+
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+
+      return (
+        scrollingElement.scrollHeight - window.scrollY - window.innerHeight <=
+        loadMoreDistancePx
+      );
+    };
+
+    const checkScrollPosition = () => {
+      if (isNearScrollEnd()) {
+        requestLoadMore();
+      }
+    };
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          onLoadMoreRef.current();
+          requestLoadMore();
         }
       },
       {
@@ -63,9 +98,14 @@ export function useInfiniteScroll({
     );
 
     observer.observe(triggerElement);
+    checkScrollPosition();
+    scrollTarget.addEventListener('scroll', checkScrollPosition, {
+      passive: true,
+    });
 
     return () => {
       observer.disconnect();
+      scrollTarget.removeEventListener('scroll', checkScrollPosition);
     };
   }, [enabled, isLoading, rootMargin, rootRef]);
 

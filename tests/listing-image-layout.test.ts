@@ -221,6 +221,11 @@ test('home infinite scroll observes the listings scroll container', async () => 
   assert.match(infiniteScrollHook, /\/\(auto\|scroll\|overlay\)\/\.test\(overflowY\)/);
   assert.match(infiniteScrollHook, /rootRef\?\.current \?\? findNearestScrollRoot\(triggerElement\)/);
   assert.match(infiniteScrollHook, /root: scrollRoot/);
+  assert.match(infiniteScrollHook, /const loadMoreDistancePx = 640/);
+  assert.match(infiniteScrollHook, /const checkScrollPosition = \(\) => \{/);
+  assert.match(infiniteScrollHook, /scrollTarget\.addEventListener\('scroll', checkScrollPosition/);
+  assert.match(infiniteScrollHook, /checkScrollPosition\(\)/);
+  assert.match(infiniteScrollHook, /requestLoadMore\(\)/);
   assert.match(homePage, /marketplaceListingsScrollRef = useRef<HTMLDivElement \| null>\(null\)/);
   assert.match(homePage, /listingsReplaceRequestIdRef = useRef\(0\)/);
   assert.match(homePage, /listingsAppendRequestIdRef = useRef\(0\)/);
