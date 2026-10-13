@@ -1048,16 +1048,14 @@ export default function AdminModerationPage() {
             void deleteClosedReport(reportId, 'conversation')
           }
         />
-        <div ref={queueLoadMoreRef} className="h-px" />
         {hasMoreQueue && (
-          <Button
-            variant="outline"
-            className="mx-auto rounded-md"
-            disabled={isLoading}
-            onClick={() => void refreshQueue(nextPage)}
-          >
-            {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
-          </Button>
+          <div>
+            <div
+              ref={queueLoadMoreRef}
+              aria-hidden="true"
+              className="h-24 w-full"
+            />
+          </div>
         )}
       </div>
     </main>

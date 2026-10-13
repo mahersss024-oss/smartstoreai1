@@ -403,18 +403,14 @@ export default function FavoritesPage() {
                     </Link>
                   ))}
                 </div>
-                <div ref={favoritesLoadMoreRef} className="h-px" />
                 {favoritesPagination?.hasMore && (
-                  <Button
-                    variant="outline"
-                    className="mx-auto rounded-md"
-                    disabled={isLoading}
-                    onClick={() =>
-                      void refreshFavorites(favoritesPagination.nextPage ?? 1)
-                    }
-                  >
-                    {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
-                  </Button>
+                  <div>
+                    <div
+                      ref={favoritesLoadMoreRef}
+                      aria-hidden="true"
+                      className="h-24 w-full"
+                    />
+                  </div>
                 )}
               </div>
             )}

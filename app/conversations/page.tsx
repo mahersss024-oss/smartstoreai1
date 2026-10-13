@@ -572,20 +572,14 @@ export default function ConversationsPage() {
                     );
                     })}
                   </div>
-                  <div ref={conversationsLoadMoreRef} className="h-px" />
                   {conversationsPagination?.hasMore && (
-                    <Button
-                      variant="outline"
-                      className="mx-auto rounded-md"
-                      disabled={isLoading}
-                      onClick={() =>
-                        void refreshConversations(
-                          conversationsPagination.nextPage ?? 1,
-                        )
-                      }
-                    >
-                      {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
-                    </Button>
+                    <div>
+                      <div
+                        ref={conversationsLoadMoreRef}
+                        aria-hidden="true"
+                        className="h-24 w-full"
+                      />
+                    </div>
                   )}
                 </div>
               )}

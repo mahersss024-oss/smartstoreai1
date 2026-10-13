@@ -777,17 +777,14 @@ export default function AdminUsersPage() {
             })
           )}
 
-          <div ref={usersLoadMoreRef} aria-hidden="true" className="h-4" />
           {pagination?.hasMore && (
-            <Button
-              className="mx-auto rounded-md"
-              disabled={isLoading}
-              onClick={() => void refreshUsers(pagination.nextPage ?? 1)}
-              type="button"
-              variant="outline"
-            >
-              تحميل المزيد
-            </Button>
+            <div>
+              <div
+                ref={usersLoadMoreRef}
+                aria-hidden="true"
+                className="h-24 w-full"
+              />
+            </div>
           )}
         </section>
       </div>

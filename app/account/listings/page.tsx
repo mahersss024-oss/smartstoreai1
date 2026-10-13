@@ -2052,18 +2052,14 @@ export default function AccountListingsPage() {
                       );
                     })}
                   </div>
-                  <div ref={listingsLoadMoreRef} className="h-px" />
                   {listingsPagination?.hasMore && (
-                    <Button
-                      variant="outline"
-                      className="mx-auto rounded-md"
-                      disabled={isListingsLoading}
-                      onClick={() =>
-                        void refreshListings(listingsPagination.nextPage ?? 1)
-                      }
-                    >
-                      {isListingsLoading ? 'جار التحميل...' : 'تحميل المزيد'}
-                    </Button>
+                    <div>
+                      <div
+                        ref={listingsLoadMoreRef}
+                        aria-hidden="true"
+                        className="h-24 w-full"
+                      />
+                    </div>
                   )}
                 </div>
               )}

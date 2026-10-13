@@ -249,7 +249,8 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.match(homePage, /setPointerCapture\(event\.pointerId\)/);
   assert.match(homePage, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(adminListingsPage, /overflow-x-auto/);
-  assert.match(listingGallery, /grid-cols-4/);
+  assert.match(listingGallery, /className="grid gap-3 px-1 py-2 sm:px-2"/);
+  assert.match(listingGallery, /aspect-\[4\/3\] w-full overflow-hidden bg-transparent/);
   assert.match(listingGallery, /onClick=\{\(\) => openLightbox\(index\)\}/);
 });
 

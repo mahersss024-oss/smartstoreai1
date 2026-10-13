@@ -2091,7 +2091,8 @@ export default function Page() {
   const assistantChatTapTrackerRef = useRef<ChatTapTracker>(
     createEmptyChatTapTracker(),
   );
-  const listingsRequestIdRef = useRef(0);
+  const listingsReplaceRequestIdRef = useRef(0);
+  const listingsAppendRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const manualListingImagePreparationRef = useRef<{
@@ -3078,11 +3079,23 @@ export default function Page() {
     page = 1,
     options?: { showLoading?: boolean },
   ) => {
-    const requestId = ++listingsRequestIdRef.current;
+    const isAppendRequest = page > 1;
+    const requestId = isAppendRequest
+      ? ++listingsAppendRequestIdRef.current
+      : ++listingsReplaceRequestIdRef.current;
     const params = new URLSearchParams();
     const showLoading = options?.showLoading ?? true;
     const requestController = new AbortController();
     listingsAbortControllersRef.current.add(requestController);
+
+    if (!isAppendRequest) {
+      listingsAppendRequestIdRef.current += 1;
+    }
+
+    const isCurrentRequest = () =>
+      isAppendRequest
+        ? requestId === listingsAppendRequestIdRef.current
+        : requestId === listingsReplaceRequestIdRef.current;
 
     if (showLoading) {
       setIsLoadingListings(true);
@@ -3111,7 +3124,7 @@ export default function Page() {
         response.json() as Promise<ListingsResponsePayload>,
       )
       .then((payload) => {
-        if (requestId !== listingsRequestIdRef.current) {
+        if (!isCurrentRequest()) {
           return;
         }
 
@@ -3140,7 +3153,7 @@ export default function Page() {
         });
       })
       .catch((error: unknown) => {
-        if (requestId !== listingsRequestIdRef.current) {
+        if (!isCurrentRequest()) {
           return;
         }
 
@@ -3156,7 +3169,7 @@ export default function Page() {
       .finally(() => {
         listingsAbortControllersRef.current.delete(requestController);
 
-        if (requestId === listingsRequestIdRef.current) {
+        if (isCurrentRequest()) {
           setIsLoadingListings(false);
         }
       });
@@ -4709,18 +4722,13 @@ export default function Page() {
                 ))}
               </div>
 
-              <div ref={listingsLoadMoreRef} className="h-px" />
-
               {canLoadMoreListings && (
-                <div className="mt-4 grid place-items-center">
-                  <Button
-                    variant="outline"
-                    className="h-10 min-w-40 rounded-md"
-                    disabled={isLoadingListings}
-                    onClick={loadMoreListings}
-                  >
-                    {isLoadingListings ? 'جاري التحميل...' : 'عرض المزيد'}
-                  </Button>
+                <div className="mt-2">
+                  <div
+                    ref={listingsLoadMoreRef}
+                    aria-hidden="true"
+                    className="h-24 w-full"
+                  />
                 </div>
               )}
 

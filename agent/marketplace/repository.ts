@@ -1113,7 +1113,7 @@ export async function listMarketplaceListings(
         take: 1,
       },
     },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     skip: pagination.skip,
     take: pagination.limit,
   });

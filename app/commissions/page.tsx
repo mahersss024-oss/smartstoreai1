@@ -581,20 +581,14 @@ export default function CommissionsPage() {
                       </article>
                     ))}
                   </div>
-                  <div ref={commissionsLoadMoreRef} className="h-px" />
                   {commissionsPagination?.hasMore && (
-                    <Button
-                      variant="outline"
-                      className="mx-auto rounded-md"
-                      disabled={isLoading}
-                      onClick={() =>
-                        void refreshCommissions(
-                          commissionsPagination.nextPage ?? 1,
-                        )
-                      }
-                    >
-                      {isLoading ? 'جارٍ التحميل...' : 'تحميل المزيد'}
-                    </Button>
+                    <div>
+                      <div
+                        ref={commissionsLoadMoreRef}
+                        aria-hidden="true"
+                        className="h-24 w-full"
+                      />
+                    </div>
                   )}
                 </div>
               )}

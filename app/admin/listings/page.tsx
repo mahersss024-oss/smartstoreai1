@@ -670,18 +670,13 @@ function AdminListingsPageContent() {
         ))}
 
         {!focusedListingId && pagination?.hasMore && (
-          <div ref={listingsLoadMoreRef} className="h-px" />
-        )}
-
-        {!focusedListingId && pagination?.hasMore && (
-          <Button
-            variant="outline"
-            className="mx-auto rounded-md"
-            disabled={isLoading}
-            onClick={() => void loadListings(pagination.nextPage ?? 1)}
-          >
-            تحميل المزيد
-          </Button>
+          <div>
+            <div
+              ref={listingsLoadMoreRef}
+              aria-hidden="true"
+              className="h-24 w-full"
+            />
+          </div>
         )}
       </div>
     );

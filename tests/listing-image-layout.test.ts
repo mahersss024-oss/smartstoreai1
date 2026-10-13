@@ -2,19 +2,22 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('listing details keeps up to eight full-width images and opens a full-screen lightbox', async () => {
+test('listing details keeps all full-width images and opens a full-screen lightbox', async () => {
   const source = await readFile(
     new URL('../app/listings/[listingId]/listing-image-gallery.tsx', import.meta.url),
     'utf8',
   );
 
-  assert.match(source, /visibleImages = images\.slice\(0, 8\)/);
+  assert.match(source, /visibleImages = images/);
+  assert.doesNotMatch(source, /images\.slice\(0, 8\)/);
   assert.match(source, /shouldShowThumbnails = visibleImages\.length > 1/);
   assert.match(source, /\{shouldShowThumbnails && \(/);
   assert.match(source, /isLightboxOpen/);
   assert.match(source, /openLightbox\(index\)/);
+  assert.match(source, /createPortal/);
+  assert.match(source, /document\.body/);
   assert.match(source, /role="dialog"/);
-  assert.match(source, /className="fixed inset-0 z-\[10000\] grid grid-rows-\[auto_1fr_auto\] bg-black text-white"/);
+  assert.match(source, /className="fixed inset-0 z-\[2147483647\] grid h-dvh w-screen grid-rows-\[auto_1fr_auto\] overscroll-contain bg-black text-white"/);
   assert.match(source, /selectedImageLabel = `\$\{selectedImageIndex \+ 1\} \/ \$\{visibleImages\.length\}`/);
   assert.match(source, /showPreviousImage/);
   assert.match(source, /showNextImage/);
@@ -73,9 +76,10 @@ test('listing details keeps up to eight full-width images and opens a full-scree
   assert.doesNotMatch(source, /className="max-h-full max-w-full object-contain"[\s\S]*src=\{selectedImage\}/);
   assert.match(source, /\{visibleImages\.length > 0 && \(/);
   assert.match(source, /className="grid gap-3 px-1 py-2 sm:px-2"/);
-  assert.match(source, /min-h-\[min\(64dvh,34rem\)\]/);
-  assert.match(source, /className="h-full w-full object-contain"/);
-  assert.match(source, /bg-slate-100 transition/);
+  assert.match(source, /aspect-\[4\/3\] w-full overflow-hidden bg-transparent/);
+  assert.match(source, /className="h-full w-full object-cover"/);
+  assert.doesNotMatch(source, /min-h-\[min\(64dvh,34rem\)\]/);
+  assert.doesNotMatch(source, /bg-slate-100 transition/);
   assert.doesNotMatch(source, /className="grid grid-cols-4 gap-1\.5 p-2 sm:p-3"/);
   assert.doesNotMatch(source, /aspect-\[16\/9\] w-full overflow-hidden/);
   assert.doesNotMatch(source, /max-h-\[18rem\]/);
@@ -218,8 +222,41 @@ test('home infinite scroll observes the listings scroll container', async () => 
   assert.match(infiniteScrollHook, /rootRef\?\.current \?\? findNearestScrollRoot\(triggerElement\)/);
   assert.match(infiniteScrollHook, /root: scrollRoot/);
   assert.match(homePage, /marketplaceListingsScrollRef = useRef<HTMLDivElement \| null>\(null\)/);
+  assert.match(homePage, /listingsReplaceRequestIdRef = useRef\(0\)/);
+  assert.match(homePage, /listingsAppendRequestIdRef = useRef\(0\)/);
+  assert.match(homePage, /listingsAppendRequestIdRef\.current \+= 1/);
   assert.match(homePage, /rootRef: marketplaceListingsScrollRef/);
   assert.match(homePage, /ref=\{marketplaceListingsScrollRef\}/);
+  assert.match(homePage, /ref=\{listingsLoadMoreRef\}/);
+  assert.match(homePage, /className="h-24 w-full"/);
+  assert.doesNotMatch(homePage, /onClick=\{loadMoreListings\}/);
+});
+
+test('infinite scroll screens use a stable end sentinel', async () => {
+  const pagePaths = [
+    '../app/page.tsx',
+    '../app/favorites/page.tsx',
+    '../app/conversations/page.tsx',
+    '../app/commissions/page.tsx',
+    '../app/account/listings/page.tsx',
+    '../app/admin/users/page.tsx',
+    '../app/admin/listings/page.tsx',
+    '../app/admin/moderation/page.tsx',
+    '../app/admin/commissions/page.tsx',
+  ];
+  const sources = await Promise.all(
+    pagePaths.map((pagePath) =>
+      readFile(new URL(pagePath, import.meta.url), 'utf8'),
+    ),
+  );
+
+  for (const source of sources) {
+    assert.match(source, /useInfiniteScroll\(/);
+    assert.match(source, /className="h-24 w-full"/);
+    assert.doesNotMatch(source, /ref=\{[A-Za-z]+LoadMoreRef\} className="h-px"/);
+    assert.doesNotMatch(source, /ref=\{[A-Za-z]+LoadMoreRef\} aria-hidden="true" className="h-4"/);
+    assert.doesNotMatch(source, /تحميل المزيد|عرض المزيد/);
+  }
 });
 
 test('listing cards keep normal navigation while images load', async () => {

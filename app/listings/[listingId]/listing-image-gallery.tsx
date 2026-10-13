@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, TouchEvent, WheelEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -83,7 +84,7 @@ export function ListingImageGallery({
   images,
   title,
 }: ListingImageGalleryProps) {
-  const visibleImages = images.slice(0, 8);
+  const visibleImages = images;
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -351,17 +352,15 @@ export function ListingImageGallery({
                   }
                   aria-label={`${title} - فتح الصورة ${index + 1} بالحجم الكامل`}
                   aria-pressed={isSelected}
-                  className={`min-h-[min(64dvh,34rem)] overflow-hidden rounded-md bg-slate-100 transition sm:min-h-[30rem] ${
-                    isSelected
-                      ? 'ring-2 ring-blue-600/30'
-                      : 'hover:ring-2 hover:ring-blue-400/30'
+                  className={`aspect-[4/3] w-full overflow-hidden bg-transparent transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
+                    isSelected ? 'opacity-100' : 'hover:opacity-95'
                   }`}
                   onClick={() => openLightbox(index)}
                   type="button"
                 >
                   <ResilientImage
                     alt={`${title} - الصورة ${index + 1}`}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-cover"
                     decoding="async"
                     fallback={<ImageIcon className="size-4 text-slate-500 dark:text-slate-400" />}
                     loading={index === 0 ? 'eager' : 'lazy'}
@@ -373,11 +372,11 @@ export function ListingImageGallery({
           </div>
         )}
       </div>
-      {isLightboxOpen && selectedLightboxUrl && (
+      {isLightboxOpen && selectedLightboxUrl && createPortal(
         <div
           aria-label="عارض صور الإعلان"
           aria-modal="true"
-          className="fixed inset-0 z-[10000] grid grid-rows-[auto_1fr_auto] bg-black text-white"
+          className="fixed inset-0 z-[2147483647] grid h-dvh w-screen grid-rows-[auto_1fr_auto] overscroll-contain bg-black text-white"
           role="dialog"
         >
           <div className="z-20 flex items-center justify-between px-4 py-4">
@@ -549,7 +548,8 @@ export function ListingImageGallery({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );
