@@ -307,7 +307,9 @@
   }
 
   .marketplace-listings-scroll {
+    contain: layout paint;
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
   }
 
   .smartstore-stable-page,
