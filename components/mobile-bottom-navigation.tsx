@@ -22,14 +22,6 @@ type NavItem = {
   alert?: boolean;
 };
 
-const mobileNavigationHrefs = [
-  '/account/listings',
-  '/conversations',
-  '/',
-  '/favorites',
-  '/account',
-];
-
 function isActive(pathname: string, href: string) {
   if (href === '/') {
     return pathname === '/';
@@ -126,29 +118,6 @@ export function MobileBottomNavigation() {
       );
     };
   }, [pathname]);
-
-  useEffect(() => {
-    if (
-      pathname === '/commission-agreement' ||
-      pathname.startsWith('/conversations/') ||
-      pathname.startsWith('/admin') ||
-      pathname.startsWith('/api')
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      for (const href of mobileNavigationHrefs) {
-        if (href !== pathname) {
-          router.prefetch(href);
-        }
-      }
-    }, 1200);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [pathname, router]);
 
   if (
     isAssistantChatViewOpen ||
