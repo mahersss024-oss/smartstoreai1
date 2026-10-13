@@ -67,7 +67,7 @@ export function useInfiniteScroll({
     return () => {
       observer.disconnect();
     };
-  }, [enabled, isLoading, rootMargin]);
+  }, [enabled, isLoading, rootMargin, rootRef]);
 
   return triggerRef;
 }

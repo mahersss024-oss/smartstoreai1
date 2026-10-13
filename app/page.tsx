@@ -2007,7 +2007,7 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
 };
 
 export default function Page() {
-  const { isNativeApp } = useAppBridge();
+  useAppBridge();
   const router = useRouter();
   const chatTransport = useMemo(
     () =>
@@ -3160,7 +3160,7 @@ export default function Page() {
           setIsLoadingListings(false);
         }
       });
-  }, [activeMarketCity, isNativeApp, marketplaceSearchQuery]);
+  }, [activeMarketCity, marketplaceSearchQuery]);
 
   useEffect(() => {
     const onPullRefresh = () => {
