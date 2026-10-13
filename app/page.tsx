@@ -4597,10 +4597,7 @@ export default function Page() {
 
               <div
                 className={cn(
-                  'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-3',
-                  isCompactViewport
-                    ? 'pb-[var(--marketplace-bottom-nav-space)] sm:pb-[var(--marketplace-bottom-nav-space)]'
-                    : 'pb-1',
+                  'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-3 lg:pb-1',
                 )}
               >
 
