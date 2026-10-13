@@ -166,8 +166,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
   assert.match(homePage, /loading="lazy"/);
   assert.match(homePage, /decoding="async"/);
-  assert.match(homePage, /\[content-visibility:auto\]/);
-  assert.match(homePage, /\[contain-intrinsic-size:126px\]/);
+  assert.match(homePage, /min-h-\[6\.25rem\] w-full/);
+  assert.match(homePage, /sm:min-h-\[7\.25rem\]/);
+  assert.doesNotMatch(homePage, /\[contain-intrinsic-size:126px\]/);
   assert.doesNotMatch(homePage, /isCardInteractionDisabled/);
   assert.doesNotMatch(homePage, /data-image-loading/);
   assert.doesNotMatch(homePage, /markListingImageReady/);

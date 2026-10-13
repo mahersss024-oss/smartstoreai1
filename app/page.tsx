@@ -1664,8 +1664,7 @@ function ListingCardView({
     return (
       <article
         className={cn(
-          'marketplace-listing-card group relative grid w-full min-w-0 cursor-pointer grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:grid-cols-[7.25rem_minmax(0,1fr)]',
-          '[contain-intrinsic-size:126px] [content-visibility:auto]',
+          'marketplace-listing-card group relative grid min-h-[6.25rem] w-full min-w-0 cursor-pointer grid-cols-[6.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right shadow-sm transition hover:border-blue-300 hover:bg-blue-50/35 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10 sm:min-h-[7.25rem] sm:grid-cols-[7.25rem_minmax(0,1fr)]',
           className,
         )}
         onClick={() => onOpen(listing)}
