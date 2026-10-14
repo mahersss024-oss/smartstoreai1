@@ -741,7 +741,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
         </header>
 
         <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-[var(--marketplace-bottom-nav-space)] pt-3 sm:px-2">
-          <div className="mx-auto grid max-w-3xl gap-3 pb-4">
+          <div className="listing-details-content mx-auto grid max-w-3xl gap-3 pb-4 [&_.text-muted-foreground]:text-foreground [&_.text-xs]:text-sm [&_.text-xs]:leading-6">
             <section className="px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">
                 <Link
@@ -788,15 +788,15 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                       مطابق لسياسة السوق
                     </span>
                   </div>
-                  <h2 className="text-xl font-bold leading-tight sm:text-2xl">{listing.title ?? 'إعلان بدون عنوان'}</h2>
-                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{listing.description ?? 'لا يوجد وصف مضاف لهذا الإعلان.'}</p>
+                  <h2 className="break-words text-xl font-bold leading-8 text-emerald-600 dark:text-emerald-300 sm:text-2xl">{listing.title ?? 'إعلان بدون عنوان'}</h2>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-base leading-8 text-foreground">{listing.description ?? 'لا يوجد وصف مضاف لهذا الإعلان.'}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-xs dark:border-white/10 sm:grid-cols-3">
                 <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
                   <span className="shrink-0 text-muted-foreground">السعر</span>
-                  <strong className="min-w-0 truncate text-sm text-blue-700">{formatPrice(listing.price)}</strong>
+                  <strong className="min-w-0 truncate text-sm text-blue-700 dark:text-blue-200">{formatPrice(listing.price)}</strong>
                 </div>
                 <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2">
                   <span className="shrink-0 text-muted-foreground">المدينة</span>
@@ -842,7 +842,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                       className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/60 bg-background/45 px-3 py-2 text-xs"
                     >
                       <span className="shrink-0 text-muted-foreground">{formatAttributeLabel(key)}</span>
-                      <strong className="min-w-0 truncate text-sm">
+                      <strong className="min-w-0 break-words text-sm">
                         {formatAttributeValue(key, value)}
                       </strong>
                     </div>

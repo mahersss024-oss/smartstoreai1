@@ -2056,6 +2056,7 @@ export default function Page() {
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
   const marketplaceToolsPanelRef = useRef<HTMLDivElement | null>(null);
+  const marketplaceCategoriesRef = useRef<HTMLDivElement | null>(null);
   const marketplaceToolsDragRef = useRef({
     pointerId: -1,
     startY: 0,
@@ -2065,7 +2066,11 @@ export default function Page() {
   const lastMarketplaceScrollAtRef = useRef(0);
   const lastMarketplaceScrollHeightRef = useRef(0);
   const marketplaceToolsManualLockUntilRef = useRef(0);
+  const marketplaceToolsTopRevealTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const marketplaceTopActionsHiddenRef = useRef(false);
+  const marketplaceScrollReversalDistanceRef = useRef(0);
   const marketplaceScrollIntentRef = useRef({
     direction: 0,
     distance: 0,
@@ -4005,15 +4010,47 @@ export default function Page() {
 
   const getMarketplaceToolsClosedOffset = useCallback(() => {
     const panelHeight = marketplaceToolsPanelRef.current?.offsetHeight ?? 0;
-    return -Math.max(0, panelHeight - 14);
+    const categoriesHeight = marketplaceCategoriesRef.current?.offsetHeight ?? 0;
+    return -Math.max(0, panelHeight - categoriesHeight);
   }, []);
 
+  useEffect(() => {
+    const categories = marketplaceCategoriesRef.current;
+    const panel = marketplaceToolsPanelRef.current;
+    if (!categories || !panel) return;
+
+    const updateCategoriesHeight = () => {
+      panel.style.setProperty(
+        '--marketplace-categories-height',
+        `${categories.offsetHeight}px`,
+      );
+    };
+    updateCategoriesHeight();
+    const observer = new ResizeObserver(updateCategoriesHeight);
+    observer.observe(categories);
+    return () => observer.disconnect();
+  }, [isCompactChatView]);
+
+  const cancelMarketplaceTopReveal = useCallback(() => {
+    if (marketplaceToolsTopRevealTimerRef.current !== null) {
+      clearTimeout(marketplaceToolsTopRevealTimerRef.current);
+      marketplaceToolsTopRevealTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(
+    () => cancelMarketplaceTopReveal,
+    [cancelMarketplaceTopReveal, isMobileChatViewOpen],
+  );
+
   const setMarketplaceToolsHidden = useCallback((hidden: boolean) => {
+    cancelMarketplaceTopReveal();
+    marketplaceScrollReversalDistanceRef.current = 0;
     marketplaceTopActionsHiddenRef.current = hidden;
     setIsMarketplaceToolsDragging(false);
     setMarketplaceToolsDragOffset(0);
     setIsMarketplaceTopActionsHidden(hidden);
-  }, []);
+  }, [cancelMarketplaceTopReveal]);
 
   useEffect(() => {
     marketplaceTopActionsHiddenRef.current = isMarketplaceTopActionsHidden;
@@ -4052,7 +4089,15 @@ export default function Page() {
       lastMarketplaceScrollAtRef.current = now;
       lastMarketplaceScrollHeightRef.current = nextScrollHeight;
 
+      if (nextScrollTop >= 24) {
+        cancelMarketplaceTopReveal();
+      }
+
       if (isMarketplaceToolsDragging) {
+        return;
+      }
+
+      if (marketplaceToolsPanelRef.current?.querySelector('[aria-expanded="true"]')) {
         return;
       }
 
@@ -4067,12 +4112,33 @@ export default function Page() {
       }
 
       if (nextScrollTop < 24) {
+        marketplaceScrollReversalDistanceRef.current = 0;
         marketplaceScrollIntentRef.current = {
           direction: 0,
           distance: 0,
           lastToggleAt: now,
         };
-        setMarketplaceToolsHidden(false);
+        if (
+          marketplaceTopActionsHiddenRef.current &&
+          marketplaceToolsTopRevealTimerRef.current === null
+        ) {
+          marketplaceToolsTopRevealTimerRef.current = setTimeout(() => {
+            marketplaceToolsTopRevealTimerRef.current = null;
+            const scrollContainer = marketplaceListingsScrollRef.current;
+            if (
+              scrollContainer?.isConnected &&
+              scrollContainer.scrollTop < 24 &&
+              marketplaceToolsDragRef.current.pointerId === -1
+            ) {
+              marketplaceScrollIntentRef.current = {
+                direction: 0,
+                distance: 0,
+                lastToggleAt: performance.now(),
+              };
+              setMarketplaceToolsHidden(false);
+            }
+          }, 3000);
+        }
         return;
       }
 
@@ -4080,33 +4146,47 @@ export default function Page() {
         return;
       }
 
-      if (Math.abs(scrollDelta) < 12) {
+      if (scrollDelta === 0) {
         return;
       }
 
       const direction = scrollDelta > 0 ? 1 : -1;
       const isFastScroll = scrollSpeed >= 1.15;
       const isMediumScroll = scrollSpeed >= 0.55;
-      const toggleCooldown = isFastScroll ? 420 : isMediumScroll ? 620 : 820;
-      const hideStartTop = isFastScroll ? 110 : isMediumScroll ? 180 : 240;
-      const hideDistance = isFastScroll ? 150 : isMediumScroll ? 260 : 360;
+      const toggleCooldown = isFastScroll ? 1200 : isMediumScroll ? 1400 : 1600;
+      const hideStartTop = isFastScroll ? 128 : isMediumScroll ? 192 : 240;
+      const hideDistance = isFastScroll ? 208 : isMediumScroll ? 304 : 384;
       const showDistance = isNearListEnd
         ? isFastScroll
-          ? 90
+          ? 160
           : isMediumScroll
-            ? 140
-            : 190
+            ? 224
+            : 288
         : isFastScroll
-          ? 130
+          ? 192
           : isMediumScroll
-            ? 220
-            : 300;
+            ? 272
+            : 336;
       const scrollIntent = marketplaceScrollIntentRef.current;
 
-      if (scrollIntent.direction !== direction) {
+      if (scrollIntent.direction === 0) {
         scrollIntent.direction = direction;
         scrollIntent.distance = Math.abs(scrollDelta);
+      } else if (scrollIntent.direction !== direction) {
+        marketplaceScrollReversalDistanceRef.current += Math.abs(scrollDelta);
+        // Require a deliberate reversal before changing the accepted direction.
+        if (marketplaceScrollReversalDistanceRef.current < 72) {
+          return;
+        }
+        scrollIntent.direction = direction;
+        scrollIntent.distance = marketplaceScrollReversalDistanceRef.current;
+        marketplaceScrollReversalDistanceRef.current = 0;
       } else {
+        scrollIntent.distance = Math.max(
+          0,
+          scrollIntent.distance - marketplaceScrollReversalDistanceRef.current,
+        );
+        marketplaceScrollReversalDistanceRef.current = 0;
         scrollIntent.distance += Math.abs(scrollDelta);
       }
 
@@ -4147,6 +4227,7 @@ export default function Page() {
       }
     },
     [
+      cancelMarketplaceTopReveal,
       isLoadingListings,
       isManualListingVisible,
       isMarketplaceToolsDragging,
@@ -4156,10 +4237,22 @@ export default function Page() {
 
   const handleMarketplaceToolsPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (isManualListingVisible) {
+      const target = event.target;
+      if (
+        isManualListingVisible ||
+        !event.isPrimary ||
+        event.button !== 0 ||
+        marketplaceToolsDragRef.current.pointerId !== -1 ||
+        !(target instanceof Element) ||
+        target.closest(
+            'button, a, input, textarea, select, label, [role="button"], [role="combobox"], [role="slider"], [role="checkbox"], [role="switch"], [contenteditable]:not([contenteditable="false"])',
+          ) ||
+        event.currentTarget.querySelector('[aria-expanded="true"]')
+      ) {
         return;
       }
 
+      cancelMarketplaceTopReveal();
       const closedOffset = getMarketplaceToolsClosedOffset();
       marketplaceToolsDragRef.current = {
         pointerId: event.pointerId,
@@ -4174,6 +4267,7 @@ export default function Page() {
       event.preventDefault();
     },
     [
+      cancelMarketplaceTopReveal,
       getMarketplaceToolsClosedOffset,
       isManualListingVisible,
       isMarketplaceTopActionsHidden,
@@ -4184,10 +4278,7 @@ export default function Page() {
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const dragState = marketplaceToolsDragRef.current;
 
-      if (
-        !isMarketplaceToolsDragging ||
-        dragState.pointerId !== event.pointerId
-      ) {
+      if (dragState.pointerId !== event.pointerId) {
         return;
       }
 
@@ -4200,7 +4291,7 @@ export default function Page() {
       setMarketplaceToolsDragOffset(nextOffset);
       event.preventDefault();
     },
-    [getMarketplaceToolsClosedOffset, isMarketplaceToolsDragging],
+    [getMarketplaceToolsClosedOffset],
   );
 
   const finishMarketplaceToolsDrag = useCallback(
@@ -4212,13 +4303,26 @@ export default function Page() {
       }
 
       const closedOffset = getMarketplaceToolsClosedOffset();
-      const shouldHide = marketplaceToolsDragOffset < closedOffset * 0.45;
+      const finalOffset = event.type === 'pointerup'
+        ? clampNumber(
+            dragState.startOffset + event.clientY - dragState.startY,
+            closedOffset,
+            0,
+          )
+        : dragState.startOffset;
+      const shouldHide = finalOffset < closedOffset * 0.45;
       marketplaceToolsDragRef.current = {
         pointerId: -1,
         startY: 0,
         startOffset: 0,
       };
-      marketplaceToolsManualLockUntilRef.current = performance.now() + 2200;
+      const now = performance.now();
+      marketplaceToolsManualLockUntilRef.current = now + 2200;
+      marketplaceScrollIntentRef.current = {
+        direction: 0,
+        distance: 0,
+        lastToggleAt: now,
+      };
       setMarketplaceToolsHidden(shouldHide);
 
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -4227,7 +4331,6 @@ export default function Page() {
     },
     [
       getMarketplaceToolsClosedOffset,
-      marketplaceToolsDragOffset,
       setMarketplaceToolsHidden,
     ],
   );
@@ -4237,7 +4340,7 @@ export default function Page() {
     : isMarketplaceToolsDragging
       ? `translate3d(0, ${marketplaceToolsDragOffset}px, 0)`
       : isMarketplaceTopActionsHidden
-        ? 'translate3d(0, calc(-100% + 0.875rem), 0)'
+        ? 'translate3d(0, calc(-100% + var(--marketplace-categories-height, 40px)), 0)'
         : 'translate3d(0, 0, 0)';
 
   return (
@@ -4330,38 +4433,60 @@ export default function Page() {
               onPointerDown={collapseAssistantFromPage}
             >
               <div className={cn(
-                'marketplace-home-controls shrink-0 border-b border-blue-100/70 pb-2 dark:border-blue-400/10',
+                'marketplace-home-controls shrink-0 rounded-md border border-blue-100/70 bg-white shadow-sm dark:border-blue-400/10 dark:bg-card',
                 isManualListingVisible
                   ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
                   : cn(
-                      'pointer-events-none absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 will-change-transform sm:inset-x-3 lg:inset-x-4 lg:top-4',
+                      'pointer-events-auto absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 will-change-transform sm:inset-x-3 lg:inset-x-4 lg:top-4',
                       isMarketplaceToolsDragging
                         ? 'transition-none'
                         : 'transition-transform duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
                     ),
               )}
               ref={marketplaceToolsPanelRef}
+              aria-label="أدوات السوق"
+              role="region"
+              tabIndex={isManualListingVisible ? undefined : 0}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget || isManualListingVisible) return;
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                event.preventDefault();
+                marketplaceToolsManualLockUntilRef.current = performance.now() + 2200;
+                setMarketplaceToolsHidden(event.key === 'ArrowUp');
+              }}
+              onPointerDown={handleMarketplaceToolsPointerDown}
+              onPointerMove={handleMarketplaceToolsPointerMove}
+              onPointerUp={finishMarketplaceToolsDrag}
+              onPointerCancel={finishMarketplaceToolsDrag}
+              onLostPointerCapture={finishMarketplaceToolsDrag}
               style={
                 isManualListingVisible
                   ? undefined
-                  : ({ transform: marketplaceToolsTransform } as CSSProperties)
+                  : ({
+                      transform: marketplaceToolsTransform,
+                      touchAction: 'pan-x pinch-zoom',
+                    } as CSSProperties)
               }
+              >
+              <div
+                className="marketplace-tools-collapsible grid gap-1 p-1"
+                inert={isMarketplaceTopActionsHidden && !isMarketplaceToolsDragging && !isManualListingVisible}
               >
               <div
                 className={cn(
                   'pointer-events-auto grid max-h-14 gap-1.5 overflow-hidden text-center md:justify-end md:text-right',
-                  'mb-1 translate-y-0 opacity-100',
+                  'translate-y-0 opacity-100',
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
-                  <Button className="marketplace-primary-cta h-9 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
+                  <Button className="marketplace-primary-cta h-9 gap-1 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Megaphone className="size-4" />
                   أنشئ إعلانك مع حمد
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 rounded-md px-2 text-sm transition duration-150 active:scale-[0.98] sm:px-3"
+                    className="h-9 gap-1 rounded-md px-2 text-sm transition duration-150 active:scale-[0.98] sm:px-3"
                     onClick={() => {
                       setIsManualListingOpen((value) => !value);
                       setIsManualListingFallbackDismissed(false);
@@ -4749,81 +4874,9 @@ export default function Page() {
                 </form>
               )}
 
-              <div className="mb-2 grid gap-1.5">
-                <div
-                  className={cn(
-                    'pointer-events-auto grid max-h-[28rem] gap-1 overflow-hidden rounded-md border border-blue-100/70 bg-white/90 p-1.5 shadow-sm backdrop-blur-md dark:border-blue-400/10 dark:bg-card/90',
-                    'translate-y-0 opacity-100',
-                  )}
-                >
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={
-                      activeMarketCategoryGroup === 'all' ? 'default' : 'outline'
-                    }
-                    className="h-8 shrink-0 rounded-full px-3 text-xs"
-                    onClick={() => {
-                      setSelectedMarketCategoryGroup('all');
-                      setSelectedMarketSubcategory('all');
-                    }}
-                  >
-                    الكل
-                  </Button>
-                  {marketplaceCategoryGroups.map((group) => (
-                    <Button
-                      key={group.label}
-                      type="button"
-                      size="sm"
-                      variant={
-                        activeMarketCategoryGroup === group.label
-                          ? 'default'
-                          : 'outline'
-                      }
-                      className="h-8 shrink-0 rounded-full px-3 text-xs"
-                      onClick={() => {
-                        setSelectedMarketCategoryGroup(group.label);
-                        setSelectedMarketSubcategory('all');
-                      }}
-                    >
-                      {group.label}
-                    </Button>
-                  ))}
-                </div>
-
-                {activeMarketCategoryGroupConfig && (
-                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={
-                        activeMarketSubcategory === 'all' ? 'default' : 'outline'
-                      }
-                      className="h-7 shrink-0 rounded-full px-2.5 text-[11px]"
-                      onClick={() => setSelectedMarketSubcategory('all')}
-                    >
-                      كل {activeMarketCategoryGroup}
-                    </Button>
-                    {activeMarketCategoryGroupConfig.categories.map((category) => (
-                      <Button
-                        key={category}
-                        type="button"
-                        size="sm"
-                        variant={
-                          activeMarketSubcategory === category ? 'default' : 'outline'
-                        }
-                        className="h-7 shrink-0 rounded-full px-2.5 text-[11px]"
-                        onClick={() => setSelectedMarketSubcategory(category)}
-                      >
-                        {category}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_auto_auto] sm:p-2">
-                  <label className="order-1 flex h-10 min-w-0 items-center gap-2 rounded-md border bg-background px-3 text-sm sm:h-9">
+              <div className="grid gap-1">
+                <div className="marketplace-filter-panel marketplace-tools-fields">
+                  <label className="marketplace-tools-search flex h-9 min-w-0 items-center gap-1 rounded-md border bg-background px-2 text-sm">
                     <Search className="size-4 shrink-0 text-blue-600" />
                     <input
                       className="min-w-0 flex-1 bg-transparent text-right outline-none"
@@ -4839,7 +4892,7 @@ export default function Page() {
                         type="button"
                         size="icon-sm"
                         variant="ghost"
-                        className="size-7 shrink-0 rounded-full"
+                        className="size-6 shrink-0 rounded-md"
                         aria-label="مسح البحث"
                         onClick={() => {
                           setMarketplaceSearchInput('');
@@ -4852,7 +4905,8 @@ export default function Page() {
                   </label>
                   <CitySelector
                     allValue="all"
-                    className="order-3 sm:order-2 [&>button]:h-9"
+                    allLabel="المنطقة"
+                    className="marketplace-tools-region [&>button]:h-9 [&>button]:gap-1 [&>button]:px-2 [&>button>svg:first-child]:hidden [&>div]:left-0 [&>div]:right-auto [&>div]:w-64"
                     popoverClassName="z-[80]"
                     value={activeMarketCity}
                     onValueChange={(value) => {
@@ -4869,7 +4923,8 @@ export default function Page() {
                         ? 'default'
                         : 'outline'
                     }
-                    className="order-4 h-9 rounded-md px-3 sm:order-3"
+                    aria-label="موقعي"
+                    className="marketplace-tools-nearby size-9 rounded-md p-0"
                     disabled={isLocatingNearbyListings}
                     onClick={handleNearbyMarketplaceSearch}
                     title={'موقعي يحتاج إذن الموقع الجغرافي'}
@@ -4879,18 +4934,20 @@ export default function Page() {
                     ) : (
                       <MapPin className="size-4" />
                     )}
-                    {'موقعي'}
+                    <span className="sr-only">موقعي</span>
                   </Button>
                   <Button
                     type="button"
                     variant={isMarketFilterOpen ? 'default' : 'outline'}
-                    className="order-2 h-10 w-10 rounded-md px-0 sm:order-4 sm:h-9 sm:w-auto sm:px-3"
+                    aria-label={activeMarketFilterCount > 0 ? `تصفية البحث، ${activeMarketFilterCount} خيارات مفعلة` : 'تصفية البحث'}
+                    className="marketplace-tools-filter relative size-9 rounded-md p-0"
+                    title="تصفية البحث"
                     onClick={() => setIsMarketFilterOpen((value) => !value)}
                   >
                     <SlidersHorizontal className="size-4" />
-                    <span className="sr-only sm:not-sr-only">{'تصفية البحث'}</span>
+                    <span className="sr-only">{'تصفية البحث'}</span>
                     {activeMarketFilterCount > 0 && (
-                      <span className="grid size-5 place-items-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-400/20 dark:text-blue-100">
+                      <span className="pointer-events-none absolute -left-1 -top-1 grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 dark:bg-blue-400/20 dark:text-blue-100">
                         {activeMarketFilterCount}
                       </span>
                     )}
@@ -4903,14 +4960,8 @@ export default function Page() {
                   </div>
                 )}
 
-                {isMarketFilterOpen && (
-                  <div className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50/70 p-3 text-right text-xs text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {hasManualMarketFilters
-                        ? 'تم تطبيق تصفية البحث محليًا على الإعلانات المعروضة فقط.'
-                        : 'اختر تصنيفًا أو منطقة لتصفية الإعلانات المعروضة.'}
-                    </span>
-                    {hasManualMarketFilters && (
+                {isMarketFilterOpen && hasManualMarketFilters && (
+                  <div className="flex justify-end">
                       <Button
                         type="button"
                         size="sm"
@@ -4927,39 +4978,66 @@ export default function Page() {
                         <X className="size-3.5" />
                         مسح الفلاتر
                       </Button>
-                    )}
                   </div>
                 )}
               </div>
               </div>
-              {!isManualListingVisible && (
-                <div
-                  aria-label={
-                    isMarketplaceTopActionsHidden
-                      ? 'اسحب لعرض أدوات السوق'
-                      : 'اسحب لإخفاء أدوات السوق'
-                  }
-                  className="pointer-events-auto mx-auto mt-1 flex h-4 w-20 cursor-grab touch-none items-center justify-center rounded-full bg-white/85 shadow-sm ring-1 ring-blue-100/80 active:cursor-grabbing dark:bg-card/85 dark:ring-blue-400/20"
-                  onPointerCancel={finishMarketplaceToolsDrag}
-                  onPointerDown={handleMarketplaceToolsPointerDown}
-                  onPointerMove={handleMarketplaceToolsPointerMove}
-                  onPointerUp={finishMarketplaceToolsDrag}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') {
-                      return;
-                    }
-
-                    event.preventDefault();
-                    marketplaceToolsManualLockUntilRef.current =
-                      performance.now() + 2200;
-                    setMarketplaceToolsHidden(!isMarketplaceTopActionsHidden);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <span className="h-1 w-10 rounded-full bg-blue-300/80 dark:bg-blue-300/50" />
+              <div className="grid gap-1 p-1" ref={marketplaceCategoriesRef} data-marketplace-categories>
+                <div className="flex touch-pan-x gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeMarketCategoryGroup === 'all' ? 'default' : 'outline'}
+                    className="h-8 shrink-0 rounded-full px-3 text-xs"
+                    onClick={() => {
+                      setSelectedMarketCategoryGroup('all');
+                      setSelectedMarketSubcategory('all');
+                    }}
+                  >
+                    الكل
+                  </Button>
+                  {marketplaceCategoryGroups.map((group) => (
+                    <Button
+                      key={group.label}
+                      type="button"
+                      size="sm"
+                      variant={activeMarketCategoryGroup === group.label ? 'default' : 'outline'}
+                      className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      onClick={() => {
+                        setSelectedMarketCategoryGroup(group.label);
+                        setSelectedMarketSubcategory('all');
+                      }}
+                    >
+                      {group.label}
+                    </Button>
+                  ))}
                 </div>
-              )}
+                {activeMarketCategoryGroupConfig && (
+                  <div className="flex touch-pan-x gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeMarketSubcategory === 'all' ? 'default' : 'outline'}
+                      className="h-8 shrink-0 rounded-full px-2.5 text-xs"
+                      onClick={() => setSelectedMarketSubcategory('all')}
+                    >
+                      كل {activeMarketCategoryGroup}
+                    </Button>
+                    {activeMarketCategoryGroupConfig.categories.map((category) => (
+                      <Button
+                        key={category}
+                        type="button"
+                        size="sm"
+                        variant={activeMarketSubcategory === category ? 'default' : 'outline'}
+                        className="h-8 shrink-0 rounded-full px-2.5 text-xs"
+                        onClick={() => setSelectedMarketSubcategory(category)}
+                      >
+                        {category}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
               </div>
 
               <div

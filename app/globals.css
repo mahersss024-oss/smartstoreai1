@@ -340,6 +340,29 @@
     scrollbar-gutter: stable;
   }
 
+  #suggested-listings > .marketplace-home-controls {
+    container-type: inline-size;
+  }
+
+  .marketplace-tools-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.25rem;
+    grid-template-areas: "search filter" "region nearby";
+    gap: 4px;
+  }
+
+  .marketplace-tools-search { grid-area: search; }
+  .marketplace-tools-filter { grid-area: filter; }
+  .marketplace-tools-region { grid-area: region; }
+  .marketplace-tools-nearby { grid-area: nearby; }
+
+  @container (min-width: 350px) {
+    .marketplace-tools-fields {
+      grid-template-columns: minmax(0, 1fr) 2.25rem minmax(6rem, 7rem) 2.25rem;
+      grid-template-areas: "search filter region nearby";
+    }
+  }
+
   .smartstore-stable-page,
   .admin-viewport > main,
   main[class*="bg-[#e8edf3]"]:not(.marketplace-shell):not(.customer-conversation-page) {
