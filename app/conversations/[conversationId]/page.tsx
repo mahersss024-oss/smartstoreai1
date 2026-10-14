@@ -29,7 +29,7 @@ import {
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
-import { ResilientImage } from '@/components/resilient-image';
+import { ListingCardImage } from '@/components/listing-card-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -1519,10 +1519,9 @@ export default function ConversationPage() {
                     href={conversationListingHref}
                     className="size-12 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                   >
-                    <ResilientImage
+                    <ListingCardImage
                       alt={displayListing.title ?? 'صورة الإعلان'}
                       className="size-full object-cover"
-                      decoding="async"
                       fallback={
                         <img
                           alt="صورة الإعلان"
@@ -1532,8 +1531,10 @@ export default function ConversationPage() {
                           src={missingListingImageDataUrl}
                         />
                       }
-                      loading="lazy"
+                      height={48}
+                      sizes="48px"
                       src={getListingImage(displayListing)}
+                      width={48}
                     />
                   </Link>
                 ) : (
@@ -1827,10 +1828,9 @@ export default function ConversationPage() {
                   href={conversationListingHref}
                   className="size-20 shrink-0 overflow-hidden rounded-md transition hover:opacity-85 active:scale-95"
                 >
-                  <ResilientImage
+                  <ListingCardImage
                     alt={displayListing.title ?? 'صورة الإعلان'}
                     className="size-full object-cover"
-                    decoding="async"
                     fallback={
                       <img
                         alt="صورة الإعلان"
@@ -1840,8 +1840,10 @@ export default function ConversationPage() {
                         src={missingListingImageDataUrl}
                       />
                     }
-                    loading="lazy"
+                    height={80}
+                    sizes="80px"
                     src={getListingImage(displayListing)}
+                    width={80}
                   />
                 </Link>
               ) : (

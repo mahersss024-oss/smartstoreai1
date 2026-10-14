@@ -65,8 +65,8 @@ import { SearchStatusIndicator } from '@/components/search-status-indicator';
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { ListingCardImage } from '@/components/listing-card-image';
 import { ListingShareButton } from '@/components/listing-share-button';
-import { ResilientImage } from '@/components/resilient-image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   chatServiceUnavailableMessage,
@@ -1520,14 +1520,15 @@ function ListingChatLinkCard({
         <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-100 text-blue-700 shadow-sm shadow-blue-950/10 dark:bg-slate-900 dark:text-blue-200">
           {effectiveListing.image ? (
             <>
-              <ResilientImage
+              <ListingCardImage
                 alt={effectiveListing.title}
                 className="h-full w-full object-contain"
-                decoding="async"
                 fallbackSrcs={effectiveListing.imageFallbacks}
                 fallback={<Megaphone className="size-5" />}
-                loading="lazy"
+                height={56}
+                sizes="56px"
                 src={effectiveListing.image}
+                width={56}
               />
             </>
           ) : (
@@ -1739,15 +1740,12 @@ function ListingCardView({
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
-              <ResilientImage
+              <ListingCardImage
                 alt={listing.title}
-                className="h-full w-full object-cover"
-                decoding="async"
                 fallbackSrcs={listing.imageFallbacks}
                 fallback={<ListingImageFallback />}
-                fetchPriority={prioritizeImage ? 'high' : 'auto'}
                 height={116}
-                loading={prioritizeImage ? 'eager' : 'lazy'}
+                priority={prioritizeImage}
                 sizes="(min-width: 640px) 116px, 100px"
                 src={listing.image}
                 width={116}
@@ -1811,15 +1809,13 @@ function ListingCardView({
       <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-900">
         {listing.image ? (
           <>
-            <ResilientImage
+            <ListingCardImage
               alt={listing.title}
               className="h-full w-full object-contain"
-              decoding="async"
               fallbackSrcs={listing.imageFallbacks}
               fallback={<ListingImageFallback />}
-              fetchPriority={prioritizeImage ? 'high' : 'auto'}
               height={200}
-              loading={prioritizeImage ? 'eager' : 'lazy'}
+              priority={prioritizeImage}
               sizes="(min-width: 640px) 184px, 50vw"
               src={listing.image}
               width={320}
@@ -4861,14 +4857,15 @@ export default function Page() {
                               >
                                 {listing.image ? (
                                   <span className="relative block aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
-                                    <ResilientImage
+                                    <ListingCardImage
                                       alt={listing.title}
                                       className="h-full w-full object-contain"
-                                      decoding="async"
                                       fallbackSrcs={listing.imageFallbacks}
                                       fallback={<span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400"><ImageIcon className="size-4" /></span>}
-                                      loading="lazy"
+                                      height={96}
+                                      sizes="96px"
                                       src={listing.image}
+                                      width={96}
                                     />
                                   </span>
                                 ) : (

@@ -60,6 +60,7 @@ test('allows load-more for marketplace exploration with remaining pages', () => 
 
 test('home marketplace renders assistant search as a separate active layer', () => {
   const homePage = readProjectFile('app', 'page.tsx');
+  const listingCardImage = readProjectFile('components', 'listing-card-image.tsx');
   const globalCss = readProjectFile('app', 'globals.css');
 
   assert.match(homePage, /hasActiveAssistantSearch/);
@@ -164,8 +165,9 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /object-cover/);
   assert.match(homePage, /formatListingRelativeTime/);
   assert.match(homePage, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
-  assert.match(homePage, /loading="lazy"/);
-  assert.match(homePage, /decoding="async"/);
+  assert.match(homePage, /<ListingCardImage/);
+  assert.match(listingCardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(listingCardImage, /decoding="async"/);
   assert.match(homePage, /min-h-\[6\.25rem\] w-full/);
   assert.match(homePage, /sm:min-h-\[7\.25rem\]/);
   assert.doesNotMatch(homePage, /\[contain-intrinsic-size:126px\]/);

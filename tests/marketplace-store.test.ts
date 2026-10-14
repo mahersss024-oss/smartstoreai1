@@ -874,10 +874,47 @@ test('paginates published marketplace listings', () => {
   assert.equal(secondPage.some((listing) => firstPageIds.has(listing.id)), false);
 });
 
+test('public listing pagination can fetch the final partial page', () => {
+  const city = 'partial-pagination-city';
+
+  for (let index = 0; index < 25; index += 1) {
+    const listing = createListingDraft({
+      sellerId: `seller:partial-pagination-${index}`,
+      category: 'electronics',
+      title: `partial-pagination-${index}`,
+      city,
+    });
+
+    publishListing(listing.id);
+  }
+
+  const firstPage = listMarketplaceListings({
+    city,
+    page: 1,
+    limit: 24,
+    take: 25,
+  });
+  const secondPage = listMarketplaceListings({
+    city,
+    page: 2,
+    limit: 24,
+    take: 25,
+  });
+
+  assert.equal(firstPage.length, 25);
+  assert.equal(firstPage.slice(0, 24).length, 24);
+  assert.equal(secondPage.length, 1);
+  assert.equal(
+    firstPage.slice(0, 24).some((listing) => listing.id === secondPage[0]?.id),
+    false,
+  );
+});
+
 test('public marketplace listings route avoids stale cache for paginated scrolling', () => {
   const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
 
   assert.match(route, /noStoreHeaders/);
+  assert.match(route, /limit: pagination\.limit,[\s\S]*take: pagination\.limit \+ 1/);
   assert.doesNotMatch(route, /publicListingsCacheSeconds/);
   assert.doesNotMatch(route, /publicListingsStaleWhileRevalidateSeconds/);
   assert.doesNotMatch(route, /getOrSetPublicJsonCache/);

@@ -101,6 +101,38 @@ test('listing details passes display, thumbnail, and original image variants to 
   assert.match(source, /image\.thumbnailUrl,[\s\S]*image\.displayUrl,[\s\S]*image\.originalUrl/);
 });
 
+test('listing card images share thumbnail-first loading behavior', async () => {
+  const cardImage = await readFile(
+    new URL('../components/listing-card-image.tsx', import.meta.url),
+    'utf8',
+  );
+  const homePage = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const favoritesPage = await readFile(
+    new URL('../app/favorites/page.tsx', import.meta.url),
+    'utf8',
+  );
+  const accountFollowsPage = await readFile(
+    new URL('../app/account/follows/page.tsx', import.meta.url),
+    'utf8',
+  );
+  const listingDetailsPage = await readFile(
+    new URL('../app/listings/[listingId]/page.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(cardImage, /export function ListingCardImage/);
+  assert.match(cardImage, /fetchPriority=\{priority \? 'high' : 'auto'\}/);
+  assert.match(cardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(cardImage, /decoding="async"/);
+  assert.match(cardImage, /sizes = '\(min-width: 640px\) 116px, 100px'/);
+  assert.match(homePage, /<ListingCardImage/);
+  assert.match(homePage, /primaryImage\?\.thumbnailUrl,[\s\S]*primaryImage\?\.displayUrl,[\s\S]*primaryImage\?\.originalUrl/);
+  assert.match(homePage, /prioritizeImage=\{index < 4\}/);
+  assert.match(favoritesPage, /<ListingCardImage/);
+  assert.match(accountFollowsPage, /<ListingCardImage/);
+  assert.match(listingDetailsPage, /<ListingCardImage/);
+});
+
 test('R2 orphan image audit is dry-run only', async () => {
   const source = await readFile(
     new URL('../scripts/r2-orphaned-listing-images-dry-run.ts', import.meta.url),
@@ -194,12 +226,16 @@ test('customer listing pages avoid large framed containers for scalable lists', 
 });
 
 test('home marketplace prioritizes only initial viewport listing images', async () => {
-  const source = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const [source, cardImage] = await Promise.all([
+    readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/listing-card-image.tsx', import.meta.url), 'utf8'),
+  ]);
 
   assert.match(source, /prioritizeImage\?: boolean/);
   assert.match(source, /prioritizeImage=\{index < 4\}/);
-  assert.match(source, /loading=\{prioritizeImage \? 'eager' : 'lazy'\}/);
-  assert.match(source, /fetchPriority=\{prioritizeImage \? 'high' : 'auto'\}/);
+  assert.match(source, /priority=\{prioritizeImage\}/);
+  assert.match(cardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(cardImage, /fetchPriority=\{priority \? 'high' : 'auto'\}/);
   assert.doesNotMatch(source, /loading="eager"/);
 });
 

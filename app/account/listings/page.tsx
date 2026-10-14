@@ -30,6 +30,7 @@ import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { CommissionAgreementDialog } from '@/components/commission-agreement-dialog';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { ListingCardImage } from '@/components/listing-card-image';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -1729,17 +1730,18 @@ export default function AccountListingsPage() {
                           type="button"
                         >
                           {listing.image ? (
-                            <ResilientImage
+                            <ListingCardImage
                               alt={listing.title}
                               className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
-                              decoding="async"
                               fallback={
                                 <span className="grid h-full place-items-center text-slate-400">
                                   <ImageIcon className="size-8" />
                                 </span>
                               }
-                              loading="lazy"
+                              height={116}
+                              sizes="(min-width: 640px) 116px, 100px"
                               src={listing.image}
+                              width={116}
                             />
                           ) : (
                             <span className="grid h-full place-items-center text-slate-400">

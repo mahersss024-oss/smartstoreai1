@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Clock3, Heart, ImageIcon, MapPin } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
-import { ResilientImage } from '@/components/resilient-image';
+import { ListingCardImage } from '@/components/listing-card-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -360,17 +360,17 @@ export default function FavoritesPage() {
                       prefetch={false}
                     >
                       <div className="aspect-square min-h-[6.25rem] overflow-hidden bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
-                        <ResilientImage
+                        <ListingCardImage
                           alt={favorite.listing?.title ?? 'صورة الإعلان'}
-                          className="h-full w-full object-cover"
-                          decoding="async"
                           fallback={
                             <div className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
                               <ImageIcon className="size-6" />
                             </div>
                           }
-                          loading="lazy"
+                          height={116}
+                          sizes="(min-width: 640px) 116px, 100px"
                           src={getListingImage(favorite.listing)}
+                          width={116}
                         />
                       </div>
                       <div className="grid min-w-0 content-between gap-1 px-2 py-1.5 sm:px-3 sm:py-2">

@@ -305,6 +305,7 @@ export type MarketplaceListingFilters = {
   excludedTerms?: string[];
   page?: number;
   limit?: number;
+  take?: number;
 };
 
 function extractListingIdLookup(value?: string) {
@@ -740,6 +741,7 @@ function getListingPagination(filters: MarketplaceListingFilters) {
     limit: pagination.limit,
     page: pagination.page,
     skip: pagination.skip,
+    take: filters.take ?? pagination.limit,
   };
 }
 
@@ -1115,7 +1117,7 @@ export async function listMarketplaceListings(
     },
     orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     skip: pagination.skip,
-    take: pagination.limit,
+    take: pagination.take,
   });
 
   return listings.map(toListingRecord);

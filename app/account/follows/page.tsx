@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ImageIcon, UserPlus } from 'lucide-react';
 
-import { ResilientImage } from '@/components/resilient-image';
+import { ListingCardImage } from '@/components/listing-card-image';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -308,17 +308,17 @@ export default function AccountFollowsPage() {
                         prefetch={false}
                       >
                         {follow.image ? (
-                          <ResilientImage
+                          <ListingCardImage
                             alt={follow.title}
-                            className="h-full w-full object-cover"
-                            decoding="async"
                             fallback={
                               <span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">
                                 <ImageIcon className="size-5" />
                               </span>
                             }
-                            loading="lazy"
+                            height={80}
+                            sizes="80px"
                             src={follow.image}
+                            width={80}
                           />
                         ) : (
                           <span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400">

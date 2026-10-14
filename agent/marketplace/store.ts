@@ -107,6 +107,7 @@ export type MarketplaceListingFilters = {
   excludedTerms?: string[];
   page?: number;
   limit?: number;
+  take?: number;
 };
 
 function extractListingIdLookup(value?: string) {
@@ -150,13 +151,14 @@ function getListingPagination(filters: MarketplaceListingFilters) {
   return {
     limit: pagination.limit,
     skip: pagination.skip,
+    take: filters.take ?? pagination.limit,
   };
 }
 
 function paginateListings<T>(listings: T[], filters: MarketplaceListingFilters) {
   const pagination = getListingPagination(filters);
 
-  return listings.slice(pagination.skip, pagination.skip + pagination.limit);
+  return listings.slice(pagination.skip, pagination.skip + pagination.take);
 }
 
 function normalizeConversationMessages(

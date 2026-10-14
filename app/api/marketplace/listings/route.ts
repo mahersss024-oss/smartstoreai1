@@ -54,7 +54,8 @@ export async function GET(request: Request) {
     query,
     city,
     page: pagination.page,
-    limit: pagination.limit + 1,
+    limit: pagination.limit,
+    take: pagination.limit + 1,
   });
   const hasMore = listings.length > pagination.limit;
   const payload = {
