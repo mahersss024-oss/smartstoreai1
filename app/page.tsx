@@ -2052,6 +2052,7 @@ export default function Page() {
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
   const lastMarketplaceScrollTopRef = useRef(0);
+  const lastMarketplaceScrollHeightRef = useRef(0);
   const marketplaceTopActionsHiddenRef = useRef(false);
   const marketplaceScrollIntentRef = useRef({
     direction: 0,
@@ -4005,10 +4006,15 @@ export default function Page() {
   const handleMarketplaceListingsScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
       const nextScrollTop = event.currentTarget.scrollTop;
+      const nextScrollHeight = event.currentTarget.scrollHeight;
       const previousScrollTop = lastMarketplaceScrollTopRef.current;
+      const previousScrollHeight = lastMarketplaceScrollHeightRef.current;
       const scrollDelta = nextScrollTop - previousScrollTop;
+      const didListGrow =
+        previousScrollHeight > 0 && nextScrollHeight > previousScrollHeight + 8;
 
       lastMarketplaceScrollTopRef.current = nextScrollTop;
+      lastMarketplaceScrollHeightRef.current = nextScrollHeight;
 
       if (isManualListingVisible) {
         marketplaceTopActionsHiddenRef.current = false;
@@ -4071,6 +4077,8 @@ export default function Page() {
       if (
         direction < 0 &&
         marketplaceTopActionsHiddenRef.current &&
+        !isLoadingListings &&
+        !didListGrow &&
         scrollIntent.distance >= 40
       ) {
         marketplaceTopActionsHiddenRef.current = false;
@@ -4082,7 +4090,7 @@ export default function Page() {
         setIsMarketplaceTopActionsHidden(false);
       }
     },
-    [isManualListingVisible],
+    [isLoadingListings, isManualListingVisible],
   );
 
   return (
@@ -4587,10 +4595,10 @@ export default function Page() {
               <div className="mb-2 grid gap-1.5">
                 <div
                   className={cn(
-                    'grid gap-1.5 overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                    'grid gap-1.5 overflow-hidden transition-[max-height,transform,margin] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
                     isMarketplaceTopActionsHidden
-                      ? 'max-h-0 -translate-y-2 opacity-0 pointer-events-none'
-                      : 'max-h-[28rem] translate-y-0 opacity-100',
+                      ? 'max-h-0 -translate-y-full pointer-events-none'
+                      : 'max-h-[28rem] translate-y-0',
                   )}
                 >
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -4835,7 +4843,10 @@ export default function Page() {
                 {exploreMarketplaceListings.map((listing, index) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
-                    className="marketplace-listing-card-enter"
+                    className={cn(
+                      'marketplace-listing-card-enter',
+                      index < 4 && 'marketplace-listing-card-critical',
+                    )}
                     listing={listing}
                     onAsk={sendStarter}
                     onOpen={openListing}

@@ -285,7 +285,7 @@ export default function FavoritesPage() {
   return (
     <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 py-3">
+        <header className="smartstore-page-header flex shrink-0 items-center justify-between gap-3 px-1">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href="/account">

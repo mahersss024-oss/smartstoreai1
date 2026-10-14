@@ -1592,8 +1592,8 @@ export default function AccountListingsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-5">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
+      <div className="relative mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-5">
+        <header className="smartstore-page-header flex shrink-0 items-center justify-between gap-2 px-1 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/account">
               <ArrowRight className="size-4" />
@@ -1644,7 +1644,7 @@ export default function AccountListingsPage() {
           </section>
         ) : (
           <>
-            <section className="flex shrink-0 flex-wrap items-center justify-start gap-3 px-1 py-3 sm:px-4">
+            <section className="absolute left-3 top-4 z-10 flex shrink-0 flex-wrap items-center justify-start gap-3 px-1 sm:left-6 sm:top-5 sm:px-4">
               <div className="flex flex-wrap gap-2">
                 <Button asChild className="rounded-md bg-blue-600 hover:bg-blue-700">
                   <Link href="/">

@@ -437,7 +437,7 @@ export default function AccountPage() {
         tone="default"
       />
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[28rem] flex-col gap-4 px-3 py-4 sm:max-w-[30rem] sm:px-5 sm:py-5 lg:max-w-4xl lg:px-6">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-3 sm:gap-3">
+        <header className="smartstore-page-header flex shrink-0 items-center justify-between gap-2 px-1 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Link className="grid size-9 place-items-center rounded-md bg-white dark:bg-card" href="/">
               <ArrowRight className="size-4" />
