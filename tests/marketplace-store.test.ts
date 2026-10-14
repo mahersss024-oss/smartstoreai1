@@ -16,6 +16,7 @@ import {
   deleteListingImageForSeller,
   getConversationBlockStatus,
   getConversationForUser,
+  getListingReport,
   listModerationQueue,
   listMarketplaceListings,
   listAdminCommissions,
@@ -725,6 +726,23 @@ test('stores listing reports for moderation review', () => {
   assert.equal(result.status, 'reported');
   assert.equal(result.report?.status, 'open');
   assert.equal(result.report?.reason, 'misleading_images');
+});
+
+test('listing reports stay unique per reporter even after moderation', () => {
+  const listing = createListingDraft({ sellerId: 'report-dedupe-seller', category: 'other', title: 'Desk' });
+  publishListing(listing.id);
+  const first = reportListing(listing.id, 'report-dedupe-buyer', 'fraud', 'First details');
+  const repeat = reportListing(listing.id, 'report-dedupe-buyer', 'other', 'Repeated details');
+  assert.equal(first.report?.id, repeat.report?.id);
+  assert.equal(repeat.report?.details, 'First details');
+  assert.equal(getListingReport(listing.id, 'report-dedupe-buyer')?.id, first.report?.id);
+  setReportModerationStatus(first.report!.id, 'reviewed');
+  const reviewedRepeat = reportListing(listing.id, 'report-dedupe-buyer', 'fraud');
+  assert.equal(reviewedRepeat.report?.id, first.report?.id);
+  const other = reportListing(listing.id, 'report-dedupe-other', 'fraud');
+  assert.notEqual(other.report?.id, first.report?.id);
+  assert.equal(listModerationQueue().reports.filter(report => report.listingId === listing.id).length, 2);
+  assert.equal(getListingReport(listing.id, 'unrelated-buyer'), null);
 });
 
 test('lists moderation queue and prevents publishing blocked listings', () => {

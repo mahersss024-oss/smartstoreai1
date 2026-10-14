@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { createSessionCookie } from '@/lib/auth/session';
 
 function measureCreateAction(element: Element) {
   const box = element.getBoundingClientRect();
@@ -193,6 +194,54 @@ test('blank toolbar space supports mouse and touch drag while controls remain us
   await session?.detach();
 });
 
+test('button drags do not activate commands and excluded fields keep their interactions', async ({ page, isMobile }) => {
+  const panel = await openMarketplace(page);
+  const session = isMobile ? await page.context().newCDPSession(page) : null;
+  async function gesture(control: Locator, distance: number) {
+    const box = (await control.boundingBox())!;
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    if (session) {
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, id: 1 }] });
+      for (let step = 1; step <= 12; step++) {
+        await session.send('Input.dispatchTouchEvent', {
+          type: 'touchMove', touchPoints: [{ x: point.x, y: point.y + distance * step / 12, id: 1 }],
+        });
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await page.mouse.move(point.x, point.y);
+      await page.mouse.down();
+      await page.mouse.move(point.x, point.y + distance, { steps: 12 });
+      await page.mouse.up();
+    }
+  }
+  const filter = panel.getByRole('button', { name: /^تصفية البحث/ });
+  const closedFilterClass = (await filter.getAttribute('class'))!;
+  await gesture(filter, -160);
+  await expectHidden(panel, true);
+  await page.waitForTimeout(1200);
+  await gesture(panel.getByRole('button', { name: 'الكل', exact: true }), 200);
+  await expectHidden(panel, false);
+  await page.waitForTimeout(1200);
+  await expect(filter).toHaveAttribute('class', closedFilterClass);
+  await gesture(filter, 1);
+  // A small movement is still a normal tap, not a toolbar gesture.
+  await expect(filter).not.toHaveAttribute('class', closedFilterClass);
+  await filter.click();
+  await expect(filter).toHaveAttribute('class', closedFilterClass);
+  await gesture(panel.getByRole('button', { name: 'المنطقة', exact: true }), -80);
+  await expectHidden(panel, false);
+  await panel.getByRole('button', { name: 'المنطقة', exact: true }).click();
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await page.getByRole('option', { name: 'الرياض', exact: true }).click();
+  const search = panel.getByRole('searchbox');
+  await search.fill('Product');
+  await gesture(search, -80);
+  await expectHidden(panel, false);
+  await expect(search).toHaveValue('Product');
+  await session?.detach();
+});
+
 test('tools fit without horizontal scrolling and preserve search, region and clear filters', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   const panel = await openMarketplace(page);
@@ -271,4 +320,82 @@ test('floating categories do not interrupt loading the final partial listings pa
   await expectHidden(panel, true);
   await page.waitForTimeout(1200);
   await expectCategoriesVisible(page);
+});
+
+test('chat search preserves the market scroll, filters and pagination while keeping highlighted results', async ({ page, baseURL }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cookie = createSessionCookie({ id: 'chat-isolation-buyer', email: 'chat-isolation@smartstore.local' });
+  await page.context().addCookies([{
+    name: 'smartstore_session', value: decodeURIComponent(cookie.split(';')[0].split('=').slice(1).join('=')),
+    url: baseURL!, httpOnly: true, sameSite: 'Lax',
+  }]);
+  const events = [
+    { type: 'start', messageId: 'isolation-assistant' },
+    { type: 'tool-input-available', toolCallId: 'isolation-search', toolName: 'searchMarketplaceListings', input: { query: 'phone' } },
+    { type: 'tool-output-available', toolCallId: 'isolation-search', output: { status: 'searched', listings: [{
+      id: 'assistant-only-result', sellerId: 'assistant-seller', category: 'الجوالات', title: 'Assistant match',
+      description: 'Assistant fixture', price: 100, city: 'الرياض', image: '/hamad-market-logo.webp',
+      imageUrls: ['/hamad-market-logo.webp'], status: 'published', views: 0, messageCount: 0,
+      favoriteCount: 0, createdAt: '2026-10-13T08:00:00.000Z',
+    }] } },
+    { type: 'text-start', id: 'isolation-text' },
+    { type: 'text-delta', id: 'isolation-text', delta: 'Assistant result ready' },
+    { type: 'text-end', id: 'isolation-text' },
+    { type: 'finish' },
+  ];
+  await page.route('**/api/chat', route => route.fulfill({
+    headers: { 'Content-Type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+    body: events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n',
+  }));
+  const panel = await openMarketplace(page, 54);
+  await panel.getByRole('button', { name: 'المنطقة', exact: true }).click();
+  const cityResponse = page.waitForResponse(response =>
+    response.url().includes('/api/marketplace/listings?') && new URL(response.url()).searchParams.get('city') === 'الرياض');
+  await page.getByRole('option', { name: 'الرياض', exact: true }).click();
+  await cityResponse;
+  await scrollTo(page, 600);
+  const list = page.locator('#suggested-listings .marketplace-listings-scroll');
+  const before = await list.evaluate(element => {
+    element.setAttribute('data-retained-list', 'same-node');
+    return element.scrollTop;
+  });
+  let requestsWhileChat = 0;
+  const countMarketRequests = (request: { url(): string }) => {
+    if (request.url().includes('/api/marketplace/listings?')) requestsWhileChat++;
+  };
+  await page.getByRole('button', { name: /فتح حمد/ }).click();
+  await expect(page.locator('#suggested-listings')).toBeHidden();
+  page.on('request', countMarketRequests);
+  await page.getByPlaceholder(/اكتب طلبك/).fill('ابحث عن جوال');
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
+  await expect(page.getByText('Assistant result ready', { exact: true })).toBeVisible();
+  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  const chat = page.getByTestId('assistant-panel');
+  const rect = (await chat.boundingBox())!;
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.mouse.wheel(0, 1800);
+  await page.mouse.wheel(0, -1800);
+  await page.waitForTimeout(500);
+  expect(requestsWhileChat).toBe(0);
+  page.off('request', countMarketRequests);
+  await page.getByRole('button', { name: 'العودة للإعلانات', exact: true }).click();
+  await expect(list).toHaveAttribute('data-retained-list', 'same-node');
+  expect(await list.evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
+  await expect(panel.locator('.marketplace-tools-region button')).toContainText('الرياض');
+  await expect(page.locator('.marketplace-listing-card:not(.smart-assistant-result-card)')).toHaveCount(24);
+  await list.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }));
+  await expect(page.getByText('Product 47', { exact: true })).toBeAttached();
+  await list.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }));
+  await expect(page.getByText('Product 53', { exact: true })).toBeAttached();
+  await expect(page.locator('.marketplace-listing-card:not(.smart-assistant-result-card)')).toHaveCount(54);
+  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await scrollTo(page, 600);
+  const desktopScroll = await list.evaluate(element => element.scrollTop);
+  const desktopChat = (await chat.boundingBox())!;
+  await page.mouse.move(desktopChat.x + desktopChat.width / 2, desktopChat.y + desktopChat.height / 2);
+  await page.mouse.wheel(0, 1800);
+  await page.mouse.wheel(0, -1800);
+  await page.waitForTimeout(300);
+  expect(await list.evaluate(element => element.scrollTop)).toBeCloseTo(desktopScroll, 0);
 });

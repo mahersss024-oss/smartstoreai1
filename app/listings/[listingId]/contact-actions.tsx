@@ -5,6 +5,7 @@ import { MessageCircle, Phone, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -148,11 +149,9 @@ export function ListingContactActions({
         </div>
       )}
 
-      {message && (
-        <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground dark:bg-card">
-          {message}
-        </div>
-      )}
+      <FloatingActionNotice message={message} open={Boolean(message)}
+        onDismiss={() => setMessage('')} durationMs={0}
+        tone={message.startsWith('تم') ? 'success' : 'danger'} />
     </div>
   );
 }

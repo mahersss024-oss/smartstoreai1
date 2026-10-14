@@ -1583,6 +1583,13 @@ export function toggleFavoriteListing(listingId: string, userId: string) {
   };
 }
 
+export function getListingReport(listingId: string, reporterId: string) {
+  loadStore();
+  return [...reports.values()].find(
+    (report) => report.listingId === listingId && report.reporterId === reporterId,
+  ) ?? null;
+}
+
 export function reportListing(
   listingId: string,
   reporterId: string,
@@ -1597,6 +1604,11 @@ export function reportListing(
       report: null,
       listing: null,
     };
+  }
+
+  const existingReport = getListingReport(listingId, reporterId);
+  if (existingReport) {
+    return { status: 'reported' as const, report: existingReport, listing, alreadyReported: true };
   }
 
   const report: ReportRecord = {

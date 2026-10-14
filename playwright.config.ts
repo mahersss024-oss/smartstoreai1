@@ -1,13 +1,19 @@
 import { defineConfig, devices } from '@playwright/test';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const port = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '3102', 10);
 const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const testDataDir = process.env.PLAYWRIGHT_BASE_URL
+  ? undefined : mkdtempSync(join(tmpdir(), 'smartstore-e2e-'));
 
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
-  globalTimeout: process.env.CI ? 300_000 : 180_000,
+  // Allow for the production build plus both sequential browser projects.
+  globalTimeout: 600_000,
   expect: {
     timeout: 10_000,
   },
@@ -23,7 +29,7 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: 'pnpm build && pnpm start',
+        command: 'pnpm exec tsx e2e/prepare-fixtures.ts && pnpm build && pnpm start',
         url: baseURL,
         reuseExistingServer: false,
         timeout: 120_000,
@@ -33,6 +39,8 @@ export default defineConfig({
           DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'e2e-placeholder',
           NODE_ENV: 'test',
           PORT: String(port),
+          NEXT_PUBLIC_APP_URL: baseURL,
+          SMARTSTORE_DATA_DIR: testDataDir!,
           SMARTSTORE_IMAGE_STORAGE: process.env.SMARTSTORE_IMAGE_STORAGE ?? '',
           SMARTSTORE_MARKETPLACE_STORE:
             process.env.SMARTSTORE_MARKETPLACE_STORE ?? 'file',

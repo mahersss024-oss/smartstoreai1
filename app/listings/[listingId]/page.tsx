@@ -725,8 +725,8 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
 
   return (
     <main className="marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="marketplace-panel mx-auto flex h-full min-h-0 max-w-4xl flex-col px-3 py-3 sm:px-5">
-        <header className="marketplace-home-controls shrink-0 border-b border-slate-300/70 px-1 py-3 dark:border-white/10">
+      <div className="marketplace-panel mx-auto flex h-full min-h-0 max-w-4xl flex-col py-3">
+        <header className="marketplace-home-controls shrink-0 mx-3 border-b border-slate-300/70 px-1 py-3 dark:border-white/10 sm:mx-5">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
               <Link href={returnHref}>
@@ -740,9 +740,9 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
           </div>
         </header>
 
-        <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-[var(--marketplace-bottom-nav-space)] pt-3 sm:px-2">
+        <section className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[var(--marketplace-bottom-nav-space)] pt-3 sm:px-7">
           <div className="listing-details-content mx-auto grid max-w-3xl gap-3 pb-4 [&_.text-muted-foreground]:text-foreground [&_.text-xs]:text-sm [&_.text-xs]:leading-6">
-            <section className="px-1 py-2 sm:px-2">
+            <section className="listing-seller-summary px-1 py-2 sm:px-2">
               <div className="flex items-center gap-3">
                 <Link
                   href={sellerProfileHref}

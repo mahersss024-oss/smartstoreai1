@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { reportListing } from '@/agent/marketplace/repository';
+import { hasReportedListing, reportListing } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -26,6 +26,19 @@ type RouteContext = {
     listingId: string;
   }>;
 };
+
+export async function GET(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+  if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'report_state', actorId: session.user.id, maxRequests: 120, windowMs: 60_000,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  const { listingId } = await context.params;
+  return Response.json({ isReported: await hasReportedListing(listingId, session.user) }, {
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
+}
 
 export async function POST(request: Request, context: RouteContext) {
   const session = getAuthSession(request);

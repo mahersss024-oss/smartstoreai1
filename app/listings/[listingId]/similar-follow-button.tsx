@@ -5,6 +5,7 @@ import { Bell, BellOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
 
 function createClientIdempotencyKey(scope: string) {
@@ -123,9 +124,9 @@ export function SimilarListingFollowButton({
         {isFollowing ? <BellOff className="size-4" /> : <Bell className="size-4" />}
         {isFollowing ? 'إيقاف متابعة المشابه' : 'تابع الإعلانات المشابهة'}
       </Button>
-      {message ? (
-        <p className="text-xs leading-6 text-muted-foreground">{message}</p>
-      ) : null}
+      <FloatingActionNotice message={message} open={Boolean(message)}
+        onDismiss={() => setMessage('')} durationMs={0}
+        tone={message.startsWith('تعذر') ? 'danger' : 'success'} />
     </div>
   );
 }

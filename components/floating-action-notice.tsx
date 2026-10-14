@@ -1,11 +1,14 @@
 'use client';
 
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 type FloatingActionNoticeTone = 'success' | 'warning' | 'danger' | 'info';
+
+const subscribeToClient = () => () => {};
 
 type FloatingActionNoticeProps = {
   action?: ReactNode;
@@ -83,6 +86,30 @@ export function FloatingActionNotice({
   const toneConfig = toneClasses[tone];
   const Icon = toneConfig.Icon;
   const isRichNotice = Boolean(title || action || statusLabel);
+  const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false);
+  const noticeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !isClient) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updatePosition = () => {
+      const element = noticeRef.current;
+      if (!element) return;
+      element.style.top = `${viewport.offsetTop + viewport.height / 2}px`;
+      element.style.left = `${viewport.offsetLeft}px`;
+      element.style.right = 'auto';
+      element.style.width = `${viewport.width}px`;
+      element.style.setProperty('--notice-viewport-height', `${viewport.height}px`);
+    };
+    updatePosition();
+    viewport.addEventListener('resize', updatePosition);
+    viewport.addEventListener('scroll', updatePosition);
+    return () => {
+      viewport.removeEventListener('resize', updatePosition);
+      viewport.removeEventListener('scroll', updatePosition);
+    };
+  }, [isClient, open]);
 
   useEffect(() => {
     if (!open || durationMs <= 0) {
@@ -94,20 +121,23 @@ export function FloatingActionNotice({
     return () => window.clearTimeout(timeoutId);
   }, [durationMs, onDismiss, open]);
 
-  if (!open) {
+  if (!open || !isClient) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div
       aria-live={tone === 'success' || tone === 'info' ? 'polite' : 'assertive'}
-      className="pointer-events-none fixed inset-x-0 top-1/2 z-[70] grid -translate-y-1/2 place-items-center px-4 [padding-bottom:env(safe-area-inset-bottom)] [padding-top:env(safe-area-inset-top)]"
+      className="pointer-events-none fixed inset-x-0 top-1/2 z-[2147483647] grid -translate-y-1/2 place-items-center px-4 [padding-bottom:env(safe-area-inset-bottom)] [padding-top:env(safe-area-inset-top)]"
+      ref={noticeRef}
       dir="rtl"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
       role={tone === 'success' || tone === 'info' ? 'status' : 'alert'}
     >
       <section
         className={cn(
-          'pointer-events-auto relative isolate w-full overflow-hidden rounded-lg border border-border/80 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-card/95',
+          'pointer-events-auto relative isolate max-h-[calc(var(--notice-viewport-height,100dvh)-2rem)] w-full overflow-x-hidden overflow-y-auto rounded-lg border border-border/80 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-card/95',
           'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:slide-in-from-bottom-2 motion-safe:duration-200',
           toneConfig.glow,
           isRichNotice
@@ -214,6 +244,7 @@ export function FloatingActionNotice({
           </div>
         )}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

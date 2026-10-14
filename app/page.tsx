@@ -2059,9 +2059,13 @@ export default function Page() {
   const marketplaceCategoriesRef = useRef<HTMLDivElement | null>(null);
   const marketplaceToolsDragRef = useRef({
     pointerId: -1,
+    startX: 0,
     startY: 0,
     startOffset: 0,
+    axis: 'pending' as 'pending' | 'horizontal' | 'vertical',
+    wasHidden: false,
   });
+  const suppressMarketplaceToolsClickRef = useRef(false);
   const lastMarketplaceScrollTopRef = useRef(0);
   const lastMarketplaceScrollAtRef = useRef(0);
   const lastMarketplaceScrollHeightRef = useRef(0);
@@ -3949,8 +3953,10 @@ export default function Page() {
     );
   }, []);
 
+  const isCompactChatView = isCompactViewport && isMobileChatViewOpen;
   const loadMoreListings = useCallback(() => {
-    if (!canLoadMoreListings || isLoadingListings) {
+    if (isCompactChatView || marketplaceListingsScrollRef.current?.clientHeight === 0 ||
+        !canLoadMoreListings || isLoadingListings) {
       return;
     }
 
@@ -3958,13 +3964,14 @@ export default function Page() {
     void refreshMarketplaceListings(undefined, listingPagination.page + 1);
   }, [
     canLoadMoreListings,
+    isCompactChatView,
     isLoadingListings,
     listingPagination.page,
     refreshMarketplaceListings,
   ]);
 
   const listingsLoadMoreRef = useInfiniteScroll({
-    enabled: canLoadMoreListings,
+    enabled: canLoadMoreListings && !isCompactChatView,
     isLoading: isLoadingListings,
     onLoadMore: loadMoreListings,
     rootRef: marketplaceListingsScrollRef,
@@ -3991,7 +3998,6 @@ export default function Page() {
     setActiveListingQuery('');
   }, []);
 
-  const isCompactChatView = isCompactViewport && isMobileChatViewOpen;
   const shouldRenderAssistantPanel = !isCompactViewport || isCompactChatView;
   const isAssistantContentVisible =
     !isCompactViewport || isAssistantExpanded || isCompactChatView;
@@ -4028,7 +4034,18 @@ export default function Page() {
     updateCategoriesHeight();
     const observer = new ResizeObserver(updateCategoriesHeight);
     observer.observe(categories);
-    return () => observer.disconnect();
+    // A confirmed manual drag must not start a native fling that absorbs the next tap.
+    const preventNativeToolPan = (event: TouchEvent) => {
+      if (marketplaceToolsDragRef.current.axis === 'vertical' &&
+          marketplaceToolsDragRef.current.pointerId !== -1 && event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    panel.addEventListener('touchmove', preventNativeToolPan, { passive: false });
+    return () => {
+      observer.disconnect();
+      panel.removeEventListener('touchmove', preventNativeToolPan);
+    };
   }, [isCompactChatView]);
 
   const cancelMarketplaceTopReveal = useCallback(() => {
@@ -4093,7 +4110,7 @@ export default function Page() {
         cancelMarketplaceTopReveal();
       }
 
-      if (isMarketplaceToolsDragging) {
+      if (isMarketplaceToolsDragging || marketplaceToolsDragRef.current.pointerId !== -1) {
         return;
       }
 
@@ -4238,6 +4255,9 @@ export default function Page() {
   const handleMarketplaceToolsPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const target = event.target;
+      if (event.isPrimary && event.button === 0) {
+        suppressMarketplaceToolsClickRef.current = false;
+      }
       if (
         isManualListingVisible ||
         !event.isPrimary ||
@@ -4245,7 +4265,7 @@ export default function Page() {
         marketplaceToolsDragRef.current.pointerId !== -1 ||
         !(target instanceof Element) ||
         target.closest(
-            'button, a, input, textarea, select, label, [role="button"], [role="combobox"], [role="slider"], [role="checkbox"], [role="switch"], [contenteditable]:not([contenteditable="false"])',
+            'a, input, textarea, select, label, .marketplace-tools-region, [role="listbox"], [role="option"], [role="combobox"], [role="slider"], [role="checkbox"], [role="switch"], [contenteditable]:not([contenteditable="false"])',
           ) ||
         event.currentTarget.querySelector('[aria-expanded="true"]')
       ) {
@@ -4256,15 +4276,14 @@ export default function Page() {
       const closedOffset = getMarketplaceToolsClosedOffset();
       marketplaceToolsDragRef.current = {
         pointerId: event.pointerId,
+        startX: event.clientX,
         startY: event.clientY,
         startOffset: isMarketplaceTopActionsHidden ? closedOffset : 0,
+        axis: 'pending',
+        wasHidden: isMarketplaceTopActionsHidden,
       };
-      setIsMarketplaceToolsDragging(true);
-      setMarketplaceToolsDragOffset(
-        isMarketplaceTopActionsHidden ? closedOffset : 0,
-      );
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.preventDefault();
+      // Keep capture on the original target so touch taps still work after a drag.
+      target.setPointerCapture(event.pointerId);
     },
     [
       cancelMarketplaceTopReveal,
@@ -4281,6 +4300,24 @@ export default function Page() {
       if (dragState.pointerId !== event.pointerId) {
         return;
       }
+
+      if (dragState.axis === 'pending') {
+        const dx = event.clientX - dragState.startX;
+        const dy = event.clientY - dragState.startY;
+        if (Math.abs(dx) >= 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          dragState.axis = 'horizontal';
+          suppressMarketplaceToolsClickRef.current = true;
+        } else if (Math.abs(dy) >= 12 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+          // Grab the rendered position, including a transition already in flight.
+          const transform = getComputedStyle(event.currentTarget).transform;
+          dragState.startOffset = transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42;
+          dragState.startY += Math.sign(dy) * 12;
+          dragState.axis = 'vertical';
+          suppressMarketplaceToolsClickRef.current = true;
+          setIsMarketplaceToolsDragging(true);
+        }
+      }
+      if (dragState.axis !== 'vertical') return;
 
       const closedOffset = getMarketplaceToolsClosedOffset();
       const nextOffset = clampNumber(
@@ -4302,6 +4339,9 @@ export default function Page() {
         return;
       }
 
+      marketplaceToolsDragRef.current = { ...dragState, pointerId: -1 };
+      if (dragState.axis !== 'vertical') return;
+
       const closedOffset = getMarketplaceToolsClosedOffset();
       const finalOffset = event.type === 'pointerup'
         ? clampNumber(
@@ -4310,12 +4350,9 @@ export default function Page() {
             0,
           )
         : dragState.startOffset;
-      const shouldHide = finalOffset < closedOffset * 0.45;
-      marketplaceToolsDragRef.current = {
-        pointerId: -1,
-        startY: 0,
-        startOffset: 0,
-      };
+      const shouldHide = event.type === 'pointerup'
+        ? finalOffset < closedOffset * 0.45
+        : dragState.wasHidden;
       const now = performance.now();
       marketplaceToolsManualLockUntilRef.current = now + 2200;
       marketplaceScrollIntentRef.current = {
@@ -4426,9 +4463,13 @@ export default function Page() {
                 : 'grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_25rem]',
             )}
           >
-            {!isCompactChatView && (
             <section
-              className="relative flex min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4"
+              className={cn(
+                'relative min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4',
+                isCompactChatView ? 'hidden' : 'flex',
+              )}
+              inert={isCompactChatView}
+              aria-hidden={isCompactChatView || undefined}
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
@@ -4444,6 +4485,8 @@ export default function Page() {
                     ),
               )}
               ref={marketplaceToolsPanelRef}
+              data-floating-tools={!isManualListingVisible || undefined}
+              data-no-pull-refresh={!isManualListingVisible || undefined}
               aria-label="أدوات السوق"
               role="region"
               tabIndex={isManualListingVisible ? undefined : 0}
@@ -4455,6 +4498,14 @@ export default function Page() {
                 setMarketplaceToolsHidden(event.key === 'ArrowUp');
               }}
               onPointerDown={handleMarketplaceToolsPointerDown}
+              onClickCapture={(event) => {
+                if (!event.currentTarget.contains(event.target as Node)) return;
+                if (event.detail > 0 && suppressMarketplaceToolsClickRef.current) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  suppressMarketplaceToolsClickRef.current = false;
+                }
+              }}
               onPointerMove={handleMarketplaceToolsPointerMove}
               onPointerUp={finishMarketplaceToolsDrag}
               onPointerCancel={finishMarketplaceToolsDrag}
@@ -4954,7 +5005,14 @@ export default function Page() {
                   </Button>
                 </div>
 
-                {nearbyMarketplaceNotice && (
+                <FloatingActionNotice
+                  message={nearbyMarketplaceNotice}
+                  open={Boolean(nearbyMarketplaceNotice) && !isLocatingNearbyListings}
+                  onDismiss={() => setNearbyMarketplaceNotice('')}
+                  durationMs={0}
+                  tone={nearbyMarketplaceNotice.startsWith('تم') ? 'success' : 'info'}
+                />
+                {nearbyMarketplaceNotice && isLocatingNearbyListings && (
                   <div className="rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 text-right text-xs font-medium text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
                     {nearbyMarketplaceNotice}
                   </div>
@@ -5145,7 +5203,6 @@ export default function Page() {
 
               </div>
             </section>
-            )}
 
             {shouldRenderAssistantPanel && (
             <section

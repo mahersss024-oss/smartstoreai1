@@ -26,6 +26,38 @@ function createImage(index: number, listingId: string): ListingImage {
   };
 }
 
+test('database listing reports remain unique under concurrent requests', async (t) => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  const suffix = crypto.randomUUID();
+  const seller = { id: `report-seller-${suffix}`, email: `seller-${suffix}@smartstore.local` };
+  const buyer = `report-buyer-${suffix}`;
+  const { prisma } = await import('@/lib/db/prisma');
+  let listingId: string | undefined;
+  try {
+    const repository = await import('@/agent/marketplace/repository');
+    const listing = await repository.createListingDraft(seller, { category: 'other', title: 'Desk' });
+    listingId = listing.id;
+    await prisma.listing.update({ where: { id: listing.id }, data: { status: 'published' } });
+    await prisma.user.upsert({ where: { id: buyer }, update: {}, create: { id: buyer, email: `${buyer}@smartstore.local` } });
+    const results = await Promise.all(Array.from({ length: 6 }, () =>
+      repository.reportListing(listing.id, buyer, 'fraud')));
+    assert.equal(new Set(results.map(result => result.report?.id)).size, 1);
+    assert.equal(await prisma.report.count({ where: { listingId, reporterId: buyer } }), 1);
+    assert.equal(await repository.hasReportedListing(listing.id, buyer), true);
+  } finally {
+    if (listingId) await prisma.listing.deleteMany({ where: { id: listingId } });
+    await prisma.user.deleteMany({ where: { id: { in: [seller.id, buyer] } } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
 test('database image writes keep listing images within the hard limit under concurrency', async (t) => {
   if (!shouldRunDatabaseIntegration()) {
     t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');

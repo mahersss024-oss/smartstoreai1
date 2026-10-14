@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import {
   detectAppPlatform,
   isInsideNativeApp,
@@ -401,6 +402,7 @@ export function PushNotificationSettings({
       : 'تفعيل إشعارات الرسائل';
 
     return (
+      <>
       <Button
         aria-label={iconLabel}
         className="shrink-0"
@@ -421,6 +423,10 @@ export function PushNotificationSettings({
           ) : null}
         </span>
       </Button>
+      <FloatingActionNotice message={notice ?? undefined} open={Boolean(notice)}
+        onDismiss={() => setNotice(null)} durationMs={0}
+        tone={notice?.startsWith('تم تفعيل') || notice?.startsWith('تم إيقاف') ? 'success' : 'info'} />
+      </>
     );
   }
 
@@ -454,11 +460,9 @@ export function PushNotificationSettings({
           {buttonText}
         </Button>
       </div>
-      {notice ? (
-        <div className="rounded-md border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-800 dark:text-blue-100">
-          {notice}
-        </div>
-      ) : null}
+      <FloatingActionNotice message={notice ?? undefined} open={Boolean(notice)}
+        onDismiss={() => setNotice(null)} durationMs={0}
+        tone={notice?.startsWith('تم تفعيل') || notice?.startsWith('تم إيقاف') ? 'success' : 'info'} />
     </section>
   );
 }

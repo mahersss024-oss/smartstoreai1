@@ -4558,6 +4558,17 @@ export async function toggleFavoriteListing(listingId: string, actor: Actor) {
   return result;
 }
 
+export async function hasReportedListing(listingId: string, actor: Actor) {
+  const reporterId = getActorId(actor);
+  if (!shouldUseDatabaseStore()) {
+    return Boolean(memoryStore.getListingReport(listingId, reporterId));
+  }
+  return Boolean(await prisma.report.findFirst({
+    where: { listingId, reporterId },
+    select: { id: true },
+  }));
+}
+
 export async function reportListing(
   listingId: string,
   actor: Actor,
@@ -4569,7 +4580,7 @@ export async function reportListing(
   if (!shouldUseDatabaseStore()) {
     const result = memoryStore.reportListing(listingId, reporterId, reason, details);
 
-    if (result.listing) {
+    if (result.listing && !result.alreadyReported) {
       safelyPublishRealtimeEvent({
         type: 'ad_updated',
         payload: {
@@ -4600,43 +4611,62 @@ export async function reportListing(
 
   await ensureActorUser(actor);
 
-  const report = await prisma.report.create({
-    data: {
-      listingId,
-      reporterId,
-      reason,
-      details,
-    },
-  });
+  let result: { report: Prisma.ReportGetPayload<object>; alreadyReported: boolean } | null = null;
+  for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const existingReport = await tx.report.findFirst({
+          where: { listingId, reporterId },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (existingReport) return { report: existingReport, alreadyReported: true };
+        const report = await tx.report.create({
+          data: { listingId, reporterId, reason, details },
+        });
+        return { report, alreadyReported: false };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      break;
+    } catch (error) {
+      if (!isRetryablePrismaWriteConflict(error) || attempt === maxSerializableWriteAttempts - 1) {
+        throw error;
+      }
+      await waitForSerializableRetry(attempt);
+    }
+  }
+  if (!result) throw new Error('Listing report transaction did not return a result.');
+  const { report, alreadyReported } = result;
 
-  safelyPublishRealtimeEvent({
-    type: 'ad_updated',
-    payload: {
-      listingId: listing.id,
-      sellerId: listing.sellerId,
-      status: listing.status,
-      reason: 'report',
-    },
-    visibility: {
-      includeAdmins: true,
-      userIds: [listing.sellerId],
-    },
-  });
+  if (!alreadyReported) {
+    safelyPublishRealtimeEvent({
+      type: 'ad_updated',
+      payload: {
+        listingId: listing.id,
+        sellerId: listing.sellerId,
+        status: listing.status,
+        reason: 'report',
+      },
+      visibility: {
+        includeAdmins: true,
+        userIds: [listing.sellerId],
+      },
+    });
 
-  safelyPublishRealtimeEvent({
-    type: 'moderation_updated',
-    payload: {
-      entity: 'report',
-      entityId: report.id,
-      status: report.status,
-    },
-    visibility: {
-      includeAdmins: true,
-    },
-  });
+    safelyPublishRealtimeEvent({
+      type: 'moderation_updated',
+      payload: {
+        entity: 'report',
+        entityId: report.id,
+        status: report.status,
+      },
+      visibility: {
+        includeAdmins: true,
+      },
+    });
+  }
 
   return {
     status: 'reported' as const,
+    alreadyReported,
     report: {
       id: report.id,
       listingId: report.listingId,

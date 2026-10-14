@@ -19,6 +19,7 @@ import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility'
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
+import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { Input } from '@ui/input';
 
 type CommissionRecord = {
@@ -403,11 +404,12 @@ export default function CommissionsPage() {
               </div>
             </section>
 
-            {notice && (
-              <div className="px-1 py-3 text-sm text-muted-foreground">
-                {notice}
-              </div>
+            {notice === 'أدخل قيمة بيع صحيحة.' && (
+              <div className="px-1 py-3 text-sm text-muted-foreground">{notice}</div>
             )}
+            <FloatingActionNotice message={notice} open={Boolean(notice) && notice !== 'أدخل قيمة بيع صحيحة.'}
+              onDismiss={() => setNotice('')} durationMs={0}
+              tone={notice.startsWith('تم') ? 'success' : 'danger'} />
             {targetListingId && targetCommission?.status === 'pending_amount' && (
               <div className="rounded-md border border-blue-500/30 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm dark:bg-blue-400/10 dark:text-blue-100">
                 أدخل قيمة البيع النهائية لهذا الإعلان ليتم حساب رسوم المنصة.

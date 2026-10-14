@@ -340,8 +340,41 @@
     scrollbar-gutter: stable;
   }
 
+  .listing-seller-summary {
+    --seller-panel-background: #e2e8f0;
+    background: var(--seller-panel-background);
+    box-shadow: 0 0 0 100vmax var(--seller-panel-background);
+    clip-path: inset(0 -100vmax);
+  }
+
+  .dark .listing-seller-summary {
+    --seller-panel-background: #1e293b;
+  }
+
   #suggested-listings > .marketplace-home-controls {
     container-type: inline-size;
+  }
+
+  #suggested-listings > [data-floating-tools] {
+    isolation: isolate;
+    user-select: none;
+  }
+
+  #suggested-listings > [data-floating-tools] :is(input, textarea, [contenteditable="true"]) {
+    user-select: text;
+  }
+
+  #suggested-listings > [data-floating-tools]::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    background: inherit;
+    pointer-events: none;
+  }
+
+  #suggested-listings > [data-floating-tools] button:not(.marketplace-tools-region button) {
+    touch-action: pan-x pinch-zoom;
   }
 
   .marketplace-tools-fields {

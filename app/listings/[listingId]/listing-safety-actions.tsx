@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Flag, Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -38,9 +38,31 @@ export function ListingSafetyActions({
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const reportInFlightRef = useRef(false);
+  const [reportedFor, setReportedFor] = useState<string | null>(null);
+  const [reportStateLoadedFor, setReportStateLoadedFor] = useState<string | null>(null);
+  const reportIdentity = session.authenticated && session.user
+    ? JSON.stringify([session.user.id, listingId]) : null;
+  const isReported = reportIdentity !== null && reportedFor === reportIdentity;
   const [canFavorite, setCanFavorite] = useState(!isOwnListing);
   const canShowFavorite = showFavorite && canFavorite && !isOwnListing;
   const canShowReport = showReport && !isOwnListing;
+
+  useEffect(() => {
+    if (isSessionLoading || !reportIdentity || !canShowReport) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    void fetch(`/api/marketplace/listings/${listingId}/reports`, {
+      cache: 'no-store', signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const payload = await response.json() as { isReported?: boolean };
+      if (!cancelled && payload.isReported) setReportedFor(reportIdentity);
+    }).catch(() => {}).finally(() => {
+      if (!cancelled) setReportStateLoadedFor(reportIdentity);
+    });
+    return () => { cancelled = true; controller.abort(); };
+  }, [canShowReport, isSessionLoading, listingId, reportIdentity]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -154,6 +176,8 @@ export function ListingSafetyActions({
   };
 
   const reportCurrentListing = async () => {
+    if (reportInFlightRef.current || isReported) return;
+    reportInFlightRef.current = true;
     setIsReporting(true);
     setNotice('');
 
@@ -183,10 +207,17 @@ export function ListingSafetyActions({
         return;
       }
 
+      const payload = await response.json() as { status?: string };
+      if (payload.status !== 'reported') {
+        setNotice('تعذر إرسال البلاغ الآن.');
+        return;
+      }
+      setReportedFor(reportIdentity);
       setNotice('تم إرسال البلاغ للمراجعة.');
     } catch {
       setNotice('تعذر إرسال البلاغ الآن.');
     } finally {
+      reportInFlightRef.current = false;
       setIsReporting(false);
     }
   };
@@ -231,11 +262,14 @@ export function ListingSafetyActions({
         {canShowReport && (
         <Button
           variant="outline"
-          className="rounded-md"
-          disabled={isReporting}
+          className={cn('rounded-md', isReported &&
+            'border-red-500/50 bg-red-50 text-red-600 dark:border-red-400/40 dark:bg-red-400/10 dark:text-red-400 disabled:opacity-100')}
+          disabled={isReporting || isReported || isSessionLoading || Boolean(reportIdentity && reportStateLoadedFor !== reportIdentity)}
           onClick={reportCurrentListing}
+          aria-pressed={isReported}
+          title={isReported ? 'تم إرسال البلاغ للمراجعة' : undefined}
         >
-          <Flag className="size-4" />
+          <Flag className={cn('size-4', isReported && 'fill-current')} />
           إبلاغ
         </Button>
         )}
