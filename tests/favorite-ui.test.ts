@@ -64,6 +64,7 @@ test('listing favorite api exposes exact favorite state for detail pages', () =>
 
 test('favorites page renders saved listings as compact horizontal rows', () => {
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
+  const listingCardImage = readProjectFile('components', 'listing-card-image.tsx');
 
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /flex h-full min-h-0 w-full max-w-6xl flex-col/);
@@ -79,7 +80,8 @@ test('favorites page renders saved listings as compact horizontal rows', () => {
   assert.match(favoritesPage, /formatListingRelativeTime/);
   assert.match(favoritesPage, /favorite\.listing\?\.createdAt \?\?\s*favorite\.listing\?\.updatedAt/);
   assert.match(favoritesPage, /Clock3/);
-  assert.match(favoritesPage, /object-cover/);
+  assert.match(favoritesPage, /<ListingCardImage/);
+  assert.match(listingCardImage, /object-cover/);
   assert.doesNotMatch(favoritesPage, /sm:grid-cols-2 lg:grid-cols-3/);
   assert.doesNotMatch(favoritesPage, /object-contain/);
 });
