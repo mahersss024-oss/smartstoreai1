@@ -4474,19 +4474,19 @@ export default function Page() {
               >
               <div
                 className={cn(
-                  'pointer-events-auto grid max-h-14 gap-1.5 overflow-hidden text-center md:justify-end md:text-right',
+                  'pointer-events-auto grid gap-1.5 text-center md:justify-end md:text-right',
                   'translate-y-0 opacity-100',
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
-                  <Button className="marketplace-primary-cta h-9 gap-1 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
+                  <Button className="marketplace-primary-cta h-auto min-h-9 min-w-0 gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Megaphone className="size-4" />
-                  أنشئ إعلانك مع حمد
+                  <span className="min-w-0 whitespace-normal leading-5">أنشئ إعلانك مع حمد</span>
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 gap-1 rounded-md px-2 text-sm transition duration-150 active:scale-[0.98] sm:px-3"
+                    className="h-auto min-h-9 min-w-0 gap-1 rounded-md px-2 py-1 text-sm transition duration-150 active:scale-[0.98] sm:px-3"
                     onClick={() => {
                       setIsManualListingOpen((value) => !value);
                       setIsManualListingFallbackDismissed(false);
@@ -4494,7 +4494,7 @@ export default function Page() {
                     }}
                   >
                     <Megaphone className="size-4" />
-                    أنشئ إعلانك يدويًا
+                    <span className="min-w-0 whitespace-normal leading-5">أنشئ إعلانك يدويًا</span>
                   </Button>
                 </div>
               </div>

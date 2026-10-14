@@ -1,5 +1,32 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+function measureCreateAction(element: Element) {
+  const box = element.getBoundingClientRect();
+  const range = document.createRange();
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const textRects: DOMRect[] = [];
+  while (walker.nextNode()) {
+    if (!walker.currentNode.textContent?.trim()) continue;
+    range.selectNodeContents(walker.currentNode);
+    textRects.push(...range.getClientRects());
+  }
+  const icon = element.querySelector('svg')!.getBoundingClientRect();
+  const fits = (rect: DOMRect) =>
+    rect.left >= box.left - 1 && rect.right <= box.right + 1 &&
+    rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1;
+
+  // Measure visible content, not the clipped decorative ::after on the CTA.
+  return {
+    text: element.textContent?.trim(),
+    width: box.width,
+    height: box.height,
+    font: getComputedStyle(element).font,
+    textFits: textRects.length > 0 && textRects.every(fits),
+    iconFits: fits(icon),
+    textRects: textRects.map(rect => rect.toJSON()),
+  };
+}
+
 async function openMarketplace(page: Page, total = 24) {
   await page.route('**/api/marketplace/listings**', async (route) => {
     const currentPage = Number(new URL(route.request().url()).searchParams.get('page') ?? 1);
@@ -171,6 +198,7 @@ test('tools fit without horizontal scrolling and preserve search, region and cle
   const panel = await openMarketplace(page);
   for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 844 });
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     const metrics = await panel.evaluate((element) => {
       const fields = element.querySelector('.marketplace-tools-fields')!;
       const rect = fields.getBoundingClientRect();
@@ -179,13 +207,18 @@ test('tools fit without horizontal scrolling and preserve search, region and cle
         height: element.getBoundingClientRect().height,
         overflow: fields.scrollWidth - fields.clientWidth,
         controlsFit: boxes.every(box => box.left >= rect.left - 1 && box.right <= rect.right + 1),
-        createButtonsFit: Array.from(element.querySelector('.marketplace-primary-cta')!.parentElement!.children).every(button => button.scrollWidth <= button.clientWidth + 1),
         searchBeforeCategories: fields.getBoundingClientRect().bottom <= element.querySelector('[data-marketplace-categories]')!.getBoundingClientRect().top,
       };
     });
     expect(metrics.overflow).toBeLessThanOrEqual(1);
     expect(metrics.controlsFit).toBe(true);
-    expect(metrics.createButtonsFit).toBe(true);
+    const actions = panel.locator('.marketplace-primary-cta').locator('..').getByRole('button');
+    for (const button of await actions.all()) {
+      const content = await button.evaluate(measureCreateAction);
+      const context = `${width}px ${JSON.stringify(content)}`;
+      expect(content.textFits, context).toBe(true);
+      expect(content.iconFits, context).toBe(true);
+    }
     expect(metrics.searchBeforeCategories).toBe(true);
     expect(metrics.height).toBeLessThanOrEqual(width < 375 ? 180 : 170);
     await expect(panel.locator('[data-marketplace-tools-handle]')).toHaveCount(0);
@@ -209,6 +242,23 @@ test('tools fit without horizontal scrolling and preserve search, region and cle
   await panel.getByRole('button', { name: 'مسح البحث', exact: true }).click();
   await expect(search).toHaveValue('');
   await expect(panel.getByRole('button', { name: 'موقعي', exact: true })).toBeEnabled();
+});
+
+test('create actions keep their labels and icons inside narrow buttons with larger text', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  const panel = await openMarketplace(page);
+  await panel.locator('.marketplace-primary-cta').evaluate(element => {
+    for (const button of element.parentElement!.children) {
+      (button.querySelector('span') as HTMLElement).style.fontSize = '18px';
+    }
+  });
+  const actions = panel.locator('.marketplace-primary-cta').locator('..').getByRole('button');
+  for (const button of await actions.all()) {
+    const metrics = await button.evaluate(measureCreateAction);
+    expect(metrics.textFits, JSON.stringify(metrics)).toBe(true);
+    expect(metrics.iconFits, JSON.stringify(metrics)).toBe(true);
+  }
+  await page.screenshot({ path: testInfo.outputPath('larger-create-labels.png') });
 });
 
 test('floating categories do not interrupt loading the final partial listings page', async ({ page }) => {
