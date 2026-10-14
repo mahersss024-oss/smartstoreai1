@@ -1349,7 +1349,7 @@ function AuthProviderMenu() {
               href={googleHref}
               role="menuitem"
             >
-              <span>{session.commissionAgreementAccepted ? 'دخول Google' : 'الإقرار ثم دخول Google'}</span>
+              <span>دخول Google</span>
               <GoogleMark className="size-5" />
             </a>
           ) : null}
@@ -1359,7 +1359,7 @@ function AuthProviderMenu() {
               href={appleHref}
               role="menuitem"
             >
-              <span>{session.commissionAgreementAccepted ? 'دخول Apple' : 'الإقرار ثم دخول Apple'}</span>
+              <span>دخول Apple</span>
               <AppleMark className="size-5 text-foreground" />
             </a>
           ) : null}
@@ -4007,11 +4007,15 @@ export default function Page() {
     (event: ReactUIEvent<HTMLDivElement>) => {
       const nextScrollTop = event.currentTarget.scrollTop;
       const nextScrollHeight = event.currentTarget.scrollHeight;
+      const viewportHeight = event.currentTarget.clientHeight;
       const previousScrollTop = lastMarketplaceScrollTopRef.current;
       const previousScrollHeight = lastMarketplaceScrollHeightRef.current;
       const scrollDelta = nextScrollTop - previousScrollTop;
       const didListGrow =
         previousScrollHeight > 0 && nextScrollHeight > previousScrollHeight + 8;
+      const distanceFromBottom =
+        nextScrollHeight - (nextScrollTop + viewportHeight);
+      const isNearListEnd = distanceFromBottom <= 96;
 
       lastMarketplaceScrollTopRef.current = nextScrollTop;
       lastMarketplaceScrollHeightRef.current = nextScrollHeight;
@@ -4038,7 +4042,7 @@ export default function Page() {
         return;
       }
 
-      if (Math.abs(scrollDelta) < 4) {
+      if (Math.abs(scrollDelta) < 8) {
         return;
       }
 
@@ -4054,15 +4058,15 @@ export default function Page() {
 
       const now = performance.now();
 
-      if (now - scrollIntent.lastToggleAt < 180) {
+      if (now - scrollIntent.lastToggleAt < 320) {
         return;
       }
 
       if (
         direction > 0 &&
         !marketplaceTopActionsHiddenRef.current &&
-        nextScrollTop > 80 &&
-        scrollIntent.distance >= 72
+        nextScrollTop > 120 &&
+        scrollIntent.distance >= 150
       ) {
         marketplaceTopActionsHiddenRef.current = true;
         marketplaceScrollIntentRef.current = {
@@ -4079,7 +4083,7 @@ export default function Page() {
         marketplaceTopActionsHiddenRef.current &&
         !isLoadingListings &&
         !didListGrow &&
-        scrollIntent.distance >= 40
+        scrollIntent.distance >= (isNearListEnd ? 72 : 120)
       ) {
         marketplaceTopActionsHiddenRef.current = false;
         marketplaceScrollIntentRef.current = {
@@ -4178,7 +4182,7 @@ export default function Page() {
           >
             {!isCompactChatView && (
             <section
-              className="flex min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4"
+              className="relative flex min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4"
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
@@ -4186,14 +4190,19 @@ export default function Page() {
                 'marketplace-home-controls shrink-0 border-b border-blue-100/70 pb-2 dark:border-blue-400/10',
                 isManualListingVisible
                   ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-                  : 'overflow-visible',
+                  : cn(
+                      'pointer-events-none absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 transition-[opacity,transform] duration-[950ms] ease-[cubic-bezier(0.2,0.82,0.18,1)] sm:inset-x-3 lg:inset-x-4 lg:top-4',
+                      isMarketplaceTopActionsHidden
+                        ? '-translate-y-[calc(100%+1rem)] opacity-0'
+                        : 'translate-y-0 opacity-100',
+                    ),
               )}>
               <div
                 className={cn(
-                  'grid gap-1.5 overflow-hidden text-center transition-[max-height,opacity,transform,margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:justify-end md:text-right',
+                  'pointer-events-auto grid max-h-14 gap-1.5 overflow-hidden text-center transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.2,0.82,0.18,1)] md:justify-end md:text-right',
                   isMarketplaceTopActionsHidden
-                    ? 'mb-0 max-h-0 -translate-y-2 opacity-0 pointer-events-none'
-                    : 'mb-2 max-h-14 translate-y-0 opacity-100',
+                    ? 'mb-2 -translate-y-full opacity-0 pointer-events-none'
+                    : 'mb-2 translate-y-0 opacity-100',
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
@@ -4595,10 +4604,10 @@ export default function Page() {
               <div className="mb-2 grid gap-1.5">
                 <div
                   className={cn(
-                    'grid gap-1.5 overflow-hidden transition-[max-height,transform,margin] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                    'pointer-events-auto grid max-h-[28rem] gap-1.5 overflow-hidden transition-[opacity,transform] duration-[950ms] ease-[cubic-bezier(0.2,0.82,0.18,1)]',
                     isMarketplaceTopActionsHidden
-                      ? 'max-h-0 -translate-y-full pointer-events-none'
-                      : 'max-h-[28rem] translate-y-0',
+                      ? '-translate-y-full opacity-0 pointer-events-none'
+                      : 'translate-y-0 opacity-100',
                   )}
                 >
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

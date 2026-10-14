@@ -488,6 +488,7 @@ export default function AccountPage() {
           </section>
         ) : (
           <>
+            <div className="marketplace-listings-scroll mx-auto grid min-h-0 w-full max-w-[28rem] flex-1 gap-3 overflow-y-auto overscroll-contain smartstore-fade-scroll px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] sm:max-w-[30rem] sm:px-2 lg:max-w-none lg:pb-6">
             {session.user?.id ? (
               <Link
                 className="mx-auto grid w-full max-w-[28rem] shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72 sm:max-w-[30rem] lg:max-w-none"
@@ -538,7 +539,6 @@ export default function AccountPage() {
               </section>
             )}
 
-            <div className="marketplace-listings-scroll mx-auto grid min-h-0 w-full max-w-[28rem] flex-1 gap-3 overflow-y-auto overscroll-contain px-1 pb-[calc(6.75rem+env(safe-area-inset-bottom))] sm:max-w-[30rem] sm:px-2 lg:max-w-none lg:pb-6">
             <section className="grid gap-1.5">
               <Link className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72" href="/account/listings" prefetch={false}>
                 <span className="grid size-9 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">

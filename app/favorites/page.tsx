@@ -334,11 +334,6 @@ export default function FavoritesPage() {
           </section>
         ) : (
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 py-3 sm:px-2">
-            <div className="favorites-saved-title mb-3 flex shrink-0 items-center gap-2 border-b border-blue-100/70 pb-2 text-sm font-bold dark:border-blue-400/10">
-              <Heart className="size-4 text-blue-600" />
-              إعلانات محفوظة
-            </div>
-
             {isLoading && favorites.length === 0 ? (
               <div className="grid max-w-4xl gap-1.5">
                 <ListingCardSkeleton count={6} />
@@ -351,7 +346,7 @@ export default function FavoritesPage() {
                 </div>
               </div>
             ) : (
-              <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-2">
+              <div className="marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain smartstore-fade-scroll pb-[var(--marketplace-bottom-nav-space)] pt-2">
                 <div className="grid max-w-4xl gap-1.5">
                   {favorites.map((favorite) => (
                     <Link

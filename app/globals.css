@@ -381,6 +381,27 @@
     min-width: 0;
   }
 
+  .smartstore-fade-scroll {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      rgb(0 0 0 / 0.35) 0.75rem,
+      #000 1.35rem,
+      #000 calc(100% - 1.25rem),
+      rgb(0 0 0 / 0.35) calc(100% - 0.45rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      rgb(0 0 0 / 0.35) 0.75rem,
+      #000 1.35rem,
+      #000 calc(100% - 1.25rem),
+      rgb(0 0 0 / 0.35) calc(100% - 0.45rem),
+      transparent 100%
+    );
+  }
+
   .smartstore-stable-page header,
   .smartstore-stable-page section,
   .smartstore-stable-page article,

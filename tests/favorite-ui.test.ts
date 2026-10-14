@@ -69,7 +69,7 @@ test('favorites page renders saved listings as compact horizontal rows', () => {
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /flex h-full min-h-0 w-full max-w-6xl flex-col/);
   assert.match(favoritesPage, /flex min-h-0 flex-1 flex-col overflow-hidden px-1 py-3 sm:px-2/);
-  assert.match(favoritesPage, /favorites-saved-title/);
+  assert.doesNotMatch(favoritesPage, /favorites-saved-title/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-listing-card grid w-full min-w-0 grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
   assert.match(favoritesPage, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
