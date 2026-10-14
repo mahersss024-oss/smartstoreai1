@@ -13,6 +13,7 @@ type ListingCardImageProps = {
   fallback?: ReactNode;
   fallbackSrcs?: string[];
   height?: number;
+  maxRetries?: number;
   priority?: boolean;
   sizes?: string;
   src?: string | null;
@@ -33,6 +34,7 @@ export function ListingCardImage({
   fallback,
   fallbackSrcs,
   height = 116,
+  maxRetries = 0,
   priority = false,
   sizes = '(min-width: 640px) 116px, 100px',
   src,
@@ -52,6 +54,7 @@ export function ListingCardImage({
       fetchPriority={priority ? 'high' : 'auto'}
       height={height}
       loading={priority ? 'eager' : 'lazy'}
+      maxRetries={maxRetries}
       sizes={sizes}
       src={src}
       width={width}

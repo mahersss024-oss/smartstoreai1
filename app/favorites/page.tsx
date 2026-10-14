@@ -6,6 +6,7 @@ import { ArrowRight, Clock3, Heart, ImageIcon, MapPin } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ListingCardImage } from '@/components/listing-card-image';
+import { ListingCardSkeleton } from '@/components/listing-card-skeleton';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -339,8 +340,8 @@ export default function FavoritesPage() {
             </div>
 
             {isLoading && favorites.length === 0 ? (
-              <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-                جار تحميل المفضلة...
+              <div className="grid max-w-4xl gap-1.5">
+                <ListingCardSkeleton count={6} />
               </div>
             ) : favorites.length === 0 ? (
               <div className="grid min-h-56 place-items-center rounded-md border border-dashed p-6 text-center">
@@ -402,6 +403,9 @@ export default function FavoritesPage() {
                       </div>
                     </Link>
                   ))}
+                  {isLoading && favorites.length > 0 && (
+                    <ListingCardSkeleton count={3} />
+                  )}
                 </div>
                 {favoritesPagination?.hasMore && (
                   <div>

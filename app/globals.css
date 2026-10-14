@@ -540,8 +540,11 @@
   }
 
   .marketplace-listing-card {
+    position: relative;
     border-color: rgb(120 165 188 / 0.42);
     box-shadow: 0 10px 24px rgb(31 88 122 / 0.08);
+    animation: marketplace-listing-card-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
   }
 
   .marketplace-listing-card::before {
@@ -591,6 +594,50 @@
   .smart-assistant-result-card {
     animation: smart-assistant-result-card-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
     will-change: opacity, transform;
+  }
+
+  .marketplace-listing-card-enter {
+    animation: marketplace-listing-card-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .marketplace-listing-card-skeleton {
+    animation: marketplace-listing-card-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .marketplace-skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      rgb(226 232 240 / 0.8),
+      rgb(241 245 249 / 0.96),
+      rgb(226 232 240 / 0.8)
+    );
+  }
+
+  .dark .marketplace-skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgb(30 41 59 / 0.75),
+      rgb(51 65 85 / 0.78),
+      rgb(30 41 59 / 0.75)
+    );
+  }
+
+  .marketplace-skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.42) 45%,
+      transparent 72%
+    );
+    transform: translateX(-120%);
+    animation: marketplace-skeleton-shimmer 1400ms ease-in-out infinite;
   }
 
   .action-feedback-button {
@@ -671,9 +718,30 @@
     }
   }
 
+  @keyframes marketplace-listing-card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.992);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes marketplace-skeleton-shimmer {
+    to {
+      transform: translateX(120%);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .smart-assistant-results-panel,
     .smart-assistant-result-card,
+    .marketplace-listing-card,
+    .marketplace-listing-card-enter,
+    .marketplace-listing-card-skeleton,
+    .marketplace-skeleton-shimmer::after,
     .action-feedback-button[data-loading="true"]::after,
     .upload-progress-track[data-indeterminate="true"] .upload-progress-fill {
       animation: none !important;

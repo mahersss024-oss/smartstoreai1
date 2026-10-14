@@ -8,6 +8,7 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
+  type UIEvent as ReactUIEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -66,6 +67,7 @@ import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingCardImage } from '@/components/listing-card-image';
+import { ListingCardSkeleton } from '@/components/listing-card-skeleton';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -2049,6 +2051,9 @@ export default function Page() {
     useState<ManualListingSubmission | null>(null);
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
+  const lastMarketplaceScrollTopRef = useRef(0);
+  const [isMarketplaceTopActionsHidden, setIsMarketplaceTopActionsHidden] =
+    useState(false);
   const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
@@ -3976,6 +3981,42 @@ export default function Page() {
     isManualListingOpen ||
     (shouldShowManualListingFallback && !isManualListingFallbackDismissed);
 
+  useEffect(() => {
+    if (isManualListingVisible) {
+      setIsMarketplaceTopActionsHidden(false);
+    }
+  }, [isManualListingVisible]);
+
+  const handleMarketplaceListingsScroll = useCallback(
+    (event: ReactUIEvent<HTMLDivElement>) => {
+      const nextScrollTop = event.currentTarget.scrollTop;
+      const previousScrollTop = lastMarketplaceScrollTopRef.current;
+      const scrollDelta = nextScrollTop - previousScrollTop;
+
+      lastMarketplaceScrollTopRef.current = nextScrollTop;
+
+      if (isManualListingVisible) {
+        setIsMarketplaceTopActionsHidden(false);
+        return;
+      }
+
+      if (nextScrollTop < 24) {
+        setIsMarketplaceTopActionsHidden(false);
+        return;
+      }
+
+      if (scrollDelta > 12 && nextScrollTop > 64) {
+        setIsMarketplaceTopActionsHidden(true);
+        return;
+      }
+
+      if (scrollDelta < -10) {
+        setIsMarketplaceTopActionsHidden(false);
+      }
+    },
+    [isManualListingVisible],
+  );
+
   return (
     <main
       className={cn(
@@ -4071,7 +4112,14 @@ export default function Page() {
                   ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
                   : 'overflow-visible',
               )}>
-              <div className="mb-2 grid gap-1.5 text-center md:justify-end md:text-right">
+              <div
+                className={cn(
+                  'grid gap-1.5 overflow-hidden text-center transition-[max-height,opacity,transform,margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:justify-end md:text-right',
+                  isMarketplaceTopActionsHidden
+                    ? 'mb-0 max-h-0 -translate-y-2 opacity-0 pointer-events-none'
+                    : 'mb-2 max-h-14 translate-y-0 opacity-100',
+                )}
+              >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
                   <Button className="marketplace-primary-cta h-9 rounded-md bg-blue-600 px-2 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
                   <Megaphone className="size-4" />
@@ -4469,6 +4517,14 @@ export default function Page() {
               )}
 
               <div className="mb-2 grid gap-1.5">
+                <div
+                  className={cn(
+                    'grid gap-1.5 overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                    isMarketplaceTopActionsHidden
+                      ? 'max-h-0 -translate-y-2 opacity-0 pointer-events-none'
+                      : 'max-h-24 translate-y-0 opacity-100',
+                  )}
+                >
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <Button
                     type="button"
@@ -4534,6 +4590,7 @@ export default function Page() {
                     ))}
                   </div>
                 )}
+                </div>
 
                 <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_auto_auto] sm:p-2">
                   <label className="order-1 flex h-10 min-w-0 items-center gap-2 rounded-md border bg-background px-3 text-sm sm:h-9">
@@ -4648,6 +4705,7 @@ export default function Page() {
 
               <div
                 ref={marketplaceListingsScrollRef}
+                onScroll={handleMarketplaceListingsScroll}
                 className={cn(
                   'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-3 lg:pb-1',
                 )}
@@ -4709,13 +4767,21 @@ export default function Page() {
                 {exploreMarketplaceListings.map((listing, index) => (
                   <ListingCardView
                     key={listing.id ?? listing.title}
+                    className="marketplace-listing-card-enter"
                     listing={listing}
                     onAsk={sendStarter}
                     onOpen={openListing}
                     prioritizeImage={index < 4}
+                    style={{
+                      animationDelay: `${Math.min(index % 24, 6) * 35}ms`,
+                    }}
                     variant="horizontal"
                   />
                 ))}
+                {isLoadingListings &&
+                  <ListingCardSkeleton
+                    count={exploreMarketplaceListings.length > 0 ? 3 : 6}
+                  />}
               </div>
 
               {canLoadMoreListings && (
@@ -4728,7 +4794,7 @@ export default function Page() {
                 </div>
               )}
 
-              {exploreMarketplaceListings.length === 0 && (
+              {!isLoadingListings && exploreMarketplaceListings.length === 0 && (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed bg-white p-6 text-center dark:bg-card">
                   <div className="grid max-w-sm gap-3">
                     <Sparkles className="mx-auto size-9 text-blue-600" />

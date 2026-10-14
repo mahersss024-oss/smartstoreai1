@@ -31,6 +31,7 @@ import { CommissionAgreementDialog } from '@/components/commission-agreement-dia
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingCardImage } from '@/components/listing-card-image';
+import { ListingCardSkeleton } from '@/components/listing-card-skeleton';
 import { ListingShareButton } from '@/components/listing-share-button';
 import { ResilientImage } from '@/components/resilient-image';
 import { useAuthSession } from '@/hooks/use-auth-session';
@@ -1685,8 +1686,8 @@ export default function AccountListingsPage() {
               id="account-listings"
             >
               {isListingsLoading && listings.length === 0 ? (
-                <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
-                  جار تحميل الإعلانات...
+                <div className="grid gap-3">
+                  <ListingCardSkeleton count={6} />
                 </div>
               ) : listings.length === 0 ? (
                 <div className="grid min-h-56 place-items-center rounded-md border border-dashed p-6 text-center">
@@ -1711,7 +1712,7 @@ export default function AccountListingsPage() {
                       const imageCount = listing.images.length;
 
                       return (
-                      <article key={listing.id} className="grid min-w-0 gap-3 rounded-md border border-slate-200/75 bg-white/88 p-2.5 shadow-sm [contain-intrinsic-size:220px] [content-visibility:auto] dark:border-white/10 dark:bg-card/72 sm:p-3">
+                      <article key={listing.id} className="marketplace-listing-card grid min-w-0 gap-3 rounded-md border border-slate-200/75 bg-white/88 p-2.5 shadow-sm [contain-intrinsic-size:220px] [content-visibility:auto] dark:border-white/10 dark:bg-card/72 sm:p-3">
                       <div className="grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
                         <button
                           aria-label={primaryImage ? 'معاينة صور الإعلان' : 'إدارة صور الإعلان'}
@@ -2053,6 +2054,9 @@ export default function AccountListingsPage() {
                       </article>
                       );
                     })}
+                    {isListingsLoading && listings.length > 0 && (
+                      <ListingCardSkeleton count={3} />
+                    )}
                   </div>
                   {listingsPagination?.hasMore && (
                     <div>

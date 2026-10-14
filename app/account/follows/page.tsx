@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, ImageIcon, UserPlus } from 'lucide-react';
 
 import { ListingCardImage } from '@/components/listing-card-image';
+import { ListingCardSkeleton } from '@/components/listing-card-skeleton';
 import { SellerAvatar } from '@/components/seller-avatar';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
@@ -292,9 +293,7 @@ export default function AccountFollowsPage() {
 
             <section className="grid gap-2">
               {isLoading ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  جار تحميل القائمة...
-                </p>
+                <ListingCardSkeleton count={4} />
               ) : activeTab === 'similar' ? (
                 follows.similarListingFollows.length ? (
                   follows.similarListingFollows.map((follow) => (

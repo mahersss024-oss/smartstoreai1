@@ -938,7 +938,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                     return (
                       <Link
                         key={similarListing.id}
-                        className="grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
+                        className="marketplace-listing-card grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
                         href={getSimilarListingHref(similarListing.id, listing.id)}
                         prefetch={false}
                       >
