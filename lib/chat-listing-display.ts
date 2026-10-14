@@ -13,19 +13,9 @@ export function getExploreListings<T extends { id?: string | null }>(input: {
   marketplaceListings: readonly T[];
   searchToolListings: readonly T[];
 }) {
-  const searchListingIds = new Set(
-    input.searchToolListings
-      .map((listing) => listing.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0),
-  );
+  void input.searchToolListings;
 
-  if (searchListingIds.size === 0) {
-    return [...input.marketplaceListings];
-  }
-
-  return input.marketplaceListings.filter(
-    (listing) => !listing.id || !searchListingIds.has(listing.id),
-  );
+  return [...input.marketplaceListings];
 }
 
 export function getCanLoadMoreExploreListings(input: {

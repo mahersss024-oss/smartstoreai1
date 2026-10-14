@@ -37,7 +37,7 @@ test('keeps marketplace exploration visible beside assistant results', () => {
   assert.deepEqual(displayed, marketplaceListings);
 });
 
-test('deduplicates assistant matches from explore listings when ids overlap', () => {
+test('keeps assistant matches from changing marketplace browsing when ids overlap', () => {
   const marketplaceListings = [{ id: 'api-1' }, { id: 'api-2' }];
   const searchToolListings = [{ id: 'api-1' }];
 
@@ -46,7 +46,7 @@ test('deduplicates assistant matches from explore listings when ids overlap', ()
     searchToolListings,
   });
 
-  assert.deepEqual(displayed, [{ id: 'api-2' }]);
+  assert.deepEqual(displayed, marketplaceListings);
 });
 
 test('allows load-more for marketplace exploration with remaining pages', () => {
@@ -76,7 +76,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.doesNotMatch(homePage, /مختارة حسب طلبك/);
   assert.match(
     homePage,
-    /searchToolListings: hasActiveAssistantSearch \? assistantResultListings : \[\]/,
+    /searchToolListings: assistantResultListings/,
   );
   assert.match(homePage, /clearAssistantSearch/);
   assert.doesNotMatch(homePage, /displayedMarketplaceListings/);

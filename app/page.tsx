@@ -2052,6 +2052,12 @@ export default function Page() {
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
   const lastMarketplaceScrollTopRef = useRef(0);
+  const marketplaceTopActionsHiddenRef = useRef(false);
+  const marketplaceScrollIntentRef = useRef({
+    direction: 0,
+    distance: 0,
+    lastToggleAt: 0,
+  });
   const [isMarketplaceTopActionsHidden, setIsMarketplaceTopActionsHidden] =
     useState(false);
   const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
@@ -2331,11 +2337,10 @@ export default function Page() {
   const exploreMarketplaceListings = useMemo(() => {
     return getExploreListings({
       marketplaceListings: manuallyFilteredMarketplaceListings,
-      searchToolListings: hasActiveAssistantSearch ? assistantResultListings : [],
+      searchToolListings: assistantResultListings,
     });
   }, [
     assistantResultListings,
-    hasActiveAssistantSearch,
     manuallyFilteredMarketplaceListings,
   ]);
   const chatListingCardsById = useMemo(() => {
@@ -3982,7 +3987,17 @@ export default function Page() {
     (shouldShowManualListingFallback && !isManualListingFallbackDismissed);
 
   useEffect(() => {
+    marketplaceTopActionsHiddenRef.current = isMarketplaceTopActionsHidden;
+  }, [isMarketplaceTopActionsHidden]);
+
+  useEffect(() => {
     if (isManualListingVisible) {
+      marketplaceTopActionsHiddenRef.current = false;
+      marketplaceScrollIntentRef.current = {
+        direction: 0,
+        distance: 0,
+        lastToggleAt: performance.now(),
+      };
       setIsMarketplaceTopActionsHidden(false);
     }
   }, [isManualListingVisible]);
@@ -3996,21 +4011,74 @@ export default function Page() {
       lastMarketplaceScrollTopRef.current = nextScrollTop;
 
       if (isManualListingVisible) {
+        marketplaceTopActionsHiddenRef.current = false;
+        marketplaceScrollIntentRef.current = {
+          direction: 0,
+          distance: 0,
+          lastToggleAt: performance.now(),
+        };
         setIsMarketplaceTopActionsHidden(false);
         return;
       }
 
       if (nextScrollTop < 24) {
+        marketplaceTopActionsHiddenRef.current = false;
+        marketplaceScrollIntentRef.current = {
+          direction: 0,
+          distance: 0,
+          lastToggleAt: performance.now(),
+        };
         setIsMarketplaceTopActionsHidden(false);
         return;
       }
 
-      if (scrollDelta > 12 && nextScrollTop > 64) {
+      if (Math.abs(scrollDelta) < 4) {
+        return;
+      }
+
+      const direction = scrollDelta > 0 ? 1 : -1;
+      const scrollIntent = marketplaceScrollIntentRef.current;
+
+      if (scrollIntent.direction !== direction) {
+        scrollIntent.direction = direction;
+        scrollIntent.distance = Math.abs(scrollDelta);
+      } else {
+        scrollIntent.distance += Math.abs(scrollDelta);
+      }
+
+      const now = performance.now();
+
+      if (now - scrollIntent.lastToggleAt < 180) {
+        return;
+      }
+
+      if (
+        direction > 0 &&
+        !marketplaceTopActionsHiddenRef.current &&
+        nextScrollTop > 80 &&
+        scrollIntent.distance >= 72
+      ) {
+        marketplaceTopActionsHiddenRef.current = true;
+        marketplaceScrollIntentRef.current = {
+          direction,
+          distance: 0,
+          lastToggleAt: now,
+        };
         setIsMarketplaceTopActionsHidden(true);
         return;
       }
 
-      if (scrollDelta < -10) {
+      if (
+        direction < 0 &&
+        marketplaceTopActionsHiddenRef.current &&
+        scrollIntent.distance >= 40
+      ) {
+        marketplaceTopActionsHiddenRef.current = false;
+        marketplaceScrollIntentRef.current = {
+          direction,
+          distance: 0,
+          lastToggleAt: now,
+        };
         setIsMarketplaceTopActionsHidden(false);
       }
     },
@@ -4522,7 +4590,7 @@ export default function Page() {
                     'grid gap-1.5 overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
                     isMarketplaceTopActionsHidden
                       ? 'max-h-0 -translate-y-2 opacity-0 pointer-events-none'
-                      : 'max-h-24 translate-y-0 opacity-100',
+                      : 'max-h-[28rem] translate-y-0 opacity-100',
                   )}
                 >
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -4590,7 +4658,6 @@ export default function Page() {
                     ))}
                   </div>
                 )}
-                </div>
 
                 <div className="marketplace-filter-panel grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 rounded-md border bg-white/85 p-1.5 shadow-sm dark:bg-card sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_auto_auto] sm:p-2">
                   <label className="order-1 flex h-10 min-w-0 items-center gap-2 rounded-md border bg-background px-3 text-sm sm:h-9">
@@ -4702,6 +4769,7 @@ export default function Page() {
                 )}
               </div>
               </div>
+              </div>
 
               <div
                 ref={marketplaceListingsScrollRef}
@@ -4754,11 +4822,11 @@ export default function Page() {
                 </div>
               )}
 
-              {(hasActiveAssistantSearch || hasMarketplaceSearchQuery) && (
+              {hasMarketplaceSearchQuery && (
                 <div className="marketplace-section-title mb-3 flex items-center justify-end gap-3">
                   <div className="flex items-center gap-2 text-base font-bold">
                     <Sparkles className="size-4 text-blue-600" />
-                    {hasActiveAssistantSearch ? 'استكشف أيضًا' : 'نتائج البحث'}
+                    نتائج البحث
                   </div>
                 </div>
               )}
