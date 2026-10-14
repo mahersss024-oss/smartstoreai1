@@ -367,7 +367,7 @@
   }
 
   .smartstore-page-header {
-    --page-header-height: 3.5rem;
+    --page-header-height: 3rem;
     align-items: center;
     box-sizing: border-box;
     flex-wrap: nowrap;

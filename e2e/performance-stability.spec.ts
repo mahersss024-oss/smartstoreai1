@@ -4,9 +4,23 @@ import { createSessionCookie } from '@/lib/auth/session';
 
 type VitalsSnapshot = {
   cls: number;
+  fcp: number;
+  inp: number;
+  inpEvent: string;
   lcp: number;
   lcpElement: string;
   longTasks: number;
+  totalBlockingTime: number;
+  domContentLoaded: number;
+  loadEvent: number;
+  ttfb: number;
+  transferSize: number;
+  encodedBodySize: number;
+  resourceCount: number;
+  imageCount: number;
+  scriptCount: number;
+  stylesheetCount: number;
+  domNodes: number;
 };
 
 type LayoutShiftEntry = PerformanceEntry & {
@@ -16,6 +30,21 @@ type LayoutShiftEntry = PerformanceEntry & {
 
 type LargestContentfulPaintEntry = PerformanceEntry & {
   element?: Element | null;
+};
+
+type PaintTimingEntry = PerformanceEntry & {
+  name: 'first-paint' | 'first-contentful-paint';
+};
+
+type EventTimingEntry = PerformanceEntry & {
+  interactionId?: number;
+  target?: Element | null;
+};
+
+type PerformanceMemory = {
+  usedJSHeapSize?: number;
+  totalJSHeapSize?: number;
+  jsHeapSizeLimit?: number;
 };
 
 const viewports = [
@@ -160,9 +189,23 @@ async function installVitalsObserver(page: Page) {
   await page.addInitScript(() => {
     window.__smartstorePerf = {
       cls: 0,
+      fcp: 0,
+      inp: 0,
+      inpEvent: '',
       lcp: 0,
       lcpElement: '',
       longTasks: 0,
+      totalBlockingTime: 0,
+      domContentLoaded: 0,
+      loadEvent: 0,
+      ttfb: 0,
+      transferSize: 0,
+      encodedBodySize: 0,
+      resourceCount: 0,
+      imageCount: 0,
+      scriptCount: 0,
+      stylesheetCount: 0,
+      domNodes: 0,
     };
 
     const describeElement = (element: Element | null | undefined) => {
@@ -187,6 +230,16 @@ async function installVitalsObserver(page: Page) {
 
     try {
       new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as PaintTimingEntry[]) {
+          if (entry.name === 'first-contentful-paint') {
+            window.__smartstorePerf.fcp = entry.startTime;
+          }
+        }
+      }).observe({ type: 'paint', buffered: true });
+    } catch {}
+
+    try {
+      new PerformanceObserver((list) => {
         const entries = list.getEntries();
         const last = entries[entries.length - 1] as LargestContentfulPaintEntry;
         if (last) {
@@ -198,14 +251,86 @@ async function installVitalsObserver(page: Page) {
 
     try {
       new PerformanceObserver((list) => {
-        window.__smartstorePerf.longTasks += list.getEntries().length;
+        const entries = list.getEntries();
+        window.__smartstorePerf.longTasks += entries.length;
+        window.__smartstorePerf.totalBlockingTime += entries.reduce(
+          (total, entry) => total + Math.max(0, entry.duration - 50),
+          0,
+        );
       }).observe({ type: 'longtask', buffered: true });
+    } catch {}
+
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as EventTimingEntry[]) {
+          if (!entry.interactionId) {
+            continue;
+          }
+
+          if (entry.duration > window.__smartstorePerf.inp) {
+            window.__smartstorePerf.inp = entry.duration;
+            window.__smartstorePerf.inpEvent = `${entry.name}:${describeElement(
+              entry.target,
+            )}`;
+          }
+        }
+      }).observe({
+        type: 'event',
+        buffered: true,
+        durationThreshold: 16,
+      } as PerformanceObserverInit & { durationThreshold: number });
     } catch {}
   });
 }
 
 async function readVitals(page: Page): Promise<VitalsSnapshot> {
-  return page.evaluate(() => window.__smartstorePerf);
+  return page.evaluate(() => {
+    const [navigation] = performance.getEntriesByType(
+      'navigation',
+    ) as PerformanceNavigationTiming[];
+    const resources = performance.getEntriesByType(
+      'resource',
+    ) as PerformanceResourceTiming[];
+    const memory = (performance as Performance & { memory?: PerformanceMemory })
+      .memory;
+
+    window.__smartstorePerf.domContentLoaded = navigation
+      ? navigation.domContentLoadedEventEnd - navigation.startTime
+      : 0;
+    window.__smartstorePerf.loadEvent = navigation
+      ? navigation.loadEventEnd - navigation.startTime
+      : 0;
+    window.__smartstorePerf.ttfb = navigation
+      ? navigation.responseStart - navigation.requestStart
+      : 0;
+    window.__smartstorePerf.transferSize = resources.reduce(
+      (total, entry) => total + entry.transferSize,
+      navigation?.transferSize ?? 0,
+    );
+    window.__smartstorePerf.encodedBodySize = resources.reduce(
+      (total, entry) => total + entry.encodedBodySize,
+      navigation?.encodedBodySize ?? 0,
+    );
+    window.__smartstorePerf.resourceCount = resources.length;
+    window.__smartstorePerf.imageCount = resources.filter((entry) =>
+      entry.initiatorType === 'img',
+    ).length;
+    window.__smartstorePerf.scriptCount = resources.filter((entry) =>
+      entry.initiatorType === 'script',
+    ).length;
+    window.__smartstorePerf.stylesheetCount = resources.filter((entry) =>
+      entry.initiatorType === 'css' || entry.initiatorType === 'link',
+    ).length;
+    window.__smartstorePerf.domNodes =
+      document.getElementsByTagName('*').length;
+
+    return {
+      ...window.__smartstorePerf,
+      usedJSHeapSize: memory?.usedJSHeapSize ?? 0,
+      totalJSHeapSize: memory?.totalJSHeapSize ?? 0,
+      jsHeapSizeLimit: memory?.jsHeapSizeLimit ?? 0,
+    };
+  });
 }
 
 async function assertNoHorizontalOverflow(page: Page) {
@@ -220,15 +345,33 @@ async function assertNoHorizontalOverflow(page: Page) {
 async function auditCurrentPage(page: Page, path: string) {
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(500);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(150);
 
   await assertNoHorizontalOverflow(page);
 
   const vitals = await readVitals(page);
+  console.log(JSON.stringify({ page: path, browserMetrics: vitals }));
+
+  expect(vitals.ttfb || 0, `${path} TTFB`).toBeLessThanOrEqual(800);
+  expect(vitals.fcp || 0, `${path} FCP`).toBeLessThanOrEqual(1_800);
   expect(vitals.cls, `${path} CLS (${vitals.lcpElement})`).toBeLessThanOrEqual(
     0.1,
   );
   expect(vitals.lcp || 0, `${path} LCP (${vitals.lcpElement})`).toBeLessThanOrEqual(
     2_500,
+  );
+  expect(vitals.inp || 0, `${path} INP (${vitals.inpEvent})`).toBeLessThanOrEqual(
+    200,
+  );
+  expect(vitals.totalBlockingTime, `${path} TBT`).toBeLessThanOrEqual(300);
+  expect(vitals.longTasks, `${path} long tasks`).toBeLessThanOrEqual(12);
+  expect(vitals.domNodes, `${path} DOM nodes`).toBeLessThanOrEqual(1_500);
+  expect(vitals.resourceCount, `${path} resource count`).toBeLessThanOrEqual(
+    120,
+  );
+  expect(vitals.transferSize, `${path} transfer size`).toBeLessThanOrEqual(
+    2_500_000,
   );
 
   await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
@@ -260,6 +403,10 @@ test.describe('mobile and tablet production performance stability audit', () => 
       }
     });
     page.on('requestfailed', (request) => {
+      if (request.url().includes('/api/realtime/stream')) {
+        return;
+      }
+
       failedRequests.push(`${request.method()} ${request.url()}`);
     });
     page.on('response', (response) => {

@@ -343,6 +343,10 @@ function clampAssistantBubblePosition(position: AssistantBubblePosition) {
   };
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function getDefaultAssistantBubblePosition() {
   return clampAssistantBubblePosition({
     x: window.innerWidth - assistantBubbleSize - assistantBubbleMargin,
@@ -2051,6 +2055,12 @@ export default function Page() {
     useState<ManualListingSubmission | null>(null);
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
+  const marketplaceToolsPanelRef = useRef<HTMLDivElement | null>(null);
+  const marketplaceToolsDragRef = useRef({
+    pointerId: -1,
+    startY: 0,
+    startOffset: 0,
+  });
   const lastMarketplaceScrollTopRef = useRef(0);
   const lastMarketplaceScrollHeightRef = useRef(0);
   const marketplaceTopActionsHiddenRef = useRef(false);
@@ -2061,6 +2071,10 @@ export default function Page() {
   });
   const [isMarketplaceTopActionsHidden, setIsMarketplaceTopActionsHidden] =
     useState(false);
+  const [isMarketplaceToolsDragging, setIsMarketplaceToolsDragging] =
+    useState(false);
+  const [marketplaceToolsDragOffset, setMarketplaceToolsDragOffset] =
+    useState(0);
   const [isManualPublishAgreementOpen, setIsManualPublishAgreementOpen] =
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
@@ -3987,21 +4001,32 @@ export default function Page() {
     isManualListingOpen ||
     (shouldShowManualListingFallback && !isManualListingFallbackDismissed);
 
+  const getMarketplaceToolsClosedOffset = useCallback(() => {
+    const panelHeight = marketplaceToolsPanelRef.current?.offsetHeight ?? 0;
+    return -Math.max(0, panelHeight - 14);
+  }, []);
+
+  const setMarketplaceToolsHidden = useCallback((hidden: boolean) => {
+    marketplaceTopActionsHiddenRef.current = hidden;
+    setIsMarketplaceToolsDragging(false);
+    setMarketplaceToolsDragOffset(0);
+    setIsMarketplaceTopActionsHidden(hidden);
+  }, []);
+
   useEffect(() => {
     marketplaceTopActionsHiddenRef.current = isMarketplaceTopActionsHidden;
   }, [isMarketplaceTopActionsHidden]);
 
   useEffect(() => {
     if (isManualListingVisible) {
-      marketplaceTopActionsHiddenRef.current = false;
       marketplaceScrollIntentRef.current = {
         direction: 0,
         distance: 0,
         lastToggleAt: performance.now(),
       };
-      setIsMarketplaceTopActionsHidden(false);
+      setMarketplaceToolsHidden(false);
     }
-  }, [isManualListingVisible]);
+  }, [isManualListingVisible, setMarketplaceToolsHidden]);
 
   const handleMarketplaceListingsScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
@@ -4020,25 +4045,27 @@ export default function Page() {
       lastMarketplaceScrollTopRef.current = nextScrollTop;
       lastMarketplaceScrollHeightRef.current = nextScrollHeight;
 
+      if (isMarketplaceToolsDragging) {
+        return;
+      }
+
       if (isManualListingVisible) {
-        marketplaceTopActionsHiddenRef.current = false;
         marketplaceScrollIntentRef.current = {
           direction: 0,
           distance: 0,
           lastToggleAt: performance.now(),
         };
-        setIsMarketplaceTopActionsHidden(false);
+        setMarketplaceToolsHidden(false);
         return;
       }
 
       if (nextScrollTop < 24) {
-        marketplaceTopActionsHiddenRef.current = false;
         marketplaceScrollIntentRef.current = {
           direction: 0,
           distance: 0,
           lastToggleAt: performance.now(),
         };
-        setIsMarketplaceTopActionsHidden(false);
+        setMarketplaceToolsHidden(false);
         return;
       }
 
@@ -4074,7 +4101,7 @@ export default function Page() {
           distance: 0,
           lastToggleAt: now,
         };
-        setIsMarketplaceTopActionsHidden(true);
+        setMarketplaceToolsHidden(true);
         return;
       }
 
@@ -4091,11 +4118,101 @@ export default function Page() {
           distance: 0,
           lastToggleAt: now,
         };
-        setIsMarketplaceTopActionsHidden(false);
+        setMarketplaceToolsHidden(false);
       }
     },
-    [isLoadingListings, isManualListingVisible],
+    [
+      isLoadingListings,
+      isManualListingVisible,
+      isMarketplaceToolsDragging,
+      setMarketplaceToolsHidden,
+    ],
   );
+
+  const handleMarketplaceToolsPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (isManualListingVisible) {
+        return;
+      }
+
+      const closedOffset = getMarketplaceToolsClosedOffset();
+      marketplaceToolsDragRef.current = {
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        startOffset: isMarketplaceTopActionsHidden ? closedOffset : 0,
+      };
+      setIsMarketplaceToolsDragging(true);
+      setMarketplaceToolsDragOffset(
+        isMarketplaceTopActionsHidden ? closedOffset : 0,
+      );
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    },
+    [
+      getMarketplaceToolsClosedOffset,
+      isManualListingVisible,
+      isMarketplaceTopActionsHidden,
+    ],
+  );
+
+  const handleMarketplaceToolsPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const dragState = marketplaceToolsDragRef.current;
+
+      if (
+        !isMarketplaceToolsDragging ||
+        dragState.pointerId !== event.pointerId
+      ) {
+        return;
+      }
+
+      const closedOffset = getMarketplaceToolsClosedOffset();
+      const nextOffset = clampNumber(
+        dragState.startOffset + event.clientY - dragState.startY,
+        closedOffset,
+        0,
+      );
+      setMarketplaceToolsDragOffset(nextOffset);
+      event.preventDefault();
+    },
+    [getMarketplaceToolsClosedOffset, isMarketplaceToolsDragging],
+  );
+
+  const finishMarketplaceToolsDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const dragState = marketplaceToolsDragRef.current;
+
+      if (dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const closedOffset = getMarketplaceToolsClosedOffset();
+      const shouldHide = marketplaceToolsDragOffset < closedOffset * 0.45;
+      marketplaceToolsDragRef.current = {
+        pointerId: -1,
+        startY: 0,
+        startOffset: 0,
+      };
+      setMarketplaceToolsHidden(shouldHide);
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    },
+    [
+      getMarketplaceToolsClosedOffset,
+      marketplaceToolsDragOffset,
+      setMarketplaceToolsHidden,
+    ],
+  );
+
+  const marketplaceToolsTransform = isManualListingVisible
+    ? 'translate3d(0, 0, 0)'
+    : isMarketplaceToolsDragging
+      ? `translate3d(0, ${marketplaceToolsDragOffset}px, 0)`
+      : isMarketplaceTopActionsHidden
+        ? 'translate3d(0, calc(-100% + 0.875rem), 0)'
+        : 'translate3d(0, 0, 0)';
 
   return (
     <main
@@ -4191,18 +4308,23 @@ export default function Page() {
                 isManualListingVisible
                   ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
                   : cn(
-                      'pointer-events-none absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 transition-[opacity,transform] duration-[950ms] ease-[cubic-bezier(0.2,0.82,0.18,1)] sm:inset-x-3 lg:inset-x-4 lg:top-4',
-                      isMarketplaceTopActionsHidden
-                        ? '-translate-y-[calc(100%+1rem)] opacity-0'
-                        : 'translate-y-0 opacity-100',
+                      'pointer-events-none absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 will-change-transform sm:inset-x-3 lg:inset-x-4 lg:top-4',
+                      isMarketplaceToolsDragging
+                        ? 'transition-none'
+                        : 'transition-transform duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
                     ),
-              )}>
+              )}
+              ref={marketplaceToolsPanelRef}
+              style={
+                isManualListingVisible
+                  ? undefined
+                  : ({ transform: marketplaceToolsTransform } as CSSProperties)
+              }
+              >
               <div
                 className={cn(
-                  'pointer-events-auto grid max-h-14 gap-1.5 overflow-hidden text-center transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.2,0.82,0.18,1)] md:justify-end md:text-right',
-                  isMarketplaceTopActionsHidden
-                    ? 'mb-2 -translate-y-full opacity-0 pointer-events-none'
-                    : 'mb-2 translate-y-0 opacity-100',
+                  'pointer-events-auto grid max-h-14 gap-1.5 overflow-hidden text-center md:justify-end md:text-right',
+                  'mb-1 translate-y-0 opacity-100',
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
@@ -4604,10 +4726,8 @@ export default function Page() {
               <div className="mb-2 grid gap-1.5">
                 <div
                   className={cn(
-                    'pointer-events-auto grid max-h-[28rem] gap-1.5 overflow-hidden transition-[opacity,transform] duration-[950ms] ease-[cubic-bezier(0.2,0.82,0.18,1)]',
-                    isMarketplaceTopActionsHidden
-                      ? '-translate-y-full opacity-0 pointer-events-none'
-                      : 'translate-y-0 opacity-100',
+                    'pointer-events-auto grid max-h-[28rem] gap-1 overflow-hidden rounded-md border border-blue-100/70 bg-white/90 p-1.5 shadow-sm backdrop-blur-md dark:border-blue-400/10 dark:bg-card/90',
+                    'translate-y-0 opacity-100',
                   )}
                 >
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -4786,6 +4906,32 @@ export default function Page() {
                 )}
               </div>
               </div>
+              {!isManualListingVisible && (
+                <div
+                  aria-label={
+                    isMarketplaceTopActionsHidden
+                      ? 'اسحب لعرض أدوات السوق'
+                      : 'اسحب لإخفاء أدوات السوق'
+                  }
+                  className="pointer-events-auto mx-auto mt-1 flex h-4 w-20 cursor-grab touch-none items-center justify-center rounded-full bg-white/85 shadow-sm ring-1 ring-blue-100/80 active:cursor-grabbing dark:bg-card/85 dark:ring-blue-400/20"
+                  onPointerCancel={finishMarketplaceToolsDrag}
+                  onPointerDown={handleMarketplaceToolsPointerDown}
+                  onPointerMove={handleMarketplaceToolsPointerMove}
+                  onPointerUp={finishMarketplaceToolsDrag}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    setMarketplaceToolsHidden(!isMarketplaceTopActionsHidden);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <span className="h-1 w-10 rounded-full bg-blue-300/80 dark:bg-blue-300/50" />
+                </div>
+              )}
               </div>
 
               <div
