@@ -204,7 +204,7 @@ export default function AdminHomePage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-bold">{section.label}</span>
-                  <span className="mt-1 block text-xs leading-6 text-muted-foreground">
+                  <span className="mt-1 hidden text-xs leading-6 text-muted-foreground sm:block">
                     {section.text}
                   </span>
                 </span>
