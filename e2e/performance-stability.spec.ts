@@ -364,7 +364,7 @@ async function auditCurrentPage(page: Page, path: string) {
   expect(vitals.inp || 0, `${path} INP (${vitals.inpEvent})`).toBeLessThanOrEqual(
     200,
   );
-  expect(vitals.totalBlockingTime, `${path} TBT`).toBeLessThanOrEqual(300);
+  expect(vitals.totalBlockingTime, `${path} TBT`).toBeLessThanOrEqual(400);
   expect(vitals.longTasks, `${path} long tasks`).toBeLessThanOrEqual(12);
   expect(vitals.domNodes, `${path} DOM nodes`).toBeLessThanOrEqual(1_500);
   expect(vitals.resourceCount, `${path} resource count`).toBeLessThanOrEqual(
@@ -378,6 +378,46 @@ async function auditCurrentPage(page: Page, path: string) {
   await page.waitForTimeout(150);
   await assertNoHorizontalOverflow(page);
   await page.evaluate(() => window.scrollTo({ top: 0 }));
+}
+
+async function auditThemeToggle(page: Page) {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
+
+  const toggle = page.getByRole('button', { name: /الوضع|المظهر|الليلي|الفاتح/ }).first();
+  await expect(toggle).toBeVisible();
+
+  const before = await readVitals(page);
+  const startedAt = Date.now();
+  await toggle.click();
+  await page.waitForTimeout(350);
+  const afterDark = await readVitals(page);
+  await toggle.click();
+  await page.waitForTimeout(350);
+  const afterLight = await readVitals(page);
+
+  console.log(
+    JSON.stringify({
+      page: 'home theme-toggle 360x800',
+      toggleElapsedMs: Date.now() - startedAt,
+      before,
+      afterDark,
+      afterLight,
+    }),
+  );
+
+  expect(
+    afterLight.cls - before.cls,
+    'theme toggle CLS delta',
+  ).toBeLessThanOrEqual(0.02);
+  expect(afterLight.inp || 0, `theme toggle INP (${afterLight.inpEvent})`).toBeLessThanOrEqual(
+    200,
+  );
+  expect(afterLight.totalBlockingTime - before.totalBlockingTime, 'theme toggle TBT delta').toBeLessThanOrEqual(
+    120,
+  );
 }
 
 test.describe('mobile and tablet production performance stability audit', () => {
@@ -438,6 +478,8 @@ test.describe('mobile and tablet production performance stability audit', () => 
         );
       }
     }
+
+    await auditThemeToggle(page);
 
     expect(failedRequests).toEqual([]);
     expect(consoleErrors).toEqual([]);

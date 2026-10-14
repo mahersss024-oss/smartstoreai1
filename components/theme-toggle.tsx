@@ -22,13 +22,31 @@ function applyTheme(theme: Theme) {
     return;
   }
 
-  document.documentElement.classList.toggle('dark', theme === 'dark');
-  document.documentElement.style.colorScheme = theme;
+  const shouldUseDarkTheme = theme === 'dark';
+
+  if (document.documentElement.classList.contains('dark') !== shouldUseDarkTheme) {
+    document.documentElement.classList.toggle('dark', shouldUseDarkTheme);
+  }
+
+  if (document.documentElement.style.colorScheme !== theme) {
+    document.documentElement.style.colorScheme = theme;
+  }
 }
 
 function persistTheme(theme: Theme) {
   localStorage.setItem(themeStorageKey, theme);
   document.cookie = `${themeCookieName}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
+function persistThemeSoon(theme: Theme) {
+  const persist = () => persistTheme(theme);
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(persist, { timeout: 800 });
+    return;
+  }
+
+  globalThis.setTimeout(persist, 0);
 }
 
 function readTheme(): Theme {
@@ -80,9 +98,11 @@ function ThemeToggle({ language = 'ar', variant = 'icon' }: ThemeToggleProps) {
 
   const toggleTheme = useCallback(() => {
     const nextTheme: Theme = theme === 'light' ? 'dark' : 'light';
-    persistTheme(nextTheme);
     applyTheme(nextTheme);
-    window.dispatchEvent(new Event(themeChangeEvent));
+    persistThemeSoon(nextTheme);
+    globalThis.setTimeout(() => {
+      window.dispatchEvent(new Event(themeChangeEvent));
+    }, 0);
   }, [theme]);
 
   if (variant === 'switch') {
@@ -117,10 +137,17 @@ function ThemeToggle({ language = 'ar', variant = 'icon' }: ThemeToggleProps) {
         <Button
           variant="ghost"
           size="icon"
+          className="size-9 shrink-0 rounded-md p-0"
           onClick={toggleTheme}
           aria-label={label}
         >
-          {theme === 'dark' ? <Moon className="size-5" /> : <Sun className="size-5" />}
+          <span className="grid size-5 place-items-center">
+            {theme === 'dark' ? (
+              <Moon className="size-5" />
+            ) : (
+              <Sun className="size-5" />
+            )}
+          </span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>

@@ -4069,7 +4069,7 @@ export default function Page() {
         return;
       }
 
-      if (Math.abs(scrollDelta) < 8) {
+      if (Math.abs(scrollDelta) < 12) {
         return;
       }
 
@@ -4085,15 +4085,15 @@ export default function Page() {
 
       const now = performance.now();
 
-      if (now - scrollIntent.lastToggleAt < 320) {
+      if (now - scrollIntent.lastToggleAt < 560) {
         return;
       }
 
       if (
         direction > 0 &&
         !marketplaceTopActionsHiddenRef.current &&
-        nextScrollTop > 120 &&
-        scrollIntent.distance >= 150
+        nextScrollTop > 180 &&
+        scrollIntent.distance >= 260
       ) {
         marketplaceTopActionsHiddenRef.current = true;
         marketplaceScrollIntentRef.current = {
@@ -4110,7 +4110,7 @@ export default function Page() {
         marketplaceTopActionsHiddenRef.current &&
         !isLoadingListings &&
         !didListGrow &&
-        scrollIntent.distance >= (isNearListEnd ? 72 : 120)
+        scrollIntent.distance >= (isNearListEnd ? 140 : 220)
       ) {
         marketplaceTopActionsHiddenRef.current = false;
         marketplaceScrollIntentRef.current = {
