@@ -2062,7 +2062,9 @@ export default function Page() {
     startOffset: 0,
   });
   const lastMarketplaceScrollTopRef = useRef(0);
+  const lastMarketplaceScrollAtRef = useRef(0);
   const lastMarketplaceScrollHeightRef = useRef(0);
+  const marketplaceToolsManualLockUntilRef = useRef(0);
   const marketplaceTopActionsHiddenRef = useRef(false);
   const marketplaceScrollIntentRef = useRef({
     direction: 0,
@@ -4036,6 +4038,10 @@ export default function Page() {
       const previousScrollTop = lastMarketplaceScrollTopRef.current;
       const previousScrollHeight = lastMarketplaceScrollHeightRef.current;
       const scrollDelta = nextScrollTop - previousScrollTop;
+      const now = performance.now();
+      const previousScrollAt = lastMarketplaceScrollAtRef.current || now;
+      const scrollElapsed = Math.max(16, now - previousScrollAt);
+      const scrollSpeed = Math.abs(scrollDelta) / scrollElapsed;
       const didListGrow =
         previousScrollHeight > 0 && nextScrollHeight > previousScrollHeight + 8;
       const distanceFromBottom =
@@ -4043,6 +4049,7 @@ export default function Page() {
       const isNearListEnd = distanceFromBottom <= 96;
 
       lastMarketplaceScrollTopRef.current = nextScrollTop;
+      lastMarketplaceScrollAtRef.current = now;
       lastMarketplaceScrollHeightRef.current = nextScrollHeight;
 
       if (isMarketplaceToolsDragging) {
@@ -4053,7 +4060,7 @@ export default function Page() {
         marketplaceScrollIntentRef.current = {
           direction: 0,
           distance: 0,
-          lastToggleAt: performance.now(),
+          lastToggleAt: now,
         };
         setMarketplaceToolsHidden(false);
         return;
@@ -4063,9 +4070,13 @@ export default function Page() {
         marketplaceScrollIntentRef.current = {
           direction: 0,
           distance: 0,
-          lastToggleAt: performance.now(),
+          lastToggleAt: now,
         };
         setMarketplaceToolsHidden(false);
+        return;
+      }
+
+      if (now < marketplaceToolsManualLockUntilRef.current) {
         return;
       }
 
@@ -4074,6 +4085,22 @@ export default function Page() {
       }
 
       const direction = scrollDelta > 0 ? 1 : -1;
+      const isFastScroll = scrollSpeed >= 1.15;
+      const isMediumScroll = scrollSpeed >= 0.55;
+      const toggleCooldown = isFastScroll ? 420 : isMediumScroll ? 620 : 820;
+      const hideStartTop = isFastScroll ? 110 : isMediumScroll ? 180 : 240;
+      const hideDistance = isFastScroll ? 150 : isMediumScroll ? 260 : 360;
+      const showDistance = isNearListEnd
+        ? isFastScroll
+          ? 90
+          : isMediumScroll
+            ? 140
+            : 190
+        : isFastScroll
+          ? 130
+          : isMediumScroll
+            ? 220
+            : 300;
       const scrollIntent = marketplaceScrollIntentRef.current;
 
       if (scrollIntent.direction !== direction) {
@@ -4083,17 +4110,15 @@ export default function Page() {
         scrollIntent.distance += Math.abs(scrollDelta);
       }
 
-      const now = performance.now();
-
-      if (now - scrollIntent.lastToggleAt < 560) {
+      if (now - scrollIntent.lastToggleAt < toggleCooldown) {
         return;
       }
 
       if (
         direction > 0 &&
         !marketplaceTopActionsHiddenRef.current &&
-        nextScrollTop > 180 &&
-        scrollIntent.distance >= 260
+        nextScrollTop > hideStartTop &&
+        scrollIntent.distance >= hideDistance
       ) {
         marketplaceTopActionsHiddenRef.current = true;
         marketplaceScrollIntentRef.current = {
@@ -4110,7 +4135,7 @@ export default function Page() {
         marketplaceTopActionsHiddenRef.current &&
         !isLoadingListings &&
         !didListGrow &&
-        scrollIntent.distance >= (isNearListEnd ? 140 : 220)
+        scrollIntent.distance >= showDistance
       ) {
         marketplaceTopActionsHiddenRef.current = false;
         marketplaceScrollIntentRef.current = {
@@ -4193,6 +4218,7 @@ export default function Page() {
         startY: 0,
         startOffset: 0,
       };
+      marketplaceToolsManualLockUntilRef.current = performance.now() + 2200;
       setMarketplaceToolsHidden(shouldHide);
 
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -4924,6 +4950,8 @@ export default function Page() {
                     }
 
                     event.preventDefault();
+                    marketplaceToolsManualLockUntilRef.current =
+                      performance.now() + 2200;
                     setMarketplaceToolsHidden(!isMarketplaceTopActionsHidden);
                   }}
                   role="button"
