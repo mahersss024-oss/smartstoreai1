@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { Button } from '@ui/button';
+import { useOverlayViewport } from '@/hooks/use-overlay-viewport';
+
+const subscribeToClient = () => () => {};
 
 type CommissionAgreementDialogProps = {
   open: boolean;
@@ -35,8 +39,10 @@ export function CommissionAgreementDialog({
 }: CommissionAgreementDialogProps) {
   const [accepted, setAccepted] = useState(false);
   const copy = agreementCopy[mode];
+  const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false);
+  const viewportRef = useOverlayViewport<HTMLDivElement>();
 
-  if (!open) {
+  if (!open || !isClient) {
     return null;
   }
 
@@ -54,8 +60,8 @@ export function CommissionAgreementDialog({
     onConfirm();
   }
 
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
+  return createPortal(
+    <div className="viewport-overlay fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm [--overlay-padding-y:1.5rem]" ref={viewportRef}>
       <section
         aria-modal="true"
         className="w-full max-w-3xl overflow-hidden rounded-2xl border bg-white text-[#142033] shadow-2xl dark:bg-card dark:text-foreground"
@@ -123,6 +129,7 @@ export function CommissionAgreementDialog({
           </div>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

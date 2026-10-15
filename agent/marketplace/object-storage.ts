@@ -31,6 +31,13 @@ type CloudflareCachePurgeConfig = {
   zoneId: string;
 };
 
+class CloudflareCachePurgeError extends Error {
+  constructor(readonly status: number, readonly codes: number[]) {
+    super('Cloudflare rejected the cache purge request.');
+    this.name = 'CloudflareCachePurgeError';
+  }
+}
+
 function getObjectStorageMode() {
   return process.env.SMARTSTORE_IMAGE_STORAGE?.trim().toLowerCase();
 }
@@ -462,13 +469,16 @@ async function purgeCloudflareCacheByUrls(urls: string[]) {
   );
 
   if (!response.ok) {
-    const responseText = await getStorageResponseText(response);
-
-    throw new Error(
-      `Cloudflare cache purge failed with status ${response.status}${
-        responseText ? `: ${responseText}` : ''
-      }.`,
-    );
+    const payload: unknown = await response.json().catch(() => null);
+    const errors = payload && typeof payload === 'object' && 'errors' in payload
+      ? payload.errors : null;
+    // Log only numeric provider codes, never raw bodies, headers, URLs or tokens.
+    const codes = Array.isArray(errors) ? errors.flatMap((error: unknown) => {
+      if (!error || typeof error !== 'object' || !('code' in error)) return [];
+      return typeof error.code === 'number' && Number.isSafeInteger(error.code)
+        ? [error.code] : [];
+    }).slice(0, 10) : [];
+    throw new CloudflareCachePurgeError(response.status, codes);
   }
 
   return true;
@@ -478,8 +488,14 @@ async function purgeCloudflareCacheBestEffort(urls: string[]) {
   try {
     await purgeCloudflareCacheByUrls(urls);
   } catch (error) {
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[cloudflare_cache_purge] failure=${errorName}`);
+    if (error instanceof CloudflareCachePurgeError) {
+      console.warn(`[cloudflare_cache_purge] failure=provider_rejected status=${error.status} codes=${error.codes.join(',') || 'none'}`);
+    } else {
+      const errorName = error instanceof Error &&
+        ['Error', 'TypeError', 'AbortError', 'TimeoutError'].includes(error.name)
+        ? error.name : 'UnknownError';
+      console.warn(`[cloudflare_cache_purge] failure=${errorName}`);
+    }
   }
 }
 

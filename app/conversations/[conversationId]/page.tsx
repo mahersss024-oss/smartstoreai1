@@ -14,6 +14,8 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
+import { useOverlayViewport } from '@/hooks/use-overlay-viewport';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
@@ -445,6 +447,7 @@ export default function ConversationPage() {
   );
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
+  const messageActionsViewportRef = useOverlayViewport<HTMLDivElement>();
   const [pendingConversationAction, setPendingConversationAction] = useState<
     'block' | 'unblock' | null
   >(null);
@@ -1721,9 +1724,10 @@ export default function ConversationPage() {
               </div>
             )}
 
-            {messageActionTarget && (
+            {messageActionTarget && createPortal(
               <div
-                className="fixed inset-0 z-50 grid place-items-end bg-black/20 p-3 backdrop-blur-[1px] sm:place-items-center"
+                className="viewport-overlay fixed inset-0 z-[80] grid place-items-end bg-black/20 p-3 backdrop-blur-[1px] [--overlay-padding-x:0.75rem] [--overlay-padding-y:0.75rem] [--overlay-padding-bottom:max(0.75rem,var(--marketplace-bottom-nav-space))] sm:place-items-center"
+                ref={messageActionsViewportRef}
                 onClick={() => setMessageActionTarget(null)}
               >
                 <div
@@ -1758,7 +1762,8 @@ export default function ConversationPage() {
                     إلغاء
                   </button>
                 </div>
-              </div>
+              </div>,
+              document.body,
             )}
 
             <form

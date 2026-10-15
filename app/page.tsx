@@ -15,6 +15,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
+import { useOverlayViewport } from '@/hooks/use-overlay-viewport';
 import { DefaultChatTransport, type ChatStatus, type FileUIPart, type UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import dynamic from 'next/dynamic';
@@ -388,6 +390,7 @@ function writeAssistantBubblePosition(position: AssistantBubblePosition) {
 function ChatAttachmentPreviewStrip({ maxFiles }: { maxFiles: number }) {
   const attachments = usePromptInputAttachments();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewViewportRef = useOverlayViewport<HTMLDivElement>();
   const files = attachments.files;
   const safePreviewIndex =
     previewIndex === null || files.length === 0 ? null : Math.min(previewIndex, files.length - 1);
@@ -470,10 +473,11 @@ function ChatAttachmentPreviewStrip({ maxFiles }: { maxFiles: number }) {
         </div>
       </div>
 
-      {previewFile && (
+      {previewFile && createPortal(
         <div
           aria-modal="true"
-          className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md"
+          className="viewport-overlay fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md [--overlay-content-height-limit:88dvh]"
+          ref={previewViewportRef}
           onClick={closePreview}
           role="dialog"
         >
@@ -548,7 +552,8 @@ function ChatAttachmentPreviewStrip({ maxFiles }: { maxFiles: number }) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
@@ -2047,6 +2052,7 @@ export default function Page() {
     useState<string[]>([]);
   const [manualListingImagePreviewIndex, setManualListingImagePreviewIndex] =
     useState<number | null>(null);
+  const manualPreviewViewportRef = useOverlayViewport<HTMLDivElement>();
   const [isPreparingManualListingImages, setIsPreparingManualListingImages] =
     useState(false);
   const [manualListingNotice, setManualListingNotice] =
@@ -4264,6 +4270,7 @@ export default function Page() {
         event.button !== 0 ||
         marketplaceToolsDragRef.current.pointerId !== -1 ||
         !(target instanceof Element) ||
+        !event.currentTarget.contains(target) ||
         target.closest(
             'a, input, textarea, select, label, .marketplace-tools-region, [role="listbox"], [role="option"], [role="combobox"], [role="slider"], [role="checkbox"], [role="switch"], [contenteditable]:not([contenteditable="false"])',
           ) ||
@@ -4781,10 +4788,11 @@ export default function Page() {
                         ))}
                       </div>
                     )}
-                    {manualListingPreviewUrl && (
+                    {manualListingPreviewUrl && createPortal(
                       <div
                         aria-modal="true"
-                        className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md"
+                        className="viewport-overlay fixed inset-0 z-[90] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md [--overlay-content-height-limit:88dvh]"
+                        ref={manualPreviewViewportRef}
                         onClick={() => setManualListingImagePreviewIndex(null)}
                         role="dialog"
                       >
@@ -4855,7 +4863,8 @@ export default function Page() {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </div>,
+                      document.body,
                     )}
                     {(isPreparingManualListingImages || manualListingImages.length > 0) && (
                       <div className="grid gap-1.5">

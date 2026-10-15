@@ -264,29 +264,48 @@ test('keeps image deletion successful when Cloudflare cache purge fails', async 
     CLOUDFLARE_ZONE_ID: 'cf-zone',
   });
   const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+  console.warn = (message: unknown) => warnings.push(String(message));
+  let failure: 'json' | 'html' | 'network' = 'json';
 
   globalThis.fetch = async (input) => {
     const url = new URL(String(input));
 
     if (url.host === 'api.cloudflare.com') {
-      return Response.json({ success: false }, { status: 500 });
+      if (failure === 'network') throw new TypeError('network error containing cf-token');
+      if (failure === 'html') return new Response('proxy error cf-token', { status: 502 });
+      return Response.json({ success: false, errors: [
+        { code: 10000, message: 'Authentication error cf-token test-secret-key' },
+        { code: 'cf-token' },
+      ] }, { status: 403 });
     }
 
     return new Response(null, { status: 204 });
   };
 
   try {
-    assert.equal(
-      await deleteListingObject({
-        imageId: 'image-1',
-        urls: [
-          'https://images.example.com/listings/2026/09/image-1.jpg',
-        ],
-      }),
-      true,
-    );
+    for (const scenario of ['json', 'html', 'network'] as const) {
+      failure = scenario;
+      assert.equal(
+        await deleteListingObject({
+          imageId: 'image-1',
+          urls: [
+            'https://images.example.com/listings/2026/09/image-1.jpg',
+          ],
+        }),
+        true,
+      );
+    }
+    assert.deepEqual(warnings, [
+      '[cloudflare_cache_purge] failure=provider_rejected status=403 codes=10000',
+      '[cloudflare_cache_purge] failure=provider_rejected status=502 codes=none',
+      '[cloudflare_cache_purge] failure=TypeError',
+    ]);
+    assert.doesNotMatch(warnings.join(' '), /cf-token|test-secret-key/);
   } finally {
     globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
     restoreEnv();
   }
 });

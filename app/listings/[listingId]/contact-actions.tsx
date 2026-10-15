@@ -1,11 +1,13 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MessageCircle, Phone, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@ui/button';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { useOverlayViewport } from '@/hooks/use-overlay-viewport';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -23,6 +25,7 @@ export function ListingContactActions({
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isContactSheetOpen, setIsContactSheetOpen] = useState(false);
+  const viewportRef = useOverlayViewport<HTMLDivElement>();
   const cleanSellerPhoneNumber = sellerPhoneNumber?.trim() ?? '';
 
   const openConversation = async () => {
@@ -92,9 +95,10 @@ export function ListingContactActions({
         تواصل مع المعلن
       </Button>
 
-      {isContactSheetOpen && (
+      {isContactSheetOpen && createPortal(
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/35 px-4 backdrop-blur-[1px]"
+          className="viewport-overlay fixed inset-0 z-[80] grid place-items-center px-4"
+          ref={viewportRef}
           onClick={() => setIsContactSheetOpen(false)}
         >
           <div
@@ -146,7 +150,8 @@ export function ListingContactActions({
               </p>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <FloatingActionNotice message={message} open={Boolean(message)}

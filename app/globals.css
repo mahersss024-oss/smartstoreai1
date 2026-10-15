@@ -340,6 +340,7 @@
     scrollbar-gutter: stable;
   }
 
+
   .listing-seller-summary {
     --seller-panel-background: #e2e8f0;
     background: var(--seller-panel-background);
@@ -1674,4 +1675,44 @@
       transform: none;
     }
   }
+}
+
+/* Portal layers escape paint containment; viewport bounds also cover keyboards.
+   Keep these constraints outside layers so page utility classes cannot unbound them. */
+.viewport-overlay {
+  top: var(--overlay-top, 0px);
+  left: var(--overlay-left, 0px);
+  right: auto;
+  bottom: auto;
+  width: var(--overlay-width, 100%);
+  height: var(--overlay-height, 100dvh);
+  padding-top: max(var(--overlay-padding-y, 1rem), env(safe-area-inset-top));
+  padding-bottom: max(var(--overlay-padding-bottom, var(--overlay-padding-y, 1rem)), env(safe-area-inset-bottom));
+  padding-left: max(var(--overlay-padding-x, 1rem), env(safe-area-inset-left));
+  padding-right: max(var(--overlay-padding-x, 1rem), env(safe-area-inset-right));
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.viewport-overlay > :first-child {
+  min-height: 0;
+  max-height: min(var(--overlay-content-height-limit, 100%), 100%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.viewport-dialog {
+  top: var(--overlay-center-y, 50%);
+  left: var(--overlay-center-x, 50%);
+  width: calc(var(--overlay-width, 100vw) - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right));
+  max-height: min(var(--overlay-height-limit, 100dvh), calc(var(--overlay-height, 100dvh) - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.viewport-notice {
+  top: var(--overlay-center-y, 50%);
+  left: var(--overlay-left, 0px);
+  right: auto;
+  width: var(--overlay-width, 100%);
 }

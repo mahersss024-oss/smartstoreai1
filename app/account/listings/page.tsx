@@ -1435,7 +1435,7 @@ export default function AccountListingsPage() {
           }
         }}
       >
-        <DialogContent className="max-h-[min(86dvh,42rem)] max-w-[min(94vw,42rem)] overflow-y-auto rounded-lg p-0" dir="rtl">
+        <DialogContent className="[--overlay-height-limit:min(86dvh,42rem)] max-h-[min(86dvh,42rem)] max-w-[min(94vw,42rem)] overflow-y-auto rounded-lg p-0" dir="rtl">
           {imageManagerListing ? (
             <div className="grid gap-4 p-4">
               <DialogHeader className="text-right">

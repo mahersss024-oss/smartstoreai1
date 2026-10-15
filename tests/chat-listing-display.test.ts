@@ -201,7 +201,9 @@ test('city selection supports search after opening everywhere it is used', () =>
   const accountListings = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const adminListings = readProjectFile('app', 'admin', 'listings', 'page.tsx');
 
-  assert.match(selector, /\{isOpen \? \(/);
+  assert.match(selector, /\{isOpen \? createPortal\(/);
+  assert.match(selector, /popoverRef\.current\?\.contains/);
+  assert.match(selector, /document\.body/);
   assert.match(selector, /placeholder="ابحث عن مدينة"/);
   assert.match(selector, /max-h-64 overflow-y-auto/);
   assert.match(selector, /normalizeArabicSearch/);

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, MapPin, Search } from 'lucide-react';
 
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
@@ -42,6 +43,46 @@ export function CitySelector({
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const root = rootRef.current;
+    const popover = popoverRef.current;
+    if (!root || !popover) return;
+    const viewport = window.visualViewport;
+    const positionPopover = (event?: Event) => {
+      if (event?.target instanceof Node && popover.contains(event.target)) return;
+      const rect = root.getBoundingClientRect();
+      const left = viewport?.offsetLeft ?? 0;
+      const top = viewport?.offsetTop ?? 0;
+      const width = viewport?.width ?? window.innerWidth;
+      const bottom = top + (viewport?.height ?? window.innerHeight);
+      const popoverWidth = Math.min(Math.max(256, rect.width), width - 16);
+      const anchorTop = Math.min(bottom - 8, Math.max(top + 8, rect.top - 4));
+      const anchorBottom = Math.min(bottom - 8, Math.max(top + 8, rect.bottom + 4));
+      const below = Math.max(0, bottom - anchorBottom - 8);
+      const above = Math.max(0, anchorTop - top - 8);
+      const openAbove = below < 160 && above > below;
+      popover.style.width = `${popoverWidth}px`;
+      popover.style.left = `${Math.max(left + 8, Math.min(rect.left, left + width - popoverWidth - 8))}px`;
+      popover.style.top = `${openAbove ? anchorTop : anchorBottom}px`;
+      popover.style.transform = openAbove ? 'translateY(-100%)' : 'none';
+      popover.style.maxHeight = `${openAbove ? above : below}px`;
+    };
+    positionPopover();
+    // Anchored options must track a moving trigger, only while they are open.
+    document.addEventListener('scroll', positionPopover, true);
+    window.addEventListener('resize', positionPopover);
+    viewport?.addEventListener('resize', positionPopover);
+    viewport?.addEventListener('scroll', positionPopover);
+    return () => {
+      document.removeEventListener('scroll', positionPopover, true);
+      window.removeEventListener('resize', positionPopover);
+      viewport?.removeEventListener('resize', positionPopover);
+      viewport?.removeEventListener('scroll', positionPopover);
+    };
+  }, [isOpen]);
 
   const cities = useMemo(() => {
     const normalizedQuery = normalizeArabicSearch(query);
@@ -65,7 +106,8 @@ export function CitySelector({
       searchRef.current?.focus({ preventScroll: true });
     }
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+      if (!rootRef.current?.contains(event.target as Node) &&
+          !popoverRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setIsOpen(false);
@@ -121,14 +163,18 @@ export function CitySelector({
         />
       </button>
 
-      {isOpen ? (
+      {isOpen ? createPortal(
         <div
+          ref={popoverRef}
           className={cn(
-            'absolute inset-x-0 top-full mt-1 min-w-64 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg [contain:layout_paint]',
+            'fixed z-[90] flex min-h-0 flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg [contain:layout_paint]',
             popoverClassName,
           )}
+          dir="rtl"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-center gap-2 border-b px-3">
+          <div className="flex shrink-0 items-center gap-2 border-b px-3">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             <input
               aria-label="البحث عن مدينة"
@@ -140,7 +186,7 @@ export function CitySelector({
               value={query}
             />
           </div>
-          <div className="max-h-64 overflow-y-auto p-1" role="listbox">
+          <div className="min-h-0 max-h-64 overflow-y-auto overscroll-contain p-1" role="listbox">
             {allValue !== undefined && !query ? (
               <button
                 aria-selected={value === allValue}
@@ -176,7 +222,8 @@ export function CitySelector({
               </p>
             ) : null}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );
