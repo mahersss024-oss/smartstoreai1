@@ -40,11 +40,11 @@ test('only successful first publication stamps new drafts; edits and republicati
   assert.equal(listing.firstPublicationTracked, true);
   assert.equal(listing.firstPublishedAt, undefined);
   assert.equal(setListingStatusForSeller(listing.id, 'wrong-seller', 'published'), null);
-  assert.equal(setListingStatusForSeller(listing.id, listing.sellerId, 'published')?.status, 'pending');
-  assert.equal(listing.firstPublishedAt, undefined);
-  approveImage(listing);
-  const first = setListingStatusForSeller(listing.id, listing.sellerId, 'published')!.firstPublishedAt;
+  assert.equal(setListingStatusForSeller(listing.id, listing.sellerId, 'published')?.status, 'published');
+  const first = listing.firstPublishedAt;
   assert.ok(first);
+  approveImage(listing);
+  assert.equal(setListingStatusForSeller(listing.id, listing.sellerId, 'published')!.firstPublishedAt, first);
   updateListingForSeller(listing.id, listing.sellerId, { title: 'Updated desk' });
   toggleFavoriteListing(listing.id, 'buyer');
   setListingStatusForSeller(listing.id, listing.sellerId, 'paused');

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
+import { runOptionalTask } from '@/lib/optional-task';
 
 export const primarySiteMessageId = 'primary';
 
@@ -17,18 +18,12 @@ export async function getActiveSiteMessage(now = new Date()) {
     return null;
   }
 
-  try {
-    return await prisma.siteMessage.findFirst({
+  return runOptionalTask('site_message', () => prisma.siteMessage.findFirst({
       where: {
         id: primarySiteMessageId,
         isEnabled: true,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       select: { message: true, type: true, expiresAt: true },
-    });
-  } catch (error) {
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[site_message] lookup_failed=${errorName}`);
-    return null;
-  }
+  }));
 }

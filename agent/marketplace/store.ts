@@ -14,7 +14,8 @@ import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from './listing-image-limits';
-import { evaluateSaudiMarketplaceCompliance } from './policy';
+import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
+import { resolveListingCategory } from './listing-category';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -40,6 +41,7 @@ import type {
 } from './types';
 
 export type CreateListingDraftInput = {
+  autoCategory?: boolean;
   id?: string;
   sellerId: string;
   category: string;
@@ -358,10 +360,6 @@ function chooseInitialStatus(compliance: ComplianceDecision): ListingStatus {
   return 'draft';
 }
 
-function hasApprovedImage(listing: Pick<ListingRecord, 'images'>) {
-  return listing.images.some((image) => image.status === 'approved');
-}
-
 function calculateCommissionAmount(productValue: number) {
   return Math.round(productValue * 0.01 * 100) / 100;
 }
@@ -414,6 +412,7 @@ function getUserReportPriority(report: UserReportRecord) {
 
 export function createListingDraft(input: CreateListingDraftInput): ListingRecord {
   loadStore();
+  input = { ...input, category: resolveListingCategory(input) };
 
   const sellerListingCount = [...listings.values()].filter(
     (listing) =>
@@ -555,8 +554,6 @@ export function setListingStatusForSeller(
   if (status === 'published' && listing.compliance.decision !== 'allow') {
     listing.status =
       listing.compliance.decision === 'block' ? 'rejected' : 'pending';
-  } else if (status === 'published' && !hasApprovedImage(listing)) {
-    listing.status = 'pending';
   } else {
     listing.status = status;
   }

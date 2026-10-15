@@ -41,7 +41,10 @@ export type ImageEnhancementAction =
   | 'compress'
   | 'create_thumbnail';
 
+export type ImageContentReviewStatus = 'clear' | 'unclear' | 'unavailable' | 'not_checked';
+
 export type ListingImage = {
+  contentReviewStatus?: ImageContentReviewStatus;
   id: string;
   listingId: string;
   originalUrl: string;
@@ -185,6 +188,7 @@ export type MarketplaceIntentDecision = {
 };
 
 export type ComplianceDecision = {
+  checkStatus?: 'completed' | 'unavailable';
   decision: 'allow' | 'block' | 'needs_review';
   reasons: string[];
   jurisdiction: 'SA';

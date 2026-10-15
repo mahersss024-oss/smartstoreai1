@@ -135,6 +135,21 @@ export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDeci
   return evaluateForbiddenMarketplaceTerms(text);
 }
 
+export function evaluateListingComplianceBestEffort(
+  text: string,
+  evaluate = evaluateSaudiMarketplaceCompliance,
+): ComplianceDecision {
+  try {
+    return evaluate(text);
+  } catch (error) {
+    console.warn(`[listing_compliance] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+    return {
+      decision: 'allow', checkStatus: 'unavailable', reasons: ['listing_compliance_unavailable'],
+      jurisdiction: 'SA', shariaSensitive: false,
+    };
+  }
+}
+
 export function getAuthRequiredResponse(language: 'ar' | 'en') {
   return language === 'en'
     ? '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] Sign in with Google or Apple first to use Hamad chat and continue marketplace assistance.'

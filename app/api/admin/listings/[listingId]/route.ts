@@ -12,6 +12,7 @@ import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
+import { runOptionalTask } from '@/lib/optional-task';
 
 const maxAdminListingUpdateRequestBytes = 64 * 1024;
 
@@ -312,7 +313,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (existing.status !== 'published' && updated.status === 'published') {
-      await notifyFollowersForAdminPublishedListing(updated);
+      await runOptionalTask('admin_listing_notifications', () => notifyFollowersForAdminPublishedListing(updated));
     }
   } catch {
     // Admin update must not fail due to realtime delivery.

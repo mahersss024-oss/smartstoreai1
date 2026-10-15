@@ -2,6 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
 import {
   saveUploadedListingImagesForSeller,
   type UploadedListingImage,
@@ -10,7 +11,6 @@ import {
   getMaxListingsPerSeller,
   isListingLimitReachedError,
 } from '@/agent/marketplace/listing-limits';
-import { checkImageMarketplaceCompliance } from '@/agent/marketplace/vision-compliance';
 import {
   createListingDraft,
   deleteListingImageForSeller,
@@ -102,27 +102,8 @@ function getComparisonListingSummary(
   };
 }
 
-function buildListingText(input: {
-  category: string;
-  title?: string;
-  description?: string;
-  city?: string;
-  condition?: string;
-  attributes?: Record<string, unknown>;
-}) {
-  return [
-    input.category,
-    input.title,
-    input.description,
-    input.city,
-    input.condition,
-    Object.values(input.attributes ?? {}).join(' '),
-  ]
-    .filter(Boolean)
-    .join(' ');
-}
-
 const listingDetailsSchema = {
+  autoCategory: z.boolean().optional().describe('Use true only when the seller has not explicitly selected a category; infer from title and description if possible. Preserve an explicit seller category.'),
   category: z.string().min(2),
   title: z.string().min(2).optional(),
   description: z.string().min(2).optional(),
@@ -257,28 +238,6 @@ async function getCurrentEditableSellerListing({
       ['draft', 'pending', 'paused'].includes(listing.status),
     ) ?? null
   );
-}
-
-function buildImageReviewMessages(
-  images: UploadedListingImage[],
-  listingText: string,
-) {
-  return [
-    {
-      role: 'user' as const,
-      content: [
-        {
-          type: 'text' as const,
-          text: `Listing text: ${listingText}`,
-        },
-        ...images.map((image) => ({
-          type: 'file' as const,
-          mediaType: image.mediaType,
-          data: image.data,
-        })),
-      ],
-    },
-  ];
 }
 
 export function createMarketplaceTools(
@@ -450,6 +409,7 @@ export function createMarketplaceTools(
           input,
         ) as CreateListingInput;
         let listing: Awaited<ReturnType<typeof createListingDraft>>;
+        let imageUploadUnavailable = false;
 
         try {
           listing = await createListingDraft(session.user, listingInput);
@@ -477,56 +437,19 @@ export function createMarketplaceTools(
         }
 
         if (options.latestUploadedImages?.length) {
-          const listingText = buildListingText(listingInput);
-          let imageCompliance: Awaited<
-            ReturnType<typeof checkImageMarketplaceCompliance>
-          >;
-
-          try {
-            imageCompliance = await checkImageMarketplaceCompliance({
-              messages: buildImageReviewMessages(
-                options.latestUploadedImages,
-                listingText,
-              ),
-              userRequest: listingText,
-              language: 'ar',
-              expectedCategory: listingInput.category,
-              listingText,
-              reviewMode: 'primary_only',
-            });
-          } catch {
-            return {
-              status: 'image_review_unavailable',
-              message:
-                'The draft was created, but the uploaded image could not be reviewed or saved. Do not publish until image review succeeds.',
-              listing,
-            };
+          const review = await reviewListingImageContent(options.latestUploadedImages, listing.images);
+          if (review.status === 'blocked') {
+            return { status: review.status, message: review.message, listing, compliance: review.compliance };
           }
-
-          if (imageCompliance.decision === 'block') {
-            return {
-              status: 'blocked',
-              message:
-                'The draft was created, but the uploaded image is blocked by Saudi marketplace and Islamic compliance policy. Do not publish.',
-              listing,
-              compliance: imageCompliance,
-            };
-          }
-
-          if (imageCompliance.decision === 'needs_review') {
-            return {
-              status: 'needs_review',
-              message:
-                'The draft was created, but the uploaded image needs manual review before publishing.',
-              listing,
-              compliance: imageCompliance,
-            };
-          }
-
           const listingWithImages = await saveUploadedListingImagesForSeller({
             listingId: listing.id,
             sellerId: session.user.id,
             images: options.latestUploadedImages,
+            contentReviewStatuses: review.imageReviewStatuses,
+          }).catch((error: unknown) => {
+            imageUploadUnavailable = true;
+            console.warn(`[draft_image_upload] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+            return null;
           });
 
           if (listingWithImages) {
@@ -539,9 +462,11 @@ export function createMarketplaceTools(
           message:
             listing.status === 'pending'
               ? 'Draft created for manual review. Do not publish directly.'
+              : imageUploadUnavailable
+                ? 'Draft created. Some photos could not be saved, but photos are optional and the seller can publish manually from Account > My listings.'
               : listing.images.some((image) => image.status === 'approved')
                 ? 'Draft created with the uploaded product image. Ask for final confirmation before publishing.'
-                : 'Draft created. Ask for missing details, images, and final confirmation before publishing.',
+                : 'Draft created. Photos are optional. Ask for useful missing details and direct the seller to Account > My listings when they want to publish.',
           listing,
         };
       },
@@ -632,56 +557,15 @@ export function createMarketplaceTools(
           };
         }
 
-        const listingText = buildListingText(targetListing);
-        let imageCompliance: Awaited<
-          ReturnType<typeof checkImageMarketplaceCompliance>
-        >;
-
-        try {
-          imageCompliance = await checkImageMarketplaceCompliance({
-            messages: buildImageReviewMessages(
-              options.latestUploadedImages,
-              listingText,
-            ),
-            userRequest: listingText,
-            language: 'ar',
-            expectedCategory: targetListing.category,
-            listingText,
-            reviewMode: 'primary_only',
-          });
-        } catch {
-          return {
-            status: 'image_review_unavailable',
-            message:
-              'The uploaded image could not be reviewed or saved. Try again before attaching it to the listing.',
-            listing: targetListing,
-          };
+        const review = await reviewListingImageContent(options.latestUploadedImages, targetListing.images);
+        if (review.status === 'blocked') {
+          return { status: review.status, message: review.message, listing: targetListing, compliance: review.compliance };
         }
-
-        if (imageCompliance.decision === 'block') {
-          return {
-            status: 'blocked',
-            message:
-              'The uploaded image is blocked by Saudi marketplace and Islamic compliance policy. It was not saved.',
-            listing: targetListing,
-            compliance: imageCompliance,
-          };
-        }
-
-        if (imageCompliance.decision === 'needs_review') {
-          return {
-            status: 'needs_review',
-            message:
-              'The uploaded image needs manual review before it can be attached.',
-            listing: targetListing,
-            compliance: imageCompliance,
-          };
-        }
-
         const listing = await saveUploadedListingImagesForSeller({
           listingId,
           sellerId: session.user.id,
           images: options.latestUploadedImages,
+          contentReviewStatuses: review.imageReviewStatuses,
         });
 
         if (!listing) {
@@ -693,6 +577,7 @@ export function createMarketplaceTools(
 
         return {
           status: 'images_added',
+          contentCheck: review.status,
           listing,
         };
       },

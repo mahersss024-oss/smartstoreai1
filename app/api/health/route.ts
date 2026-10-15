@@ -1,5 +1,6 @@
 import { getSiteVisitStats } from '@/lib/analytics/site-visits';
 import { getRuntimeMetricsSnapshot } from '@/lib/observability/runtime-metrics';
+import { runOptionalTask } from '@/lib/optional-task';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -67,7 +68,7 @@ export async function GET() {
 
   // Touch the store stats path so a degraded analytics backend does not mask
   // an otherwise healthy process, but never let it fail the health check.
-  await getSiteVisitStats().catch(() => undefined);
+  await runOptionalTask('health_analytics', getSiteVisitStats, 500);
 
   return Response.json(
     {

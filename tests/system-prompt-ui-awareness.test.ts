@@ -39,9 +39,10 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /after visible matches exist/);
 });
 
-test('system prompt accepts recognizable imperfect images and separates distinct products', () => {
-  assert.match(systemPrompt, /product is recognizable/);
-  assert.match(systemPrompt, /This does not relax prohibited-product/);
+test('system prompt makes photos optional without relaxing prohibited content or merging distinct products', () => {
+  assert.match(systemPrompt, /Images are optional/);
+  assert.match(systemPrompt, /Identified prohibited products and genuine text-policy review requirements remain enforced/);
+  assert.match(systemPrompt, /image inspection is unavailable/);
   assert.match(systemPrompt, /Different standalone products must not be merged into one listing/);
   assert.match(systemPrompt, /multiple_distinct_products_in_images/);
   assert.match(systemPrompt, /one bundled listing or separate listings/);

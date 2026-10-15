@@ -18,7 +18,8 @@ import {
 } from '@/lib/push/follow-notifications';
 import { Prisma, type AdminAuditAction } from '@prisma/client';
 
-import { evaluateSaudiMarketplaceCompliance } from './policy';
+import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
+import { resolveListingCategory } from './listing-category';
 import { getComparableListings } from './market-intelligence';
 import {
   getMarketplaceSearchTermVariants,
@@ -54,6 +55,7 @@ import {
 import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
 import { deleteListingObject } from './object-storage';
 import { recordDatabaseFirstPublication } from './listing-publication';
+import { runOptionalTask } from '@/lib/optional-task';
 
 type DatabaseListingRecord = {
   firstPublicationTracked?: boolean;
@@ -76,6 +78,7 @@ type DatabaseListingRecord = {
   favoriteCount: number;
   compliance: unknown;
   images?: Array<{
+    contentReviewStatus?: string | null;
     id: string;
     listingId: string;
     originalUrl: string;
@@ -336,6 +339,7 @@ function extractListingIdLookup(value?: string) {
 }
 
 export type CreateListingInput = {
+  autoCategory?: boolean;
   category: string;
   title?: string;
   description?: string;
@@ -376,10 +380,6 @@ function chooseInitialStatus(compliance: ComplianceDecision): ListingStatus {
   }
 
   return 'draft';
-}
-
-function hasApprovedImage(listing: { images: ListingImage[] }) {
-  return listing.images.some((image) => image.status === 'approved');
 }
 
 function toPriceMode(price: CreateListingInput['price']) {
@@ -721,6 +721,11 @@ async function notifySimilarFollowersWhenListingIsPublished(
   }
 }
 
+async function notifyPublishedListingBestEffort(listing: memoryStore.ListingRecord, previousStatus: ListingStatus) {
+  await runOptionalTask('listing_follower_notifications', () => notifyFollowersWhenListingIsPublished(listing, previousStatus));
+  await runOptionalTask('listing_similar_notifications', () => notifySimilarFollowersWhenListingIsPublished(listing, previousStatus));
+}
+
 function getMemorySellerRatingStats(sellerId: string) {
   const ratings = [...memorySellerRatings.values()].filter(
     (rating) => rating.sellerId === sellerId,
@@ -786,6 +791,7 @@ function toListingRecord(listing: DatabaseListingRecord): memoryStore.ListingRec
             qualityScore: image.qualityScore,
             status: image.status,
             enhancements: image.enhancements,
+            contentReviewStatus: image.contentReviewStatus ?? undefined,
           }) as ListingImage,
       ) ?? [],
     attributes: asRecord(listing.attributes),
@@ -2291,6 +2297,7 @@ export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,
 ) {
+  input = { ...input, category: resolveListingCategory(input) };
   if (!shouldUseDatabaseStore()) {
     const listing = memoryStore.createListingDraft({
       sellerId: user.id,
@@ -2506,8 +2513,7 @@ export async function setListingStatusForSeller(
         visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
       });
 
-      await notifyFollowersWhenListingIsPublished(listing, previousStatus);
-      await notifySimilarFollowersWhenListingIsPublished(listing, previousStatus);
+      await notifyPublishedListingBestEffort(listing, previousStatus);
 
       if (listing.status === 'deleted') {
         safelyPublishRealtimeEvent({
@@ -2539,8 +2545,6 @@ export async function setListingStatusForSeller(
       ? existing.compliance.decision === 'block'
         ? 'rejected'
         : 'pending'
-      : status === 'published' && !hasApprovedImage(existing)
-        ? 'pending'
       : status;
   const listing = await prisma.$transaction(async (tx) => {
     await recordDatabaseFirstPublication(tx, listingId, nextStatus);
@@ -2587,8 +2591,7 @@ export async function setListingStatusForSeller(
     ),
   });
 
-  await notifyFollowersWhenListingIsPublished(mappedListing, previousStatus);
-  await notifySimilarFollowersWhenListingIsPublished(mappedListing, previousStatus);
+  await notifyPublishedListingBestEffort(mappedListing, previousStatus);
 
   if (mappedListing.status === 'deleted') {
     safelyPublishRealtimeEvent({
@@ -2698,6 +2701,7 @@ export async function addListingImageForSeller(
               qualityScore: image.qualityScore,
               status: image.status,
               enhancements: image.enhancements,
+              contentReviewStatus: image.contentReviewStatus,
             },
           });
 

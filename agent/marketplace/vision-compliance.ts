@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import type { AppLanguage } from '@/app/i18n';
+import type { ImageContentReviewStatus } from './types';
 
 function readTimeoutMs(envKey: string, fallbackMs: number) {
   const value = Number.parseInt(process.env[envKey] ?? '', 10);
@@ -151,6 +152,8 @@ const imageComplianceSchema = z.preprocess((value) => {
 }));
 
 export type ImageComplianceDecision = {
+  imageReviewStatuses?: ImageContentReviewStatus[];
+  inspectionUnavailable?: boolean;
   decision: 'allow' | 'block' | 'needs_review';
   confidence: number;
   reasons: string[];
@@ -162,7 +165,7 @@ export type ImageComplianceDecision = {
   shariaSensitive: boolean;
 };
 
-export type ImageComplianceReviewMode = 'all_images' | 'primary_only';
+export type ImageComplianceReviewMode = 'all_images' | 'primary_only' | 'first_clear_max_three';
 
 type ModelImageFilePart = {
   type: 'file';
@@ -355,7 +358,7 @@ function wait(ms: number) {
   });
 }
 
-export function parseImageComplianceDecision(text: string): ImageComplianceDecision {
+export function parseImageComplianceDecision(text: string, ignoreCategoryMismatch = false): ImageComplianceDecision {
   const parsed = imageComplianceSchema.parse(
     JSON.parse(extractJsonObject(text)),
   );
@@ -367,7 +370,7 @@ export function parseImageComplianceDecision(text: string): ImageComplianceDecis
     reason.length > 180 ? `${reason.slice(0, 177)}...` : reason,
   );
   const decision =
-    parsed.decision === 'allow' &&
+    !ignoreCategoryMismatch && parsed.decision === 'allow' &&
     expectedCategory &&
     categoryMatch === 'mismatch'
       ? 'needs_review'
@@ -624,7 +627,7 @@ export function aggregateImageComplianceDecisions(
   } satisfies ImageComplianceDecision;
 }
 
-async function generateImageComplianceText(imageMessage: ModelMessage) {
+async function generateImageComplianceText(imageMessage: ModelMessage, prohibitedOnly = false) {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= imageComplianceMaxAttempts; attempt += 1) {
@@ -632,7 +635,9 @@ async function generateImageComplianceText(imageMessage: ModelMessage) {
       const result = await withTimeout(imageComplianceTimeoutMs, (signal) =>
         generateText({
           model: getDeepseekChatModel('vision'),
-          instructions: imageComplianceSystemPrompt,
+          instructions: prohibitedOnly
+            ? `${imageComplianceSystemPrompt}\nUpload acceptance mode: Check prohibited content only. Do not require image quality, resolution, lighting or category/listing matching. Return block for identified prohibited content, allow if the visible content can be understood and is not prohibited, or needs_review only if the content cannot be understood well enough to determine this. That uncertainty is informational, not a condition for accepting the upload.`
+            : imageComplianceSystemPrompt,
           maxOutputTokens: 520,
           abortSignal: signal,
           messages: [imageMessage],
@@ -716,6 +721,12 @@ Return this exact JSON shape:
   "sharia_sensitive": true
 }`;
 
+export function limitImageDecisionToProhibitedContent(decision: ImageComplianceDecision): ImageComplianceDecision {
+  return decision.decision === 'needs_review'
+    ? { ...decision, decision: 'allow', reasons: ['no_prohibited_content_detected'] }
+    : decision;
+}
+
 export async function checkImageMarketplaceCompliance({
   messages,
   userRequest,
@@ -723,6 +734,7 @@ export async function checkImageMarketplaceCompliance({
   expectedCategory,
   listingText,
   reviewMode = 'all_images',
+  prohibitedOnly = false,
 }: {
   messages: ModelMessage[];
   userRequest: string;
@@ -730,6 +742,7 @@ export async function checkImageMarketplaceCompliance({
   expectedCategory?: string;
   listingText?: string;
   reviewMode?: ImageComplianceReviewMode;
+  prohibitedOnly?: boolean;
 }): Promise<ImageComplianceDecision> {
   const imageMessages = createImageComplianceUserMessages({
     messages,
@@ -752,11 +765,37 @@ export async function checkImageMarketplaceCompliance({
 
   const decisions: ImageComplianceDecision[] = [];
 
+  if (reviewMode === 'first_clear_max_three') {
+    const statuses: ImageContentReviewStatus[] = [];
+    let latest: ImageComplianceDecision = {
+      decision: 'allow', confidence: 0, reasons: [], categoryMatch: 'unclear', shariaSensitive: false,
+    };
+    for (const imageMessage of imageMessages.slice(0, 3)) {
+      try {
+        latest = parseImageComplianceDecision(await generateImageComplianceText(imageMessage, prohibitedOnly), prohibitedOnly);
+      } catch (error) {
+        if (!prohibitedOnly) throw error;
+        console.warn(`[image_content_review] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+        return {
+          decision: 'allow', confidence: 0, reasons: ['image_inspection_unavailable'],
+          categoryMatch: 'unclear', shariaSensitive: false, inspectionUnavailable: true,
+          imageReviewStatuses: [...statuses, 'unavailable'],
+        };
+      }
+      if (latest.decision === 'block') return { ...latest, imageReviewStatuses: statuses };
+      statuses.push(latest.decision === 'allow' ? 'clear' : 'unclear');
+      if (latest.decision === 'allow') break;
+    }
+    return { ...limitImageDecisionToProhibitedContent(latest), imageReviewStatuses: statuses };
+  }
+
   for (const imageMessage of imageMessages) {
     decisions.push(
-      parseImageComplianceDecision(
-        await generateImageComplianceText(imageMessage),
-      ),
+      prohibitedOnly
+        ? limitImageDecisionToProhibitedContent(parseImageComplianceDecision(
+            await generateImageComplianceText(imageMessage, true),
+          ))
+        : parseImageComplianceDecision(await generateImageComplianceText(imageMessage)),
     );
   }
 

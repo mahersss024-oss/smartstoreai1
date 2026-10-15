@@ -20,6 +20,7 @@ import {
   listSellerListings,
 } from '@/agent/marketplace/store';
 import { createSessionCookie } from '@/lib/auth/session';
+import { mockImageContentReview } from './helpers/image-content';
 
 test('extracts the latest uploaded product images from prior chat context', () => {
   const messages: ModelMessage[] = [
@@ -159,6 +160,63 @@ test('returns a controlled error for malformed listing image uploads', async () 
 
   assert.equal(response.status, 400);
   assert.equal(body.error, 'invalid_multipart_form_data');
+});
+
+for (const reviewDecision of ['allow', 'needs_review', 'unavailable'] as const) {
+test(`accepts eight images when content review is ${reviewDecision} and rejects the ninth`, async (t) => {
+  const listing = createListingDraft({
+    sellerId: `seller:unconditional-images-${reviewDecision}`, category: 'cars', title: 'Car listing',
+  });
+  const cookie = createSessionCookie({ id: listing.sellerId, email: 'images@example.test' });
+  const bytes = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#000000' } }).png().toBuffer();
+  const networkCalls = mockImageContentReview(t, reviewDecision);
+  for (let index = 0; index < defaultMaxListingImages; index++) {
+    const data = new FormData();
+    data.set('image', new File([bytes], `small-${index}.png`, { type: 'image/png' }));
+    data.set('isRelevantToListing', 'false');
+    data.set('hasDetectedSensitiveInfo', 'true');
+    const response = await uploadListingImage(new Request(
+      `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
+      { method: 'POST', headers: { cookie }, body: data },
+    ), { params: Promise.resolve({ listingId: listing.id }) });
+    const body = await response.json();
+    assert.equal(response.status, 201);
+    assert.equal(body.image.status, 'approved');
+    const reviewed = index < (reviewDecision === 'allow' ? 1 : 3);
+    assert.equal(body.contentCheck, !reviewed ? 'skipped' : reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
+    if (reviewDecision === 'unavailable') assert.equal(body.compliance, null);
+    assert.ok(body.image.thumbnailUrl);
+    assert.ok(body.image.displayUrl);
+  }
+  const response = await uploadListingImage(new Request(
+    `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
+    { method: 'POST', headers: { cookie } },
+  ), { params: Promise.resolve({ listingId: listing.id }) });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, 'listing_image_limit_reached');
+  assert.equal(networkCalls(), reviewDecision === 'allow' ? 1 : 3);
+  assert.equal(listSellerListings(listing.sellerId)[0].images.length, defaultMaxListingImages);
+});
+}
+
+test('blocks prohibited content even when the listing already has an approved image', async (t) => {
+  mockImageContentReview(t, 'block');
+  const listing = createListingDraft({ sellerId: 'seller:blocked-image', category: 'other', title: 'Desk' });
+  addListingImageForSeller(listing.id, listing.sellerId, {
+    id: 'approved-before-block', listingId: listing.id,
+    originalUrl: 'https://example.com/a.jpg', displayUrl: 'https://example.com/a.jpg', thumbnailUrl: 'https://example.com/a.jpg',
+    status: 'approved', qualityScore: 90, isPrimary: true, enhancements: [],
+  });
+  const bytes = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  const data = new FormData();
+  data.set('image', new File([bytes], 'product.png', { type: 'image/png' }));
+  const response = await uploadListingImage(new Request(
+    `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
+    { method: 'POST', headers: { cookie: createSessionCookie({ id: listing.sellerId, email: 'blocked@example.test' }) }, body: data },
+  ), { params: Promise.resolve({ listingId: listing.id }) });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error, 'image_policy_blocked');
+  assert.equal(listSellerListings(listing.sellerId)[0].images.length, 1);
 });
 
 test('rejects listing image uploads when declared type does not match bytes', async () => {

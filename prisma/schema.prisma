@@ -261,6 +261,7 @@ model MobilePushToken {
 }
 
 model ListingImage {
+  contentReviewStatus String?
   id           String             @id @default(cuid())
   listingId    String
   originalUrl  String

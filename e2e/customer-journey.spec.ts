@@ -67,6 +67,57 @@ const corePageText: Record<string, RegExp> = {
   '/commissions': /رسوم المنصة|العمولة|عمولاتي/i,
 };
 
+test('manual photo-free publication remains independent of assistant availability and preserves category choice', async ({ page, baseURL }) => {
+  await addSignedInSession(baseURL, page);
+  await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
+  await page.route('**/api/chat', route => route.fulfill({ status: 503, json: { error: 'fixture_unavailable' } }));
+  let created: Record<string, unknown> | undefined;
+  let published = 0;
+  let imageRequests = 0;
+  // Intercept every write so this test never creates a real marketplace listing.
+  await page.route('**/api/marketplace/listings', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    created = route.request().postDataJSON();
+    await route.fulfill({ status: 201, json: { listing: {
+      ...created, id: 'photo-free-fixture', status: 'draft', images: [],
+    } } });
+  });
+  await page.route('**/api/marketplace/listings/photo-free-fixture**', async route => {
+    if (route.request().url().endsWith('/images')) imageRequests++;
+    else if (route.request().method() === 'PATCH') published++;
+    await route.fulfill({ json: { listing: { ...created, id: 'photo-free-fixture', status: 'published', images: [] } } });
+  });
+  await page.goto('/');
+  const chat = await openAssistantChatIfNeeded(page);
+  await chat.fill('Test assistant availability');
+  const unavailable = page.waitForResponse(response => response.url().endsWith('/api/chat'));
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
+  expect((await unavailable).status()).toBe(503);
+  await closeAssistantChatIfOpen(page);
+  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
+  const form = page.locator('.marketplace-home-controls form');
+  const title = form.locator('input[maxlength="140"]');
+  await title.fill('iPhone 15');
+  await form.locator('textarea').fill('Used phone for sale');
+  const category = form.locator('select').first();
+  await expect(category).toHaveValue('mobile_phones');
+  await category.selectOption('furniture');
+  await title.fill('Toyota Camry');
+  await form.locator('textarea').focus();
+  await expect(category).toHaveValue('furniture');
+  await form.locator('button[aria-haspopup="listbox"]').click();
+  await page.getByRole('option', { name: 'الرياض', exact: true }).click();
+  await form.getByRole('button', { name: 'حفظ ونشر الإعلان', exact: true })
+    .evaluate(element => (element as HTMLButtonElement).click());
+  const agreement = page.locator('body > .viewport-overlay > [role="dialog"]');
+  await agreement.getByRole('checkbox').check();
+  await agreement.getByRole('button', { name: 'استمرار ونشر الإعلان', exact: true }).click();
+  await expect.poll(() => published).toBe(1);
+  expect(created?.category).toBe('furniture');
+  expect(created?.autoCategory).toBe(false);
+  expect(imageRequests).toBe(0);
+});
+
 test('visitor can reach the marketplace and choose an auth provider', async ({
   page,
 }) => {

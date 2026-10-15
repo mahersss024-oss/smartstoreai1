@@ -14,7 +14,7 @@ import {
 } from './listing-image-limits';
 import { storeListingObject } from './object-storage';
 import { addListingImageForSeller, getListing } from './repository';
-import type { ListingImage } from './types';
+import type { ListingImage, ImageContentReviewStatus } from './types';
 
 const supportedMimeTypes = new Set([
   'image/jpeg',
@@ -158,10 +158,12 @@ export async function saveUploadedListingImagesForSeller({
   listingId,
   sellerId,
   images,
+  contentReviewStatuses,
 }: {
   listingId: string;
   sellerId: string;
   images: UploadedListingImage[];
+  contentReviewStatuses?: ImageContentReviewStatus[];
 }) {
   const maxImages = getMaxListingImagesPerListing();
   const existingListing = await getListing(listingId);
@@ -181,7 +183,7 @@ export async function saveUploadedListingImagesForSeller({
 
   let latestListing = existingListing;
 
-  for (const uploadedImage of images.slice(0, remainingSlots)) {
+  for (const [index, uploadedImage] of images.slice(0, remainingSlots).entries()) {
     const imageId = randomUUID();
     let sanitizedOriginal: Awaited<
       ReturnType<typeof createSanitizedListingImageOriginal>
@@ -237,12 +239,13 @@ export async function saveUploadedListingImagesForSeller({
       thumbnailUrl: thumbnailUrl ?? displayUrl ?? imageUrl,
     });
     const image: ListingImage = {
+      contentReviewStatus: contentReviewStatuses?.[index],
       id: imageId,
       listingId,
       ...imageUrls,
       isPrimary: false,
       qualityScore: quality.qualityScore,
-      status: quality.listingImageStatus,
+      status: 'approved',
       enhancements: quality.enhancements,
     };
 

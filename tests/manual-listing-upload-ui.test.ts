@@ -5,7 +5,7 @@ import test from 'node:test';
 test('manual listing image picker uses the custom upload surface', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   const uploadInputIndex = page.indexOf(
-    'accept="image/jpeg,image/png,image/webp"',
+    'accept="image/*"',
     page.indexOf('manualListingForm.description'),
   );
   const uploadSurface = page.slice(uploadInputIndex - 900, uploadInputIndex + 5200);
@@ -24,6 +24,7 @@ test('manual listing image picker uses the custom upload surface', async () => {
   assert.match(page, /data-indeterminate=\{isPreparingManualListingImages \|\| undefined\}/);
   assert.match(page, /showPreviousManualListingImage/);
   assert.match(page, /showNextManualListingImage/);
+  assert.doesNotMatch(page, /maxFileSize=\{12 \* 1024 \* 1024\}/);
   assert.doesNotMatch(
     uploadSurface,
     /className="rounded-md border bg-background px-3 py-2 text-sm"/,

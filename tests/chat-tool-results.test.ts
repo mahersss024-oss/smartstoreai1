@@ -118,16 +118,24 @@ test('chat route keeps buyer search responses on the real agent path', () => {
   assert.match(route, /abortSignal: signal/);
 });
 
-test('chat route inspects all uploaded images before assistant reasoning', () => {
+test('chat blocks prohibited content only, not quality or category mismatches', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
     'utf8',
   );
   const chatVisionReview = route.slice(
     route.indexOf('imageComplianceDecision = await checkImageMarketplaceCompliance({'),
-    route.indexOf('if (imageComplianceDecision.decision ==='),
+    route.indexOf('if ((marketplaceIntent.requiresAuth'),
   );
 
-  assert.match(chatVisionReview, /reviewMode: 'all_images'/);
+  assert.match(chatVisionReview, /reviewMode: 'first_clear_max_three'/);
   assert.doesNotMatch(chatVisionReview, /reviewMode: 'primary_only'/);
+  assert.match(chatVisionReview, /prohibitedOnly: true/);
+  assert.match(chatVisionReview, /kind: 'image_policy_block'/);
+  assert.doesNotMatch(chatVisionReview, /kind: 'image_inspection_unavailable'/);
+  assert.match(chatVisionReview, /Do not claim that the images were checked/);
+  assert.doesNotMatch(chatVisionReview, /kind: 'image_manual_review'/);
+  const context = route.slice(route.indexOf('function createImageComplianceContextMessage('),
+    route.indexOf('function addDefaultTextToLatestImageOnlyMessage('));
+  assert.doesNotMatch(context, /decision: decision.decision|reasons: decision.reasons|categoryMatch: decision.categoryMatch/);
 });

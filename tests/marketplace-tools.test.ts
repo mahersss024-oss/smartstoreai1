@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import sharp from 'sharp';
+import { mockImageContentReview } from './helpers/image-content';
 
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import {
@@ -199,7 +201,7 @@ test('sensitive marketplace tools require explicit confirmation flags', async ()
   assert.match(priceResult.message, /Confirm/);
 });
 
-test('chat image attachment tool rechecks retained images before saving', () => {
+test('chat image attachment checks prohibited content without quality or category conditions', () => {
   const source = readFileSync(
     join(process.cwd(), 'agent', 'tools', 'marketplace.ts'),
     'utf8',
@@ -209,9 +211,64 @@ test('chat image attachment tool rechecks retained images before saving', () => 
     source.indexOf('deleteListingImage: tool({'),
   );
 
-  assert.match(addImagesTool, /checkImageMarketplaceCompliance/);
-  assert.match(addImagesTool, /status: 'image_review_unavailable'/);
-  assert.match(addImagesTool, /status: 'blocked'/);
-  assert.match(addImagesTool, /status: 'needs_review'/);
+  assert.doesNotMatch(addImagesTool, /checkImageMarketplaceCompliance/);
+  assert.match(addImagesTool, /reviewListingImageContent/);
+  assert.doesNotMatch(addImagesTool, /status: 'image_review_unavailable'|status: 'blocked'|status: 'needs_review'/);
+  assert.match(addImagesTool, /targetListing.sellerId !== session.user.id/);
   assert.match(addImagesTool, /saveUploadedListingImagesForSeller/);
+});
+
+for (const reviewDecision of ['needs_review', 'unavailable'] as const) {
+test(`chat creation and attachment continue when content review is ${reviewDecision}`, async (t) => {
+  const session = createTestSession(`seller:chat-images-${reviewDecision}`);
+  const data = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#000000' } }).png().toBuffer();
+  const networkCalls = mockImageContentReview(t, reviewDecision);
+  const tools = createMarketplaceTools(session, {
+    latestUploadedImages: [{ data: new Uint8Array(data), mediaType: 'image/png' }],
+  });
+  type Result = { status: string; contentCheck?: string; listing: { id: string; images: { status: string }[] } };
+  const create = tools.createListingDraft.execute as unknown as (
+    input: { category: string; title: string }, options: Record<string, never>,
+  ) => Promise<Result>;
+  const add = tools.addUploadedImagesToListing.execute as unknown as (
+    input: { listingId: string }, options: Record<string, never>,
+  ) => Promise<Result>;
+  const created = await create({ category: 'cars', title: 'Car listing' }, {});
+  assert.equal(created.status, 'draft_created');
+  assert.equal(created.listing.images.length, 1);
+  assert.equal(created.listing.images[0].status, 'approved');
+  const attached = await add({ listingId: created.listing.id }, {});
+  assert.equal(attached.status, 'images_added');
+  assert.equal(attached.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
+  assert.equal(attached.listing.images.length, 2);
+  assert.ok(attached.listing.images.every(image => image.status === 'approved'));
+  const other = createListingDraft({ sellerId: 'seller:other-photo-owner', category: 'cars', title: 'Other car' });
+  assert.equal((await add({ listingId: other.id }, {})).status, 'not_found');
+  assert.equal(networkCalls(), 2);
+});
+}
+
+test('chat draft survives optional object-storage failure without pretending photos were saved', async (t) => {
+  const previousMode = process.env.SMARTSTORE_IMAGE_STORAGE;
+  const previousEndpoint = process.env.SMARTSTORE_OBJECT_STORAGE_ENDPOINT;
+  process.env.SMARTSTORE_IMAGE_STORAGE = 'object';
+  delete process.env.SMARTSTORE_OBJECT_STORAGE_ENDPOINT;
+  t.after(() => {
+    if (previousMode === undefined) delete process.env.SMARTSTORE_IMAGE_STORAGE;
+    else process.env.SMARTSTORE_IMAGE_STORAGE = previousMode;
+    if (previousEndpoint === undefined) delete process.env.SMARTSTORE_OBJECT_STORAGE_ENDPOINT;
+    else process.env.SMARTSTORE_OBJECT_STORAGE_ENDPOINT = previousEndpoint;
+  });
+  mockImageContentReview(t);
+  const data = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  const tools = createMarketplaceTools(createTestSession('seller:photo-storage-outage'), {
+    latestUploadedImages: [{ data: new Uint8Array(data), mediaType: 'image/png' }],
+  });
+  const create = tools.createListingDraft.execute as unknown as (
+    input: { category: string; title: string }, options: Record<string, never>,
+  ) => Promise<{ status: string; message: string; listing: { images: unknown[] } }>;
+  const created = await create({ category: 'other', title: 'Desk' }, {});
+  assert.equal(created.status, 'draft_created');
+  assert.equal(created.listing.images.length, 0);
+  assert.match(created.message, /photos could not be saved/);
 });

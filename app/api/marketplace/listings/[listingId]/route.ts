@@ -159,7 +159,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         error: 'listing_publish_blocked',
         message:
           listing.status === 'pending'
-            ? 'لا يمكن نشر الإعلان الآن. يحتاج الإعلان إلى صورة حقيقية مطابقة أو مراجعة قبل النشر.'
+            ? 'الإعلان يحتاج إلى مراجعة محتواه وفق سياسة السوق قبل النشر.'
             : 'لا يمكن نشر الإعلان لأنه لا يطابق سياسة السوق.',
         listing,
       };

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
+import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
 import { createListingImageDeliveryUrls } from '@/agent/marketplace/listing-image-delivery';
 import {
   getMaxListingImagesPerListing,
@@ -12,10 +13,6 @@ import {
   createSanitizedListingImageOriginal,
   ListingImageSecurityError,
 } from '@/agent/marketplace/listing-image-variants';
-import {
-  checkImageMarketplaceCompliance,
-  type ImageComplianceDecision,
-} from '@/agent/marketplace/vision-compliance';
 import {
   addListingImageForSeller,
   getListing,
@@ -37,22 +34,6 @@ const supportedMimeTypes = new Set([
 ]);
 const maxImageBytes = 12 * 1024 * 1024;
 const maxImageUploadRequestBytes = maxImageBytes + 1024 * 1024;
-
-function createTrustedSecondaryImageComplianceDecision(
-  expectedCategory?: string,
-): ImageComplianceDecision {
-  return {
-    decision: 'allow',
-    confidence: 1,
-    reasons: [
-      'secondary_image_trusted_after_approved_primary_image',
-      'technical_upload_checks_only',
-    ],
-    expectedCategory,
-    categoryMatch: expectedCategory ? 'match' : 'unclear',
-    shariaSensitive: false,
-  };
-}
 
 type RouteContext = {
   params: Promise<{
@@ -214,79 +195,13 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json(responseBody, { status });
   }
 
-  const listingText = [
-    existingListing.title,
-    existingListing.description,
-    existingListing.city,
-    existingListing.condition,
-  ]
-    .filter(Boolean)
-    .join(' ');
-  let imageCompliance: Awaited<
-    ReturnType<typeof checkImageMarketplaceCompliance>
-  >;
-  const hasApprovedPrimaryImage = existingListing.images.some(
-    (image) => image.status === 'approved',
-  );
-
-  if (hasApprovedPrimaryImage) {
-    imageCompliance = createTrustedSecondaryImageComplianceDecision(
-      existingListing.category,
-    );
-  } else {
-    try {
-      imageCompliance = await checkImageMarketplaceCompliance({
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Listing category: ${existingListing.category}. Listing text: ${listingText}`,
-              },
-              {
-                type: 'file',
-                mediaType: sanitizedOriginal.mediaType,
-                data: sanitizedOriginal.data,
-              },
-            ],
-          },
-        ],
-        userRequest: listingText,
-        language: 'ar',
-        expectedCategory: existingListing.category,
-        listingText,
-        reviewMode: 'primary_only',
-      });
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[listing_image_compliance] failure=${errorName}`);
-
-      const responseBody = {
-        error: 'image_compliance_unavailable',
-        message:
-          'Image compliance review is unavailable. The image was not accepted.',
-      };
-
-      await idempotency?.abandon();
-      incrementRuntimeCounter('listing.image_upload.failed', {
-        reason: 'compliance_unavailable',
-      });
-      return Response.json(responseBody, { status: 503 });
-    }
-  }
-
-  if (imageCompliance.decision === 'block') {
-    incrementRuntimeCounter('listing.image_upload.rejected', {
-      reason: 'policy_blocked',
-    });
+  const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images);
+  if (contentReview.status === 'blocked') {
     const responseBody = {
       error: 'image_policy_blocked',
-      message:
-        'Image appears to show a product prohibited by Saudi marketplace or Islamic compliance policy.',
-      compliance: imageCompliance,
+      compliance: contentReview.compliance,
     };
-
+    incrementRuntimeCounter('listing.image_upload.rejected', { reason: responseBody.error });
     return idempotency
       ? idempotency.complete(responseBody, 422)
       : Response.json(responseBody, { status: 422 });
@@ -365,27 +280,19 @@ export async function POST(request: Request, context: RouteContext) {
     fileName: file.name,
     mimeType: file.type,
     sizeBytes: file.size,
-    hasDetectedPhoneNumber:
-      formData.get('hasDetectedPhoneNumber') === 'true' || undefined,
-    hasDetectedSensitiveInfo:
-      formData.get('hasDetectedSensitiveInfo') === 'true' || undefined,
-    isRelevantToListing:
-      formData.get('isRelevantToListing') === 'false' ? false : undefined,
   });
   const imageUrls = createListingImageDeliveryUrls(imageUrl, {
     displayUrl,
     thumbnailUrl,
   });
   const image: ListingImage = {
+    contentReviewStatus: contentReview.imageReviewStatuses[0],
     id: imageId,
     listingId,
     ...imageUrls,
     isPrimary: false,
     qualityScore: quality.qualityScore,
-    status:
-      imageCompliance.decision === 'needs_review'
-        ? 'pending_review'
-        : quality.listingImageStatus,
+    status: 'approved',
     enhancements: quality.enhancements,
   };
 
@@ -394,10 +301,11 @@ export async function POST(request: Request, context: RouteContext) {
   const responseBody = {
     image,
     quality,
-    compliance: imageCompliance,
+    compliance: contentReview.compliance,
+    contentCheck: contentReview.status,
     listing,
   };
-  const responseStatus = image.status === 'pending_review' ? 202 : 201;
+  const responseStatus = 201;
   incrementRuntimeCounter('listing.image_upload.saved', {
     status: image.status,
   });

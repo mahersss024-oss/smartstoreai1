@@ -80,7 +80,7 @@ test('publishes only compliant listings', () => {
   assert.equal(published?.status, 'published');
 });
 
-test('requires an approved image before seller publishes listing', () => {
+test('seller can publish without images and add photos later', () => {
   const listing = createListingDraft({
     sellerId: 'seller:image-required',
     category: 'cars',
@@ -93,7 +93,7 @@ test('requires an approved image before seller publishes listing', () => {
     'published',
   );
 
-  assert.equal(pending?.status, 'pending');
+  assert.equal(pending?.status, 'published');
 
   addListingImageForSeller(listing.id, 'seller:image-required', {
     id: 'publish-image-required',

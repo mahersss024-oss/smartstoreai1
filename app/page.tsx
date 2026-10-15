@@ -897,6 +897,7 @@ const manualListingConditionOptions = [
 ] as const;
 
 type ManualListingForm = {
+  autoCategory: boolean;
   title: string;
   description: string;
   priceMode: 'number' | 'bid' | 'negotiable';
@@ -918,6 +919,7 @@ type ManualListingNotice = {
 type ManualListingSubmission = 'saving' | 'saving_and_publishing';
 
 const defaultManualListingForm: ManualListingForm = {
+  autoCategory: true,
   title: '',
   description: '',
   priceMode: 'number',
@@ -2048,6 +2050,14 @@ export default function Page() {
   const [isManualListingOpen, setIsManualListingOpen] = useState(false);
   const [manualListingForm, setManualListingForm] =
     useState<ManualListingForm>(defaultManualListingForm);
+  const refreshManualCategorySuggestion = useCallback(async () => {
+    try {
+      const { resolveListingCategory } = await import('@/agent/marketplace/listing-category');
+      setManualListingForm(form => form.autoCategory ? { ...form, category: resolveListingCategory(form) } : form);
+    } catch {
+      // Category suggestions must never prevent manual creation.
+    }
+  }, []);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
   const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
     useState<string[]>([]);
@@ -3680,6 +3690,7 @@ export default function Page() {
     }
 
     const payload: {
+      autoCategory: boolean;
       title: string;
       description: string;
       price?: number | 'bid' | 'negotiable';
@@ -3688,6 +3699,7 @@ export default function Page() {
       condition: ManualListingForm['condition'];
       attributes?: Record<string, unknown>;
     } = {
+      autoCategory: manualListingForm.autoCategory,
       title,
       description,
       city,
@@ -3741,10 +3753,11 @@ export default function Page() {
 
     const selectedImages = manualListingImages.slice(0, 8);
     const existingPreparation = manualListingImagePreparationRef.current;
-    const preparedImagesPromise =
+    const preparedImagesPromise = (
       existingPreparation && existingPreparation.source === manualListingImages
         ? existingPreparation.promise
-        : prepareUploadableImageFilesOnDemand(selectedImages);
+        : prepareUploadableImageFilesOnDemand(selectedImages)
+    ).catch(() => []);
 
     try {
       const response = await fetch('/api/marketplace/listings', {
@@ -3779,7 +3792,7 @@ export default function Page() {
       }
 
       const createdListing = responsePayload.listing;
-      const preparedImages = await preparedImagesPromise.catch(() => []);
+      const preparedImages = await preparedImagesPromise;
       let uploadedImages = 0;
       let publishStatus: 'not_requested' | 'published' | 'blocked' = 'not_requested';
       let publishMessage = '';
@@ -4642,6 +4655,7 @@ export default function Page() {
                         className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
                         maxLength={140}
                         value={manualListingForm.title}
+                        onBlur={refreshManualCategorySuggestion}
                         onChange={(event) =>
                           setManualListingForm((form) => ({
                             ...form,
@@ -4673,6 +4687,7 @@ export default function Page() {
                           setManualListingForm((form) => ({
                             ...form,
                             category: event.target.value,
+                            autoCategory: false,
                           }))
                         }
                       >
@@ -4747,6 +4762,7 @@ export default function Page() {
                       className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
                       maxLength={4000}
                       value={manualListingForm.description}
+                      onBlur={refreshManualCategorySuggestion}
                       onChange={(event) =>
                         setManualListingForm((form) => ({
                           ...form,
@@ -4760,7 +4776,7 @@ export default function Page() {
                     <span>الصور</span>
                     <label className="group grid min-h-36 cursor-pointer place-items-center rounded-md border-2 border-dashed border-blue-400/70 bg-blue-50/35 px-4 py-5 text-center transition duration-150 ease-out active:scale-[0.99] active:border-blue-500 active:bg-blue-50 hover:border-blue-500/80 hover:bg-blue-50/55 dark:border-blue-400/45 dark:bg-blue-400/5 dark:hover:border-blue-300/70">
                       <input
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/*"
                         className="sr-only"
                         multiple
                         type="file"
@@ -5455,13 +5471,12 @@ export default function Page() {
                 onPointerDown={handleChatInputPointerDown}
               >
                 <PromptInput
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
                   allowAttachments
                   className="mx-auto max-w-[52rem]"
                   dir="ltr"
                   inputGroupClassName="items-end rounded-[1.35rem] border border-border/80 bg-card shadow-lg shadow-slate-200/70 transition-[border-color,box-shadow] duration-200 focus-within:border-primary/70 focus-within:shadow-primary/15 dark:border-slate-700/80 dark:bg-slate-950/50 dark:shadow-slate-950/10 dark:focus-within:border-blue-400/70 dark:focus-within:shadow-blue-950/20"
                   inputGroupStyle={chatInputGroupStyle}
-                  maxFileSize={12 * 1024 * 1024}
                   maxFiles={chatMaxAttachments}
                   multiple
                   onSubmit={handleSubmit}

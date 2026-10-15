@@ -19,6 +19,7 @@ export const dynamic = 'force-dynamic';
 
 const maxCreateListingRequestBytes = 64 * 1024;
 const createListingSchema = z.object({
+  autoCategory: z.boolean().optional(),
   category: z.string().min(2).max(80),
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),

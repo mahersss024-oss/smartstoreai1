@@ -8,7 +8,18 @@ import {
   createImageComplianceUserMessage,
   createImageComplianceUserMessages,
   parseImageComplianceDecision,
+  limitImageDecisionToProhibitedContent,
 } from '@/agent/marketplace/vision-compliance';
+
+test('prohibited-only mode ignores manual review and preserves prohibited blocks', () => {
+  for (const decision of ['allow', 'block', 'needs_review'] as const) {
+    const result = limitImageDecisionToProhibitedContent({
+      decision, confidence: 0.9, reasons: ['quality_or_category'],
+      categoryMatch: 'mismatch', shariaSensitive: false,
+    });
+    assert.equal(result.decision, decision === 'block' ? 'block' : 'allow');
+  }
+});
 
 test('parses image compliance block JSON', () => {
   const decision = parseImageComplianceDecision(`text before

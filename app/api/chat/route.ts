@@ -826,18 +826,14 @@ function createImageComplianceContextMessage(
     content: `Latest uploaded marketplace image analysis:
 ${JSON.stringify(
   {
-    decision: decision.decision,
     detectedProduct: decision.detectedProduct,
     detectedCategory: decision.detectedCategory,
-    expectedCategory: decision.expectedCategory,
-    categoryMatch: decision.categoryMatch,
-    reasons: decision.reasons,
   },
   null,
   2,
 )}
 
-The raw image has already been checked by the visual compliance model and is intentionally removed before the chat agent runs. Use this analysis as the image context. Do not claim live database results from the image. If product details are missing, ask concise follow-up questions.`,
+Use this analysis to understand the product. Only prohibited content may prevent image acceptance; do not require image quality or category matching. The raw image is intentionally removed before the chat agent runs. Do not claim live database results from the image. If product details are missing, ask concise follow-up questions.`,
   } satisfies ModelMessage;
 }
 
@@ -1459,40 +1455,34 @@ export async function POST(request: Request) {
             } ${userRequest}`,
           ),
         listingText: adaptiveIntent.normalizedRequest ?? userRequest,
-        reviewMode: 'all_images',
+        reviewMode: 'first_clear_max_three',
+        prohibitedOnly: true,
       });
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[vision_compliance] failure=${errorName}`);
 
-      return generateProfessionalChatIssueResponse({
-        kind: 'image_inspection_unavailable',
-        language,
-        userRequest,
-      });
+      imageComplianceContextMessage = {
+        role: 'system',
+        content: 'Image inspection is unavailable. Do not claim that the images were checked or block uploading them for this reason. Uploaded images remain available to listing tools. Ask for product details only if needed to understand the request.',
+      };
     }
 
-    if (imageComplianceDecision.decision === 'block') {
+    if (imageComplianceDecision?.decision === 'block') {
       return generateProfessionalChatIssueResponse({
-        kind: 'image_policy_block',
-        language,
-        userRequest,
-        complianceDecision: imageComplianceDecision,
+        kind: 'image_policy_block', language, userRequest, complianceDecision: imageComplianceDecision,
       });
     }
-
-    if (imageComplianceDecision.decision === 'needs_review') {
-      return generateProfessionalChatIssueResponse({
-        kind: 'image_manual_review',
-        language,
-        userRequest,
-        complianceDecision: imageComplianceDecision,
-      });
+    if (imageComplianceDecision?.inspectionUnavailable) {
+      imageComplianceContextMessage = {
+        role: 'system',
+        content: 'Image inspection is unavailable. Do not claim the images were checked. Continue with uploaded listing images and ask for product details only if needed.',
+      };
+    } else if (imageComplianceDecision) {
+      imageComplianceContextMessage = createImageComplianceContextMessage(
+        imageComplianceDecision,
+      );
     }
-
-    imageComplianceContextMessage = createImageComplianceContextMessage(
-      imageComplianceDecision,
-    );
   }
 
   if ((marketplaceIntent.requiresAuth || adaptiveIntent.requiresAuth) && !session) {
