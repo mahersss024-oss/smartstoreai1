@@ -84,6 +84,7 @@ export function getMissingObjectStorageConfig() {
     ['SMARTSTORE_OBJECT_STORAGE_BUCKET', s3Config.bucket],
     ['SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID', s3Config.accessKeyId],
     ['SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY', s3Config.secretAccessKey],
+    ['SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL', s3Config.publicUrl],
   ]
     .filter(([, value]) => !value)
     .map(([key]) => key);
@@ -151,12 +152,15 @@ function buildCanonicalQuery(params: Array<[string, string]>) {
     .join('&');
 }
 
-function buildPublicUrl(config: S3ObjectStorageConfig, key: string, uploadUrl: URL) {
+function buildPublicUrl(config: S3ObjectStorageConfig, key: string) {
   if (!config.publicUrl) {
-    return uploadUrl.toString();
+    throw new Error('Missing public image delivery URL.');
   }
-
-  return `${config.publicUrl.replace(/\/$/, '')}/${key}`;
+  const url = new URL(config.publicUrl);
+  if (!['https:', 'http:'].includes(url.protocol) || url.search || url.hash || url.username || url.password) {
+    throw new Error('Invalid public image delivery URL.');
+  }
+  return `${url.toString().replace(/\/$/, '')}/${key}`;
 }
 
 const listingObjectCacheControl = 'public, max-age=31536000, immutable';
@@ -317,6 +321,7 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   const config = getS3ObjectStorageConfig();
   const body = Buffer.from(input.data);
   const key = createObjectKey(input);
+  const publicUrl = buildPublicUrl(config, key);
   const request = createPresignedRequest({
     method: 'PUT',
     key,
@@ -353,7 +358,7 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
 
   return {
     key,
-    url: buildPublicUrl(config, key, request.uploadUrl),
+    url: publicUrl,
   };
 }
 

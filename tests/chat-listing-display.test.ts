@@ -166,7 +166,7 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /formatListingRelativeTime/);
   assert.match(homePage, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
   assert.match(homePage, /<ListingCardImage/);
-  assert.match(listingCardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(listingCardImage, /loading=\{priority \|\| eager \? 'eager' : 'lazy'\}/);
   assert.match(listingCardImage, /decoding="async"/);
   assert.match(homePage, /min-h-\[6\.25rem\] w-full/);
   assert.match(homePage, /sm:min-h-\[7\.25rem\]/);

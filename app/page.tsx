@@ -1687,6 +1687,7 @@ function ListingCardView({
   className,
   onAsk,
   onOpen,
+  eagerImage = false,
   prioritizeImage = false,
   isSmartResult = false,
   style,
@@ -1697,6 +1698,7 @@ function ListingCardView({
   isSmartResult?: boolean;
   onAsk: (prompt: string, listing?: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
+  eagerImage?: boolean;
   prioritizeImage?: boolean;
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
@@ -1756,6 +1758,7 @@ function ListingCardView({
             <>
               <ListingCardImage
                 alt={listing.title}
+                eager={eagerImage}
                 fallbackSrcs={listing.imageFallbacks}
                 fallback={<ListingImageFallback />}
                 height={116}
@@ -1825,6 +1828,7 @@ function ListingCardView({
           <>
             <ListingCardImage
               alt={listing.title}
+              eager={eagerImage}
               className="h-full w-full object-contain"
               fallbackSrcs={listing.imageFallbacks}
               fallback={<ListingImageFallback />}
@@ -5224,7 +5228,8 @@ export default function Page() {
                     listing={listing}
                     onAsk={sendStarter}
                     onOpen={openListing}
-                    prioritizeImage={index < 4}
+                    eagerImage={index < 4}
+                    prioritizeImage={index === 0}
                     style={{
                       animationDelay: `${Math.min(index % 24, 6) * 35}ms`,
                     }}

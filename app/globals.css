@@ -3,6 +3,19 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Theme colors commit together; movement remains available during that commit. */
+html[data-theme-switching],
+html[data-theme-switching]::before,
+html[data-theme-switching]::after,
+html[data-theme-switching] *,
+html[data-theme-switching] *::before,
+html[data-theme-switching] *::after {
+  transition-property: transform, translate, scale, rotate, opacity,
+    width, height, min-width, min-height, max-width, max-height,
+    top, right, bottom, left, flex-basis, grid-template-columns,
+    grid-template-rows, gap, border-radius !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

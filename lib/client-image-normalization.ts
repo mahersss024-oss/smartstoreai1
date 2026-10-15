@@ -216,7 +216,8 @@ export async function prepareUploadableImageFiles(
   files: File[],
   maxConcurrency = 2
 ) {
-  return Promise.all(queueUploadableImagePreparation(files, maxConcurrency));
+  const results = await Promise.allSettled(queueUploadableImagePreparation(files, maxConcurrency));
+  return results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
 }
 
 export function queueUploadableImagePreparation(

@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { preload } from 'react-dom';
 
 import { ImageIcon } from 'lucide-react';
 
@@ -10,6 +11,7 @@ import { ResilientImage } from './resilient-image';
 type ListingCardImageProps = {
   alt: string;
   className?: string;
+  eager?: boolean;
   fallback?: ReactNode;
   fallbackSrcs?: string[];
   height?: number;
@@ -31,6 +33,7 @@ function DefaultListingImageFallback() {
 export function ListingCardImage({
   alt,
   className,
+  eager = false,
   fallback,
   fallbackSrcs,
   height = 116,
@@ -44,6 +47,10 @@ export function ListingCardImage({
     return fallback ?? <DefaultListingImageFallback />;
   }
 
+  if (priority) {
+    preload(src, { as: 'image', fetchPriority: 'high' });
+  }
+
   return (
     <ResilientImage
       alt={alt}
@@ -53,7 +60,7 @@ export function ListingCardImage({
       fallbackSrcs={fallbackSrcs}
       fetchPriority={priority ? 'high' : 'auto'}
       height={height}
-      loading={priority ? 'eager' : 'lazy'}
+      loading={priority || eager ? 'eager' : 'lazy'}
       maxRetries={maxRetries}
       sizes={sizes}
       src={src}

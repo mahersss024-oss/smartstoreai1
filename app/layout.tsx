@@ -255,6 +255,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode | React.ReactElement;
 }>) {
+  let listingImageOrigin: string | undefined;
+  try {
+    const url = new URL(
+      process.env.SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL?.trim() || "https://images.souqhamad.com",
+    );
+    if (url.protocol === "https:") listingImageOrigin = url.origin;
+  } catch {
+    // An invalid optional image origin must not prevent page rendering.
+  }
+
   return (
     <html
       dir="rtl"
@@ -266,6 +276,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {listingImageOrigin && <link rel="preconnect" href={listingImageOrigin} />}
         <script
           id="smartstore-native-viewport-init"
           dangerouslySetInnerHTML={{ __html: nativeViewportInitScript }}

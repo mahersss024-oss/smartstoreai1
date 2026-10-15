@@ -2,12 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
 import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
-import { createListingImageDeliveryUrls } from '@/agent/marketplace/listing-image-delivery';
 import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from '@/agent/marketplace/listing-image-limits';
-import { createPersistentListingImageUrl } from '@/agent/marketplace/listing-image-storage';
+import { discardUnattachedListingImage, storeListingImageDelivery } from '@/agent/marketplace/listing-image-storage';
 import {
   createListingImageVariants,
   createSanitizedListingImageOriginal,
@@ -155,165 +154,149 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency.response;
   }
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  let sanitizedOriginal: Awaited<
-    ReturnType<typeof createSanitizedListingImageOriginal>
-  >;
-  let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>>;
-
   try {
-    sanitizedOriginal = await createSanitizedListingImageOriginal({
-      data: new Uint8Array(fileBuffer),
-      mediaType: file.type,
-      fileName: file.name,
-    });
-    generatedVariants = await createListingImageVariants({
-      data: new Uint8Array(fileBuffer),
-      mediaType: file.type,
-      fileName: file.name,
-    });
-  } catch (error) {
-    incrementRuntimeCounter('listing.image_upload.rejected', {
-      reason:
-        error instanceof ListingImageSecurityError
-          ? error.code
-          : 'image_decode_failed',
-    });
-    const responseBody = {
-      error:
-        error instanceof ListingImageSecurityError
-          ? error.code
-          : 'image_decode_failed',
-      message: 'Image could not be accepted after server security checks.',
-    };
-    const status =
-      error instanceof ListingImageSecurityError &&
-      ['unsupported_image_type', 'image_type_mismatch'].includes(error.code)
-        ? 415
-        : 422;
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    let sanitizedOriginal: Awaited<
+      ReturnType<typeof createSanitizedListingImageOriginal>
+    >;
+    let generatedVariants: Awaited<ReturnType<typeof createListingImageVariants>>;
 
-    return Response.json(responseBody, { status });
-  }
+    try {
+      sanitizedOriginal = await createSanitizedListingImageOriginal({
+        data: new Uint8Array(fileBuffer),
+        mediaType: file.type,
+        fileName: file.name,
+      });
+      generatedVariants = await createListingImageVariants({
+        data: new Uint8Array(fileBuffer),
+        mediaType: file.type,
+        fileName: file.name,
+      });
+    } catch (error) {
+      incrementRuntimeCounter('listing.image_upload.rejected', {
+        reason:
+          error instanceof ListingImageSecurityError
+            ? error.code
+            : 'image_decode_failed',
+      });
+      const responseBody = {
+        error:
+          error instanceof ListingImageSecurityError
+            ? error.code
+            : 'image_decode_failed',
+        message: 'Image could not be accepted after server security checks.',
+      };
+      const status =
+        error instanceof ListingImageSecurityError &&
+        ['unsupported_image_type', 'image_type_mismatch'].includes(error.code)
+          ? 415
+          : 422;
 
-  const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images);
-  if (contentReview.status === 'blocked') {
-    const responseBody = {
-      error: 'image_policy_blocked',
-      compliance: contentReview.compliance,
-    };
-    incrementRuntimeCounter('listing.image_upload.rejected', { reason: responseBody.error });
-    return idempotency
-      ? idempotency.complete(responseBody, 422)
-      : Response.json(responseBody, { status: 422 });
-  }
-
-  const imageId = randomUUID();
-  let imageUrl: string | null;
-
-  try {
-    imageUrl = await createPersistentListingImageUrl({
-      data: sanitizedOriginal.data,
-      mediaType: sanitizedOriginal.mediaType,
-      imageId,
-      fileName: sanitizedOriginal.fileName,
-      variant: 'original',
-    });
-  } catch (error) {
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    const errorMessage =
-      error instanceof Error
-        ? error.message.replace(/\s+/g, ' ').slice(0, 240)
-        : 'Unknown image storage error';
-    console.warn(
-      `[listing_image_storage] failure=${errorName} message="${errorMessage}"`,
-    );
-
-    const responseBody = {
-      error: 'image_storage_unavailable',
-      message:
-        'Image storage is unavailable. The image was not saved.',
-    };
-
-    await idempotency?.abandon();
-    incrementRuntimeCounter('listing.image_upload.failed', {
-      reason: 'storage_unavailable',
-    });
-    return Response.json(responseBody, { status: 503 });
-  }
-
-  if (!imageUrl) {
-    incrementRuntimeCounter('listing.image_upload.rejected', {
-      reason: 'unsupported_type',
-    });
-    const responseBody = { error: 'unsupported_image_type' };
-
-    return idempotency
-      ? idempotency.complete(responseBody, 415)
-      : Response.json(responseBody, { status: 415 });
-  }
-
-  let displayUrl = imageUrl;
-  let thumbnailUrl = imageUrl;
-  try {
-    // The server is the canonical image processor. Browser encoders vary widely
-    // and can produce deceptively large files despite a .webp extension.
-    if (generatedVariants) {
-      displayUrl =
-        (await createPersistentListingImageUrl({
-          ...generatedVariants.display,
-          imageId,
-          variant: 'display',
-        })) ?? imageUrl;
-      thumbnailUrl =
-        (await createPersistentListingImageUrl({
-          ...generatedVariants.thumbnail,
-          imageId,
-          variant: 'thumbnail',
-        })) ?? displayUrl;
+      return idempotency ? await idempotency.complete(responseBody, status) : Response.json(responseBody, { status });
     }
+
+    const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images);
+    if (contentReview.status === 'blocked') {
+      const responseBody = {
+        error: 'image_policy_blocked',
+        compliance: contentReview.compliance,
+      };
+      incrementRuntimeCounter('listing.image_upload.rejected', { reason: responseBody.error });
+      return idempotency
+        ? await idempotency.complete(responseBody, 422)
+        : Response.json(responseBody, { status: 422 });
+    }
+
+    const imageId = randomUUID();
+    let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;
+
+    try {
+      imageUrls = await storeListingImageDelivery({
+        imageId,
+        original: sanitizedOriginal,
+        variants: generatedVariants,
+      });
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage =
+        error instanceof Error
+          ? error.message.replace(/\s+/g, ' ').slice(0, 240)
+          : 'Unknown image storage error';
+      console.warn(
+        `[listing_image_storage] failure=${errorName} message="${errorMessage}"`,
+      );
+
+      const responseBody = {
+        error: 'image_storage_unavailable',
+        message:
+          'Image storage is unavailable. The image was not saved.',
+      };
+
+      await idempotency?.abandon();
+      incrementRuntimeCounter('listing.image_upload.failed', {
+        reason: 'storage_unavailable',
+      });
+      return Response.json(responseBody, { status: 503 });
+    }
+
+    if (!imageUrls) {
+      incrementRuntimeCounter('listing.image_upload.rejected', {
+        reason: 'unsupported_type',
+      });
+      const responseBody = { error: 'unsupported_image_type' };
+
+      return idempotency
+        ? await idempotency.complete(responseBody, 415)
+        : Response.json(responseBody, { status: 415 });
+    }
+
+    const quality = analyzeImageQuality({
+      fileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    });
+    const image: ListingImage = {
+      contentReviewStatus: contentReview.imageReviewStatuses[0],
+      id: imageId,
+      listingId,
+      ...imageUrls,
+      isPrimary: false,
+      qualityScore: quality.qualityScore,
+      status: 'approved',
+      enhancements: quality.enhancements,
+    };
+
+    const listing = await addListingImageForSeller(listingId, session.user.id, image).catch(async (error: unknown) => {
+      await discardUnattachedListingImage(image);
+      throw error;
+    });
+    if (!listing?.images.some(saved => saved.id === image.id)) {
+      await discardUnattachedListingImage(image);
+      const status = listing ? 409 : 404;
+      const body = { error: listing ? 'listing_image_limit_reached' : 'listing_not_found' };
+      return idempotency ? await idempotency.complete(body, status) : Response.json(body, { status });
+    }
+
+    const responseBody = {
+      image,
+      quality,
+      compliance: contentReview.compliance,
+      contentCheck: contentReview.status,
+      listing,
+    };
+    const responseStatus = 201;
+    incrementRuntimeCounter('listing.image_upload.saved', {
+      status: image.status,
+    });
+    recordRuntimeDurationMs('listing.image_upload.duration_ms', Date.now() - startedAt, {
+      status: responseStatus,
+    });
+
+    return idempotency
+      ? await idempotency.complete(responseBody, responseStatus)
+      : Response.json(responseBody, { status: responseStatus });
   } catch (error) {
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.warn(`[listing_image_variant_generation] failure=${errorName}`);
+    await idempotency?.abandon();
+    throw error;
   }
-
-  const quality = analyzeImageQuality({
-    fileName: file.name,
-    mimeType: file.type,
-    sizeBytes: file.size,
-  });
-  const imageUrls = createListingImageDeliveryUrls(imageUrl, {
-    displayUrl,
-    thumbnailUrl,
-  });
-  const image: ListingImage = {
-    contentReviewStatus: contentReview.imageReviewStatuses[0],
-    id: imageId,
-    listingId,
-    ...imageUrls,
-    isPrimary: false,
-    qualityScore: quality.qualityScore,
-    status: 'approved',
-    enhancements: quality.enhancements,
-  };
-
-  const listing = await addListingImageForSeller(listingId, session.user.id, image);
-
-  const responseBody = {
-    image,
-    quality,
-    compliance: contentReview.compliance,
-    contentCheck: contentReview.status,
-    listing,
-  };
-  const responseStatus = 201;
-  incrementRuntimeCounter('listing.image_upload.saved', {
-    status: image.status,
-  });
-  recordRuntimeDurationMs('listing.image_upload.duration_ms', Date.now() - startedAt, {
-    status: responseStatus,
-  });
-
-  return idempotency
-    ? idempotency.complete(responseBody, responseStatus)
-    : Response.json(responseBody, { status: responseStatus });
 }

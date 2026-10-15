@@ -1,0 +1,158 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import type { TestContext } from 'node:test';
+import sharp from 'sharp';
+
+import { POST } from '@/app/api/marketplace/listings/[listingId]/images/route';
+import { createListingImageVariants, createSanitizedListingImageOriginal } from '@/agent/marketplace/listing-image-variants';
+import { discardUnattachedListingImage, saveUploadedListingImagesForSeller, storeListingImageDelivery } from '@/agent/marketplace/listing-image-storage';
+import { storeListingObject } from '@/agent/marketplace/object-storage';
+import { addListingImageForSeller, createListingDraft, getListing } from '@/agent/marketplace/store';
+import { createSessionCookie } from '@/lib/auth/session';
+import { mockImageContentReview } from './helpers/image-content';
+
+function storageEnvironment(t: TestContext) {
+  const values = {
+    SMARTSTORE_IMAGE_STORAGE: 's3', SMARTSTORE_MARKETPLACE_STORE: 'file',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://test.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'images', SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.test',
+    CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ZONE_ID: '',
+  };
+  const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  Object.assign(process.env, values);
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+}
+
+async function sample() {
+  const data = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  const input = { data: new Uint8Array(data), mediaType: 'image/png', fileName: 'desk.png' };
+  return { input, original: await createSanitizedListingImageOriginal(input), variants: await createListingImageVariants(input) };
+}
+
+for (const failed of ['display', 'thumbnail'] as const) {
+  test(`keeps the best available variant after ${failed} storage fails`, async t => {
+    storageEnvironment(t);
+    const writes: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+      const url = String(input);
+      writes.push(url);
+      return new Response(null, { status: url.includes(`-${failed}.webp`) ? 503 : 200 });
+    });
+    const { original, variants } = await sample();
+    const result = await storeListingImageDelivery({ imageId: 'recovery', original, variants });
+    assert.equal(writes.length, 3);
+    assert.ok(result);
+    if (failed === 'display') {
+      assert.equal(result.displayUrl, result.originalUrl);
+      assert.match(result.thumbnailUrl, /-thumbnail\.webp$/);
+    } else {
+      assert.match(result.displayUrl, /-display\.webp$/);
+      assert.equal(result.thumbnailUrl, result.displayUrl);
+    }
+  });
+}
+
+test('chat keeps uploading after an original fails, and saves images despite display failure', async t => {
+  storageEnvironment(t);
+  let originals = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('.jpg') && ++originals === 1) return new Response(null, { status: 503 });
+    return new Response(null, { status: path.endsWith('-display.webp') ? 503 : 200 });
+  });
+  const listing = createListingDraft({ sellerId: 'recovery-chat', category: 'other', title: 'Desk' });
+  const { input } = await sample();
+  const result = await saveUploadedListingImagesForSeller({ listingId: listing.id, sellerId: listing.sellerId, images: [input, input, input] });
+  assert.equal(result?.images.length, 2);
+  assert.ok(result?.images.every(image => image.thumbnailUrl.endsWith('-thumbnail.webp')));
+});
+
+test('missing or invalid public image URL fails before writing an object', async t => {
+  storageEnvironment(t);
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => { requests++; return new Response(null, { status: 200 }); });
+  for (const url of ['', 'not a url', 'https://images.example.test/?token=secret']) {
+    process.env.SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL = url;
+    await assert.rejects(storeListingObject({ imageId: 'invalid-config', data: new Uint8Array([1]), mediaType: 'image/png' }));
+  }
+  assert.equal(requests, 0);
+});
+
+test('cleanup never deletes an image already attached to its listing', async t => {
+  storageEnvironment(t);
+  const listing = createListingDraft({ sellerId: 'recovery-cleanup', category: 'other', title: 'Desk' });
+  const image = {
+    id: 'attached-image', listingId: listing.id, originalUrl: 'https://images.example.test/listings/attached.jpg',
+    displayUrl: 'https://images.example.test/listings/attached-display.webp',
+    thumbnailUrl: 'https://images.example.test/listings/attached-thumbnail.webp',
+    isPrimary: true, status: 'approved' as const, qualityScore: 90, enhancements: [],
+  };
+  addListingImageForSeller(listing.id, listing.sellerId, image);
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => { requests++; return new Response(null, { status: 200 }); });
+  await discardUnattachedListingImage(image);
+  assert.equal(requests, 0);
+  assert.equal(getListing(listing.id)?.images.length, 1);
+});
+
+test('security rejection completes idempotency rather than leaving the upload pending', async t => {
+  storageEnvironment(t);
+  const listing = createListingDraft({ sellerId: 'recovery-security', category: 'other', title: 'Desk' });
+  const cookie = createSessionCookie({ id: listing.sellerId, email: 'security@example.test' });
+  for (let index = 0; index < 2; index++) {
+    const body = new FormData();
+    body.set('image', new File(['not an image'], 'bad.png', { type: 'image/png' }));
+    const response = await POST(new Request('https://smartstore.test/upload', {
+      method: 'POST', headers: { cookie, 'Idempotency-Key': 'invalid-same-key' }, body,
+    }), { params: Promise.resolve({ listingId: listing.id }) });
+    assert.equal(response.status, 415);
+  }
+});
+
+test('concurrent uploads report the actual saved image and clean up the rejected objects', async t => {
+  storageEnvironment(t);
+  const listing = createListingDraft({ sellerId: 'recovery-concurrent', category: 'other', title: 'Desk' });
+  for (let index = 0; index < 7; index++) {
+    addListingImageForSeller(listing.id, listing.sellerId, {
+      id: `existing-${index}`, listingId: listing.id, originalUrl: `https://images.example.test/existing-${index}.jpg`,
+      displayUrl: '', thumbnailUrl: '', isPrimary: index === 0, status: 'approved', qualityScore: 90, enhancements: [],
+    });
+  }
+  mockImageContentReview(t, 'allow');
+  const previousFetch = globalThis.fetch;
+  let started = 0;
+  let release!: () => void;
+  const bothStarted = new Promise<void>(resolve => { release = resolve; });
+  const deleted: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (!url.hostname.endsWith('r2.cloudflarestorage.com')) return previousFetch(input, init);
+    if (init?.method === 'DELETE') deleted.push(url.pathname);
+    if (init?.method === 'PUT' && url.pathname.endsWith('.jpg')) {
+      if (++started === 2) release();
+      await bothStarted;
+    }
+    return new Response(null, { status: 200 });
+  });
+  const { input } = await sample();
+  const cookie = createSessionCookie({ id: listing.sellerId, email: 'concurrent@example.test' });
+  const upload = () => {
+    const body = new FormData();
+    body.set('image', new File([input.data as Uint8Array<ArrayBuffer>], 'desk.png', { type: input.mediaType }));
+    return POST(new Request('https://smartstore.test/upload', { method: 'POST', headers: { cookie }, body }), { params: Promise.resolve({ listingId: listing.id }) });
+  };
+  const responses = await Promise.all([upload(), upload()]);
+  assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
+  assert.equal(getListing(listing.id)?.images.length, 8);
+  assert.equal(deleted.length, 3);
+  const savedResponse = responses.find(response => response.status === 201)!;
+  const payload = await savedResponse.json();
+  assert.ok(getListing(listing.id)?.images.some(image => image.id === payload.image.id));
+});

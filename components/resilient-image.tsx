@@ -9,6 +9,7 @@ type ResilientImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   fallbackSrcs?: string[];
   fallback?: ReactNode;
   maxRetries?: number;
+  loadTimeoutMs?: number;
   src: string;
 };
 
@@ -19,26 +20,14 @@ type ImageLoadState = {
   src: string;
 };
 
-function withRetryToken(src: string, attempt: number) {
-  if (attempt === 0 || src.startsWith('data:') || src.startsWith('blob:')) {
-    return src;
-  }
-
-  try {
-    const url = new URL(src, window.location.href);
-    url.searchParams.set('imageRetry', String(attempt));
-    return url.toString();
-  } catch {
-    return src;
-  }
-}
-
 export function ResilientImage({
   alt = '',
   fallbackSrcs = [],
   fallback = null,
   maxRetries = 2,
+  loadTimeoutMs = 15_000,
   onError,
+  onLoad,
   src,
   ...props
 }: ResilientImageProps) {
@@ -52,12 +41,52 @@ export function ResilientImage({
     src,
   });
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const activeLoadState =
     loadState.src === src
       ? loadState
       : { attempt: 0, failed: false, sourceIndex: 0, src };
   const attempt = activeLoadState.attempt;
   const activeSource = sources[activeLoadState.sourceIndex] ?? src;
+  const sourceIndex = activeLoadState.sourceIndex;
+  const sourceCount = sources.length;
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image || activeLoadState.failed || (image.complete && image.naturalWidth > 0)) return;
+    let observer: IntersectionObserver | undefined;
+    const start = () => {
+      if (loadTimerRef.current || (image.complete && image.naturalWidth > 0)) return;
+      loadTimerRef.current = setTimeout(() => {
+        loadTimerRef.current = null;
+        // A pending source should not delay a different available variant.
+        setLoadState(current => {
+          if (current.src !== src && sourceIndex !== 0) return current;
+          if (sourceIndex + 1 < sourceCount) {
+            return { src, sourceIndex: sourceIndex + 1, attempt: 0, failed: false };
+          }
+          return { src, sourceIndex, attempt: attempt + 1, failed: attempt >= maxRetries };
+        });
+      }, loadTimeoutMs);
+    };
+    if (props.loading === 'lazy' && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          start();
+          observer?.disconnect();
+        }
+      });
+      observer.observe(image);
+    } else {
+      start();
+    }
+    return () => {
+      observer?.disconnect();
+      if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+      loadTimerRef.current = null;
+    };
+  }, [src, activeSource, sourceIndex, sourceCount, attempt, activeLoadState.failed, loadTimeoutMs, maxRetries, props.loading]);
 
   useEffect(() => {
     if (retryTimerRef.current) {
@@ -81,9 +110,18 @@ export function ResilientImage({
   return (
     <img
       {...props}
+      key={`${src}:${sourceIndex}:${attempt}`}
+      ref={imageRef}
       alt={alt}
-      src={withRetryToken(activeSource, attempt)}
+      src={activeSource}
+      onLoad={(event) => {
+        if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+        loadTimerRef.current = null;
+        onLoad?.(event);
+      }}
       onError={(event) => {
+        if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+        loadTimerRef.current = null;
         onError?.(event);
 
         if (attempt >= maxRetries) {

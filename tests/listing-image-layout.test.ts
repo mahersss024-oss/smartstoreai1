@@ -122,12 +122,13 @@ test('listing card images share thumbnail-first loading behavior', async () => {
 
   assert.match(cardImage, /export function ListingCardImage/);
   assert.match(cardImage, /fetchPriority=\{priority \? 'high' : 'auto'\}/);
-  assert.match(cardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(cardImage, /loading=\{priority \|\| eager \? 'eager' : 'lazy'\}/);
   assert.match(cardImage, /decoding="async"/);
   assert.match(cardImage, /sizes = '\(min-width: 640px\) 116px, 100px'/);
   assert.match(homePage, /<ListingCardImage/);
   assert.match(homePage, /primaryImage\?\.thumbnailUrl,[\s\S]*primaryImage\?\.displayUrl,[\s\S]*primaryImage\?\.originalUrl/);
-  assert.match(homePage, /prioritizeImage=\{index < 4\}/);
+  assert.match(homePage, /prioritizeImage=\{index === 0\}/);
+  assert.match(homePage, /eagerImage=\{index < 4\}/);
   assert.match(favoritesPage, /<ListingCardImage/);
   assert.match(accountFollowsPage, /<ListingCardImage/);
   assert.match(listingDetailsPage, /<ListingCardImage/);
@@ -232,9 +233,10 @@ test('home marketplace prioritizes only initial viewport listing images', async 
   ]);
 
   assert.match(source, /prioritizeImage\?: boolean/);
-  assert.match(source, /prioritizeImage=\{index < 4\}/);
+  assert.match(source, /prioritizeImage=\{index === 0\}/);
+  assert.match(source, /eagerImage=\{index < 4\}/);
   assert.match(source, /priority=\{prioritizeImage\}/);
-  assert.match(cardImage, /loading=\{priority \? 'eager' : 'lazy'\}/);
+  assert.match(cardImage, /loading=\{priority \|\| eager \? 'eager' : 'lazy'\}/);
   assert.match(cardImage, /fetchPriority=\{priority \? 'high' : 'auto'\}/);
   assert.doesNotMatch(source, /loading="eager"/);
 });

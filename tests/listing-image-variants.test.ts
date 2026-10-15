@@ -92,8 +92,9 @@ test('chat and multipart uploads generate server variants when clients omit them
   const route = await readFile(new URL('../app/api/marketplace/listings/[listingId]/images/route.ts', import.meta.url), 'utf8');
   assert.match(storage, /createListingImageVariants\(uploadedImage\)/);
   assert.match(route, /createListingImageVariants\(\{/);
-  assert.match(route, /variant: 'display'/);
-  assert.match(route, /variant: 'thumbnail'/);
+  assert.match(route, /storeListingImageDelivery\(\{/);
+  assert.match(storage, /saveVariant\('display', originalUrl\)/);
+  assert.match(storage, /saveVariant\('thumbnail', displayUrl\)/);
 });
 
 test('backfill is batched, dry-run by default, idempotent by database state and preserves originals', async () => {
@@ -127,6 +128,8 @@ test('listing surfaces retain thumbnail, display and zoom-only original behavior
 
   const resilientImage = await readFile(new URL('../components/resilient-image.tsx', import.meta.url), 'utf8');
   assert.match(resilientImage, /maxRetries = 2/);
-  assert.match(resilientImage, /imageRetry/);
+  assert.doesNotMatch(resilientImage, /imageRetry/);
+  assert.match(resilientImage, /IntersectionObserver/);
+  assert.match(resilientImage, /loadTimeoutMs = 15_000/);
   assert.match(resilientImage, /500 \* \(attempt \+ 1\)/);
 });

@@ -12,7 +12,7 @@ import {
   defaultMaxListingImages,
   getMaxListingImagesPerListing,
 } from './listing-image-limits';
-import { storeListingObject } from './object-storage';
+import { deleteListingObject, storeListingObject } from './object-storage';
 import { addListingImageForSeller, getListing } from './repository';
 import type { ListingImage, ImageContentReviewStatus } from './types';
 
@@ -154,6 +154,43 @@ export function extractLatestUploadedListingImages(
   return [];
 }
 
+export async function storeListingImageDelivery({
+  imageId,
+  original,
+  variants,
+}: {
+  imageId: string;
+  original: UploadedListingImage;
+  variants: Awaited<ReturnType<typeof createListingImageVariants>>;
+}) {
+  const originalUrl = await createPersistentListingImageUrl({ ...original, imageId, variant: 'original' });
+  if (!originalUrl) return null;
+
+  const saveVariant = async (variant: 'display' | 'thumbnail', fallback: string) => {
+    try {
+      return (await createPersistentListingImageUrl({ ...variants[variant], imageId, variant })) ?? fallback;
+    } catch (error) {
+      console.warn(`[listing_image_variant_storage] variant=${variant} failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+      return fallback;
+    }
+  };
+  // Independent writes let a thumbnail succeed even when the display write fails.
+  const displayUrl = await saveVariant('display', originalUrl);
+  const thumbnailUrl = await saveVariant('thumbnail', displayUrl);
+  return createListingImageDeliveryUrls(originalUrl, { displayUrl, thumbnailUrl });
+}
+
+export async function discardUnattachedListingImage(image: Pick<ListingImage, 'id' | 'listingId' | 'originalUrl' | 'displayUrl' | 'thumbnailUrl'>) {
+  try {
+    // A failed database response does not prove that its transaction rolled back.
+    const listing = await getListing(image.listingId);
+    if (listing?.images.some(saved => saved.id === image.id)) return;
+    await deleteListingObject({ imageId: image.id, urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl] });
+  } catch (error) {
+    console.warn(`[listing_image_cleanup] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+  }
+}
+
 export async function saveUploadedListingImagesForSeller({
   listingId,
   sellerId,
@@ -182,6 +219,8 @@ export async function saveUploadedListingImagesForSeller({
   }
 
   let latestListing = existingListing;
+  const initialImageCount = existingListing.images.length;
+  let storageFailure: unknown;
 
   for (const [index, uploadedImage] of images.slice(0, remainingSlots).entries()) {
     const imageId = randomUUID();
@@ -201,42 +240,20 @@ export async function saveUploadedListingImagesForSeller({
       continue;
     }
 
-    const imageUrl = await createPersistentListingImageUrl({
-      data: sanitizedOriginal.data,
-      mediaType: sanitizedOriginal.mediaType,
-      imageId,
-      fileName: sanitizedOriginal.fileName,
-      variant: 'original',
-    });
-
-    if (!imageUrl) {
+    let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;
+    try {
+      imageUrls = await storeListingImageDelivery({ imageId, original: sanitizedOriginal, variants: generatedVariants });
+    } catch (error) {
+      console.warn(`[listing_image_storage] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+      storageFailure = error;
       continue;
     }
-    const displayUrl =
-      (await createPersistentListingImageUrl({
-        data: generatedVariants.display.data,
-        mediaType: generatedVariants.display.mediaType,
-        imageId,
-        fileName: generatedVariants.display.fileName,
-        variant: 'display',
-      })) ?? imageUrl;
-    const thumbnailUrl =
-      (await createPersistentListingImageUrl({
-        data: generatedVariants.thumbnail.data,
-        mediaType: generatedVariants.thumbnail.mediaType,
-        imageId,
-        fileName: generatedVariants.thumbnail.fileName,
-        variant: 'thumbnail',
-      })) ?? displayUrl;
+    if (!imageUrls) continue;
 
     const quality = analyzeImageQuality({
       fileName: uploadedImage.fileName,
       mimeType: sanitizedOriginal.mediaType,
       sizeBytes: sanitizedOriginal.data.byteLength,
-    });
-    const imageUrls = createListingImageDeliveryUrls(imageUrl, {
-      displayUrl: displayUrl ?? imageUrl,
-      thumbnailUrl: thumbnailUrl ?? displayUrl ?? imageUrl,
     });
     const image: ListingImage = {
       contentReviewStatus: contentReviewStatuses?.[index],
@@ -253,12 +270,24 @@ export async function saveUploadedListingImagesForSeller({
       listingId,
       sellerId,
       image,
-    );
+    ).catch(async (error: unknown) => {
+      await discardUnattachedListingImage(image);
+      throw error;
+    });
+
+    if (!updatedListing?.images.some(saved => saved.id === image.id)) {
+      await discardUnattachedListingImage(image);
+      if (!updatedListing) return null;
+      break;
+    }
 
     if (updatedListing) {
       latestListing = updatedListing;
     }
   }
 
+  if (storageFailure && latestListing.images.length === initialImageCount) {
+    throw storageFailure;
+  }
   return latestListing;
 }
