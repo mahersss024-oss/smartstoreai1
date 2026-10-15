@@ -189,7 +189,8 @@ test('blank toolbar space supports mouse and touch drag while controls remain us
     const point = await panel.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       for (let y = rect.bottom - 2; y >= Math.max(0, rect.top) + 2; y -= 2) {
-        for (let x = rect.left + 4; x < rect.right - 4; x += 8) {
+        // Chromium can retarget touch contacts near the rounded outer border.
+        for (let x = rect.left + 16; x < rect.right - 16; x += 8) {
           const hit = document.elementFromPoint(x, y);
           if (hit && element.contains(hit) && !hit.closest(
             'button, a, input, textarea, select, label, [role="button"], [role="option"], [contenteditable]',

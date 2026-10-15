@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
+import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
@@ -216,6 +217,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       : undefined;
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (parsed.data.status) {
+      await recordDatabaseFirstPublication(tx, listingId, parsed.data.status);
+    }
     const listing = await tx.listing.update({
       where: { id: listingId },
       data: {

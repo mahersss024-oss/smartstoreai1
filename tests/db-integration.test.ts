@@ -12,6 +12,62 @@ function shouldRunDatabaseIntegration() {
   );
 }
 
+test('future first-publication timestamps survive concurrent publish, edits and republication without enrolling legacy rows', async (t) => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  const suffix = crypto.randomUUID();
+  const seller = { id: `publication-seller-${suffix}`, email: `publication-${suffix}@smartstore.local` };
+  const { prisma } = await import('@/lib/db/prisma');
+  try {
+    const repository = await import('@/agent/marketplace/repository');
+    const listing = await repository.createListingDraft(seller, { category: 'other', title: 'Desk' });
+    assert.equal(listing.firstPublicationTracked, true);
+    assert.equal(listing.firstPublishedAt, undefined);
+    await prisma.listingImage.create({ data: {
+      listingId: listing.id, originalUrl: 'https://example.com/desk.webp',
+      displayUrl: 'https://example.com/desk.webp', thumbnailUrl: 'https://example.com/desk.webp',
+      status: 'approved', qualityScore: 95,
+    } });
+    const results = await Promise.all(Array.from({ length: 4 }, () =>
+      repository.setListingStatusForSeller(listing.id, seller.id, 'published')));
+    const firstPublishedAt = results[0]!.firstPublishedAt;
+    assert.ok(firstPublishedAt);
+    assert.ok(results.every(result => result?.firstPublishedAt === firstPublishedAt));
+    await repository.updateListingForSeller(listing.id, seller.id, { title: 'Updated desk' });
+    await repository.setListingStatusForSeller(listing.id, seller.id, 'paused');
+    const republished = await repository.setListingStatusForSeller(listing.id, seller.id, 'published');
+    assert.equal(republished?.firstPublishedAt, firstPublishedAt);
+    assert.equal(republished?.createdAt, listing.createdAt);
+
+    const legacy = await prisma.listing.create({ data: {
+      sellerId: seller.id, category: 'other', title: 'Legacy desk', status: 'paused',
+      compliance: { decision: 'allow', reasons: [] },
+      images: { create: {
+        originalUrl: 'https://example.com/old.webp', displayUrl: 'https://example.com/old.webp',
+        thumbnailUrl: 'https://example.com/old.webp', status: 'approved', qualityScore: 95,
+      } },
+    } });
+    assert.equal(legacy.firstPublicationTracked, false);
+    const legacyPublished = await repository.setListingStatusForSeller(legacy.id, seller.id, 'published');
+    assert.equal(legacyPublished?.firstPublishedAt, undefined);
+    assert.equal(legacyPublished?.firstPublicationTracked, false);
+    const feed = await repository.listMarketplaceListings({ take: 80 });
+    const newIndex = feed.findIndex(item => item.id === listing.id);
+    const legacyIndex = feed.findIndex(item => item.id === legacy.id);
+    if (legacyIndex !== -1) assert.ok(newIndex !== -1 && newIndex < legacyIndex);
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId: seller.id } });
+    await prisma.user.deleteMany({ where: { id: seller.id } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
 function createImage(index: number, listingId: string): ListingImage {
   return {
     id: `db-integration-image-${Date.now()}-${index}`,

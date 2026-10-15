@@ -53,8 +53,11 @@ import {
 } from './listing-image-limits';
 import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
 import { deleteListingObject } from './object-storage';
+import { recordDatabaseFirstPublication } from './listing-publication';
 
 type DatabaseListingRecord = {
+  firstPublicationTracked?: boolean;
+  firstPublishedAt?: Date | null;
   id: string;
   sellerId: string;
   category: string;
@@ -787,6 +790,8 @@ function toListingRecord(listing: DatabaseListingRecord): memoryStore.ListingRec
       ) ?? [],
     attributes: asRecord(listing.attributes),
     status: listing.status as ListingStatus,
+    firstPublicationTracked: listing.firstPublicationTracked,
+    firstPublishedAt: listing.firstPublishedAt?.toISOString(),
     createdAt: listing.createdAt.toISOString(),
     updatedAt: listing.updatedAt.toISOString(),
     views: listing.views,
@@ -1103,24 +1108,46 @@ export async function listMarketplaceListings(
     });
   }
 
-  const listings = await prisma.listing.findMany({
-    where: {
-      status: 'published',
-      ...(searchConditions.length ? { AND: searchConditions } : {}),
-    },
-    include: {
-      images: {
-        where: { status: 'approved' },
-        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        take: 1,
+  // Only the unfiltered feed changes ordering. Search and filters keep their old ranking.
+  const readListings = async (db: Prisma.TransactionClient) => {
+    const feedIds = searchConditions.length === 0
+      ? await db.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "Listing"
+          WHERE "status" = 'published'
+          ORDER BY "firstPublishedAt" DESC NULLS LAST,
+            CASE WHEN "firstPublishedAt" IS NULL THEN "updatedAt" END DESC,
+            "id" DESC
+          LIMIT ${pagination.take} OFFSET ${pagination.skip}
+        `
+      : undefined;
+    const listings = await db.listing.findMany({
+      where: {
+        status: 'published',
+        ...(feedIds ? { id: { in: feedIds.map(listing => listing.id) } } : {}),
+        ...(searchConditions.length ? { AND: searchConditions } : {}),
       },
-    },
-    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-    skip: pagination.skip,
-    take: pagination.take,
-  });
+      include: {
+        images: {
+          where: { status: 'approved' },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 1,
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      skip: feedIds ? 0 : pagination.skip,
+      take: pagination.take,
+    });
 
-  return listings.map(toListingRecord);
+    if (feedIds) {
+      const positions = new Map(feedIds.map((listing, index) => [listing.id, index]));
+      listings.sort((left, right) => positions.get(left.id)! - positions.get(right.id)!);
+    }
+    return listings.map(toListingRecord);
+  };
+  // Keep ID selection and hydration in the same snapshot during concurrent writes.
+  return searchConditions.length
+    ? readListings(prisma)
+    : prisma.$transaction(readListings, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
 export async function getListing(listingId: string) {
@@ -2319,6 +2346,7 @@ export async function createListingDraft(
                 compliance as unknown as Record<string, unknown>,
               ),
               status: chooseInitialStatus(compliance),
+              firstPublicationTracked: true,
             },
             include: { images: true },
           });
@@ -2515,6 +2543,7 @@ export async function setListingStatusForSeller(
         ? 'pending'
       : status;
   const listing = await prisma.$transaction(async (tx) => {
+    await recordDatabaseFirstPublication(tx, listingId, nextStatus);
     const updatedListing = await tx.listing.update({
       where: { id: listingId },
       data: { status: nextStatus },
@@ -5052,6 +5081,7 @@ export async function setListingModerationStatus(
         ? 'delete_listing'
         : 'reject_listing';
   const listing = await prisma.$transaction(async (tx) => {
+    await recordDatabaseFirstPublication(tx, listingId, status);
     const updatedListing = await tx.listing.update({
       where: { id: listingId },
       data: { status },

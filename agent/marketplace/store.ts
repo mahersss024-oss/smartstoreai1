@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { normalizePagination } from '@/lib/pagination';
+import { comparePublicationFeed, recordFirstPublication } from './listing-publication';
 
 import { evaluateConversationMessageSafety } from './message-safety';
 import {
@@ -52,6 +53,8 @@ export type CreateListingDraftInput = {
 };
 
 export type ListingRecord = ListingDraft & {
+  firstPublicationTracked?: boolean;
+  firstPublishedAt?: string;
   createdAt: string;
   updatedAt: string;
   views: number;
@@ -435,6 +438,7 @@ export function createListingDraft(input: CreateListingDraftInput): ListingRecor
     images: input.images ?? [],
     attributes: input.attributes ?? {},
     status: chooseInitialStatus(compliance),
+    firstPublicationTracked: true,
     createdAt: timestamp,
     updatedAt: timestamp,
     views: 0,
@@ -475,6 +479,7 @@ export function publishListing(listingId: string) {
   }
 
   listing.updatedAt = nowIso();
+  recordFirstPublication(listing, listing.updatedAt);
   listings.set(listing.id, listing);
   persistStore();
   return listing;
@@ -557,6 +562,7 @@ export function setListingStatusForSeller(
   }
 
   listing.updatedAt = nowIso();
+  recordFirstPublication(listing, listing.updatedAt);
   if (listing.status === 'sold') {
     ensureCommissionForSoldListing(listing);
   }
@@ -690,7 +696,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
     !filters.termGroups?.length &&
     !filters.excludedTerms?.length
   ) {
-    return paginateListings(publishedListings, filters);
+    return paginateListings(publishedListings.sort(comparePublicationFeed), filters);
   }
 
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
@@ -1744,6 +1750,7 @@ export function setListingModerationStatus(
 
   listing.status = status;
   listing.updatedAt = nowIso();
+  recordFirstPublication(listing, listing.updatedAt);
   listings.set(listing.id, listing);
   persistStore();
 
