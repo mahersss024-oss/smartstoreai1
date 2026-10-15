@@ -11,6 +11,7 @@ import {
   type UIEvent as ReactUIEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -2061,6 +2062,7 @@ export default function Page() {
     useState<ManualListingSubmission | null>(null);
   const manualListingSubmissionRef = useRef<ManualListingSubmission | null>(null);
   const marketplaceListingsScrollRef = useRef<HTMLDivElement | null>(null);
+  const marketplaceContentOffsetTargetRef = useRef('var(--marketplace-tools-height, 180px)');
   const marketplaceToolsPanelRef = useRef<HTMLDivElement | null>(null);
   const marketplaceCategoriesRef = useRef<HTMLDivElement | null>(null);
   const marketplaceToolsDragRef = useRef({
@@ -4026,20 +4028,24 @@ export default function Page() {
     return -Math.max(0, panelHeight - categoriesHeight);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const categories = marketplaceCategoriesRef.current;
     const panel = marketplaceToolsPanelRef.current;
     if (!categories || !panel) return;
 
     const updateCategoriesHeight = () => {
+      const categoriesHeight = `${categories.offsetHeight}px`;
       panel.style.setProperty(
         '--marketplace-categories-height',
-        `${categories.offsetHeight}px`,
+        categoriesHeight,
       );
+      panel.parentElement?.style.setProperty('--marketplace-categories-height', categoriesHeight);
+      panel.parentElement?.style.setProperty('--marketplace-tools-height', `${panel.offsetHeight}px`);
     };
     updateCategoriesHeight();
     const observer = new ResizeObserver(updateCategoriesHeight);
     observer.observe(categories);
+    observer.observe(panel);
     // A confirmed manual drag must not start a native fling that absorbs the next tap.
     const preventNativeToolPan = (event: TouchEvent) => {
       if (marketplaceToolsDragRef.current.axis === 'vertical' &&
@@ -4052,7 +4058,23 @@ export default function Page() {
       observer.disconnect();
       panel.removeEventListener('touchmove', preventNativeToolPan);
     };
-  }, [isCompactChatView]);
+  }, [isCompactChatView, isManualListingVisible]);
+
+  useLayoutEffect(() => {
+    const target = isManualListingVisible
+      ? '0px'
+      : isMarketplaceToolsDragging
+        ? `calc(var(--marketplace-tools-height, 180px) + ${marketplaceToolsDragOffset}px)`
+        : isMarketplaceTopActionsHidden
+          ? 'var(--marketplace-categories-height, 40px)'
+          : 'var(--marketplace-tools-height, 180px)';
+    marketplaceContentOffsetTargetRef.current = target;
+    const list = marketplaceListingsScrollRef.current;
+    // Align only the beginning; floating tools must not reposition browsed cards.
+    if (list && list.scrollTop <= 1) {
+      (list.firstElementChild as HTMLElement | null)?.style.setProperty('--marketplace-content-offset', target);
+    }
+  }, [isManualListingVisible, isMarketplaceToolsDragging, marketplaceToolsDragOffset, isMarketplaceTopActionsHidden]);
 
   const cancelMarketplaceTopReveal = useCallback(() => {
     if (marketplaceToolsTopRevealTimerRef.current !== null) {
@@ -4093,6 +4115,11 @@ export default function Page() {
   const handleMarketplaceListingsScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
       const nextScrollTop = event.currentTarget.scrollTop;
+      if (nextScrollTop <= 1) {
+        (event.currentTarget.firstElementChild as HTMLElement | null)?.style.setProperty(
+          '--marketplace-content-offset', marketplaceContentOffsetTargetRef.current,
+        );
+      }
       const nextScrollHeight = event.currentTarget.scrollHeight;
       const viewportHeight = event.currentTarget.clientHeight;
       const previousScrollTop = lastMarketplaceScrollTopRef.current;
@@ -4472,7 +4499,7 @@ export default function Page() {
           >
             <section
               className={cn(
-                'relative min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 dark:bg-background/55 sm:p-3 lg:border-b-0 lg:border-l lg:p-4',
+                'relative min-h-0 min-w-0 flex-col overflow-hidden border-b bg-white/45 p-2 [--marketplace-list-edge:0.5rem] dark:bg-background/55 sm:p-3 sm:[--marketplace-list-edge:0.75rem] lg:border-b-0 lg:border-l lg:p-4 lg:[--marketplace-list-edge:1rem] lg:[--marketplace-tools-top:1rem]',
                 isCompactChatView ? 'hidden' : 'flex',
               )}
               inert={isCompactChatView}
@@ -5110,10 +5137,13 @@ export default function Page() {
               <div
                 ref={marketplaceListingsScrollRef}
                 onScroll={handleMarketplaceListingsScroll}
+                data-floating-list={!isManualListingVisible || undefined}
+                data-tools-dragging={isMarketplaceToolsDragging || undefined}
                 className={cn(
-                  'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[var(--marketplace-bottom-nav-space)] pt-3 lg:pb-1',
+                  'marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pt-3',
                 )}
               >
+              <div className="marketplace-listings-content pb-[var(--marketplace-bottom-nav-space)] lg:pb-1">
 
               {hasActiveAssistantSearch && (
                 <div className="smart-assistant-results-panel mb-3 grid gap-1.5">
@@ -5210,6 +5240,7 @@ export default function Page() {
                 </div>
               )}
 
+              </div>
               </div>
             </section>
 

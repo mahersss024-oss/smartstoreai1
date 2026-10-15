@@ -125,6 +125,61 @@ test('tools ignore brief reversals and wait at the top without a stale reveal', 
   await expectHidden(panel, false);
 });
 
+test('first card clears categories without moving the floating scroll viewport', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const panel = await openMarketplace(page, 54);
+  const list = page.locator('#suggested-listings .marketplace-listings-scroll');
+  const firstCard = list.locator('.marketplace-listing-card-enter').first();
+  const categories = panel.locator('[data-marketplace-categories]');
+  await page.evaluate(() => {
+    const target = window as typeof window & { __firstCardShifts: number };
+    target.__firstCardShifts = 0;
+    new PerformanceObserver(entries => {
+      for (const entry of entries.getEntries()) {
+        target.__firstCardShifts += (entry as PerformanceEntry & { value: number }).value;
+      }
+    }).observe({ type: 'layout-shift' });
+  });
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 },
+    { width: 768, height: 1024 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport);
+    const listTop = (await list.boundingBox())!.y;
+    for (const key of ['ArrowDown', 'ArrowUp']) {
+      await panel.focus();
+      await page.waitForTimeout(250);
+      const before = await page.evaluate(() =>
+        (window as typeof window & { __firstCardShifts: number }).__firstCardShifts);
+      await page.keyboard.press(key);
+      await expectHidden(panel, key === 'ArrowUp');
+      await page.waitForTimeout(1150);
+      const card = (await firstCard.boundingBox())!;
+      const category = (await categories.boundingBox())!;
+      expect(Math.abs(card.y - category.y - category.height - 12)).toBeLessThan(2);
+      expect(await list.evaluate(element => element.scrollTop)).toBe(0);
+      expect((await list.boundingBox())!.y).toBe(listTop);
+      await expect(firstCard).toBeInViewport({ ratio: 1 });
+      const after = await page.evaluate(() =>
+        (window as typeof window & { __firstCardShifts: number }).__firstCardShifts);
+      expect(after - before, `toolbar layout shifts at ${viewport.width}px`).toBeLessThanOrEqual(0.001);
+      await page.screenshot({ path: testInfo.outputPath(`first-card-${viewport.width}-${key}.png`) });
+    }
+  }
+  await scrollTo(page, 600);
+  const scrollBefore = await list.evaluate(element => element.scrollTop);
+  const cardBefore = (await firstCard.boundingBox())!.y;
+  const viewportBefore = (await list.boundingBox())!;
+  const categoryBefore = (await categories.boundingBox())!;
+  expect(viewportBefore.y).toBeLessThan(categoryBefore.y + categoryBefore.height);
+  expect(cardBefore).toBeLessThan(viewportBefore.y);
+  await panel.focus();
+  await page.keyboard.press('ArrowDown');
+  await expectHidden(panel, false);
+  await page.waitForTimeout(1150);
+  expect(await list.evaluate(element => element.scrollTop)).toBe(scrollBefore);
+  expect((await firstCard.boundingBox())!.y).toBe(cardBefore);
+  expect((await list.boundingBox())!.y).toBe(viewportBefore.y);
+});
+
 test('blank toolbar space supports mouse and touch drag while controls remain usable', async ({ page, isMobile }) => {
   const panel = await openMarketplace(page);
   const session = isMobile ? await page.context().newCDPSession(page) : null;
