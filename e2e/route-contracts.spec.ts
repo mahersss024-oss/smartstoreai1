@@ -80,7 +80,10 @@ for (const entry of pages) {
       await expect.poll(() => page.locator('body').innerText()).not.toBe('');
       await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
       const expectedPath = guestAdmin || (role === 'guest' && entry.path === '/account/seller-profile')
-        ? '/account' : path;
+        ? '/account'
+        : role === 'guest' && entry.path === '/conversations/[conversationId]'
+          ? '/commission-agreement'
+          : path;
       await expect(page).toHaveURL(url => url.pathname === expectedPath);
       if (guestAdmin) await expect.poll(() => authStarts).toBe(1);
       await page.waitForTimeout(300);
