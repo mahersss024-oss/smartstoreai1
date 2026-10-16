@@ -14,11 +14,12 @@ for (const lifecycle of ['test:coverage', 'test:db:integration']) {
     };
     // This is an independent runner, not another Node test-worker IPC child.
     delete env.NODE_TEST_CONTEXT;
-    const result = spawnSync(process.execPath, ['scripts/test.mjs', 'tests/fixtures/test-runner-environment.fixture.ts'], {
+    // The assertion below consumes TAP, independent of Node's default reporter.
+    const result = spawnSync(process.execPath, ['scripts/test.mjs', '--test-reporter=tap', 'tests/fixtures/test-runner-environment.fixture.ts'], {
       cwd: process.cwd(), env, encoding: 'utf8', timeout: 60_000,
     });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /# pass 1/);
+    assert.match(result.stdout, /^# pass 1\s*$/m);
   });
 }
