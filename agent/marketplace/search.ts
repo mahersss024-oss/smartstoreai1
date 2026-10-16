@@ -1,3 +1,4 @@
+import { marketplaceSearchCategoryRules as categoryMatchers } from '@/lib/marketplace/category-matching';
 import {
   marketplaceTermAliasEntries,
   vehicleBrandAliasEntries,
@@ -132,59 +133,6 @@ const searchStopWords = new Set([
   'need',
 ]);
 
-const categoryMatchers: Array<{
-  category: string;
-  patterns: RegExp[];
-  stopWords: string[];
-}> = [
-  {
-    category: 'cars',
-    patterns: [
-      /(?:سيارة|سيارات|موتر|سياره|مواتر|كامري|كورولا|يارس|تويوتا|تايوتا|نيسان|هوندا|هيونداي|كيا|مازدا|لكزس|مرسيدس|car|cars|toyota|camry|corolla|sedan|suv)/i,
-    ],
-    stopWords: ['سيارة', 'سيارات', 'سياره', 'موتر', 'مواتر', 'car', 'cars'],
-  },
-  {
-    category: 'mobile_phones',
-    patterns: [/(?:جوال|جوالات|هاتف|ايفون|آيفون|سامسونج|iphone|samsung|phone|mobile)/i],
-    stopWords: ['جوال', 'جوالات', 'هاتف', 'phone', 'mobile'],
-  },
-  {
-    category: 'computers',
-    patterns: [/(?:لابتوب|لاب توب|كمبيوتر|ماكبوك|macbook|laptop|computer)/i],
-    stopWords: ['لابتوب', 'كمبيوتر', 'laptop', 'computer'],
-  },
-  {
-    category: 'cameras',
-    patterns: [/(?:كاميرا|كاميره|كاميرات|كانون|نيكون|فوجي|سوني الفا|camera|cameras|canon|nikon|fujifilm|sony alpha)/i],
-    stopWords: ['كاميرا', 'كاميره', 'كاميرات', 'camera', 'cameras'],
-  },
-  {
-    category: 'real_estate',
-    patterns: [/(?:عقار|شقة|فيلا|بيت|ارض|أرض|real estate|apartment|villa|house)/i],
-    stopWords: ['عقار', 'شقة', 'فيلا', 'بيت', 'ارض', 'أرض'],
-  },
-  {
-    category: 'furniture',
-    patterns: [/(?:اثاث|أثاث|كنب|كرسي|طاولة|furniture|chair|table|sofa)/i],
-    stopWords: ['اثاث', 'أثاث', 'furniture'],
-  },
-  {
-    category: 'women_supplies',
-    patterns: [/(?:مستلزمات نسائية|نسائي|نسائية|حريمي|عباية|عبايات|طرحة|حجاب|women supplies|women|female|ladies|abaya|hijab)/i],
-    stopWords: ['مستلزمات', 'نسائية', 'نسائي', 'حريمي', 'women', 'female', 'ladies'],
-  },
-  {
-    category: 'men_supplies',
-    patterns: [/(?:مستلزمات رجالية|رجالي|رجالية|شماغ|غترة|عقال|men supplies|men|male|mens|shemagh|ghutra)/i],
-    stopWords: ['مستلزمات', 'رجالية', 'رجالي', 'men', 'male', 'mens'],
-  },
-  {
-    category: 'fashion',
-    patterns: [/(?:ملابس|ثوب|حذاء|فستان|شنطة|fashion|clothes|shoes|dress|bag)/i],
-    stopWords: ['ملابس', 'ثوب', 'حذاء', 'فستان', 'شنطة', 'fashion', 'clothes', 'shoes'],
-  },
-];
 
 const cityMatchers: Array<{ city: string; patterns: RegExp[]; stopWords: string[] }> = [
   {

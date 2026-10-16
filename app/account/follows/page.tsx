@@ -1,4 +1,5 @@
 'use client';
+import { formatMarketplaceCategory } from '@/lib/marketplace/categories';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -328,7 +329,7 @@ export default function AccountFollowsPage() {
                       <Link className="min-w-0" href={encodeListingHref(follow.listingId)} prefetch={false}>
                         <h3 className="line-clamp-2 text-sm font-bold">{follow.title}</h3>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {follow.city ?? 'السعودية'} · {follow.category} · {formatFollowDate(follow.createdAt)}
+                          {follow.city ?? 'السعودية'} · {formatMarketplaceCategory(follow.category)} · {formatFollowDate(follow.createdAt)}
                         </p>
                       </Link>
                       <Button

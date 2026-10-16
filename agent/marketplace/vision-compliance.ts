@@ -1,3 +1,4 @@
+import { marketplaceVisionCategoryRules as categoryRules } from '@/lib/marketplace/category-matching';
 import { generateText, type ModelMessage } from 'ai';
 import { z } from 'zod';
 
@@ -204,85 +205,6 @@ function isModelTextPart(part: unknown): part is { type: 'text'; text: string } 
   );
 }
 
-const categoryRules: Array<{
-  category: string;
-  patterns: RegExp[];
-}> = [
-  {
-    category: 'cars',
-    patterns: [
-      /(?:سيارة|سيارات|موتر|كامري|كورولا|يارس|لاندكروزر|نيسان|هوندا|هيونداي|كيا|مازدا|لكزس|مرسيدس|بي ام|car|cars|toyota|camry|corolla|sedan|suv)/i,
-    ],
-  },
-  {
-    category: 'auto_parts',
-    patterns: [/(?:قطع غيار|كفرات|جنوط|بطارية سيارة|مكينة|قير|صدام|auto parts|spare parts|tires|engine|gearbox)/i],
-  },
-  {
-    category: 'mobile_phones',
-    patterns: [/(?:جوال|جوالات|هاتف|ايفون|آيفون|سامسونج|هواوي|شاومي|iphone|samsung|phone|mobile)/i],
-  },
-  {
-    category: 'computers',
-    patterns: [/(?:لابتوب|لاب توب|كمبيوتر|ماكبوك|شاشة|كيبورد|طابعة|macbook|laptop|computer|pc|monitor|keyboard|printer)/i],
-  },
-  {
-    category: 'cameras',
-    patterns: [/(?:كاميرا|كاميره|كاميرات|كانون|نيكون|فوجي|سوني الفا|camera|cameras|canon|nikon|fujifilm|sony alpha)/i],
-  },
-  {
-    category: 'real_estate',
-    patterns: [/(?:عقار|شقة|فيلا|بيت|أرض|ارض|استراحة|real estate|apartment|villa|house|land)/i],
-  },
-  {
-    category: 'furniture',
-    patterns: [/(?:أثاث|اثاث|كنب|كرسي|طاولة|سرير|دولاب|furniture|chair|table|sofa|bed|wardrobe)/i],
-  },
-  {
-    category: 'women_supplies',
-    patterns: [/(?:مستلزمات نسائية|نسائي|نسائية|حريمي|عباية|عبايات|طرحة|طرح|حجاب|women supplies|women|female|ladies|abaya|hijab)/i],
-  },
-  {
-    category: 'men_supplies',
-    patterns: [/(?:مستلزمات رجالية|رجالي|رجالية|ثوب رجالي|شماغ|غترة|عقال|men supplies|men|male|mens|thobe|shemagh|ghutra)/i],
-  },
-  {
-    category: 'fashion',
-    patterns: [/(?:ملابس|ثوب|شماغ|حذاء|فستان|شنطة|fashion|clothes|shoes|dress|bag)/i],
-  },
-  {
-    category: 'home_garden',
-    patterns: [/(?:منزل|حديقة|مطبخ|مكنسة|ثلاجة|غسالة|مكيف|home|garden|kitchen|vacuum|fridge|washer|ac)/i],
-  },
-  {
-    category: 'sports',
-    patterns: [/(?:رياضة|دراجة|جهاز مشي|أوزان|اوزان|sports|bicycle|treadmill|weights)/i],
-  },
-  {
-    category: 'gaming_hobbies',
-    patterns: [/(?:بلايستيشن|اكس بوكس|نينتندو|لعبة|العاب|هواية|playstation|xbox|nintendo|game|gaming|hobby)/i],
-  },
-  {
-    category: 'books_education',
-    patterns: [/(?:كتاب|كتب|تعليم|مدرسي|جامعة|book|books|education|school|university)/i],
-  },
-  {
-    category: 'kids',
-    patterns: [/(?:طفل|أطفال|اطفال|عربة أطفال|كرسي طفل|kids|baby|stroller|child seat)/i],
-  },
-  {
-    category: 'tools_equipment',
-    patterns: [/(?:عدة|أدوات|ادوات|معدات|دريل|منشار|tool|tools|equipment|drill|saw)/i],
-  },
-  {
-    category: 'watches_accessories',
-    patterns: [/(?:ساعة|ساعات|اكسسوار|إكسسوار|نظارة|محفظة|watch|watches|accessory|accessories|glasses|wallet)/i],
-  },
-  {
-    category: 'beauty',
-    patterns: [/(?:عناية|تجميل|عطر|مكياج|كريم|beauty|perfume|makeup|cosmetic|cream)/i],
-  },
-];
 
 export function inferExpectedMarketplaceCategory(text: string) {
   const normalized = text.trim();

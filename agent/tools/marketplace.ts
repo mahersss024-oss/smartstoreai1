@@ -1,4 +1,5 @@
 import { tool } from 'ai';
+import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { z } from 'zod';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
@@ -104,7 +105,7 @@ function getComparisonListingSummary(
 
 const listingDetailsSchema = {
   autoCategory: z.boolean().optional().describe('Use true only when the seller has not explicitly selected a category; infer from title and description if possible. Preserve an explicit seller category.'),
-  category: z.string().min(2),
+  category: z.string().min(2).describe(`Marketplace category ID: ${marketplaceCategoryPrompt}. Preserve an explicit seller category.`),
   title: z.string().min(2).optional(),
   description: z.string().min(2).optional(),
   price: z

@@ -16,6 +16,7 @@ import {
 } from './listing-image-limits';
 import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
 import { resolveListingCategory } from './listing-category';
+import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -704,6 +705,9 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
   const maxPrice = filters.maxPrice ?? parsedQuery.maxPrice;
   const yearMin = filters.yearMin ?? parsedQuery.yearMin;
   const yearMax = filters.yearMax ?? parsedQuery.yearMax;
+  const termGroups = listingIdLookup ? [] : getFilterTermGroups(filters);
+  const categories = category && !filters.category && termGroups.length
+    ? getMarketplaceCategorySearchIds(category) : category ? [category] : [];
   const filteredListings = publishedListings.filter((listing) => {
     if (
       listingIdLookup &&
@@ -712,7 +716,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
       return false;
     }
 
-    if (category && listing.category !== category) {
+    if (category && !categories.includes(listing.category)) {
       return false;
     }
 
@@ -770,7 +774,6 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
 
     return true;
   });
-  const termGroups = listingIdLookup ? [] : getFilterTermGroups(filters);
 
   if (termGroups.length === 0) {
     return paginateListings(filteredListings, filters);

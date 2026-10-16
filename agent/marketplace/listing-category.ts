@@ -1,10 +1,5 @@
 import { parseMarketplaceSearchQuery } from './search';
-
-const selectableCategories = new Set([
-  'cars', 'auto_parts', 'mobile_phones', 'computers', 'real_estate', 'furniture',
-  'fashion', 'women_supplies', 'men_supplies', 'kids', 'home_garden', 'sports',
-  'gaming_hobbies', 'books_education', 'tools_equipment', 'watches_accessories', 'beauty', 'other',
-]);
+import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 
 export function resolveListingCategory(
   input: { category: string; autoCategory?: boolean; title?: string; description?: string },
@@ -13,7 +8,7 @@ export function resolveListingCategory(
   if (!input.autoCategory) return input.category;
   try {
     const category = infer(input.title ?? '') ?? infer(input.description ?? '');
-    return category && selectableCategories.has(category) ? category : 'other';
+    return category && isMarketplaceCategory(category) ? category : 'other';
   } catch {
     return input.category;
   }

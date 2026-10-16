@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMarketplaceCategory as formatCategory, marketplaceCategoryIds as listingCategoryOptions } from '@/lib/marketplace/categories';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -173,26 +174,6 @@ type ImagePreviewState = {
   imageId: string;
 } | null;
 
-const listingCategoryOptions = [
-  'cars',
-  'auto_parts',
-  'mobile_phones',
-  'computers',
-  'real_estate',
-  'furniture',
-  'fashion',
-  'women_supplies',
-  'men_supplies',
-  'home_garden',
-  'sports',
-  'gaming_hobbies',
-  'books_education',
-  'kids',
-  'tools_equipment',
-  'watches_accessories',
-  'beauty',
-  'other',
-];
 
 const listingConditionOptions = [
   { value: 'new', label: 'جديد' },
@@ -243,30 +224,6 @@ function formatImageCount(count: number) {
   return `${count} صور`;
 }
 
-function formatCategory(category: string) {
-  const labels: Record<string, string> = {
-    mobile_phones: 'الجوالات',
-    cars: 'السيارات',
-    computers: 'الأجهزة',
-    furniture: 'الأثاث',
-    real_estate: 'العقارات',
-    auto_parts: 'قطع الغيار',
-    fashion: 'الموضة',
-    home_garden: 'المنزل والحديقة',
-    sports: 'الرياضة',
-    gaming_hobbies: 'الألعاب والهوايات',
-    books_education: 'الكتب والتعليم',
-    kids: 'مستلزمات الأطفال',
-    women_supplies: 'مستلزمات نسائية',
-    men_supplies: 'مستلزمات رجالية',
-    tools_equipment: 'معدات وأدوات',
-    watches_accessories: 'ساعات وإكسسوارات',
-    beauty: 'العناية والتجميل',
-    other: 'أخرى',
-  };
-
-  return labels[category] ?? category;
-}
 
 function formatComplianceReason(reason: string) {
   if (reason === 'prohibited_in_saudi_marketplace_policy') {

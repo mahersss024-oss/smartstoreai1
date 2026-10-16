@@ -1,4 +1,5 @@
 
+import { formatMarketplaceCategory as formatCategory } from '@/lib/marketplace/categories';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -79,30 +80,6 @@ function formatPrice(price: number | 'bid' | 'negotiable' | undefined) {
   return 'السعر غير محدد';
 }
 
-function formatCategory(category: string) {
-  const labels: Record<string, string> = {
-    mobile_phones: 'الجوالات',
-    cars: 'السيارات',
-    auto_parts: 'قطع الغيار',
-    computers: 'الأجهزة',
-    real_estate: 'العقارات',
-    furniture: 'الأثاث',
-    fashion: 'الموضة',
-    home_garden: 'المنزل والحديقة',
-    sports: 'الرياضة',
-    gaming_hobbies: 'الألعاب والهوايات',
-    books_education: 'الكتب والتعليم',
-    kids: 'مستلزمات الأطفال',
-    women_supplies: 'مستلزمات نسائية',
-    men_supplies: 'مستلزمات رجالية',
-    tools_equipment: 'معدات وأدوات',
-    watches_accessories: 'ساعات وإكسسوارات',
-    beauty: 'العناية والتجميل',
-    other: 'أخرى',
-  };
-
-  return labels[category] ?? category;
-}
 
 function formatCondition(condition: ListingCondition | undefined) {
   const labels: Record<ListingCondition, string> = {

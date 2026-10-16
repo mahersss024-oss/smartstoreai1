@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { formatMarketplaceCategory, marketplaceCategoryGroups } from '@/lib/marketplace/categories';
 
 import {
   getAssistantResultListings,
@@ -99,11 +100,12 @@ test('home marketplace renders assistant search as a separate active layer', () 
   assert.match(homePage, /pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.match(homePage, /animationDelay/);
   assert.match(homePage, /marketplaceCategoryGroups/);
-  assert.match(homePage, /label: 'أزياء ومستلزمات'/);
-  assert.match(homePage, /'مستلزمات نسائية'/);
-  assert.match(homePage, /'مستلزمات رجالية'/);
-  assert.match(homePage, /women_supplies: 'مستلزمات نسائية'/);
-  assert.match(homePage, /men_supplies: 'مستلزمات رجالية'/);
+  assert.match(homePage, /marketplaceCategoryGroups[^\n]*from '@\/lib\/marketplace\/categories'/);
+  const supplies = marketplaceCategoryGroups.find(group => group.label === 'أزياء ومستلزمات');
+  assert.ok(supplies?.categories.includes('مستلزمات نسائية'));
+  assert.ok(supplies?.categories.includes('مستلزمات رجالية'));
+  assert.equal(formatMarketplaceCategory('women_supplies'), 'مستلزمات نسائية');
+  assert.equal(formatMarketplaceCategory('men_supplies'), 'مستلزمات رجالية');
   assert.match(homePage, /saudiMarketplaceCities/);
   assert.match(homePage, /marketplaceSearchInput/);
   assert.match(homePage, /marketplaceSearchQuery/);

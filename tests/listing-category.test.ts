@@ -19,7 +19,7 @@ test('automatic categorization prefers the title and falls back to description o
   assert.equal(resolveListingCategory({ ...input, title: 'For sale', description: 'Wooden chair' }), 'furniture');
   assert.equal(resolveListingCategory({ ...input, title: 'Toyota Camry' }), 'cars');
   assert.equal(resolveListingCategory({ ...input, category: 'cars', title: 'Unspecified item' }), 'other');
-  assert.equal(resolveListingCategory({ ...input, title: 'Canon camera' }), 'other');
+  assert.equal(resolveListingCategory({ ...input, title: 'Canon camera' }), 'cameras');
   assert.equal(resolveListingCategory(input, () => { throw new Error('unavailable'); }), 'other');
 });
 

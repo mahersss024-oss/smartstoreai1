@@ -1,4 +1,5 @@
 import { generateText } from 'ai';
+import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { z } from 'zod';
 
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
@@ -191,6 +192,7 @@ Understand Arabic, Saudi dialect, Arabizi, English brands/models, misspellings, 
 Do not copy the full user sentence into search terms.
 Do not treat words like search, find, want, need, show me, listing, marketplace, سوق حمد, ابحث, اريد, ابي, دور, اعلان, سوق, or منتج as product data.
 Use structured fields whenever possible: category, brand, model, city, minPrice, maxPrice, yearMin, yearMax, condition, mileageMin, mileageMax, color, requiredFeatures, excludedFeatures, excludedColors, rankingPreferences, sortPreference, locationPreference.
+Use these marketplace category IDs: ${marketplaceCategoryPrompt}. Categories describe goods, not jobs or service booking.
 Set searchMode="new_search" when the buyer starts a fresh search or asks broadly for a product/category such as "ابي سيارة". Set searchMode="refine" only when the buyer is clearly narrowing the existing results, such as adding budget, city, mileage, color, or "show cheaper".
 Use descriptiveTerms only for concrete product descriptors that are not already represented by structured fields.
 Never invent listings, sellers, prices, availability, or unsupported platform actions.

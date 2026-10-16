@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
+import { formatMarketplaceCategory as formatCategory, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
 import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
@@ -801,93 +802,8 @@ function formatListingStatus(status: string | undefined) {
   return status ? labels[status] : undefined;
 }
 
-function formatCategory(category: string) {
-  const labels: Record<string, string> = {
-    mobile_phones: 'الجوالات',
-    cars: 'السيارات',
-    computers: 'الأجهزة',
-    furniture: 'الأثاث',
-    real_estate: 'العقارات',
-    auto_parts: 'قطع الغيار',
-    fashion: 'الموضة',
-    home_garden: 'المنزل والحديقة',
-    sports: 'الرياضة',
-    gaming_hobbies: 'الألعاب والهوايات',
-    books_education: 'الكتب والتعليم',
-    kids: 'مستلزمات الأطفال',
-    women_supplies: 'مستلزمات نسائية',
-    men_supplies: 'مستلزمات رجالية',
-    tools_equipment: 'معدات وأدوات',
-    watches_accessories: 'ساعات وإكسسوارات',
-    beauty: 'العناية والتجميل',
-    other: 'أخرى',
-  };
 
-  return labels[category] ?? category;
-}
 
-const marketplaceCategoryGroups = [
-  {
-    label: 'إلكترونيات',
-    categories: ['الجوالات', 'الأجهزة'],
-  },
-  {
-    label: 'سيارات ومركبات',
-    categories: ['السيارات', 'قطع الغيار'],
-  },
-  {
-    label: 'العقار',
-    categories: ['العقارات'],
-  },
-  {
-    label: 'البيت والأثاث',
-    categories: ['الأثاث', 'المنزل والحديقة'],
-  },
-  {
-    label: 'أزياء ومستلزمات',
-    categories: [
-      'الموضة',
-      'مستلزمات نسائية',
-      'مستلزمات رجالية',
-      'ساعات وإكسسوارات',
-      'العناية والتجميل',
-      'مستلزمات الأطفال',
-    ],
-  },
-  {
-    label: 'رياضة وهوايات وتعليم',
-    categories: ['الرياضة', 'الألعاب والهوايات', 'الكتب والتعليم'],
-  },
-  {
-    label: 'معدات وأدوات',
-    categories: ['معدات وأدوات'],
-  },
-  {
-    label: 'الخدمات العامة',
-    categories: ['أخرى'],
-  },
-] satisfies Array<{ label: string; categories: string[] }>;
-
-const manualListingCategoryOptions = [
-  'cars',
-  'auto_parts',
-  'mobile_phones',
-  'computers',
-  'real_estate',
-  'furniture',
-  'fashion',
-  'women_supplies',
-  'men_supplies',
-  'kids',
-  'home_garden',
-  'sports',
-  'gaming_hobbies',
-  'books_education',
-  'tools_equipment',
-  'watches_accessories',
-  'beauty',
-  'other',
-] satisfies string[];
 
 const manualListingConditionOptions = [
   { value: 'new', label: 'جديد' },

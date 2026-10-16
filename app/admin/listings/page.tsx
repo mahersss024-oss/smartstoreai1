@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -211,7 +212,7 @@ function AdminListingCard({
 
       <div className="grid gap-2 lg:grid-cols-4">
         <Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
-        <Input disabled={!canManageListings} name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
+        <Input disabled={!canManageListings} list="marketplace-admin-category-options" name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
         <CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} />
         <Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
       </div>
@@ -684,6 +685,11 @@ function AdminListingsPageContent() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <datalist id="marketplace-admin-category-options">
+        {marketplaceCategoryDefinitions.map(category => (
+          <option key={category.id} value={category.id}>{category.label}</option>
+        ))}
+      </datalist>
       <ActionConfirmDialog
         confirmLabel={
           pendingDeleteAction?.permanent ? 'حذف نهائي' : 'حذف الإعلان'

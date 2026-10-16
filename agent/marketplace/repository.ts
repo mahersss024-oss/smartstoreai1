@@ -20,6 +20,7 @@ import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
 import { resolveListingCategory } from './listing-category';
+import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { getComparableListings } from './market-intelligence';
 import {
   getMarketplaceSearchTermVariants,
@@ -1041,7 +1042,9 @@ export async function listMarketplaceListings(
   }
 
   if (category) {
-    searchConditions.push({ category });
+    const categories = !filters.category && termGroups.length
+      ? getMarketplaceCategorySearchIds(category) : [category];
+    searchConditions.push(categories.length > 1 ? { category: { in: categories } } : { category });
   }
 
   if (city) {
