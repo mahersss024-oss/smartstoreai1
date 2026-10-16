@@ -1,0 +1,177 @@
+/* TailAdmin layout, scoped to administration and using the marketplace theme. */
+.admin-workspace {
+  height: calc(100dvh - var(--mobile-web-app-banner-space, 0px));
+  min-height: calc(100dvh - var(--mobile-web-app-banner-space, 0px));
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  letter-spacing: 0;
+}
+.admin-sidebar {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: 17rem;
+  border-inline-end: 1px solid var(--border);
+  background: var(--card);
+  transform: translateX(100%);
+  overflow-y: auto;
+  transition:
+    width 0.2s,
+    transform 0.2s;
+}
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.admin-nav-item:hover,
+.admin-nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+.admin-nav-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.admin-topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 4rem;
+  min-height: 4rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.admin-content {
+  min-width: 0;
+  height: calc(100% - 4rem);
+}
+.admin-content > main {
+  height: 100% !important;
+  min-height: 100% !important;
+  padding-top: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: transparent !important;
+}
+.admin-content > main > div {
+  min-height: 0 !important;
+  padding-bottom: 2rem !important;
+}
+.admin-content > main > div > header:first-child {
+  position: static !important;
+}
+.admin-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #0008;
+}
+.admin-sidebar {
+  visibility: hidden;
+}
+.admin-workspace[data-mobile-open='true'] .admin-sidebar {
+  visibility: visible;
+  transform: translateX(0);
+}
+.admin-panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+}
+.admin-panel-heading {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.admin-panel-body {
+  min-width: 0;
+  padding: 1rem;
+}
+.admin-chart {
+  height: 280px;
+  direction: ltr;
+}
+.admin-chart .apexcharts-tooltip {
+  color: #17212b;
+}
+.admin-calendar {
+  min-width: 0;
+  font-size: 0.8rem;
+  --fc-classic-primary: var(--primary);
+  --fc-classic-primary-foreground: var(--primary-foreground);
+  --fc-classic-background: var(--card);
+  --fc-classic-foreground: var(--foreground);
+  --fc-classic-border: var(--border);
+  --fc-classic-muted-foreground: var(--muted-foreground);
+  --fc-classic-today: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.admin-calendar .fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-button-bg-color: var(--primary);
+  --fc-button-border-color: var(--primary);
+  --fc-today-bg-color: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.admin-calendar .fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.admin-calendar .fc-toolbar-title {
+  font-size: 1rem;
+}
+.admin-calendar .fc-event {
+  cursor: pointer;
+}
+@media (min-width: 1280px) {
+  .admin-sidebar {
+    visibility: visible;
+    transform: none;
+  }
+  .admin-content,
+  .admin-topbar {
+    margin-inline-start: 17rem;
+    transition: margin-inline-start 0.2s;
+  }
+  .admin-workspace[data-expanded='false'] .admin-sidebar {
+    width: 5rem;
+  }
+  .admin-workspace[data-expanded='false'] .admin-sidebar-label {
+    display: none;
+  }
+  .admin-workspace[data-expanded='false'] .admin-content,
+  .admin-workspace[data-expanded='false'] .admin-topbar {
+    margin-inline-start: 5rem;
+  }
+  .admin-drawer-backdrop {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-workspace * {
+    transition: none !important;
+  }
+}

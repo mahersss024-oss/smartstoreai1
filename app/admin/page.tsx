@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -19,6 +19,7 @@ import {
 
 import { Button } from '@ui/button';
 import { useAdminAccess } from './use-admin-access';
+import { WorkspaceDashboard } from '@/components/admin/workspace-dashboard';
 
 export default function AdminHomePage() {
   const [overview, setOverview] = useState<{
@@ -191,7 +192,8 @@ export default function AdminHomePage() {
               {overviewNotice && <p className="col-span-full py-4 text-sm text-red-700 dark:text-red-300">{overviewNotice}</p>}
             </section>
           )}
-          <nav aria-label="أقسام الإدارة" className="grid">
+          {canManageUsers && <Suspense fallback={<p role="status" className="py-6 text-sm text-muted-foreground">جارٍ تحميل متابعة الإدارة...</p>}><WorkspaceDashboard /></Suspense>}
+          <nav aria-label="أقسام الإدارة" className="grid sm:grid-cols-2 gap-x-6">
             {adminSections.map((section) => (
               <Link
                 key={section.href}
