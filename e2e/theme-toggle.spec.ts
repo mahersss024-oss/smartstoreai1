@@ -1,21 +1,22 @@
 import { expect, test } from '@playwright/test';
 import { createSessionCookie } from '@/lib/auth/session';
 
+test.beforeEach(async ({ page, baseURL }) => {
+  const cookie = createSessionCookie({ id: 'theme-customer', email: 'theme-customer@example.test', name: 'Theme customer' });
+  await page.context().addCookies([{
+    name: 'smartstore_session', value: decodeURIComponent(cookie.split(';')[0].split('=').slice(1).join('=')),
+    url: baseURL!, httpOnly: true, sameSite: 'Lax',
+  }]);
+});
+
 test('theme colors and icon settle at the first frame without interrupting motion', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('smartstore_welcome_seen', '1');
     localStorage.setItem('theme', 'light');
   });
-  await page.route('**/api/marketplace/listings?**', route => route.fulfill({ json: {
-    listings: Array.from({ length: 24 }, (_, index) => ({
-      id: `theme-frame-${index}`, title: `Desk ${index}`, category: 'furniture', city: 'Riyadh',
-      price: 100, status: 'published', createdAt: '2026-10-15T00:00:00Z',
-      images: [{ status: 'approved', thumbnailUrl: '/hamad-market-logo.webp' }],
-    })), pagination: { page: 1, hasMore: false },
-  } }));
-  await page.goto('/');
-  await expect(page.locator('.marketplace-listing-card')).toHaveCount(24);
-  const toggle = page.locator('.marketplace-panel button').filter({ has: page.locator('.lucide-sun, .lucide-moon') }).first();
+  await page.goto('/account');
+  const toggle = page.locator('button[aria-pressed]').filter({ has: page.locator('.lucide-sun, .lucide-moon') });
+  await expect(toggle).toBeVisible();
   const results = [];
   for (const dark of [true, false]) {
     await page.evaluate(() => {
@@ -25,9 +26,8 @@ test('theme colors and icon settle at the first frame without interrupting motio
       document.body.appendChild(probe);
       void getComputedStyle(probe).transform;
       const targets = [
-        document.body, document.querySelector('.marketplace-listing-card')!,
-        document.querySelector('.marketplace-home-controls')!,
-        ...document.querySelectorAll('.marketplace-home-controls button'),
+        document.body, document.querySelector('main')!,
+        ...document.querySelectorAll('main button'),
       ];
       let started = 0;
       toggle.addEventListener('pointerdown', () => { started = performance.now(); }, { once: true, capture: true });
@@ -100,7 +100,7 @@ test('theme toggles immediately even while preference persistence is deferred', 
       },
     });
   });
-  await page.goto('/');
+  await page.goto('/account');
   const toggle = page.getByRole('button', { name: /^الوضع (الداكن|الفاتح)$/ });
   await expect(toggle).toHaveAttribute('aria-label', 'الوضع الداكن');
   for (const dark of [true, false, true, false, true]) {
@@ -141,7 +141,7 @@ test('theme remains usable when the browser refuses preference writes', async ({
     sessionStorage.setItem('smartstore_welcome_seen', '1');
     localStorage.setItem('theme', 'light');
   });
-  await page.goto('/');
+  await page.goto('/account');
   const toggle = page.getByRole('button', { name: /^الوضع (الداكن|الفاتح)$/ });
   await expect(toggle).toBeVisible();
   await page.evaluate(() => {
@@ -158,12 +158,7 @@ test('theme remains usable when the browser refuses preference writes', async ({
   expect(errors).toEqual([]);
 });
 
-test('account appearance switch and home icon share the applied theme across navigation', async ({ page, baseURL }, testInfo) => {
-  const cookie = createSessionCookie({ id: 'theme-customer', email: 'theme-customer@example.test', name: 'Theme customer' });
-  await page.context().addCookies([{
-    name: 'smartstore_session', value: decodeURIComponent(cookie.split(';')[0].split('=').slice(1).join('=')),
-    url: baseURL!, httpOnly: true, sameSite: 'Lax',
-  }]);
+test('account appearance switch persists on home without a duplicate theme button', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('smartstore_welcome_seen', '1');
     if (!localStorage.getItem('theme')) localStorage.setItem('theme', 'light');
@@ -178,10 +173,17 @@ test('account appearance switch and home icon share the applied theme across nav
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   const homeToggle = page.getByRole('button', { name: /^الوضع (الداكن|الفاتح)$/ });
-  await expect(homeToggle).toHaveAttribute('aria-label', 'الوضع الفاتح');
+  await expect(homeToggle).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('theme-dark.png') });
-  await homeToggle.click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  await expect(homeToggle).toHaveCount(0);
+  await page.goto('/account');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('theme'))).toBe('light');
+  await page.goto('/');
   await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
-  await expect(homeToggle).toHaveAttribute('aria-label', 'الوضع الداكن');
+  await expect(homeToggle).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('theme-light.png') });
 });

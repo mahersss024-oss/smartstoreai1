@@ -72,7 +72,7 @@ import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ListingCardImage } from '@/components/listing-card-image';
 import { ListingCardSkeleton } from '@/components/listing-card-skeleton';
 import { ListingShareButton } from '@/components/listing-share-button';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { ThemeSync } from '@/components/theme-toggle';
 import {
   chatServiceUnavailableMessage,
   isRawServiceErrorResponse,
@@ -2089,7 +2089,6 @@ export default function Page() {
   });
   const suppressMarketplaceToolsClickRef = useRef(false);
   const lastMarketplaceScrollTopRef = useRef(0);
-  const lastMarketplaceScrollAtRef = useRef(0);
   const lastMarketplaceScrollHeightRef = useRef(0);
   const marketplaceToolsManualLockUntilRef = useRef(0);
   const marketplaceToolsTopRevealTimerRef = useRef<ReturnType<
@@ -4138,25 +4137,17 @@ export default function Page() {
         );
       }
       const nextScrollHeight = event.currentTarget.scrollHeight;
-      const viewportHeight = event.currentTarget.clientHeight;
       const previousScrollTop = lastMarketplaceScrollTopRef.current;
       const previousScrollHeight = lastMarketplaceScrollHeightRef.current;
       const scrollDelta = nextScrollTop - previousScrollTop;
       const now = performance.now();
-      const previousScrollAt = lastMarketplaceScrollAtRef.current || now;
-      const scrollElapsed = Math.max(16, now - previousScrollAt);
-      const scrollSpeed = Math.abs(scrollDelta) / scrollElapsed;
       const didListGrow =
         previousScrollHeight > 0 && nextScrollHeight > previousScrollHeight + 8;
-      const distanceFromBottom =
-        nextScrollHeight - (nextScrollTop + viewportHeight);
-      const isNearListEnd = distanceFromBottom <= 96;
 
       lastMarketplaceScrollTopRef.current = nextScrollTop;
-      lastMarketplaceScrollAtRef.current = now;
       lastMarketplaceScrollHeightRef.current = nextScrollHeight;
 
-      if (nextScrollTop >= 24) {
+      if (nextScrollTop > 1) {
         cancelMarketplaceTopReveal();
       }
 
@@ -4178,7 +4169,7 @@ export default function Page() {
         return;
       }
 
-      if (nextScrollTop < 24) {
+      if (nextScrollTop <= 1) {
         marketplaceScrollReversalDistanceRef.current = 0;
         marketplaceScrollIntentRef.current = {
           direction: 0,
@@ -4194,7 +4185,7 @@ export default function Page() {
             const scrollContainer = marketplaceListingsScrollRef.current;
             if (
               scrollContainer?.isConnected &&
-              scrollContainer.scrollTop < 24 &&
+              scrollContainer.scrollTop <= 1 &&
               marketplaceToolsDragRef.current.pointerId === -1
             ) {
               marketplaceScrollIntentRef.current = {
@@ -4204,7 +4195,7 @@ export default function Page() {
               };
               setMarketplaceToolsHidden(false);
             }
-          }, 3000);
+          }, 120);
         }
         return;
       }
@@ -4218,22 +4209,10 @@ export default function Page() {
       }
 
       const direction = scrollDelta > 0 ? 1 : -1;
-      const isFastScroll = scrollSpeed >= 1.15;
-      const isMediumScroll = scrollSpeed >= 0.55;
-      const toggleCooldown = isFastScroll ? 1200 : isMediumScroll ? 1400 : 1600;
-      const hideStartTop = isFastScroll ? 128 : isMediumScroll ? 192 : 240;
-      const hideDistance = isFastScroll ? 208 : isMediumScroll ? 304 : 384;
-      const showDistance = isNearListEnd
-        ? isFastScroll
-          ? 160
-          : isMediumScroll
-            ? 224
-            : 288
-        : isFastScroll
-          ? 192
-          : isMediumScroll
-            ? 272
-            : 336;
+      const toggleCooldown = 120;
+      const hideStartTop = 12;
+      const hideDistance = 12;
+      const showDistance = 8;
       const scrollIntent = marketplaceScrollIntentRef.current;
 
       if (scrollIntent.direction === 0) {
@@ -4242,7 +4221,7 @@ export default function Page() {
       } else if (scrollIntent.direction !== direction) {
         marketplaceScrollReversalDistanceRef.current += Math.abs(scrollDelta);
         // Require a deliberate reversal before changing the accepted direction.
-        if (marketplaceScrollReversalDistanceRef.current < 72) {
+        if (marketplaceScrollReversalDistanceRef.current < 4) {
           return;
         }
         scrollIntent.direction = direction;
@@ -4491,7 +4470,7 @@ export default function Page() {
             </nav>
 
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              <ThemeToggle language="ar" />
+              <ThemeSync />
               {session.authenticated ? (
                 <Button asChild variant="outline" size="sm" className="rounded-md px-2 sm:px-3">
                   <Link href="/account" onClick={closeAssistantForNavigation} prefetch={false}>
@@ -4532,7 +4511,7 @@ export default function Page() {
                       'pointer-events-auto absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 will-change-transform sm:inset-x-3 lg:inset-x-4 lg:top-4',
                       isMarketplaceToolsDragging
                         ? 'transition-none'
-                        : 'transition-transform duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
+                        : 'transition-[transform,clip-path] duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
                     ),
               )}
               ref={marketplaceToolsPanelRef}
@@ -4566,6 +4545,12 @@ export default function Page() {
                   ? undefined
                   : ({
                       transform: marketplaceToolsTransform,
+                      // Clip the translated controls themselves, not the cards behind them.
+                      clipPath: isMarketplaceToolsDragging
+                        ? `inset(${-marketplaceToolsDragOffset}px -100vmax -100vmax)`
+                        : isMarketplaceTopActionsHidden
+                          ? 'inset(calc(100% - var(--marketplace-categories-height, 40px)) -100vmax -100vmax)'
+                          : 'inset(-1rem -100vmax -100vmax)',
                       touchAction: 'pan-x pinch-zoom',
                     } as CSSProperties)
               }

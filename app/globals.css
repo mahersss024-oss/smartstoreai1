@@ -10,7 +10,7 @@ html[data-theme-switching]::after,
 html[data-theme-switching] *,
 html[data-theme-switching] *::before,
 html[data-theme-switching] *::after {
-  transition-property: transform, translate, scale, rotate, opacity,
+  transition-property: transform, translate, scale, rotate, opacity, clip-path,
     width, height, min-width, min-height, max-width, max-height,
     top, right, bottom, left, flex-basis, grid-template-columns,
     grid-template-rows, gap, border-radius !important;

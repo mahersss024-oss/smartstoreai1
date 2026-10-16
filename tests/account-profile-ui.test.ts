@@ -176,7 +176,7 @@ test('account hub options use the same row layout as profile settings', () => {
 }
 );
 
-test('theme toggle stays on home and account settings only', () => {
+test('theme toggle stays in account settings while home retains theme synchronization', () => {
   const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
   const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
   const pagesWithoutThemeToggle = [
@@ -188,7 +188,8 @@ test('theme toggle stays on home and account settings only', () => {
   ].map((segments) => readFileSync(join(process.cwd(), ...segments), 'utf8'));
 
   assert.match(accountPage, /<ThemeToggle language="ar" variant="switch" \/>/);
-  assert.match(homePage, /<ThemeToggle language="ar" \/>/);
+  assert.doesNotMatch(homePage, /ThemeToggle/);
+  assert.match(homePage, /<ThemeSync \/>/);
   assert.doesNotMatch(homePage, /PushNotificationSettings/);
 
   for (const source of pagesWithoutThemeToggle) {

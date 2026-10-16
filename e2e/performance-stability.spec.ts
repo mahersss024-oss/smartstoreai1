@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, type Request, test } from '@playwright/test';
 
 import { createSessionCookie } from '@/lib/auth/session';
 
@@ -382,7 +382,7 @@ async function auditCurrentPage(page: Page, path: string) {
 
 async function auditThemeToggle(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/account', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(500);
 
@@ -400,7 +400,7 @@ async function auditThemeToggle(page: Page) {
 
   console.log(
     JSON.stringify({
-      page: 'home theme-toggle 360x800',
+      page: 'account theme-toggle 360x800',
       toggleElapsedMs: Date.now() - startedAt,
       before,
       afterDark,
@@ -436,6 +436,7 @@ test.describe('mobile and tablet production performance stability audit', () => 
 
     const consoleErrors: string[] = [];
     const failedRequests: string[] = [];
+    const successfulPrefetches = new WeakSet<Request>();
 
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -447,11 +448,19 @@ test.describe('mobile and tablet production performance stability audit', () => 
         return;
       }
 
+      // A cancelled, successful prefetch is not a failed page or API response.
+      if (successfulPrefetches.has(request) && request.failure()?.errorText === 'net::ERR_ABORTED') {
+        return;
+      }
+
       failedRequests.push(`${request.method()} ${request.url()}`);
     });
     page.on('response', (response) => {
       const status = response.status();
       const url = response.url();
+      if (response.ok() && response.request().headers()['next-router-prefetch'] === '1') {
+        successfulPrefetches.add(response.request());
+      }
       if (status >= 400 && !url.includes('/api/realtime/stream')) {
         failedRequests.push(`${status} ${url}`);
       }

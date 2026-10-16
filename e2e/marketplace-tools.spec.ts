@@ -97,32 +97,107 @@ async function expectCategoriesVisible(page: Page) {
   }).toBeGreaterThanOrEqual(-1);
 }
 
-test('tools ignore brief reversals and wait at the top without a stale reveal', async ({ page }) => {
+test('tools respond to small scrolls, ignore jitter and reveal promptly at the top', async ({ page }) => {
   const panel = await openMarketplace(page);
-  await scrollTo(page, 100);
-  await scrollTo(page, 80);
-  await scrollTo(page, 140);
+  await scrollTo(page, 6);
   await expectHidden(panel, false);
-  await scrollTo(page, 600);
+  await scrollTo(page, 16);
   await expectHidden(panel, true);
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(1150);
   await expectCategoriesVisible(page);
-  await scrollTo(page, 560);
-  await scrollTo(page, 580);
-  await scrollTo(page, 460);
+  await scrollTo(page, 15);
+  await scrollTo(page, 16);
   await expectHidden(panel, true);
-
-  await scrollTo(page, 0);
-  await page.waitForTimeout(1500);
-  await expectHidden(panel, true);
-  await scrollTo(page, 100);
-  await page.waitForTimeout(3100);
-  await expectHidden(panel, true);
-  await scrollTo(page, 0);
-  await page.waitForTimeout(2500);
-  await expectHidden(panel, true);
-  await page.waitForTimeout(700);
+  await scrollTo(page, 8);
   await expectHidden(panel, false);
+  await page.waitForTimeout(150);
+  await scrollTo(page, 24);
+  await expectHidden(panel, true);
+  // Leaving the top cancels its delayed reveal instead of reopening stale tools.
+  await page.locator('#suggested-listings .marketplace-listings-scroll').evaluate(element => {
+    for (const top of [0, 40]) {
+      element.scrollTo({ top, behavior: 'instant' });
+      element.dispatchEvent(new Event('scroll'));
+    }
+  });
+  await page.waitForTimeout(180);
+  await expectHidden(panel, true);
+  await scrollTo(page, 0);
+  await expectHidden(panel, false);
+});
+
+test('hidden controls leave no painted or clickable strip and do not displace browsed cards', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const panel = await openMarketplace(page);
+  const list = page.locator('#suggested-listings .marketplace-listings-scroll');
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 },
+    { width: 768, height: 1024 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport);
+    for (const dark of [false, true]) {
+      await page.evaluate(value => document.documentElement.classList.toggle('dark', value), dark);
+      await scrollTo(page, 600);
+      await page.waitForTimeout(1150);
+      await list.evaluate(async element => {
+        const content = element.querySelector('.marketplace-listings-content')!;
+        content.getBoundingClientRect();
+        await Promise.all(content.getAnimations().map(animation => animation.finished));
+      });
+      // Record the settled list height before testing a direction reversal.
+      await scrollTo(page, 616);
+      await page.waitForTimeout(150);
+      const before = await list.evaluate(element => ({
+        top: element.getBoundingClientRect().top,
+        scroll: element.scrollTop,
+        card: element.querySelector('.marketplace-listing-card-enter')!.getBoundingClientRect().top,
+      }));
+      await scrollTo(page, 608);
+      await expectHidden(panel, false);
+      await page.waitForTimeout(1150);
+      const shown = await list.evaluate(element => ({
+        top: element.getBoundingClientRect().top,
+        scroll: element.scrollTop,
+        card: element.querySelector('.marketplace-listing-card-enter')!.getBoundingClientRect().top,
+      }));
+      expect(shown.top).toBe(before.top);
+      expect(shown.scroll).toBe(608);
+      expect(shown.card).toBeCloseTo(before.card + before.scroll - 608, 5);
+      await scrollTo(page, 620);
+      await expectHidden(panel, true);
+      await page.waitForTimeout(1150);
+      await expectCategoriesVisible(page);
+      const after = await list.evaluate(element => ({
+        top: element.getBoundingClientRect().top,
+        scroll: element.scrollTop,
+        card: element.querySelector('.marketplace-listing-card-enter')!.getBoundingClientRect().top,
+      }));
+      expect(after.top).toBe(before.top);
+      expect(after.scroll).toBe(620);
+      expect(after.card).toBeCloseTo(before.card + before.scroll - 620, 5);
+      const geometry = await panel.evaluate(element => {
+        const categories = element.querySelector('[data-marketplace-categories]')!.getBoundingClientRect();
+        const y = categories.top - 2;
+        const hits = [0.1, 0.5, 0.9].map(ratio => document.elementFromPoint(
+          categories.left + categories.width * ratio, y,
+        ));
+        return {
+          stripHitsTools: hits.some(hit => hit && element.contains(hit)),
+          transition: getComputedStyle(element).transitionDuration,
+          clip: getComputedStyle(element).clipPath,
+        };
+      });
+      expect(geometry.stripHitsTools).toBe(false);
+      expect(geometry.clip).not.toBe('none');
+      expect(geometry.transition).toBe('1.05s');
+      const guardedTransition = await panel.evaluate(element => {
+        document.documentElement.setAttribute('data-theme-switching', '');
+        const properties = getComputedStyle(element).transitionProperty;
+        document.documentElement.removeAttribute('data-theme-switching');
+        return properties;
+      });
+      expect(guardedTransition).toContain('clip-path');
+      await page.screenshot({ path: testInfo.outputPath(`hidden-tools-${viewport.width}-${dark ? 'dark' : 'light'}.png`) });
+    }
+  }
 });
 
 test('first card clears categories without moving the floating scroll viewport', async ({ page }, testInfo) => {

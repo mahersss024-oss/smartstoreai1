@@ -114,6 +114,11 @@ type ThemeToggleProps = {
   variant?: 'icon' | 'switch';
 };
 
+function ThemeSync() {
+  useTheme();
+  return null;
+}
+
 function ThemeToggle({ language = 'ar', variant = 'icon' }: ThemeToggleProps) {
   const theme = useTheme();
   const copy = appCopy[language];
@@ -178,4 +183,4 @@ function ThemeToggle({ language = 'ar', variant = 'icon' }: ThemeToggleProps) {
   );
 }
 
-export { ThemeToggle };
+export { ThemeSync, ThemeToggle };

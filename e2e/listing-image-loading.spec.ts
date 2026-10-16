@@ -123,9 +123,13 @@ test('first listing image loads promptly without changing card geometry or loadi
   const originalImage = await first.elementHandle();
   const imageSize = await first.boundingBox();
   const toggle = page.getByRole('button', { name: /^الوضع (الداكن|الفاتح)$/ });
+  await expect(toggle).toHaveCount(0);
   for (const dark of [true, false]) {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-label', dark ? 'الوضع الفاتح' : 'الوضع الداكن');
+    await page.evaluate(value => {
+      const theme = value ? 'dark' : 'light';
+      localStorage.setItem('theme', theme);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'theme', newValue: theme }));
+    }, dark);
     await expect.poll(() => page.locator('html').evaluate(element => element.classList.contains('dark'))).toBe(dark);
     await page.waitForLoadState('networkidle');
     expect(await originalImage!.evaluate(element => element.isConnected)).toBe(true);
