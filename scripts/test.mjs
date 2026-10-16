@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -48,14 +48,28 @@ function loadEnvFile(path) {
 loadEnvFile(resolve(process.cwd(), '.env.local'));
 
 const dataDir = mkdtempSync(join(tmpdir(), 'smartstore-test-data-'));
-const testTargets = process.argv.slice(2);
+const coverage = process.argv.includes('--coverage');
+const testTargets = process.argv.slice(2).filter(argument => argument !== '--coverage');
 const patterns = testTargets.length > 0 ? testTargets : ['tests/*.test.ts'];
+const coverageOptions = coverage ? [
+  '--experimental-test-coverage',
+  ...['agent/**', 'app/**', 'components/**', 'hooks/**', 'lib/**', 'public/**', 'scripts/**', 'proxy.ts', 'next.config.ts']
+    .map(pattern => `--test-coverage-include=${pattern}`),
+  '--test-reporter=spec', '--test-reporter-destination=stdout',
+  '--test-reporter=./scripts/testing/coverage-reporter.mjs',
+  '--test-reporter-destination=coverage/unit-summary.json',
+] : [];
+if (coverage) mkdirSync('coverage', { recursive: true });
 const child = spawn(
   process.execPath,
-  ['node_modules/tsx/dist/cli.mjs', '--test', ...patterns],
+  ['node_modules/tsx/dist/cli.mjs', '--test', ...coverageOptions, ...patterns],
   {
     env: {
       ...process.env,
+      // Stores use the test lifecycle to disable persistence between test cases.
+      npm_lifecycle_event: 'test',
+      ...(process.env.npm_lifecycle_event === 'test:db:integration'
+        ? { SMARTSTORE_DB_INTEGRATION: '1' } : {}),
       SMARTSTORE_DATA_DIR: dataDir,
     },
     stdio: 'inherit',

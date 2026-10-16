@@ -365,8 +365,13 @@ html[data-theme-switching] *::after {
     --seller-panel-background: #1e293b;
   }
 
-  #suggested-listings > .marketplace-home-controls {
+  #suggested-listings .marketplace-home-controls {
     container-type: inline-size;
+  }
+
+  /* Keep the clipping edge stationary while only the tools translate beneath it. */
+  .marketplace-tools-viewport {
+    clip-path: inset(0 -100vmax -100vmax);
   }
 
   /* Reserve the first card's starting space without moving the scroll viewport. */
@@ -379,16 +384,16 @@ html[data-theme-switching] *::after {
     transition: none;
   }
 
-  #suggested-listings > [data-floating-tools] {
+  #suggested-listings .marketplace-tools-viewport > [data-floating-tools] {
     isolation: isolate;
     user-select: none;
   }
 
-  #suggested-listings > [data-floating-tools] :is(input, textarea, [contenteditable="true"]) {
+  #suggested-listings .marketplace-tools-viewport > [data-floating-tools] :is(input, textarea, [contenteditable="true"]) {
     user-select: text;
   }
 
-  #suggested-listings > [data-floating-tools]::before {
+  #suggested-listings .marketplace-tools-viewport > [data-floating-tools]::before {
     content: "";
     position: absolute;
     inset: -1px;
@@ -397,7 +402,7 @@ html[data-theme-switching] *::after {
     pointer-events: none;
   }
 
-  #suggested-listings > [data-floating-tools] button:not(.marketplace-tools-region button) {
+  #suggested-listings .marketplace-tools-viewport > [data-floating-tools] button:not(.marketplace-tools-region button) {
     touch-action: pan-x pinch-zoom;
   }
 

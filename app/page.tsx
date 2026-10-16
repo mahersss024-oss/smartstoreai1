@@ -4055,8 +4055,9 @@ export default function Page() {
         '--marketplace-categories-height',
         categoriesHeight,
       );
-      panel.parentElement?.style.setProperty('--marketplace-categories-height', categoriesHeight);
-      panel.parentElement?.style.setProperty('--marketplace-tools-height', `${panel.offsetHeight}px`);
+      const section = panel.closest<HTMLElement>('#suggested-listings');
+      section?.style.setProperty('--marketplace-categories-height', categoriesHeight);
+      section?.style.setProperty('--marketplace-tools-height', `${panel.offsetHeight}px`);
     };
     updateCategoriesHeight();
     const observer = new ResizeObserver(updateCategoriesHeight);
@@ -4503,15 +4504,18 @@ export default function Page() {
               id="suggested-listings"
               onPointerDown={collapseAssistantFromPage}
             >
+              <div className={isManualListingVisible
+                ? 'contents'
+                : 'marketplace-tools-viewport pointer-events-none absolute inset-x-2 bottom-0 top-2 z-20 sm:inset-x-3 lg:inset-x-4 lg:top-4'}>
               <div className={cn(
                 'marketplace-home-controls shrink-0 rounded-md border border-blue-100/70 bg-white shadow-sm dark:border-blue-400/10 dark:bg-card',
                 isManualListingVisible
                   ? 'max-h-[min(58dvh,34rem)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
                   : cn(
-                      'pointer-events-auto absolute inset-x-2 top-2 z-20 overflow-visible border-b-0 pb-0 will-change-transform sm:inset-x-3 lg:inset-x-4 lg:top-4',
+                      'pointer-events-auto relative overflow-visible border-b-0 pb-0 will-change-transform',
                       isMarketplaceToolsDragging
                         ? 'transition-none'
-                        : 'transition-[transform,clip-path] duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
+                        : 'transition-transform duration-[1050ms] ease-[cubic-bezier(0.16,0.86,0.22,1)]',
                     ),
               )}
               ref={marketplaceToolsPanelRef}
@@ -4545,12 +4549,6 @@ export default function Page() {
                   ? undefined
                   : ({
                       transform: marketplaceToolsTransform,
-                      // Clip the translated controls themselves, not the cards behind them.
-                      clipPath: isMarketplaceToolsDragging
-                        ? `inset(${-marketplaceToolsDragOffset}px -100vmax -100vmax)`
-                        : isMarketplaceTopActionsHidden
-                          ? 'inset(calc(100% - var(--marketplace-categories-height, 40px)) -100vmax -100vmax)'
-                          : 'inset(-1rem -100vmax -100vmax)',
                       touchAction: 'pan-x pinch-zoom',
                     } as CSSProperties)
               }
@@ -5136,6 +5134,7 @@ export default function Page() {
                     ))}
                   </div>
                 )}
+              </div>
               </div>
               </div>
 

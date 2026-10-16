@@ -182,11 +182,13 @@ test('hidden controls leave no painted or clickable strip and do not displace br
         return {
           stripHitsTools: hits.some(hit => hit && element.contains(hit)),
           transition: getComputedStyle(element).transitionDuration,
-          clip: getComputedStyle(element).clipPath,
+          clip: getComputedStyle(element.parentElement!).clipPath,
+          movingClip: getComputedStyle(element).clipPath,
         };
       });
       expect(geometry.stripHitsTools).toBe(false);
       expect(geometry.clip).not.toBe('none');
+      expect(geometry.movingClip).toBe('none');
       expect(geometry.transition).toBe('1.05s');
       const guardedTransition = await panel.evaluate(element => {
         document.documentElement.setAttribute('data-theme-switching', '');
@@ -194,7 +196,7 @@ test('hidden controls leave no painted or clickable strip and do not displace br
         document.documentElement.removeAttribute('data-theme-switching');
         return properties;
       });
-      expect(guardedTransition).toContain('clip-path');
+      expect(guardedTransition).toContain('transform');
       await page.screenshot({ path: testInfo.outputPath(`hidden-tools-${viewport.width}-${dark ? 'dark' : 'light'}.png`) });
     }
   }

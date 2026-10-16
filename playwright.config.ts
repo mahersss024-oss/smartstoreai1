@@ -12,8 +12,8 @@ const testDataDir = process.env.PLAYWRIGHT_BASE_URL
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
-  // Allow for the production build plus both sequential browser projects.
-  globalTimeout: 600_000,
+  // Include the complete route/page matrix and interaction journeys on both projects.
+  globalTimeout: 1_800_000,
   expect: {
     timeout: 10_000,
   },
