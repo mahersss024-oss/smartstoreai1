@@ -40,6 +40,8 @@ run:
       value: "1500"
     - name: SMARTSTORE_RUN_DB_MIGRATIONS_ON_START
       value: "1"
+    - name: SMARTSTORE_EVIDENCE_STORAGE_BUCKET
+      value: souqhamad-evidence
   secrets:
     - name: DATABASE_URL
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:DATABASE_URL::"
