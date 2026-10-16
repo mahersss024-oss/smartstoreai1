@@ -2148,6 +2148,7 @@ export default function Page() {
   const listingsReplaceRequestIdRef = useRef(0);
   const listingsAppendRequestIdRef = useRef(0);
   const listingsAbortControllersRef = useRef(new Set<AbortController>());
+  const listingsInFlightRequestsRef = useRef(new Map<string, Promise<void>>());
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const manualListingImagePreparationRef = useRef<{
     source: File[];
@@ -3133,11 +3134,31 @@ export default function Page() {
     options?: { showLoading?: boolean },
   ) => {
     const isAppendRequest = page > 1;
+    const params = new URLSearchParams();
+    const showLoading = options?.showLoading ?? true;
+    const effectiveQuery = query ?? marketplaceSearchQuery;
+
+    if (effectiveQuery.trim()) {
+      params.set('q', effectiveQuery.trim());
+    }
+
+    if (activeMarketCity !== 'all') {
+      params.set('city', activeMarketCity);
+    }
+
+    params.set('page', String(page));
+    params.set('limit', '24');
+
+    const endpoint = `/api/marketplace/listings?${params.toString()}`;
+    const existingRequest = listingsInFlightRequestsRef.current.get(endpoint);
+
+    if (existingRequest) {
+      return existingRequest;
+    }
+
     const requestId = isAppendRequest
       ? ++listingsAppendRequestIdRef.current
       : ++listingsReplaceRequestIdRef.current;
-    const params = new URLSearchParams();
-    const showLoading = options?.showLoading ?? true;
     const requestController = new AbortController();
     listingsAbortControllersRef.current.add(requestController);
 
@@ -3154,22 +3175,7 @@ export default function Page() {
       setIsLoadingListings(true);
     }
 
-    const effectiveQuery = query ?? marketplaceSearchQuery;
-
-    if (effectiveQuery.trim()) {
-      params.set('q', effectiveQuery.trim());
-    }
-
-    if (activeMarketCity !== 'all') {
-      params.set('city', activeMarketCity);
-    }
-
-    params.set('page', String(page));
-    params.set('limit', '24');
-
-    const endpoint = `/api/marketplace/listings?${params.toString()}`;
-
-    return fetch(endpoint, {
+    const request = fetch(endpoint, {
       cache: 'no-store',
       signal: requestController.signal,
     })
@@ -3220,12 +3226,16 @@ export default function Page() {
         setListingPagination({ page: 1, hasMore: false });
       })
       .finally(() => {
+        listingsInFlightRequestsRef.current.delete(endpoint);
         listingsAbortControllersRef.current.delete(requestController);
 
         if (isCurrentRequest()) {
           setIsLoadingListings(false);
         }
       });
+
+    listingsInFlightRequestsRef.current.set(endpoint, request);
+    return request;
   }, [activeMarketCity, marketplaceSearchQuery]);
 
   useEffect(() => {
