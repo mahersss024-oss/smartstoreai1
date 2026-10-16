@@ -117,8 +117,26 @@ for (const wrapper of [false, true]) {
           pixelFrames++;
         }
         await cdp.detach();
+        await info.attach('rapid-scroll-samples', { body: JSON.stringify(samples), contentType: 'application/json' });
+        const waitForScrollIdle = async () => {
+          let previous = Number.NaN;
+          let stableSamples = 0;
+          await expect.poll(async () => {
+            const current = await list.evaluate(element => element.scrollTop);
+            stableSamples = Math.abs(current - previous) < 0.1 ? stableSamples + 1 : 0;
+            previous = current;
+            return stableSamples;
+          }, { intervals: [100], timeout: 5000, message: 'Scroll momentum must settle before checking a new direction' }).toBeGreaterThanOrEqual(3);
+        };
+        // Finish native momentum and the direction cooldown before a controlled scroll.
+        // An arbitrary destination after flings may otherwise be upward, or emit no scroll at all.
+        await waitForScrollIdle();
+        await list.evaluate(element => element.scrollTo({ top: 1000, behavior: 'instant' }));
+        await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeCloseTo(1000, 0);
+        await waitForScrollIdle();
         // Confirm the toolbar still settles correctly after the stress sequence and at the list start.
-        await list.evaluate(element => element.scrollTo({ top: 5000, behavior: 'instant' }));
+        await list.evaluate(element => element.scrollTo({ top: 1500, behavior: 'instant' }));
+        await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeCloseTo(1500, 0);
         await page.waitForTimeout(1400);
         await expect(hidden).toHaveAttribute('inert', '');
         await list.evaluate(element => element.scrollTo({ top: 1000, behavior: 'instant' }));
@@ -129,7 +147,6 @@ for (const wrapper of [false, true]) {
         await expect(hidden).not.toHaveAttribute('inert');
         await expect(panel.locator('input').first()).toBeVisible();
         expect(errors).toEqual([]);
-        await info.attach('rapid-scroll-samples', { body: JSON.stringify(samples), contentType: 'application/json' });
         console.log(JSON.stringify({ rapidScroll: { project: info.project.name, wrapper, dark, samples: samples.length, pixelFrames } }));
       });
     }
