@@ -1,4 +1,5 @@
 import { marketplaceSearchCategoryRules as categoryMatchers } from '@/lib/marketplace/category-matching';
+import { getProductAliases, getProductCategory } from '@/lib/marketplace/product-lexicon';
 import {
   marketplaceTermAliasEntries,
   vehicleBrandAliasEntries,
@@ -501,7 +502,7 @@ function getPriceBounds(normalizedQuery: string) {
 
 export function getMarketplaceSearchTermVariants(term: string) {
   const normalizedTerm = normalizeMarketplaceSearchText(term);
-  const baseTerms = termSynonyms.get(normalizedTerm) ?? termSynonyms.get(term) ?? [term];
+  const baseTerms = [...(termSynonyms.get(normalizedTerm) ?? termSynonyms.get(term) ?? [term]), ...getProductAliases(term)];
   const variants = uniqueValues([term, normalizedTerm, ...baseTerms]).flatMap(
     (baseTerm) =>
       getArabicArticleVariants(baseTerm).flatMap(getArabicEndingVariants),
@@ -580,7 +581,7 @@ export function parseMarketplaceSearchQuery(
   );
 
   return {
-    category: categoryRule?.category,
+    category: getProductCategory(rawQuery) ?? categoryRule?.category,
     city: cityRule?.city,
     minPrice: priceBounds.minPrice,
     maxPrice: priceBounds.maxPrice,

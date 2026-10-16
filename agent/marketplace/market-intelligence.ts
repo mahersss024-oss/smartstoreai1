@@ -5,6 +5,7 @@ import {
 } from './ranking-engine';
 import { normalizeMarketplaceSearchText } from './search';
 import type { ListingRecord } from './store';
+import { canonicalProductTokens, getHeavyVehicleConfiguration, getProductIdentity, getProductOfferKind } from '@/lib/marketplace/product-lexicon';
 
 export type ListingMarketIntelligence = {
   listingId: string;
@@ -239,8 +240,7 @@ function productTextTokens(listing: ListingRecord) {
   );
 
   return new Set(
-    text
-      .split(/[^\p{L}\p{N}]+/u)
+    canonicalProductTokens(text)
       .map((token) => token.trim())
       .filter((token) => {
         return (
@@ -258,6 +258,15 @@ function productSimilarityScore(target: ListingRecord, candidate: ListingRecord)
   }
 
   const targetBrand = productIdentityValue(target, ['brand', 'make']);
+  const targetIdentity = getProductIdentity(target.title ?? '') ?? getProductIdentity(target.description ?? '');
+  const candidateIdentity = getProductIdentity(candidate.title ?? '') ?? getProductIdentity(candidate.description ?? '');
+  if (targetIdentity && candidateIdentity && targetIdentity.id !== candidateIdentity.id) return 0;
+  if (getProductOfferKind(target.title ?? '') !== getProductOfferKind(candidate.title ?? '')) return 0;
+  if (targetIdentity?.category === 'heavy_equipment') {
+    const targetConfiguration = getHeavyVehicleConfiguration(target.title ?? '');
+    const candidateConfiguration = getHeavyVehicleConfiguration(candidate.title ?? '');
+    if (targetConfiguration && candidateConfiguration && targetConfiguration !== candidateConfiguration) return 0;
+  }
   const candidateBrand = productIdentityValue(candidate, ['brand', 'make']);
   const targetModel = productIdentityValue(target, ['model', 'series']);
   const candidateModel = productIdentityValue(candidate, ['model', 'series']);
@@ -265,6 +274,10 @@ function productSimilarityScore(target: ListingRecord, candidate: ListingRecord)
   const candidateTokens = productTextTokens(candidate);
   let score = 0;
   let hasProductIdentityMatch = false;
+  if (targetIdentity && candidateIdentity && targetIdentity.id === candidateIdentity.id) {
+    score += 8;
+    hasProductIdentityMatch = true;
+  }
 
   if (targetBrand && candidateBrand) {
     if (targetBrand !== candidateBrand) {

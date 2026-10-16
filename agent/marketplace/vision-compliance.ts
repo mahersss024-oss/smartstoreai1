@@ -1,4 +1,5 @@
 import { marketplaceVisionCategoryRules as categoryRules } from '@/lib/marketplace/category-matching';
+import { getProductCategory } from '@/lib/marketplace/product-lexicon';
 import { generateText, type ModelMessage } from 'ai';
 import { z } from 'zod';
 
@@ -213,7 +214,7 @@ export function inferExpectedMarketplaceCategory(text: string) {
     return undefined;
   }
 
-  return categoryRules.find((rule) =>
+  return getProductCategory(normalized) ?? categoryRules.find((rule) =>
     rule.patterns.some((pattern) => pattern.test(normalized)),
   )?.category;
 }

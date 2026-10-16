@@ -70,3 +70,27 @@ test('manual creation and account editing expose identical category IDs and labe
   await expect(editing).toHaveValue('home_appliances');
   await page.screenshot({ path: info.outputPath('account-categories.png') });
 });
+
+test('manual title recognizes colloquial products while typing and preserves explicit category selection', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
+  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
+  const form = page.locator('.marketplace-home-controls form');
+  const title = form.locator('input[maxlength="140"]');
+  const select = form.locator('select').first();
+  for (const value of ['وايت سكس للبيع', 'تريله للبيع', 'سطحه للبيع']) {
+    await title.fill(value);
+    await expect(select).toHaveValue('heavy_equipment');
+    await expect(title).toBeFocused();
+  }
+  await title.fill('قطع غيار تريله');
+  await expect(select).toHaveValue('auto_parts');
+  await title.fill('كنبة للبيع');
+  await expect(select).toHaveValue('furniture');
+  await select.selectOption('cameras');
+  await title.fill('وايت سكس للبيع');
+  await page.waitForTimeout(600);
+  await expect(select).toHaveValue('cameras');
+  await form.locator('textarea').focus();
+  await expect(select).toHaveValue('cameras');
+});

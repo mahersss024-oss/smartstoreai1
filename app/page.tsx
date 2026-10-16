@@ -1978,6 +1978,11 @@ export default function Page() {
       // Category suggestions must never prevent manual creation.
     }
   }, []);
+  useEffect(() => {
+    if (!isManualListingOpen || !manualListingForm.autoCategory) return;
+    const timeout = setTimeout(() => { void refreshManualCategorySuggestion(); }, 300);
+    return () => clearTimeout(timeout);
+  }, [isManualListingOpen, manualListingForm.autoCategory, manualListingForm.title, manualListingForm.description, refreshManualCategorySuggestion]);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
   const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
     useState<string[]>([]);
