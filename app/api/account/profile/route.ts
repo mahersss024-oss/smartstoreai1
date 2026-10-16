@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hasProtectedUserEvidence, lockUserEvidenceEntities, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -195,6 +196,10 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  return withEvidenceProtection(deleteProfile)(request);
+}
+
+async function deleteProfile(request: Request) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -236,8 +241,17 @@ export async function DELETE(request: Request) {
   });
 
   if (user) {
-    await prisma.user.delete({
-      where: { id: user.id },
+    await prisma.$transaction(async tx => {
+      await lockUserEvidenceEntities(tx, user.id);
+      if (await hasProtectedUserEvidence(user.id, tx)) {
+        await tx.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+        await tx.listing.updateMany({ where: { sellerId: user.id, status: { not: 'deleted' } }, data: { status: 'deleted' } });
+        await tx.conversation.updateMany({ where: { OR: [{ sellerId: user.id }, { buyerId: user.id }] }, data: { status: 'closed' } });
+        await tx.pushSubscription.deleteMany({ where: { userId: user.id } });
+        await tx.mobilePushToken.deleteMany({ where: { userId: user.id } });
+      } else {
+        await tx.user.delete({ where: { id: user.id } });
+      }
     });
   }
 

@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 import path from 'node:path';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
+import { prisma } from '@/lib/db/prisma';
 
 type StoreListingObjectInput = {
   data: Uint8Array;
@@ -214,11 +215,13 @@ function createPresignedRequest({
   key,
   mediaType,
   config,
+  cacheControl = listingObjectCacheControl,
 }: {
-  method: 'PUT' | 'DELETE';
+  method: 'PUT' | 'DELETE' | 'GET';
   key: string;
   mediaType?: string;
   config: S3ObjectStorageConfig;
+  cacheControl?: string;
 }) {
   if (!config.endpoint || !config.bucket || !config.accessKeyId) {
     throw new Error('Missing object storage configuration.');
@@ -236,7 +239,7 @@ function createPresignedRequest({
   const requestHeaders: Record<string, string> =
     method === 'PUT'
       ? {
-          'Cache-Control': listingObjectCacheControl,
+          'Cache-Control': cacheControl,
           'Content-Type': mediaType ?? 'application/octet-stream',
         }
       : {};
@@ -378,6 +381,70 @@ export async function storeListingObject(input: StoreListingObjectInput) {
   return storeListingObjectInS3(input);
 }
 
+function getEvidenceStorageConfig() {
+  const config = getS3ObjectStorageConfig();
+  const bucket = process.env.SMARTSTORE_EVIDENCE_STORAGE_BUCKET?.trim();
+  if (!bucket || bucket === config.bucket) throw new Error('private_evidence_bucket_required');
+  return { ...config, bucket, publicUrl: undefined };
+}
+
+async function readEvidenceBody(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('empty_evidence_source');
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.length;
+      if (size > 20 * 1024 * 1024) throw new Error('evidence_source_too_large');
+      parts.push(chunk.value);
+    }
+  } finally { await reader.cancel(); }
+  return Buffer.concat(parts);
+}
+
+export async function readEvidenceSource(sourceUrl: string) {
+  if (/^data:image\/(jpeg|png|webp);base64,/.test(sourceUrl)) {
+    const [header, encoded] = sourceUrl.split(',', 2);
+    if (encoded.length > Math.ceil(20 * 1024 * 1024 * 4 / 3)) throw new Error('evidence_source_too_large');
+    const data = Buffer.from(encoded, 'base64');
+    if (data.length > 20 * 1024 * 1024) throw new Error('evidence_source_too_large');
+    return { data, mediaType: header.slice(5, -7) };
+  }
+  const config = getS3ObjectStorageConfig();
+  const key = getStoredObjectKeyFromUrl(config, sourceUrl);
+  if (!key || !key.startsWith('listings/') || key.split('/').some(part => part === '..')) {
+    throw new Error('untrusted_evidence_source');
+  }
+  // Read through authenticated storage, never fetch an arbitrary URL from a report.
+  const request = createPresignedRequest({ method: 'GET', key, config });
+  const response = await fetch(request.uploadUrl, { redirect: 'error', signal: AbortSignal.timeout(getObjectStorageTimeoutMs()) });
+  if (!response.ok) throw new Error(`evidence_source_http_${response.status}`);
+  const mediaType = response.headers.get('content-type')?.split(';')[0] ?? '';
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mediaType)) throw new Error('invalid_evidence_image');
+  return { data: await readEvidenceBody(response), mediaType };
+}
+
+export async function storeEvidenceObject(key: string, data: Buffer, mediaType: string) {
+  const config = getEvidenceStorageConfig();
+  const request = createPresignedRequest({ method: 'PUT', key, mediaType, config, cacheControl: 'private, no-store' });
+  const response = await fetchWithTimeout(request.uploadUrl, { method: 'PUT', headers: request.headers, body: new Uint8Array(data) }, getObjectStorageTimeoutMs());
+  if (!response.ok) throw new Error('evidence_upload_failed');
+}
+
+export async function readEvidenceObject(key: string) {
+  const request = createPresignedRequest({ method: 'GET', key, config: getEvidenceStorageConfig() });
+  const response = await fetch(request.uploadUrl, { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(getObjectStorageTimeoutMs()) });
+  if (!response.ok) throw new Error('evidence_read_failed');
+  return readEvidenceBody(response);
+}
+
+export async function deleteEvidenceObject(key: string) {
+  await deleteStoredObjectKey(getEvidenceStorageConfig(), key);
+}
+
 function getStoredObjectKeyFromUrl(config: S3ObjectStorageConfig, urlValue: string) {
   if (!urlValue) {
     return null;
@@ -505,6 +572,9 @@ async function purgeCloudflareCacheBestEffort(urls: string[]) {
 }
 
 export async function deleteListingObject(input: DeleteListingObjectInput) {
+  if (process.env.SMARTSTORE_MARKETPLACE_STORE === 'database' && input.urls?.length && await prisma.evidenceAsset.count({
+    where: { sourceHash: { in: input.urls.map(sha256Hex) }, status: { not: 'stored' }, evidenceCase: { status: { not: 'disposed' } } },
+  })) throw new Error('evidence_copy_pending');
   if (!isObjectStorageEnabled()) {
     return false;
   }

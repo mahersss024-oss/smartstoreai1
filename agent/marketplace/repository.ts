@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { createAdminAuditLog } from '@/lib/admin/audit';
 import {
   type PaginationInput,
   normalizePagination,
@@ -57,6 +58,7 @@ import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
 import { deleteListingObject } from './object-storage';
 import { recordDatabaseFirstPublication } from './listing-publication';
 import { runOptionalTask } from '@/lib/optional-task';
+import { scheduleEvidenceCopy, scheduleListingEvidenceCopy } from './evidence';
 
 type DatabaseListingRecord = {
   firstPublicationTracked?: boolean;
@@ -857,31 +859,6 @@ async function getAdminAuditActorId(actor?: Actor) {
 
   await ensureActorUser(actor);
   return getActorId(actor);
-}
-
-async function createAdminAuditLog(
-  tx: Prisma.TransactionClient,
-  input: {
-    adminId: string | null;
-    action: AdminAuditAction;
-    targetType: string;
-    targetId: string;
-    metadata?: Record<string, unknown>;
-  },
-) {
-  if (!input.adminId) {
-    return;
-  }
-
-  await tx.adminAuditLog.create({
-    data: {
-      adminId: input.adminId,
-      action: input.action,
-      targetType: input.targetType,
-      targetId: input.targetId,
-      metadata: toPrismaJsonObject(input.metadata ?? {}),
-    },
-  });
 }
 
 function toConversationRecord(
@@ -2117,8 +2094,8 @@ export async function reportUserDirect(
 
   await ensureActorUser(reporter);
 
-  const report = await prisma.userReport
-    .create({
+  const report = await prisma.$transaction(async tx => {
+    const created = await tx.userReport.create({
       data: {
         reporterId,
         targetUserId,
@@ -2126,7 +2103,10 @@ export async function reportUserDirect(
         details: input.details,
         status: 'open',
       },
-    })
+    });
+    await tx.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'UserReport', sourceId: created.id } } });
+    return created;
+  })
     .catch(async (error) => {
       if (
         !(error instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -2144,6 +2124,8 @@ export async function reportUserDirect(
         },
       });
     });
+
+  scheduleEvidenceCopy('UserReport', report.id);
 
   return {
     status: 'reported' as const,
@@ -2735,6 +2717,7 @@ export async function addListingImageForSeller(
   const mappedListing = listing ? toListingRecord(listing) : null;
 
   if (mappedListing) {
+    scheduleListingEvidenceCopy(mappedListing.id);
     safelyPublishRealtimeEvent({
       type: 'ad_updated',
       payload: {
@@ -3793,8 +3776,8 @@ export async function reportConversationUser(
 
   await ensureActorUser(reporter);
 
-  const report = await prisma.userReport
-    .create({
+  const report = await prisma.$transaction(async tx => {
+    const created = await tx.userReport.create({
       data: {
         reporterId,
         targetUserId,
@@ -3803,7 +3786,10 @@ export async function reportConversationUser(
         details: input.details,
         status: 'open',
       },
-    })
+    });
+    await tx.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'UserReport', sourceId: created.id } } });
+    return created;
+  })
     .catch(async (error) => {
       if (
         !(error instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -3821,6 +3807,8 @@ export async function reportConversationUser(
         },
       });
     });
+
+  scheduleEvidenceCopy('UserReport', report.id);
 
   safelyPublishRealtimeEvent({
     type: 'conversation_updated',
@@ -4659,6 +4647,7 @@ export async function reportListing(
         const report = await tx.report.create({
           data: { listingId, reporterId, reason, details },
         });
+        await tx.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
         return { report, alreadyReported: false };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       break;
@@ -4671,6 +4660,7 @@ export async function reportListing(
   }
   if (!result) throw new Error('Listing report transaction did not return a result.');
   const { report, alreadyReported } = result;
+  scheduleEvidenceCopy('Report', report.id);
 
   if (!alreadyReported) {
     safelyPublishRealtimeEvent({

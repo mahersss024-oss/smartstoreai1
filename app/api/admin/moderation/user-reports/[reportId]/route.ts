@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { actOnCaseEvidence, readCaseEvidence, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { setUserReportModerationStatus } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -38,12 +39,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (oversized) return oversized;
 
   const payload = await request.json().catch(() => null);
+  const { reportId } = await context.params;
+  const evidenceResponse = await actOnCaseEvidence('UserReport', reportId, session, payload);
+  if (evidenceResponse) return evidenceResponse;
   const parsed = actionSchema.safeParse(payload);
   if (!parsed.success) {
     return Response.json({ error: 'invalid_request' }, { status: 400 });
   }
 
-  const { reportId } = await context.params;
   const result = await setUserReportModerationStatus(
     reportId,
     parsed.data.action,
@@ -59,6 +62,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteReport)(request, context);
+}
+
+async function deleteReport(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
   if (!(await hasVerifiedModeratorAccess(session))) {
@@ -105,4 +112,13 @@ export async function DELETE(request: Request, context: RouteContext) {
   ]);
 
   return Response.json({ status: 'deleted', reportId });
+}
+
+export async function GET(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+  if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
+  if (!(await hasVerifiedModeratorAccess(session))) return Response.json({ error: 'admin_required' }, { status: 403 });
+  const limited = await enforceApiRateLimit(request, { namespace: 'evidence_read', actorId: session.user.id, maxRequests: 120, windowMs: 60_000 });
+  if (limited) return limited;
+  return readCaseEvidence('UserReport', (await context.params).reportId, session.user.id, request);
 }

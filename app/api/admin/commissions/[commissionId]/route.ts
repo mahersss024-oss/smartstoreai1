@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -93,6 +94,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteCommission)(request, context);
+}
+
+async function deleteCommission(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {

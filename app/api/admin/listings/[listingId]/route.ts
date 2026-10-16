@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
@@ -333,6 +334,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteListing)(request, context);
+}
+
+async function deleteListing(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {

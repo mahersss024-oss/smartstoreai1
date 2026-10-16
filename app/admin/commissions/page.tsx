@@ -207,7 +207,8 @@ export default function AdminCommissionsPage() {
       });
 
       if (!response.ok) {
-        setNotice('تعذر حذف سجل الرسوم.');
+        const payload = await response.json().catch(() => null) as { message?: string } | null;
+        setNotice(payload?.message ?? 'تعذر حذف سجل الرسوم.');
         return;
       }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -324,6 +325,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteUser)(request, context);
+}
+
+async function deleteUser(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {

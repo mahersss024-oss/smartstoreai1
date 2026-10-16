@@ -106,7 +106,16 @@ test('database listing reports remain unique under concurrent requests', async (
     assert.equal(await prisma.report.count({ where: { listingId, reporterId: buyer } }), 1);
     assert.equal(await repository.hasReportedListing(listing.id, buyer), true);
   } finally {
-    if (listingId) await prisma.listing.deleteMany({ where: { id: listingId } });
+    if (listingId) {
+      const cases = await prisma.evidenceCase.findMany({ where: { listingId }, select: { id: true } });
+      const ids = cases.map(item => item.id);
+      await prisma.evidenceCase.updateMany({ where: { id: { in: ids } }, data: { status: 'disposing' } });
+      await prisma.evidenceEvent.deleteMany({ where: { caseId: { in: ids } } });
+      await prisma.evidenceAsset.deleteMany({ where: { caseId: { in: ids } } });
+      await prisma.evidenceCase.updateMany({ where: { id: { in: ids } }, data: { status: 'disposed', snapshot: {}, snapshotHash: '', participantIds: [], conversationIds: [], listingId: null } });
+      await prisma.evidenceCase.deleteMany({ where: { id: { in: ids } } });
+      await prisma.listing.deleteMany({ where: { id: listingId } });
+    }
     await prisma.user.deleteMany({ where: { id: { in: [seller.id, buyer] } } });
     await prisma.$disconnect();
     if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;

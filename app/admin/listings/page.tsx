@@ -617,7 +617,7 @@ function AdminListingsPageContent() {
         if (!response.ok) {
           setActionNotice({
             tone: 'danger',
-            message: 'تعذر حذف الإعلان نهائيًا.',
+            message: ((await response.json().catch(() => null)) as { message?: string } | null)?.message ?? 'تعذر حذف الإعلان نهائيًا.',
           });
           return;
         }

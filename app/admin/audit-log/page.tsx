@@ -19,6 +19,7 @@ type AuditRecord = {
 };
 
 const actionLabels: Record<string, string> = {
+  manage_evidence: 'إدارة أدلة قضية',
   approve_listing: 'نشر أو تعديل إعلان',
   update_listing: 'تعديل حالة أو بيانات إعلان',
   reject_listing: 'رفض أو إيقاف إعلان',
@@ -35,6 +36,7 @@ const actionLabels: Record<string, string> = {
 };
 
 const entityLabels: Record<string, string> = {
+  evidence_case: 'أدلة قضية',
   listing: 'إعلان', report: 'بلاغ إعلان', user_report: 'بلاغ محادثة',
   user: 'مستخدم', commission: 'رسوم', maintenance: 'صيانة', site_message: 'رسالة الموقع',
 };

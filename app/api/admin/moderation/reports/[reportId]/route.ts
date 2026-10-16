@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { actOnCaseEvidence, readCaseEvidence, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -72,6 +73,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'invalid_json' }, { status: 400 });
   }
 
+  const { reportId } = await context.params;
+  const evidenceResponse = await actOnCaseEvidence('Report', reportId, session, payload);
+  if (evidenceResponse) return evidenceResponse;
   const parsed = reportActionSchema.safeParse(payload);
 
   if (!parsed.success) {
@@ -81,7 +85,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const { reportId } = await context.params;
   const result = await setReportModerationStatus(
     reportId,
     getReportStatus(parsed.data.action),
@@ -96,6 +99,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteReport)(request, context);
+}
+
+async function deleteReport(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -146,4 +153,13 @@ export async function DELETE(request: Request, context: RouteContext) {
   ]);
 
   return Response.json({ status: 'deleted', reportId });
+}
+
+export async function GET(request: Request, context: RouteContext) {
+  const session = getAuthSession(request);
+  if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
+  if (!(await hasVerifiedModeratorAccess(session))) return Response.json({ error: 'admin_required' }, { status: 403 });
+  const limited = await enforceModerationReportMutationRateLimit(request, session.user.id);
+  if (limited) return limited;
+  return readCaseEvidence('Report', (await context.params).reportId, session.user.id, request);
 }

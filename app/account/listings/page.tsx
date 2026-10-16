@@ -1144,7 +1144,8 @@ export default function AccountListingsPage() {
         }
 
         if (!response.ok) {
-          setImageDeleteError('تعذر حذف الصورة الآن.');
+          const payload = await response.json().catch(() => null) as { message?: string } | null;
+          setImageDeleteError(payload?.message ?? 'تعذر حذف الصورة الآن.');
           return;
         }
 

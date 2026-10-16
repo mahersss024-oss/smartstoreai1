@@ -23,6 +23,7 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
 import { useAdminAccess } from '../use-admin-access';
+import { EvidencePanel } from './evidence-panel';
 
 type ListingRecord = {
   id: string;
@@ -292,6 +293,7 @@ function ListingReportsSection({
   isLoading,
   processingReportId,
   canDeleteReports,
+  canManageEvidence,
   onResolve,
   onDelete,
 }: Readonly<{
@@ -299,6 +301,7 @@ function ListingReportsSection({
   isLoading: boolean;
   processingReportId: string | null;
   canDeleteReports: boolean;
+  canManageEvidence: boolean;
   onResolve: (report: ReportRecord, action: ListingReportAction) => void;
   onDelete: (reportId: string) => void;
 }>) {
@@ -402,6 +405,7 @@ function ListingReportsSection({
                   </Button>
                 </div>
               )}
+              <EvidencePanel reportId={report.id} sourceType="Report" canManage={canManageEvidence} />
             </article>
           );
         })}
@@ -509,6 +513,7 @@ function UserReportsSection({
             </div>
             {isExpanded && (
               <>
+            <EvidencePanel reportId={report.id} sourceType="UserReport" canManage={canViewAccounts} />
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border p-2 text-xs leading-6">
                 <div className="font-bold">المبلّغ</div>
@@ -874,7 +879,8 @@ export default function AdminModerationPage() {
         );
 
         if (response.status === 409) {
-          setNotice('لا يمكن حذف البلاغ قبل إغلاقه.');
+          const payload = await response.json().catch(() => null) as { message?: string } | null;
+          setNotice(payload?.message ?? 'لا يمكن حذف البلاغ قبل إغلاقه.');
           return;
         }
 
@@ -1030,6 +1036,7 @@ export default function AdminModerationPage() {
             isLoading={isLoading}
             processingReportId={processingReportId}
             canDeleteReports={canDeleteReports}
+            canManageEvidence={adminAccessRole === 'owner' || adminAccessRole === 'admin'}
             onResolve={(report, action) => void resolveReport(report, action)}
             onDelete={(reportId) =>
               void deleteClosedReport(reportId, 'listing')

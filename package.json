@@ -12,7 +12,7 @@
     "test:inventory": "tsx scripts/test-inventory.ts",
     "test:coverage": "pnpm test:inventory && node scripts/test.mjs --coverage && tsx scripts/test-coverage-report.ts",
     "test:routes": "playwright test e2e/route-contracts.spec.ts --global-timeout=1200000",
-    "test:db:integration": "node scripts/test.mjs tests/db-integration.test.ts",
+    "test:db:integration": "node scripts/test.mjs tests/db-integration.test.ts tests/evidence-db-integration.test.ts",
     "test:e2e": "playwright test",
     "test:ai-load": "tsx scripts/ai-path-load-test.ts",
     "test:load": "node tests/load/scripts/run-k6.mjs tests/load/scenarios/public-read.js",

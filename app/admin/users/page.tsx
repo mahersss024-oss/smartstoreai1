@@ -347,9 +347,9 @@ export default function AdminUsersPage() {
           setNotice(
             payload?.message ??
               payload?.error ??
-              isPermanent
+              (isPermanent
                 ? 'تعذر حذف المستخدم نهائيًا.'
-                : 'تعذر تعطيل الحساب الآن.',
+                : 'تعذر تعطيل الحساب الآن.'),
           );
           return;
         }

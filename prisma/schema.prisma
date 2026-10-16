@@ -61,6 +61,7 @@ enum CommissionSource {
 }
 
 enum AdminAuditAction {
+  manage_evidence
   approve_listing
   update_listing
   reject_listing
@@ -491,6 +492,65 @@ model AdminAuditLog {
   @@index([action, createdAt])
   @@index([createdAt])
   @@index([targetType, targetId])
+}
+
+// Evidence deliberately has no foreign keys to deletable marketplace records.
+model EvidenceCase {
+  id              String   @id @default(cuid())
+  sourceType      String
+  sourceId        String
+  listingId       String?
+  participantIds  String[]
+  conversationIds String[]
+  snapshot        Json
+  snapshotHash    String
+  status          String   @default("open")
+  captureStatus   String   @default("pending")
+  closedAt        DateTime?
+  retainUntil     DateTime?
+  legalHold       Boolean  @default(false)
+  disposedAt      DateTime?
+  createdAt       DateTime @default(now())
+  assets          EvidenceAsset[]
+  events          EvidenceEvent[]
+
+  @@unique([sourceType, sourceId])
+  @@index([listingId, status])
+  @@index([participantIds], type: Gin)
+  @@index([conversationIds], type: Gin)
+}
+
+model EvidenceAsset {
+  id          String   @id @default(cuid())
+  caseId      String
+  sourceUrl   String
+  sourceHash  String
+  objectKey   String   @unique
+  status      String   @default("pending")
+  sha256      String?
+  mediaType   String?
+  byteLength  Int?
+  attempts    Int      @default(0)
+  lastError   String?
+  leaseUntil  DateTime?
+  createdAt   DateTime @default(now())
+  evidenceCase EvidenceCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@unique([caseId, sourceHash])
+  @@index([caseId, status])
+  @@index([sourceHash, status])
+}
+
+model EvidenceEvent {
+  id         String   @id @default(cuid())
+  caseId     String
+  action     String
+  actorId    String?
+  payload    Json
+  createdAt  DateTime @default(now())
+  evidenceCase EvidenceCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([caseId, createdAt, id])
 }
 
 model SiteMessage {

@@ -1,11 +1,12 @@
 import type { Prisma } from '@prisma/client';
+import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 import { z } from 'zod';
 
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
-import { getAuthSession } from '@/lib/auth/session';
+import { getAuthSession, type AuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
@@ -137,7 +138,7 @@ async function runCleanup(
   throw new Error('unsupported_cleanup_scope');
 }
 
-async function requireAdmin(request: Request) {
+async function requireAdmin(request: Request): Promise<{ response: Response } | { session: AuthSession }> {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -168,6 +169,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  return withEvidenceProtection(cleanupMaintenance)(request);
+}
+
+async function cleanupMaintenance(request: Request) {
   const admin = await requireAdmin(request);
 
   if ('response' in admin) {

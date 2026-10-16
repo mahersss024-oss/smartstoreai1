@@ -9,6 +9,7 @@ import { createPaginationMeta, parsePaginationFromRequest } from '@/lib/paginati
 export const dynamic = 'force-dynamic';
 
 const auditActions = new Set<AdminAuditAction>([
+  'manage_evidence',
   'approve_listing',
   'update_listing',
   'reject_listing',

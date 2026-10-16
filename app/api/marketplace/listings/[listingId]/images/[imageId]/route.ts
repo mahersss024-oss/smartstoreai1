@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { evidenceMutationResponse, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import {
   deleteListingImageForSeller,
@@ -104,6 +105,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withEvidenceProtection(deleteImage)(request, context);
+}
+
+async function deleteImage(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -137,11 +142,13 @@ export async function DELETE(request: Request, context: RouteContext) {
     return idempotency.response;
   }
 
-  const listing = await deleteListingImageForSeller(
-    listingId,
-    session.user.id,
-    imageId,
-  );
+  let listing;
+  try {
+    listing = await deleteListingImageForSeller(listingId, session.user.id, imageId);
+  } catch (error) {
+    const response = evidenceMutationResponse(error);
+    return idempotency ? idempotency.complete(await response.json(), response.status) : response;
+  }
 
   if (!listing) {
     const responseBody = { error: 'listing_or_image_not_found' };
