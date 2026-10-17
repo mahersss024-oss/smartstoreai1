@@ -36,7 +36,7 @@ function mapListing(listing: {
   createdAt: Date;
   updatedAt: Date;
   seller?: { email: string; name: string | null } | null;
-  images?: Array<{ id: string; thumbnailUrl: string; isPrimary: boolean }>;
+  images?: Array<{ id: string; originalUrl: string; displayUrl: string; thumbnailUrl: string; isPrimary: boolean }>;
 }) {
   return {
     id: listing.id,
@@ -58,8 +58,7 @@ function mapListing(listing: {
     images:
       listing.images?.map((image) => ({
         ...image,
-        thumbnailUrl: createListingImageDeliveryUrls(image.thumbnailUrl)
-          .thumbnailUrl,
+        ...createListingImageDeliveryUrls(image.originalUrl, { displayUrl: image.displayUrl, thumbnailUrl: image.thumbnailUrl }),
       })) ?? [],
   };
 }
@@ -79,11 +78,13 @@ export async function GET(request: Request) {
   const query = url.searchParams.get('query')?.trim();
   const status = url.searchParams.get('status')?.trim();
   const listingId = url.searchParams.get('listingId')?.trim();
+  const sellerId = url.searchParams.get('sellerId')?.trim();
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 24,
     maxLimit: 48,
   });
   const where = {
+    ...(sellerId ? { sellerId } : {}),
     ...(listingId ? { id: listingId } : {}),
     ...(status && status !== 'all' ? { status: status as never } : {}),
     ...(query && !listingId
@@ -107,7 +108,7 @@ export async function GET(request: Request) {
         seller: { select: { email: true, name: true } },
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          select: { id: true, thumbnailUrl: true, isPrimary: true },
+          select: { id: true, originalUrl: true, displayUrl: true, thumbnailUrl: true, isPrimary: true },
         },
       },
       orderBy: { updatedAt: 'desc' },

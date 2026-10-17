@@ -1,8 +1,10 @@
 'use client';
 
+import { AdminPageHeading } from '@/components/admin/page-heading';
+import { RecordDetails, TechnicalDetails } from '@/components/admin/record-details';
+
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowRight, ClipboardList, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
@@ -91,18 +93,12 @@ export default function AdminAuditLogPage() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="grid min-h-[4.5rem] grid-cols-1 content-center gap-3 border-b border-slate-300/70 pb-4 dark:border-slate-700/70">
-          <div className="grid grid-cols-[2.5rem_1.5rem_minmax(0,1fr)] items-center gap-3">
-            <Button asChild variant="outline" size="icon"><Link href="/admin" aria-label="العودة" prefetch={false}><ArrowRight className="size-4" /></Link></Button>
-            <ClipboardList className="size-6 text-blue-700 dark:text-blue-300" />
-            <div className="min-w-0"><h1 className="min-h-6 font-bold">سجل الإدارة</h1><p className="min-h-4 text-xs text-muted-foreground">سجل تدقيق للعمليات الإدارية الحساسة</p></div>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="سجل الإدارة" />
 
         {(adminAccessNotice || notice) && <p className="text-sm text-muted-foreground">{adminAccessNotice || notice}</p>}
 
-        <section className="grid gap-3 border-b border-slate-300/70 pb-4 dark:border-slate-700/70">
+        <section className="admin-filterbar">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="معرف أو نوع الكيان" />
             <Input value={admin} onChange={(e) => setAdmin(e.target.value)} placeholder="المشرف: اسم أو بريد" />
@@ -145,14 +141,13 @@ export default function AdminAuditLogPage() {
               <article key={record.id} className="grid min-h-[7.5rem] gap-2 py-4 sm:grid-cols-[1fr_auto] sm:items-start">
                 <div className="min-w-0">
                   <h2 className="min-h-5 text-sm font-bold">{actionLabels[record.action] ?? record.action}</h2>
-                  <p className="mt-1 min-h-4 break-all text-xs text-muted-foreground">{entityLabels[record.targetType] ?? record.targetType}: {record.targetId}</p>
+                  <p className="mt-1 min-h-4 text-xs text-muted-foreground">{entityLabels[record.targetType] ?? record.targetType}</p>
+                  <TechnicalDetails title="معرّف السجل" value={{ targetId: record.targetId, targetType: record.targetType }} />
                   <p className="mt-2 min-h-4 text-xs">{record.admin ? record.admin.name || record.admin.email : 'حساب إداري محذوف'}</p>
                   {Object.keys(record.metadata ?? {}).length > 0 && (
                     <details className="mt-3 min-h-4 text-xs">
                       <summary className="cursor-pointer text-blue-700 dark:text-blue-300">عرض التفاصيل</summary>
-                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-slate-100 p-3 text-left text-[11px] leading-5 dark:bg-slate-900" dir="ltr">
-                        {JSON.stringify(record.metadata, null, 2)}
-                      </pre>
+                      <div className="mt-3"><RecordDetails value={record.metadata} /></div>
                     </details>
                   )}
                 </div>

@@ -83,7 +83,7 @@ test('admin workspace renders real payloads, charts and read-only calendar on al
       element.scrollTop = element.scrollHeight;
     });
     await expect(
-      page.getByRole('link', { name: 'الصيانة والتنظيف', exact: false }).last(),
+      page.getByRole('heading', { name: 'العمولات الحالية', exact: true }),
     ).toBeInViewport();
   }
   await page.goto('/admin?view=calendar');

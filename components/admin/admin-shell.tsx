@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ArrowRight,
   CalendarDays,
@@ -18,10 +18,20 @@ import {
   Wrench,
   X,
   Megaphone,
+  Search,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@ui/dialog';
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandItem,
+} from '@ui/command';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { useAdminAccess } from '@/app/admin/use-admin-access';
+import { AdminReportNotifications } from './report-notifications';
 
 // Adapted from TailAdmin's sidebar/header layout; see docs/licenses/tailadmin.txt.
 const sections = [
@@ -41,6 +51,8 @@ const sections = [
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [previousPath, setPreviousPath] = useState(pathname);
@@ -100,6 +112,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       data-expanded={expanded}
       data-mobile-open={mobileOpen}
     >
+      {!isAdminAccessAllowed && <div className="admin-topbar" aria-hidden="true" />}
       {isAdminAccessAllowed && (
         <>
           {mobileOpen && (
@@ -219,15 +232,72 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">
               {title}
             </span>
+            <Button
+              variant="outline"
+              size="icon"
+              title="البحث في أقسام الإدارة"
+              aria-label="البحث في أقسام الإدارة"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search className="size-4" />
+            </Button>
             <span className="hidden text-xs text-muted-foreground sm:block">
               {canManage ? 'إدارة المنصة' : 'الإشراف'}
             </span>
             <ThemeToggle language="ar" />
+            <AdminReportNotifications canManage={canManage} />
           </header>
+          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+            <DialogContent
+              dir="rtl"
+              className="p-3"
+              aria-describedby={undefined}
+            >
+              <DialogTitle className="sr-only">
+                الوصول السريع لأقسام الإدارة
+              </DialogTitle>
+              <Command>
+                <CommandInput
+                  placeholder="بحث في أقسام الإدارة"
+                  aria-label="بحث في أقسام الإدارة"
+                />
+                <CommandList>
+                  <CommandEmpty>لا توجد أقسام مطابقة.</CommandEmpty>
+                  {sections
+                    .filter((section) => section.staff || canManage)
+                    .map(({ href, label, icon: Icon }) => (
+                      <CommandItem
+                        key={href}
+                        value={label}
+                        onSelect={() => {
+                          setSearchOpen(false);
+                          router.push(href);
+                        }}
+                      >
+                        <Icon className="size-4" />
+                        {label}
+                      </CommandItem>
+                    ))}
+                  {canManage && (
+                    <CommandItem
+                      value="التقويم الإداري"
+                      onSelect={() => {
+                        setSearchOpen(false);
+                        router.push('/admin?view=calendar');
+                      }}
+                    >
+                      <CalendarDays className="size-4" />
+                      التقويم الإداري
+                    </CommandItem>
+                  )}
+                </CommandList>
+              </Command>
+            </DialogContent>
+          </Dialog>
         </>
       )}
       <div
-        className={isAdminAccessAllowed ? 'admin-content' : ''}
+        className="admin-content"
         inert={mobileOpen || undefined}
       >
         {children}

@@ -65,11 +65,12 @@ test('app pages use in-app confirmations instead of browser dialogs', () => {
   }
 });
 
-test('admin dashboard links to user management', () => {
+test('admin dashboard keeps section navigation in the shared sidebar only', () => {
   const page = readProjectFile('app', 'admin', 'page.tsx');
-
-  assert.match(page, /\/admin\/users/);
-  assert.match(page, /إدارة المستخدمين/);
+  const sidebar = readProjectFile('components', 'admin', 'admin-shell.tsx');
+  assert.doesNotMatch(page, /adminSections|<nav/);
+  assert.match(sidebar, /\/admin\/users/);
+  assert.match(sidebar, /العملاء/);
 });
 
 test('admin users page exposes searchable account control', () => {
@@ -106,14 +107,13 @@ test('admin dashboard stays focused on required statistics and administrative na
   const listingsPage = readProjectFile('app', 'admin', 'listings', 'page.tsx');
   const commissionsPage = readProjectFile('app', 'admin', 'commissions', 'page.tsx');
 
-  assert.match(dashboard, /aria-label="أقسام الإدارة"/);
-  assert.match(dashboard, /المراجعة والبلاغات/);
-  assert.match(dashboard, /الصيانة والتنظيف/);
+  assert.doesNotMatch(dashboard, /aria-label="أقسام الإدارة"/);
+  assert.match(dashboard, /WorkspaceDashboard/);
   assert.doesNotMatch(dashboard, /admin-work-queue/);
   assert.doesNotMatch(dashboard, /StatCard/);
   assert.doesNotMatch(dashboard, /StatusBlock/);
   assert.match(dashboard, /\/api\/admin\/overview/);
-  assert.match(dashboard, /\/hamad-market-logo\.webp/);
+  assert.doesNotMatch(dashboard, /\/hamad-market-logo\.webp/);
   assert.doesNotMatch(usersPage, /\/hamad-market-logo\.webp/);
   assert.doesNotMatch(moderationPage, /\/hamad-market-logo\.webp/);
   assert.doesNotMatch(listingsPage, /\/hamad-market-logo\.webp/);
@@ -122,9 +122,8 @@ test('admin dashboard stays focused on required statistics and administrative na
   assert.match(dashboard, /المستخدمون النشطون/);
   assert.match(dashboard, /الإعلانات المنشورة/);
   assert.match(dashboard, /البلاغات المفتوحة/);
-  assert.match(dashboard, /سجل الإدارة/);
-  assert.match(usersPage, /grid max-w-full gap-2 overflow-hidden rounded-md border bg-white px-3 py-2/);
-  assert.match(usersPage, /border-b border-slate-200\/70 py-3 last:border-b-0/);
+  assert.match(usersPage, /className="admin-section"/);
+  assert.match(usersPage, /className="admin-record"/);
   assert.doesNotMatch(usersPage, /grid gap-4 rounded-md border bg-white p-4 shadow-sm/);
 });
 
@@ -132,9 +131,9 @@ test('admin users page keeps long account identifiers inside android pwa viewpor
   const page = readProjectFile('app', 'admin', 'users', 'page.tsx');
 
   assert.match(page, /<main className="[^"]*overflow-x-hidden/);
-  assert.match(page, /<header className="[^"]*max-w-full[^"]*overflow-hidden/);
+  assert.match(page, /<AdminPageHeading/);
   assert.match(page, /className="[^"]*min-w-0 flex-1 items-center gap-3/);
-  assert.match(page, /className="mt-1 break-all text-\[11px\] leading-4 text-muted-foreground"/);
+  assert.match(page, /<TechnicalDetails title="معرّف الحساب"/);
   assert.match(page, /className="h-11 min-w-0 rounded-md border bg-background/);
 });
 
@@ -638,6 +637,7 @@ test('the users page lets owner-level admins change roles and protects the owner
 
 test('scoped admin roles are enforced consistently by pages and APIs', () => {
   const dashboard = readProjectFile('app', 'admin', 'page.tsx');
+  const shell = readProjectFile('components', 'admin', 'admin-shell.tsx');
   const commissionsPage = readProjectFile(
     'app',
     'admin',
@@ -670,8 +670,9 @@ test('scoped admin roles are enforced consistently by pages and APIs', () => {
   );
 
   assert.match(dashboard, /useAdminAccess\('moderator'\)/);
-  assert.match(dashboard, /href: '\/admin\/commissions'/);
-  assert.match(dashboard, /visible: isOwner/);
+  assert.match(shell, /href: '\/admin\/commissions'/);
+  assert.match(shell, /section\.staff \|\| canManage/);
+  assert.match(shell, /adminAccessRole === 'admin' \|\| adminAccessRole === 'owner'/);
   assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
   assert.match(commissionsRoute, /hasVerifiedAdminAccess/);
   assert.match(commissionRoute, /hasVerifiedAdminAccess/);
@@ -706,8 +707,8 @@ test('admin dashboard admits moderators and renders a scoped moderator view', ()
   const dashboard = readProjectFile('app', 'admin', 'page.tsx');
 
   assert.match(dashboard, /useAdminAccess\('moderator'\)/);
-  assert.match(dashboard, /isModeratorOnly/);
-  assert.match(dashboard, /لوحة المشرف/);
+  assert.match(dashboard, /canManageUsers/);
+  assert.match(dashboard, /المؤشرات العامة متاحة لإدارة المنصة فقط/);
   assert.doesNotMatch(dashboard, /\/api\/moderator\/overview/);
 });
 

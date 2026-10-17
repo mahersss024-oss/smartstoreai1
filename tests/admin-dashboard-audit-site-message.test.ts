@@ -83,10 +83,10 @@ test('audit log is server protected, paginated, filterable and read-only', async
   assert.match(page, /min-h-\[7\.5rem\]/);
   assert.match(page, /aria-busy=\{loading\}/);
   const adminPage = await source('app/admin/page.tsx');
-  assert.match(adminPage, /value: null/);
+  assert.match(adminPage, /value: overview\?\.[a-zA-Z]+ \?\? null/);
   assert.match(adminPage, /absolute inset-x-0 top-1\/2/);
-  assert.match(adminPage, /prefetch=\{false\}/);
-  assert.match(page, /prefetch=\{false\}/);
+  assert.doesNotMatch(adminPage, /adminSections|<nav/);
+  assert.match(await source('components/admin/page-heading.tsx'), /prefetch=\{false\}/);
 });
 
 test('site message visibility honors activation and expiration', () => {

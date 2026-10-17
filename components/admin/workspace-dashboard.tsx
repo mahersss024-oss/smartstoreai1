@@ -13,6 +13,7 @@ import {
 import { Button } from '@ui/button';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 import { WorkspaceCharts } from './workspace-charts';
+import { StatusDistribution } from './status-distribution';
 
 const WorkspaceCalendar = dynamic(() => import('./workspace-calendar'), {
   ssr: false,
@@ -214,42 +215,67 @@ export function WorkspaceDashboard() {
           ) : (
             <>
               <WorkspaceCharts data={data} />
-              <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-                <section className="admin-panel">
-                  <h2 className="admin-panel-heading">
-                    حالات الإعلانات الحالية
-                  </h2>
-                  <dl className="admin-panel-body grid gap-3 text-sm">
-                    {data.listings.map((row) => (
-                      <div
-                        key={row.status}
-                        className="flex justify-between gap-3"
-                      >
-                        <dt>{listingLabels[row.status] ?? row.status}</dt>
-                        <dd>{number(row.count)}</dd>
-                      </div>
-                    ))}
-                    {data.listings.length === 0 && <div>لا توجد إعلانات.</div>}
-                  </dl>
-                </section>
-                <section className="admin-panel">
-                  <h2 className="admin-panel-heading">حفظ الأدلة</h2>
-                  <dl className="admin-panel-body grid gap-3 text-sm">
-                    {data.evidence.map((row) => (
-                      <div
-                        key={row.status}
-                        className="flex justify-between gap-3"
-                      >
-                        <dt>{evidenceLabels[row.status] ?? row.status}</dt>
-                        <dd>{number(row.count)}</dd>
-                      </div>
-                    ))}
-                    {data.evidence.length === 0 && (
-                      <div>لا توجد قضايا بأدلة محفوظة.</div>
-                    )}
-                  </dl>
-                </section>
+              <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+                <StatusDistribution
+                  title="توزيع حالات الإعلانات"
+                  rows={data.listings}
+                  labels={listingLabels}
+                  href={(status) =>
+                    `/admin/listings?status=${encodeURIComponent(status)}`
+                  }
+                  source="المصدر: الإعلانات المسجلة في قاعدة البيانات"
+                  empty="لا توجد إعلانات مسجلة."
+                />
+                <StatusDistribution
+                  title="اكتمال حفظ الأدلة"
+                  rows={data.evidence}
+                  labels={evidenceLabels}
+                  href={() => '/admin/moderation'}
+                  source="المصدر: القضايا التي لم تُتلف أدلتها"
+                  empty="لا توجد قضايا بأدلة محفوظة."
+                />
               </div>
+              <details className="admin-disclosure">
+                <summary>تفاصيل الحالات</summary>
+                <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                  <section className="admin-panel">
+                    <h2 className="admin-panel-heading">
+                      حالات الإعلانات الحالية
+                    </h2>
+                    <dl className="admin-panel-body grid gap-3 text-sm">
+                      {data.listings.map((row) => (
+                        <div
+                          key={row.status}
+                          className="flex justify-between gap-3"
+                        >
+                          <dt>{listingLabels[row.status] ?? row.status}</dt>
+                          <dd>{number(row.count)}</dd>
+                        </div>
+                      ))}
+                      {data.listings.length === 0 && (
+                        <div>لا توجد إعلانات.</div>
+                      )}
+                    </dl>
+                  </section>
+                  <section className="admin-panel">
+                    <h2 className="admin-panel-heading">حفظ الأدلة</h2>
+                    <dl className="admin-panel-body grid gap-3 text-sm">
+                      {data.evidence.map((row) => (
+                        <div
+                          key={row.status}
+                          className="flex justify-between gap-3"
+                        >
+                          <dt>{evidenceLabels[row.status] ?? row.status}</dt>
+                          <dd>{number(row.count)}</dd>
+                        </div>
+                      ))}
+                      {data.evidence.length === 0 && (
+                        <div>لا توجد قضايا بأدلة محفوظة.</div>
+                      )}
+                    </dl>
+                  </section>
+                </div>
+              </details>
               <section className="admin-panel">
                 <h2 className="admin-panel-heading">العمولات الحالية</h2>
                 <div className="admin-panel-body overflow-x-auto">

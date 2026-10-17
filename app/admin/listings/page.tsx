@@ -1,7 +1,12 @@
 'use client';
 
+import { AdminPageHeading } from '@/components/admin/page-heading';
+import { AdminRecordPreview } from '@/components/admin/record-preview';
+import { AdminResultsTable } from '@/components/admin/results-table';
+
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
+import { getListingDisplayUrl } from '@/agent/marketplace/listing-image-delivery';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -13,6 +18,7 @@ import {
   Save,
   Search,
   Megaphone,
+  ExternalLink,
   Trash2,
 } from 'lucide-react';
 
@@ -48,7 +54,7 @@ type AdminListing = {
   views: number;
   messageCount: number;
   favoriteCount: number;
-  images: Array<{ id: string; thumbnailUrl: string; isPrimary: boolean }>;
+  images: Array<{ id: string; originalUrl?: string; displayUrl?: string; thumbnailUrl: string; isPrimary: boolean }>;
 };
 
 type PaginationMeta = {
@@ -167,6 +173,8 @@ function AdminListingCard({
   onPermanentDelete: (listingId: string) => void;
   pendingAction: PendingAdminListingAction | null;
 }>) {
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
+  const activeImage = listing.images.find(image => image.id === activeImageId) ?? listing.images.find(image => image.isPrimary) ?? listing.images[0];
   const isSaving =
     pendingAction?.listingId === listing.id && pendingAction.action === 'save';
   const isDeleting =
@@ -177,7 +185,7 @@ function AdminListingCard({
   const isActionPending = Boolean(pendingAction);
 
   return (
-    <article className="grid gap-3 rounded-md border p-3">
+    <article className="admin-record">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold">{listing.title ?? 'إعلان بدون عنوان'}</h3>
@@ -193,10 +201,11 @@ function AdminListingCard({
         </span>
       </div>
 
+      {activeImage && <div className="grid aspect-[4/3] max-h-80 place-items-center overflow-hidden rounded-md border bg-background"><ResilientImage src={getListingDisplayUrl(activeImage)!} fallbackSrcs={[activeImage.originalUrl, activeImage.thumbnailUrl].filter((url): url is string => Boolean(url))} alt={listing.title ?? 'صورة الإعلان'} className="h-full w-full object-contain" fallback={<ImageIcon className="size-8 text-muted-foreground" />} /></div>}
       {listing.images.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
           {listing.images.map((image) => (
-            <div key={image.id} className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900">
+            <button type="button" aria-label={`عرض صورة الإعلان ${listing.images.indexOf(image) + 1}`} aria-pressed={activeImage?.id === image.id} onClick={() => setActiveImageId(image.id)} key={image.id} className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-background aria-pressed:border-primary">
               <ResilientImage
                 alt=""
                 className="h-full w-full object-contain"
@@ -205,19 +214,20 @@ function AdminListingCard({
                 loading="lazy"
                 src={image.thumbnailUrl}
               />
-            </div>
+            </button>
           ))}
         </div>
       )}
 
-      <div className="grid gap-2 lg:grid-cols-4">
-        <Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" />
-        <Input disabled={!canManageListings} list="marketplace-admin-category-options" name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" />
-        <CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} />
-        <Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="admin-field">العنوان<Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" /></label>
+        <label className="admin-field">التصنيف<Input disabled={!canManageListings} list="marketplace-admin-category-options" name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" /></label>
+        <div className="admin-field"><span>المدينة</span><CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} /></div>
+        <label className="admin-field">السعر<Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" /></label>
       </div>
 
-      <textarea
+      <div className="admin-field"><label htmlFor={`listing-${listing.id}-description`}>الوصف</label><textarea
+        id={`listing-${listing.id}-description`}
         className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
         disabled={!canManageListings}
         name={`listing-${listing.id}-description`}
@@ -226,10 +236,10 @@ function AdminListingCard({
           onUpdateDraft(listing.id, { description: event.target.value })
         }
         placeholder="الوصف"
-      />
+      /></div>
 
       <div className="grid gap-2 md:grid-cols-3">
-        <select
+        <label className="admin-field">حالة المنتج<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
           disabled={!canManageListings}
           name={`listing-${listing.id}-condition`}
@@ -245,8 +255,8 @@ function AdminListingCard({
               {option.label}
             </option>
           ))}
-        </select>
-        <select
+        </select></label>
+        <label className="admin-field">طريقة السعر<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
           disabled={!canManageListings}
           name={`listing-${listing.id}-priceMode`}
@@ -260,8 +270,8 @@ function AdminListingCard({
           <option value="fixed">سعر محدد</option>
           <option value="bid">على السوم</option>
           <option value="negotiable">قابل للتفاوض</option>
-        </select>
-        <select
+        </select></label>
+        <label className="admin-field">حالة الإعلان<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
           disabled={!canManageListings}
           name={`listing-${listing.id}-status`}
@@ -279,11 +289,12 @@ function AdminListingCard({
                 {option.label}
               </option>
             ))}
-        </select>
+        </select></label>
       </div>
 
       {canManageListings && (
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="admin-actions">
+        <Button asChild variant="outline"><Link href={`/listings/${encodeURIComponent(listing.id)}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-4" />فتح صفحة الإعلان</Link></Button>
         <Button
           className="rounded-md bg-blue-600 hover:bg-blue-700"
           disabled={isActionPending && !isSaving}
@@ -347,6 +358,7 @@ function AdminListingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusedListingId = searchParams.get('listingId')?.trim() ?? '';
+  const sellerId = searchParams.get('sellerId')?.trim() ?? '';
   const {
     adminAccessRole,
     adminAccessNotice,
@@ -354,10 +366,11 @@ function AdminListingsPageContent() {
     verifyAdminAccess,
   } = useAdminAccess('moderator');
   const [listings, setListings] = useState<AdminListing[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(focusedListingId || null);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ListingDraft>>({});
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<AdminListing['status'] | 'all'>('all');
+  const [query, setQuery] = useState(searchParams.get('query')?.trim() ?? '');
+  const [status, setStatus] = useState<AdminListing['status'] | 'all'>(() => statusOptions.find(option => option.value === searchParams.get('status'))?.value ?? 'all');
   const [notice, setNotice] = useState('');
   const [actionNotice, setActionNotice] =
     useState<AdminListingActionNotice | null>(null);
@@ -382,6 +395,9 @@ function AdminListingsPageContent() {
 
   useEffect(() => {
     focusedListingIdRef.current = focusedListingId;
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled && focusedListingId) setSelectedId(focusedListingId); });
+    return () => { cancelled = true; };
   }, [focusedListingId]);
 
   const loadListings = useCallback(
@@ -402,6 +418,7 @@ function AdminListingsPageContent() {
           limit: '24',
           status: statusRef.current,
         });
+        if (sellerId) params.set('sellerId', sellerId);
 
         if (focusedListingIdRef.current) {
           params.set('listingId', focusedListingIdRef.current);
@@ -450,7 +467,7 @@ function AdminListingsPageContent() {
         setIsLoading(false);
       }
     },
-    [router, verifyAdminAccess],
+    [router, verifyAdminAccess, sellerId],
   );
 
   useEffect(() => {
@@ -502,6 +519,9 @@ function AdminListingsPageContent() {
     adminAccessRole === 'owner' ||
     adminAccessRole === 'admin' ||
     adminAccessRole === 'moderator';
+  const selectedIndex = listings.findIndex(listing => listing.id === selectedId);
+  const selectedListing = listings[selectedIndex];
+  const listingIsDirty = (listing: AdminListing) => Boolean(drafts[listing.id] && JSON.stringify(drafts[listing.id]) !== JSON.stringify(createDraft(listing)));
 
   const updateDraft = useCallback(
     (listingId: string, updates: Partial<ListingDraft>) => {
@@ -652,11 +672,25 @@ function AdminListingsPageContent() {
   } else {
     listingsContent = (
       <div className="grid gap-3">
-        {listings.map((listing) => (
+        <AdminResultsTable
+          columns={['الإعلان', 'المعلن', 'المدينة', 'السعر', 'الحالة']}
+          selectedId={selectedId}
+          onOpen={setSelectedId}
+          rows={listings.map(listing => ({
+            id: listing.id, label: listing.title ?? 'إعلان بدون عنوان', dirty: listingIsDirty(listing),
+            cells: [<span key="title" className="admin-listing-identity">{listing.images[0] ? <ResilientImage alt="" src={listing.images[0].thumbnailUrl} className="admin-result-image" /> : <ImageIcon className="size-8 shrink-0 text-muted-foreground" />}<strong>{listing.title ?? 'إعلان بدون عنوان'}</strong></span>, listing.seller?.name ?? listing.seller?.email ?? 'غير متوفر', listing.city ?? 'غير محددة', typeof listing.price === 'number' ? `${formatNumber(listing.price)} ر.س` : listing.price === 'bid' || listing.priceMode === 'bid' ? 'على السوم' : listing.price === 'negotiable' || listing.priceMode === 'negotiable' ? 'قابل للتفاوض' : 'غير محدد', <span key="status" className="admin-status">{statusOptions.find(option => option.value === listing.status)?.label ?? listing.status}</span>],
+          }))}
+        />
+        {selectedListing && <AdminRecordPreview
+          open title="معاينة الإعلان" dirty={listingIsDirty(selectedListing)} busy={Boolean(pendingAction) || Boolean(pendingDeleteAction)}
+          onClose={() => setSelectedId(null)}
+          onPrevious={selectedIndex > 0 ? () => setSelectedId(listings[selectedIndex - 1].id) : undefined}
+          onNext={selectedIndex < listings.length - 1 ? () => setSelectedId(listings[selectedIndex + 1].id) : undefined}
+        >
           <AdminListingCard
-            key={listing.id}
-            listing={listing}
-            draft={drafts[listing.id] ?? createDraft(listing)}
+            key={selectedListing.id}
+            listing={selectedListing}
+            draft={drafts[selectedListing.id] ?? createDraft(selectedListing)}
             canManageListings={canManageListings}
             onUpdateDraft={updateDraft}
             onSave={(listingId) => void saveListing(listingId)}
@@ -668,7 +702,7 @@ function AdminListingsPageContent() {
             }
             pendingAction={pendingAction}
           />
-        ))}
+        </AdminRecordPreview>}
 
         {!focusedListingId && pagination?.hasMore && (
           <div>
@@ -728,25 +762,9 @@ function AdminListingsPageContent() {
         title={actionNotice?.title}
         tone={actionNotice?.tone ?? 'info'}
       />
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-              <Megaphone className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">إدارة الإعلانات</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                تعديل وحذف وتغيير حالة كل إعلانات المنصة
-              </p>
-            </div>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="إدارة الإعلانات" />
+        {sellerId && <div className="admin-notice flex flex-wrap justify-between gap-2"><span>إعلانات الحساب المحدد</span><Link href="/admin/listings" prefetch={false} className="text-primary underline">عرض كل الإعلانات</Link></div>}
 
         {focusedListingId ? (
           <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
@@ -762,7 +780,7 @@ function AdminListingsPageContent() {
             </Button>
           </section>
         ) : (
-          <section className="grid gap-3 rounded-md border bg-white p-4 shadow-sm dark:bg-card md:grid-cols-[1fr_auto_auto]">
+          <section className="admin-filterbar grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
             <Input
               name="listingSearch"
               value={query}
@@ -796,7 +814,7 @@ function AdminListingsPageContent() {
           </div>
         )}
 
-        <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+        <section className="admin-section">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-bold">
               {getListingsSectionTitle(focusedListingId, pagination)}

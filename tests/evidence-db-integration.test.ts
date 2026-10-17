@@ -5,8 +5,36 @@ import { prisma } from '@/lib/db/prisma';
 import { actOnCaseEvidence, copyEvidenceAssets, evidenceHash, hasProtectedUserEvidence, readCaseEvidence } from '@/agent/marketplace/evidence';
 import { createSessionCookie } from '@/lib/auth/session';
 import { DELETE as deleteAccount } from '@/app/api/account/profile/route';
+import { acknowledgeReportNotification, listReportNotifications } from '@/lib/admin/report-notifications';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
+
+test('database report notifications share concurrent acknowledgements without resolving either report type', { skip: !enabled }, async () => {
+  const f = await fixture();
+  try {
+    const report = await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+    const conversationReport = await prisma.userReport.create({ data: { reporterId: f.buyer.id, targetUserId: f.seller.id, conversationId: f.conversation.id, reason: 'conversation_report' } });
+    const evidence = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
+    const otherCase = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'UserReport', sourceId: conversationReport.id } } });
+    const before = await listReportNotifications(1, 48);
+    assert.ok(before.notifications.some(item => item.id === evidence.id && item.title === 'Original desk'));
+    assert.ok(before.notifications.some(item => item.id === otherCase.id && item.sourceType === 'UserReport'));
+    const results = await Promise.all(Array.from({ length: 4 }, (_, index) => acknowledgeReportNotification(evidence.id, index % 2 ? f.buyer.id : f.seller.id)));
+    assert.ok(results.every(Boolean));
+    const events = await prisma.evidenceEvent.findMany({ where: { caseId: evidence.id, action: 'notification.viewed' } });
+    assert.equal(events.length, 1);
+    assert.ok([f.buyer.id, f.seller.id].includes(events[0].actorId!));
+    assert.equal((await prisma.report.findUniqueOrThrow({ where: { id: report.id } })).status, 'open');
+    assert.equal((await prisma.userReport.findUniqueOrThrow({ where: { id: conversationReport.id } })).status, 'open');
+    const after = await listReportNotifications(1, 48);
+    assert.ok(!after.notifications.some(item => item.id === evidence.id));
+    assert.ok(after.notifications.some(item => item.id === otherCase.id));
+    const preserved = await prisma.evidenceCase.findUniqueOrThrow({ where: { id: evidence.id } });
+    assert.equal(preserved.snapshotHash, evidence.snapshotHash);
+    assert.deepEqual(preserved.snapshot, evidence.snapshot);
+    assert.equal(preserved.status, 'open');
+  } finally { await cleanup(f); }
+});
 
 async function fixture() {
   const suffix = randomUUID();

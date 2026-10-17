@@ -4741,7 +4741,7 @@ export async function listModerationQueue() {
   };
 }
 
-export async function listModerationQueuePage(filters: PaginationInput = {}) {
+export async function listModerationQueuePage(filters: PaginationInput = {}, focus?: { reportId: string; sourceType: 'Report' | 'UserReport' }) {
   const pagination = normalizePagination(filters, {
     defaultLimit: 20,
     maxLimit: 48,
@@ -4749,6 +4749,12 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
 
   if (!shouldUseDatabaseStore()) {
     const queue = memoryStore.listModerationQueue();
+
+    if (focus) {
+      queue.listings = [];
+      queue.reports = focus.sourceType === 'Report' ? queue.reports.filter(report => report.id === focus.reportId) : [];
+      queue.userReports = focus.sourceType === 'UserReport' ? queue.userReports.filter(report => report.id === focus.reportId) : [];
+    }
 
     return {
       listings: toPaginatedResponse(
@@ -4788,7 +4794,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
 
   const [listings, reports, userReports] = await Promise.all([
     prisma.listing.findMany({
-      where: { status: { in: ['pending', 'rejected'] } },
+      where: { status: { in: ['pending', 'rejected'] }, ...(focus ? { id: { in: [] } } : {}) },
       include: {
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
@@ -4800,6 +4806,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
       take: pagination.take,
     }),
     prisma.report.findMany({
+      ...(focus ? { where: { id: focus.sourceType === 'Report' ? focus.reportId : { in: [] } } } : {}),
       include: {
         listing: {
           include: {
@@ -4815,6 +4822,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}) {
       take: pagination.take,
     }),
     prisma.userReport.findMany({
+      ...(focus ? { where: { id: focus.sourceType === 'UserReport' ? focus.reportId : { in: [] } } } : {}),
       include: {
         reporter: { select: { id: true, email: true, name: true } },
         targetUser: { select: { id: true, email: true, name: true } },

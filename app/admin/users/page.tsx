@@ -1,10 +1,14 @@
 'use client';
 
+import { AdminPageHeading } from '@/components/admin/page-heading';
+import { AdminRecordPreview } from '@/components/admin/record-preview';
+import { AdminResultsTable } from '@/components/admin/results-table';
+import { TechnicalDetails } from '@/components/admin/record-details';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight,
   BadgeCheck,
   ExternalLink,
   MessageCircle,
@@ -15,7 +19,6 @@ import {
   ShieldCheck,
   Megaphone,
   Trash2,
-  Users,
 } from 'lucide-react';
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
@@ -98,6 +101,7 @@ export default function AdminUsersPage() {
   } = useAdminAccess('admin');
   const isOwner = adminAccessRole === 'owner' || adminAccessRole === 'admin';
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [query, setQuery] = useState('');
@@ -119,6 +123,8 @@ export default function AdminUsersPage() {
     () => users.filter((user) => Boolean(user.phoneNumber)).length,
     [users],
   );
+  const selectedIndex = users.findIndex(user => user.id === selectedId);
+  const userIsDirty = (user: AdminUserRecord) => Boolean(drafts[user.id] && (drafts[user.id].role !== normalizeRole(user.role) || drafts[user.id].phoneNumber !== (user.phoneNumber ?? '')));
 
   const refreshUsers = useCallback(
     async (page = 1) => {
@@ -471,30 +477,8 @@ export default function AdminUsersPage() {
         }
         tone={pendingUserConfirm?.action === 'restore' ? 'default' : 'danger'}
       />
-      <div className="mx-auto grid w-full max-w-7xl gap-4 px-3 py-5 sm:px-6">
-        <header className="flex max-w-full flex-wrap items-center justify-between gap-3 overflow-hidden rounded-md border bg-white px-3 py-3 shadow-sm dark:bg-card sm:px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-              <Users className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-bold">إدارة المستخدمين</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                عرض بيانات العملاء والتحكم في الدور ورقم التواصل الرسمي
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" className="rounded-md" onClick={() => void refreshUsers(1)}>
-              تحديث
-            </Button>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="إدارة المستخدمين" actions={<Button variant="outline" onClick={() => void refreshUsers(1)}>تحديث</Button>} />
 
         {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
@@ -502,22 +486,22 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
-            <div className="text-xs text-muted-foreground">إجمالي المستخدمين</div>
+        {pagination && <section className="admin-statistics sm:grid-cols-3">
+          <div>
+            <div className="text-xs text-muted-foreground">{pagination.total !== undefined ? 'النتائج المطابقة' : 'المستخدمون المحمّلون'}</div>
             <div className="mt-1 text-xl font-bold">{formatNumber(totalUsers)}</div>
           </div>
-          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
-            <div className="text-xs text-muted-foreground">أرقام تواصل محفوظة</div>
+          <div>
+            <div className="text-xs text-muted-foreground">أرقام تواصل في السجلات المحمّلة</div>
             <div className="mt-1 text-xl font-bold">{formatNumber(usersWithPhone)}</div>
           </div>
-          <div className="rounded-md border bg-white px-3 py-2.5 shadow-sm dark:bg-card">
+          <div>
             <div className="text-xs text-muted-foreground">المعروض حاليًا</div>
             <div className="mt-1 text-xl font-bold">{formatNumber(users.length)}</div>
           </div>
-        </section>
+        </section>}
 
-        <section className="max-w-full overflow-hidden rounded-md border bg-white p-3 shadow-sm dark:bg-card">
+        <section className="admin-filterbar">
           <form
             className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
             onSubmit={(event) => {
@@ -562,7 +546,12 @@ export default function AdminUsersPage() {
           </form>
         </section>
 
-        <section className="grid max-w-full gap-2 overflow-hidden rounded-md border bg-white px-3 py-2 shadow-sm dark:bg-card">
+        <section className="admin-section">
+          {users.length > 0 && <AdminResultsTable
+            columns={['المستخدم', 'التواصل', 'الصلاحية', 'حالة الحساب']}
+            selectedId={selectedId} onOpen={setSelectedId}
+            rows={users.map(user => ({ id: user.id, label: user.name ?? user.email, dirty: userIsDirty(user), cells: [<span key="identity" className="admin-listing-identity"><SellerAvatar alt="" className="size-10 shrink-0 rounded-md object-cover" picture={user.picture} /><strong>{user.name ?? 'مستخدم سوق حمد'}</strong></span>, <span key="contact" className="grid gap-1"><span dir="ltr">{user.email}</span>{user.phoneNumber && <span dir="ltr">{user.phoneNumber}</span>}</span>, roleLabels[user.role] ?? user.role, <span key="status" className="admin-status">{user.deletedAt ? 'حساب معطّل' : 'غير معطّل'}</span>] }))}
+          />}
           {isLoading && users.length === 0 ? (
             <div className="grid min-h-72 place-items-center rounded-md border bg-white text-sm text-muted-foreground shadow-sm dark:bg-card">
               جار تحميل المستخدمين...
@@ -572,7 +561,7 @@ export default function AdminUsersPage() {
               لا يوجد مستخدمون مطابقون.
             </div>
           ) : (
-            users.map((user) => {
+            users.filter(user => user.id === selectedId).map((user) => {
               const draft = drafts[user.id] ?? {
                 role: normalizeRole(user.role),
                 phoneNumber: user.phoneNumber ?? '',
@@ -589,7 +578,11 @@ export default function AdminUsersPage() {
               const isBusy = isSaving || isDeleting;
 
               return (
-                <article key={user.id} className="grid min-w-0 gap-3 border-b border-slate-200/70 py-3 last:border-b-0 dark:border-white/10">
+                <AdminRecordPreview key={user.id} open title="ملف المستخدم" dirty={userIsDirty(user)} busy={isBusy || Boolean(pendingUserConfirm)}
+                  onClose={() => setSelectedId(null)}
+                  onPrevious={selectedIndex > 0 ? () => setSelectedId(users[selectedIndex - 1].id) : undefined}
+                  onNext={selectedIndex < users.length - 1 ? () => setSelectedId(users[selectedIndex + 1].id) : undefined}>
+                <article className="admin-record">
                   <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                     <Link
                       className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
@@ -605,9 +598,6 @@ export default function AdminUsersPage() {
                       <div className="min-w-0 flex-1">
                         <h2 className="truncate text-sm font-bold">{user.name ?? 'مستخدم سوق حمد'}</h2>
                         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                        <p className="mt-1 break-all text-[11px] leading-4 text-muted-foreground" dir="ltr">
-                          {user.id}
-                        </p>
                       </div>
                     </Link>
                     <span className="shrink-0 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
@@ -616,8 +606,10 @@ export default function AdminUsersPage() {
                         : roleLabels[user.role] ?? user.role}
                     </span>
                   </div>
+                  <TechnicalDetails title="معرّف الحساب" value={{ id: user.id }} />
 
-                  <div className="grid min-w-0 gap-3 md:grid-cols-3">
+                  <div className="grid min-w-0 gap-3 border-t pt-4 md:grid-cols-3">
+                    <h3 className="text-sm font-semibold md:col-span-3">الصلاحيات والتواصل</h3>
                     <label className="grid min-w-0 gap-1 text-sm font-semibold">
                       الدور
                       <select
@@ -674,10 +666,10 @@ export default function AdminUsersPage() {
                     </label>
                   </div>
 
-                  <div className="grid min-w-0 gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="admin-user-facts grid min-w-0 gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
                     <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <Megaphone className="size-4 text-blue-600" />
-                      الإعلانات: {formatNumber(user.counts.listings)}
+                      <Link className="hover:text-primary hover:underline" href={`/admin/listings?sellerId=${encodeURIComponent(user.id)}`} prefetch={false}>الإعلانات: {formatNumber(user.counts.listings)}</Link>
                     </div>
                     <div className="flex min-w-0 items-center gap-2 rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       <MessageCircle className="size-4 text-blue-600" />
@@ -698,9 +690,9 @@ export default function AdminUsersPage() {
                     <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       الرسائل: {formatNumber(user.counts.messages)}
                     </div>
-                    <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
-                      بلاغات المستخدم: {formatNumber(user.counts.userReportsReceived ?? 0)}
-                    </div>
+                    {typeof user.counts.userReportsReceived === 'number' && <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
+                      بلاغات المستخدم: {formatNumber(user.counts.userReportsReceived)}
+                    </div>}
                     <div className="rounded-md bg-[#f7f9fc] px-2.5 py-1.5 dark:bg-background">
                       آخر تحديث: {formatDate(user.updatedAt)}
                     </div>
@@ -722,6 +714,7 @@ export default function AdminUsersPage() {
                         </Link>
                       </Button>
                     </div>
+                    <details className="admin-sensitive-actions"><summary>الإجراءات الحساسة</summary><div className="mt-3 flex flex-wrap gap-2">
                     {canDisable && (
                       <Button
                         className="rounded-md border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-200"
@@ -762,6 +755,7 @@ export default function AdminUsersPage() {
                         {isDeleting && userAction === 'permanent' ? 'جار الحذف النهائي...' : 'حذف نهائي'}
                       </Button>
                     ) : null}
+                    </div></details>
                     <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
                       disabled={isBusy || isOwnerAccount}
@@ -773,6 +767,7 @@ export default function AdminUsersPage() {
                     </Button>
                   </div>
                 </article>
+                </AdminRecordPreview>
               );
             })
           )}

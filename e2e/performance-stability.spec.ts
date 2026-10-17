@@ -90,6 +90,21 @@ async function addAdminSession(baseURL: string | undefined, page: Page) {
 }
 
 async function mockStableData(page: Page) {
+  // Keep this rendering audit deterministic; live SSE is verified separately.
+  await page.route('**/api/realtime/stream**', route => route.fulfill({
+    contentType: 'text/event-stream',
+    body: 'retry: 60000\nevent: heartbeat\ndata: {}\n\n',
+  }));
+  await page.route('**/api/admin/moderation?view=notifications**', route => route.fulfill({
+    json: { notifications: [], page: 1, hasMore: false },
+  }));
+  await page.route('**/api/admin/overview?view=workspace**', route => route.fulfill({
+    json: {
+      month: new Date().toISOString().slice(0, 7),
+      listings: [{ status: 'published', count: 28 }],
+      evidence: [], commissions: [], visits: [], events: [], hasMoreEvents: false,
+    },
+  }));
   await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
       contentType: 'application/json',

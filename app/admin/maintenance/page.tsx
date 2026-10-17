@@ -1,9 +1,10 @@
 'use client';
 
+import { AdminPageHeading } from '@/components/admin/page-heading';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Megaphone, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
+import { Megaphone, RefreshCw, Trash2 } from 'lucide-react';
 
 import { Button } from '@ui/button';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
@@ -274,25 +275,8 @@ export default function AdminMaintenancePage() {
         open={Boolean(notice)}
         tone={notice.startsWith('تم') ? 'success' : 'danger'}
       />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <div className="grid size-10 place-items-center rounded-md bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-200">
-              <ShieldAlert className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">الصيانة والتنظيف</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                أدوات مالك المنصة لتنظيف البيانات وتشغيل الصيانة بأمان
-              </p>
-            </div>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="الصيانة والتنظيف" />
 
         {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
@@ -300,7 +284,7 @@ export default function AdminMaintenancePage() {
           </div>
         )}
 
-        <section className="grid gap-4 border-b border-slate-300/70 pb-5 dark:border-slate-700/70">
+        <section className="admin-section grid gap-4">
           <div className="flex items-start gap-3">
             <Megaphone className="mt-0.5 size-5 text-blue-700 dark:text-blue-300" />
             <div>
@@ -337,7 +321,7 @@ export default function AdminMaintenancePage() {
           </Button>
         </section>
 
-        <section className="grid gap-4 rounded-md border border-red-500/30 bg-white p-4 shadow-sm dark:bg-card">
+        <section className="admin-section admin-danger-zone grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold">تنفيذ تنظيف</h2>

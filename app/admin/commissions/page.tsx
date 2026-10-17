@@ -1,11 +1,11 @@
 'use client';
 
+import { AdminPageHeading } from '@/components/admin/page-heading';
+import { TechnicalDetails } from '@/components/admin/record-details';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import {
-  ArrowRight,
   CheckCircle2,
-  Percent,
   Receipt,
   ShieldCheck,
   Trash2,
@@ -240,25 +240,8 @@ export default function AdminCommissionsPage() {
         title="تأكيد حذف سجل الرسوم"
         tone="danger"
       />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-              <Percent className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">إدارة رسوم المنصة</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                متابعة رسوم 1% من عمليات البيع داخل الموقع
-              </p>
-            </div>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="إدارة رسوم المنصة" />
 
         {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
@@ -266,22 +249,22 @@ export default function AdminCommissionsPage() {
           </div>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+        <section className="admin-statistics sm:grid-cols-3">
+          <div>
             <div className="text-xs text-muted-foreground">مستحق</div>
             <div className="mt-1 text-2xl font-bold">{formatMoney(totalDue)}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div>
             <div className="text-xs text-muted-foreground">مدفوع</div>
             <div className="mt-1 text-2xl font-bold">{formatMoney(totalPaid)}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div>
             <div className="text-xs text-muted-foreground">السجلات</div>
             <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
           </div>
         </section>
 
-        <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+        <section className="admin-section">
           <div className="mb-4 flex items-center gap-2 text-sm font-bold">
             <Receipt className="size-4 text-blue-600" />
             سجل رسوم المنصة
@@ -299,18 +282,13 @@ export default function AdminCommissionsPage() {
             <div className="grid gap-4">
               <div className="grid gap-3">
                 {commissions.map((commission) => (
-                  <article key={commission.id} className="grid gap-3 rounded-md border p-3">
+                  <article key={commission.id} className="admin-record">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-base font-bold">
                         {commission.listing?.title ?? 'إعلان غير متاح'}
                       </h2>
-                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>المعلن: {commission.sellerId}</span>
-                        <span>قيمة البيع: {formatMoney(commission.productValue)}</span>
-                        <span>رسوم المنصة: {formatMoney(commission.commissionAmount)}</span>
-                        <span>{formatStatus(commission.status)}</span>
-                      </div>
+                      <span className="admin-status mt-2">{formatStatus(commission.status)}</span>
                     </div>
                     <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
                       <ShieldCheck className="size-3.5" />
@@ -318,7 +296,9 @@ export default function AdminCommissionsPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  <dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">قيمة البيع</dt><dd className="mt-1 text-lg font-semibold">{formatMoney(commission.productValue)}</dd></div><div><dt className="text-xs text-muted-foreground">رسوم المنصة</dt><dd className="mt-1 text-lg font-semibold">{formatMoney(commission.commissionAmount)}</dd></div></dl>
+                  <TechnicalDetails title="معرّفات سجل الرسوم" value={{ commissionId: commission.id, sellerId: commission.sellerId, listingId: commission.listingId }} />
+                  <div className="admin-actions">
                     <Button
                       variant="outline"
                       className="rounded-md"

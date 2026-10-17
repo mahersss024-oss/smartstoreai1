@@ -13,6 +13,9 @@ type AuthSessionPayload = {
 
 type AdminAccessStatus = 'idle' | 'checking' | 'allowed' | 'forbidden' | 'error';
 
+// The shell and page can detect an expired session in the same document.
+const signInRedirects = new WeakSet<Document>();
+
 function hasRequiredRole(role: string | undefined, requiredRole: AdminAccessRole) {
   if (requiredRole === 'moderator') {
     return role === 'owner' || role === 'admin' || role === 'moderator';
@@ -47,9 +50,17 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
       if (!session.authenticated) {
         setRole(null);
         setStatus('forbidden');
-        window.location.assign(
-          new URL('/api/auth/google/start', window.location.origin),
-        );
+        if (!signInRedirects.has(document)) {
+          signInRedirects.add(document);
+          try {
+            window.location.assign(
+              new URL('/api/auth/google/start', window.location.origin),
+            );
+          } catch (error) {
+            signInRedirects.delete(document);
+            throw error;
+          }
+        }
         return false;
       }
 

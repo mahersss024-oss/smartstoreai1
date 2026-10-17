@@ -1,17 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminPageHeading } from '@/components/admin/page-heading';
+import { TechnicalDetails } from '@/components/admin/record-details';
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowRight,
   BadgeCheck,
   Ban,
   CheckCircle2,
   ExternalLink,
   Flag,
   MessageCircle,
-  Percent,
   ShieldCheck,
   Trash2,
   Users,
@@ -226,7 +227,7 @@ function SensitiveListingsSection({
     content = (
       <div className="grid gap-3">
         {listings.map((listing) => (
-          <article key={listing.id} className="grid gap-3 rounded-md border p-3">
+          <article key={listing.id} className="admin-record">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-bold">{listing.title ?? 'إعلان بدون عنوان'}</h2>
@@ -278,7 +279,7 @@ function SensitiveListingsSection({
   }
 
   return (
-    <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <section id="pending-listings" className="admin-section">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold">
         <ShieldCheck className="size-4 text-blue-600" />
         الإعلانات الحساسة
@@ -327,7 +328,7 @@ function ListingReportsSection({
             Boolean(report.listing) && report.listing?.status !== 'deleted';
 
           return (
-            <article key={report.id} className="grid gap-3 rounded-md border p-3">
+            <article key={report.id} className="admin-record">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-base font-bold">
@@ -347,7 +348,7 @@ function ListingReportsSection({
                 )}
               </div>
               {report.status === 'open' && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="admin-actions">
                   {hasActiveListing && report.listing && (
                     <Button asChild variant="outline" className="rounded-md">
                       <Link
@@ -414,10 +415,10 @@ function ListingReportsSection({
   }
 
   return (
-    <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <section id="listing-reports" className="admin-section">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold">
         <Flag className="size-4 text-blue-600" />
-        البلاغات
+        بلاغات الإعلانات
       </div>
       {content}
     </section>
@@ -456,7 +457,7 @@ function UserReportsSection({
           const messagePreview = report.conversation?.messages.at(0);
 
           return (
-          <article key={report.id} className="grid gap-3 rounded-md border p-3">
+          <article key={report.id} className="admin-record">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="font-bold">
@@ -515,11 +516,11 @@ function UserReportsSection({
               <>
             <EvidencePanel reportId={report.id} sourceType="UserReport" canManage={canViewAccounts} />
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md border p-2 text-xs leading-6">
+              <div className="min-w-0 border-s-2 ps-3 text-xs leading-6">
                 <div className="font-bold">المبلّغ</div>
                 <div>{report.reporter?.name ?? 'دون اسم'}</div>
                 <div className="break-all text-muted-foreground">{report.reporter?.email ?? report.reporterId}</div>
-                <div className="break-all text-muted-foreground">{report.reporterId}</div>
+                <TechnicalDetails title="معرّف المبلّغ" value={{ id: report.reporterId }} />
                 {canViewAccounts && (
                   <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
                     <Link href={`/admin/users?query=${encodeURIComponent(report.reporterId)}`}>
@@ -529,11 +530,11 @@ function UserReportsSection({
                   </Button>
                 )}
               </div>
-              <div className="rounded-md border p-2 text-xs leading-6">
+              <div className="min-w-0 border-s-2 ps-3 text-xs leading-6">
                 <div className="font-bold">المبلّغ عنه</div>
                 <div>{report.targetUser?.name ?? 'دون اسم'}</div>
                 <div className="break-all text-muted-foreground">{report.targetUser?.email ?? report.targetUserId}</div>
-                <div className="break-all text-muted-foreground">{report.targetUserId}</div>
+                <TechnicalDetails title="معرّف المبلّغ عنه" value={{ id: report.targetUserId }} />
                 {canViewAccounts && (
                   <Button asChild size="sm" variant="outline" className="mt-2 w-full rounded-md">
                     <Link href={`/admin/users?query=${encodeURIComponent(report.targetUserId)}`}>
@@ -545,7 +546,7 @@ function UserReportsSection({
               </div>
             </div>
             {report.conversation?.messages.length ? (
-              <div className="grid gap-1.5 rounded-md border p-2">
+              <div className="admin-scroll-records border-t pt-3">
                 <div className="text-xs font-bold">آخر الرسائل المرتبطة بالبلاغ</div>
                 {report.conversation.messages.map((message) => (
                   <div key={message.id} className="rounded bg-[#f7f9fc] px-2 py-1.5 text-xs dark:bg-background">
@@ -560,7 +561,7 @@ function UserReportsSection({
               </>
             )}
             {report.status === 'open' && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="admin-actions">
                 <Button
                   variant="outline"
                   className="rounded-md"
@@ -616,7 +617,7 @@ function UserReportsSection({
   }
 
   return (
-    <section className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+    <section id="conversation-reports" className="admin-section">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold">
         <MessageCircle className="size-4 text-blue-600" />
         بلاغات المحادثات
@@ -626,7 +627,10 @@ function UserReportsSection({
   );
 }
 
-export default function AdminModerationPage() {
+function AdminModerationPageContent() {
+  const params = useSearchParams();
+  const focusedReportId = params.get('reportId') ?? '';
+  const focusedSource = params.get('sourceType') ?? '';
   const router = useRouter();
   const {
     adminAccessRole,
@@ -675,7 +679,8 @@ export default function AdminModerationPage() {
         return;
       }
 
-      const response = await fetch(`/api/admin/moderation?page=${page}&limit=20`, {
+      const focusQuery = focusedReportId ? `&reportId=${encodeURIComponent(focusedReportId)}&sourceType=${encodeURIComponent(focusedSource)}` : '';
+      const response = await fetch(`/api/admin/moderation?page=${page}&limit=20${focusQuery}`, {
         cache: 'no-store',
       });
 
@@ -714,7 +719,7 @@ export default function AdminModerationPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [router, verifyAdminAccess]);
+  }, [router, verifyAdminAccess, focusedReportId, focusedSource]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -976,30 +981,9 @@ export default function AdminModerationPage() {
         title={pendingModerationConfirm?.title ?? 'تأكيد الإجراء'}
         tone={pendingModerationConfirm?.tone ?? 'default'}
       />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white px-4 py-3 shadow-sm dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/admin">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-bold">لوحة المراجعة</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                الإعلانات الحساسة والبلاغات
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="rounded-md">
-              <Link href="/admin/commissions">
-                <Percent className="size-4" />
-                رسوم المنصة
-              </Link>
-            </Button>
-          </div>
-        </header>
+      <div className="admin-page">
+        <AdminPageHeading title="البلاغات والأدلة" />
+        {focusedReportId && <div className="admin-notice flex flex-wrap justify-between gap-3"><span>البلاغ المحدد من الإشعارات</span><Link href="/admin/moderation" prefetch={false} className="text-primary underline">عرض كل البلاغات</Link></div>}
 
         {(adminAccessNotice || notice) && (
           <div className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
@@ -1007,16 +991,16 @@ export default function AdminModerationPage() {
           </div>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+        <section className="admin-statistics sm:grid-cols-3">
+          <div>
             <div className="text-xs text-muted-foreground">إعلانات تنتظر المراجعة</div>
             <div className="mt-1 text-2xl font-bold">{queue.listings.length}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div>
             <div className="text-xs text-muted-foreground">بلاغات مفتوحة</div>
             <div className="mt-1 text-2xl font-bold">{openReportsCount}</div>
           </div>
-          <div className="rounded-md border bg-white p-4 shadow-sm dark:bg-card">
+          <div>
             <div className="text-xs text-muted-foreground">إجمالي البلاغات</div>
             <div className="mt-1 text-2xl font-bold">
               {queue.reports.length + queue.userReports.length}
@@ -1024,13 +1008,9 @@ export default function AdminModerationPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <SensitiveListingsSection
-            listings={queue.listings}
-            isLoading={isLoading}
-            onModerate={(listingId, action) => void moderateListing(listingId, action)}
-          />
-
+        <nav className="admin-section-nav" aria-label="أقسام المراجعة"><a href="#listing-reports">بلاغات الإعلانات</a><a href="#conversation-reports">بلاغات المحادثات</a><a href="#pending-listings">الإعلانات الحساسة</a></nav>
+        <p className="text-xs text-muted-foreground">الإحصاءات للسجلات المحمّلة في هذه الصفحة.</p>
+        <div className="grid gap-6">
           <ListingReportsSection
             reports={queue.reports}
             isLoading={isLoading}
@@ -1042,7 +1022,7 @@ export default function AdminModerationPage() {
               void deleteClosedReport(reportId, 'listing')
             }
           />
-        </section>
+        </div>
         <UserReportsSection
           userReports={queue.userReports}
           processingReportId={processingReportId}
@@ -1054,6 +1034,11 @@ export default function AdminModerationPage() {
           onDelete={(reportId) =>
             void deleteClosedReport(reportId, 'conversation')
           }
+        />
+        <SensitiveListingsSection
+          listings={queue.listings}
+          isLoading={isLoading}
+          onModerate={(listingId, action) => void moderateListing(listingId, action)}
         />
         {hasMoreQueue && (
           <div>
@@ -1067,4 +1052,8 @@ export default function AdminModerationPage() {
       </div>
     </main>
   );
+}
+
+export default function AdminModerationPage() {
+  return <Suspense fallback={null}><AdminModerationPageContent /></Suspense>;
 }

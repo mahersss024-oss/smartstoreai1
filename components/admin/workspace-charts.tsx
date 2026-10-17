@@ -1,6 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useState } from 'react';
+import { ChartColumn, ChartLine } from 'lucide-react';
+import { Button } from '@ui/button';
 import type { ApexOptions } from 'apexcharts';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 
@@ -18,9 +21,10 @@ const ReactApexChart = dynamic(() => import('react-apexcharts'), {
 
 // TailAdmin chart composition, with marketplace theme and real daily visit data.
 export function WorkspaceCharts({ data }: { data: AdminWorkspace }) {
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const options: ApexOptions = {
     chart: {
-      type: 'bar',
+      type: chartType,
       height: 280,
       fontFamily: 'inherit',
       toolbar: { show: false },
@@ -57,7 +61,36 @@ export function WorkspaceCharts({ data }: { data: AdminWorkspace }) {
   };
   return (
     <section className="admin-panel" aria-label="مؤشرات الزيارات">
-      <h2 className="admin-panel-heading">زيارات الموقع</h2>
+      <header className="admin-panel-heading flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2>زيارات الموقع</h2>
+          <p className="mt-1 text-xs font-normal text-muted-foreground">
+            {data.month} · الأيام المسجلة فقط
+          </p>
+        </div>
+        <div className="flex gap-1" role="group" aria-label="نوع رسم الزيارات">
+          <Button
+            variant={chartType === 'bar' ? 'secondary' : 'ghost'}
+            size="icon"
+            title="أعمدة"
+            aria-label="عرض الزيارات بالأعمدة"
+            aria-pressed={chartType === 'bar'}
+            onClick={() => setChartType('bar')}
+          >
+            <ChartColumn className="size-4" />
+          </Button>
+          <Button
+            variant={chartType === 'line' ? 'secondary' : 'ghost'}
+            size="icon"
+            title="خط زمني"
+            aria-label="عرض الزيارات بخط زمني"
+            aria-pressed={chartType === 'line'}
+            onClick={() => setChartType('line')}
+          >
+            <ChartLine className="size-4" />
+          </Button>
+        </div>
+      </header>
       <div className="admin-panel-body">
         <div className="admin-chart" aria-hidden="true">
           <ReactApexChart
@@ -69,10 +102,18 @@ export function WorkspaceCharts({ data }: { data: AdminWorkspace }) {
                 data: data.visits.map((row) => row.uniqueVisitors),
               },
             ]}
-            type="bar"
+            type={chartType}
             height={280}
           />
         </div>
+        {data.visits.length > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            إجمالي الزيارات المسجلة في الفترة:{' '}
+            {new Intl.NumberFormat('ar-SA').format(
+              data.visits.reduce((sum, row) => sum + row.visits, 0),
+            )}
+          </p>
+        )}
         <details className="mt-3 text-sm">
           <summary className="cursor-pointer text-primary">
             عرض أرقام الزيارات

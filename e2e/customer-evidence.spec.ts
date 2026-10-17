@@ -25,7 +25,7 @@ for (const role of ['admin', 'moderator']) {
     await page.getByText('الإعلان وقت البلاغ', { exact: true }).click();
     await expect(page.getByText('الوصف الأصلي وقت البلاغ')).toBeVisible();
     await page.getByText('المحادثة المحفوظة', { exact: true }).click();
-    await expect(page.getByText('نص محفوظ من المحادثة')).toBeVisible();
+    await expect(page.getByText('نص محفوظ من المحادثة', { exact: true })).toBeVisible();
     if (role === 'admin') {
       await page.getByText('إدارة الاحتفاظ والإتلاف', { exact: true }).click();
       await expect(page.getByRole('button', { name: 'إتلاف الأدلة', exact: true })).toBeDisabled();
