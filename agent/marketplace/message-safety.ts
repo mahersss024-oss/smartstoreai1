@@ -1,4 +1,4 @@
-import { evaluateForbiddenMarketplaceTerms } from './forbidden-terms';
+import { evaluateSaudiMarketplaceCompliance } from './policy';
 
 export type ConversationMessageSafetyDecision = {
   decision: 'allow' | 'block';
@@ -47,7 +47,7 @@ export function evaluateConversationMessageSafety(
   body: string,
 ): ConversationMessageSafetyDecision {
   const reasons = new Set<string>();
-  const forbiddenTermsDecision = evaluateForbiddenMarketplaceTerms(body);
+  const forbiddenTermsDecision = evaluateSaudiMarketplaceCompliance(body);
 
   if (forbiddenTermsDecision.decision !== 'allow') {
     reasons.add('forbidden_or_regulated_marketplace_terms');

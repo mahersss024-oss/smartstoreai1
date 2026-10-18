@@ -5,7 +5,6 @@ import {
   type StructuredSearchIntent,
   structuredSearchIntentSchema,
 } from './structured-search-intent';
-import { normalizeMarketplaceSearchText } from './search';
 
 export type MarketplaceSearchState = StructuredSearchIntent & {
   revision: number;
@@ -71,20 +70,6 @@ function isDifferentPrimaryTarget(
     return true;
   }
 
-  const currentTerms = getProductIdentityTerms(current.terms);
-  const nextTerms = getProductIdentityTerms(next.terms);
-
-  if (
-    currentTerms.length > 0 &&
-    nextTerms.length > 0 &&
-    !next.category &&
-    !next.brand &&
-    !next.model &&
-    !nextTerms.some((term) => currentTerms.includes(term))
-  ) {
-    return true;
-  }
-
   return false;
 }
 
@@ -92,22 +77,15 @@ function uniqueStrings(values: Array<string | undefined>) {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
 
-function getProductIdentityTerms(terms: string[]) {
-  return uniqueStrings(
-    terms
-      .map((term) => normalizeMarketplaceSearchText(term))
-      .filter((term) => !/^\d+$/.test(term) && term.length > 1),
-  );
-}
-
 function mergeSearchState(
   current: MarketplaceSearchState | null,
   next: StructuredSearchIntent,
 ): MarketplaceSearchState {
-  const base = isDifferentPrimaryTarget(current, next) ? null : current;
+  // Retain prior filters only for an explicitly requested continuation.
+  const base = next.searchMode === 'refine' && !isDifferentPrimaryTarget(current, next)
+    ? current : null;
   const updatedAt = new Date().toISOString();
-  const searchMode =
-    next.searchMode ?? (base ? 'refine' : 'new_search');
+  const searchMode = base ? 'refine' : 'new_search';
 
   return {
     intent: 'search_listing',
@@ -143,6 +121,7 @@ function mergeSearchState(
     sortPreference: next.sortPreference ?? base?.sortPreference,
     locationPreference: next.locationPreference ?? base?.locationPreference,
     terms: uniqueStrings([...(base?.terms ?? []), ...next.terms]),
+    termAliases: [...new Map([...(base?.termAliases ?? []), ...(next.termAliases ?? [])].map(entry => [entry.term, entry])).values()].slice(-40),
     rawQuery: next.rawQuery || base?.rawQuery,
     revision: (base?.revision ?? 0) + 1,
     updatedAt,

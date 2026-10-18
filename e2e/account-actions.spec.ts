@@ -48,7 +48,8 @@ test('profile controls cancel edits, preserve input on failure, retry saving and
   await page.getByRole('button', { name: labels.edit, exact: true }).click();
   await phone.fill('0500000002');
   await save.click();
-  await expect(page.getByText('Profile temporarily unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('تعذر حفظ بيانات الحساب الآن. حاول مرة أخرى.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Profile temporarily unavailable', { exact: true })).toHaveCount(0);
   await expect(name).toHaveValue('Updated fixture');
   await expect(phone).toHaveValue('0500000002');
   await save.click();
@@ -94,7 +95,10 @@ for (const status of [401, 503, 200]) {
       await expect(page).toHaveURL(/\/$/);
     } else {
       await expect(page).toHaveURL(/\/delete-account$/);
-      if (status === 503) await expect(page.getByText('Deletion fixture unavailable', { exact: true })).toBeVisible();
+      if (status === 503) {
+        await expect(page.getByText('تعذر إكمال الإجراء الآن. راجع البيانات وحاول مجددًا.', { exact: true })).toBeVisible();
+        await expect(page.getByText('Deletion fixture unavailable', { exact: true })).toHaveCount(0);
+      }
       else await expect(page.getByText(/\u0633\u062c\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0625\u0644\u0649 \u062d\u0633\u0627\u0628\u0643 \u0623\u0648\u0644/)).toBeVisible();
       await expect(remove).toBeEnabled();
     }

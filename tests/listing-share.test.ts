@@ -219,6 +219,7 @@ test('assistant message renderer turns listing links into a listing card inside 
   assert.match(homePage, /chatListingCardsById/);
   assert.match(homePage, /getListingIdFromHref\(listingHref\)/);
   assert.match(homePage, /عرض بطاقة الإعلان/);
-  assert.match(homePage, /return renderTextMessagePart\(part\.text, index, listingsById\)/);
+  assert.match(homePage, /return renderTextMessagePart\(text, index, listingsById\)/);
+  assert.match(homePage, /getSafeAssistantText\(part\.text\)/);
   assert.match(homePage, /فتح الإعلان/);
 });

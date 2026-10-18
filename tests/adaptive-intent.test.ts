@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
 
 import {
   getFallbackAdaptiveMarketplaceIntent,
@@ -57,7 +59,8 @@ test('uses conversation context for short marketplace follow-ups', () => {
   assert.equal(intent.requiresAuth, false);
 });
 
-test('routes seller listing requests to authenticated draft creation', () => {
+test('routes model-understood seller listing requests to authenticated draft creation', (t) => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'create_listing' }));
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'عندي آيفون 14 برو للبيع' }] },
   ]);
@@ -68,7 +71,8 @@ test('routes seller listing requests to authenticated draft creation', () => {
   assert.equal(intent.requiresConfirmation, true);
 });
 
-test('does not search listings when the user wants to create an ad', () => {
+test('does not search listings when the model identifies creation intent', (t) => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'create_listing' }));
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'أريد إنشاء إعلان آيفون للبيع' }] },
   ]);
@@ -108,7 +112,8 @@ test('routes listing approval follow-ups to draft creation', () => {
   assert.equal(intent.requiresAuth, true);
 });
 
-test('routes a new standalone seller product to a new draft after a prior listing', () => {
+test('routes a model-understood new standalone seller product to a new draft after a prior listing', (t) => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'create_listing' }));
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'عندي آيفون 14 برو للبيع' }] },
     {

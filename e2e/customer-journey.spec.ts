@@ -71,6 +71,9 @@ test('manual photo-free publication remains independent of assistant availabilit
   await addSignedInSession(baseURL, page);
   await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
   await page.route('**/api/chat', route => route.fulfill({ status: 503, json: { error: 'fixture_unavailable' } }));
+  await page.route('**/api/marketplace/listing-category', route => route.fulfill({
+    json: { status: 'suggested', category: 'mobile_phones', confidence: 0.95 },
+  }));
   let created: Record<string, unknown> | undefined;
   let published = 0;
   let imageRequests = 0;
@@ -140,8 +143,8 @@ test('visitor can reach the marketplace and choose an auth provider', async ({
   }
 
   await expect(page.getByTestId('auth-provider-menu')).toBeVisible();
-  await expect(page.getByTestId('auth-provider-menu')).toContainText(/Google/i);
-  await expect(page.getByTestId('auth-provider-menu')).toContainText(/Apple/i);
+  await expect(page.getByTestId('auth-provider-menu')).toContainText('جوجل');
+  await expect(page.getByTestId('auth-provider-menu')).toContainText('آبل');
 });
 
 test('signed-in customer can open the core journey pages without auth flash or server errors', async ({
@@ -159,7 +162,7 @@ test('signed-in customer can open the core journey pages without auth flash or s
     );
     await expect(page.locator('body'), path).toContainText(corePageText[path]);
     await expect(
-      page.getByRole('button', { name: /Google|Apple/i }),
+      page.getByRole('button', { name: /جوجل|آبل/i }),
       path,
     ).toHaveCount(0);
   }

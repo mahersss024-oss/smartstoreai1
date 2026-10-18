@@ -109,25 +109,6 @@ export function analyzeImageQuality(input: ImageQualityInput): ImageQualityResul
     notes.push('sensitive_info_should_be_blurred');
   }
 
-  if (qualityScore < 50) {
-    return {
-      qualityScore: Math.max(0, qualityScore),
-      resolution: hasResolution
-        ? { width: input.width!, height: input.height! }
-        : undefined,
-      sharpness: 'low',
-      lighting: 'unknown',
-      productVisibility: 'partial',
-      hasSensitiveInfo,
-      hasPhoneNumber,
-      isRelevantToListing,
-      recommendedAction: 'request_retake',
-      listingImageStatus: 'needs_retake',
-      enhancements,
-      notes,
-    };
-  }
-
   if (qualityScore < 75 || hasSensitiveInfo) {
     enhancements.push('improve_lighting', 'sharpen', 'auto_crop');
 

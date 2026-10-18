@@ -1,94 +1,57 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
+import { getMarketplaceSearchTermVariants, normalizeMarketplaceSearchText, parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 
-import {
-  getMarketplaceSearchTermVariants,
-  normalizeMarketplaceSearchText,
-  parseMarketplaceSearchQuery,
-} from '@/agent/marketplace/search';
-
-test('treats search wording as intent and not database search terms', () => {
-  const parsed = parseMarketplaceSearchQuery('أبحث عن سيارة في الرياض');
-
+test('search uses contextual model fields instead of extracting keywords locally', t => {
+  const output = textAnalysis({ category: 'cars', brand: 'Toyota', model: 'Camry',
+    aliases: [{ term: 'Toyota', variants: ['تويوتا', 'تايوتا', 'toyota'] }],
+    search: { ...textAnalysis().search, city: 'الرياض', maxPrice: 80000, yearMin: 2020, yearMax: 2020 },
+  });
+  const query = 'أبحث عن تايوتا كامري 2020 في الرياض تحت 80 ألف';
+  t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => text === query ? output : null);
+  const parsed = parseMarketplaceSearchQuery(query);
   assert.equal(parsed.category, 'cars');
   assert.equal(parsed.city, 'الرياض');
-  assert.deepEqual(parsed.terms, []);
-});
-
-test('extracts buyer budget without keeping intent words as terms', () => {
-  const parsed = parseMarketplaceSearchQuery(
-    'أبحث عن سيارة في الرياض ميزانيتي 50 ألف',
-  );
-
-  assert.equal(parsed.category, 'cars');
-  assert.equal(parsed.city, 'الرياض');
-  assert.equal(parsed.maxPrice, 50000);
-  assert.deepEqual(parsed.terms, []);
-});
-
-test('keeps real product details as marketplace search terms', () => {
-  const parsed = parseMarketplaceSearchQuery('تايوتا كامري 2020');
-
-  assert.equal(parsed.category, 'cars');
-  assert.deepEqual(parsed.terms, ['تايوتا', 'كامري', '2020']);
-  assert.equal(parsed.termGroups[0].includes('تويوتا'), true);
-  assert.equal(parsed.termGroups[0].includes('toyota'), true);
-});
-
-test('removes generic words while preserving product attributes', () => {
-  const parsed = parseMarketplaceSearchQuery('أريد أبحث عن ساعة زرقاء في الرياض');
-
-  assert.equal(parsed.city, 'الرياض');
-  assert.deepEqual(parsed.terms, ['ساعه', 'زرقا']);
-});
-
-test('keeps car model year while extracting max price', () => {
-  const parsed = parseMarketplaceSearchQuery('كامري 2020 تحت 80000');
-
-  assert.equal(parsed.category, 'cars');
   assert.equal(parsed.maxPrice, 80000);
-  assert.deepEqual(parsed.terms, ['كامري', '2020']);
+  assert.equal(parsed.yearMin, 2020);
+  assert.deepEqual(parsed.terms, ['Toyota', 'Camry']);
+  assert.ok(parsed.termGroups[0].includes('تويوتا'));
+  assert.ok(parsed.termGroups[0].includes('toyota'));
 });
 
-test('extracts camera category and brand from Arabic buyer search', () => {
-  const parsed = parseMarketplaceSearchQuery('اريد كاميرا تصوير من نوع كانون');
-
-  assert.equal(parsed.category, 'cameras');
-  assert.deepEqual(parsed.terms, ['تصوير', 'نوع', 'كانون']);
-  assert.equal(parsed.termGroups.at(-1)?.includes('كانون'), true);
-  assert.equal(parsed.termGroups.at(-1)?.includes('canon'), true);
+test('broad model category requests do not turn request wording into product terms', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: 'cars' }));
+  assert.deepEqual(parseMarketplaceSearchQuery('أبحث عن سيارة').terms, []);
 });
 
-test('extracts gender supplies categories without falling back to generic fashion', () => {
-  const womenParsed = parseMarketplaceSearchQuery('women supplies abaya');
-  const menParsed = parseMarketplaceSearchQuery('men supplies shemagh');
-
-  assert.equal(womenParsed.category, 'women_supplies');
-  assert.equal(menParsed.category, 'men_supplies');
+test('model color and feature constraints remain searchable', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: 'watches_accessories',
+    search: { ...textAnalysis().search, color: 'blue', requiredFeatures: ['waterproof'] },
+  }));
+  assert.deepEqual(parseMarketplaceSearchQuery('أريد ساعة زرقاء مقاومة للماء').terms, ['blue', 'waterproof']);
 });
 
-test('expands vehicle brand and model aliases across Arabic and English spellings', () => {
-  const nissanVariants = getMarketplaceSearchTermVariants('Nissan');
-  const patrolVariants = getMarketplaceSearchTermVariants('بترول');
-
-  assert.equal(nissanVariants.includes('nissan'), true);
-  assert.equal(nissanVariants.includes('نيسان'), true);
-  assert.equal(patrolVariants.includes('بترول'), true);
-  assert.equal(patrolVariants.includes('باترول'), true);
-  assert.equal(patrolVariants.includes('patrol'), true);
+test('unknown text stays literal without a guessed category city or budget', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
+  const parsed = parseMarketplaceSearchQuery('unknown object 2020');
+  assert.equal(parsed.category, undefined);
+  assert.equal(parsed.city, undefined);
+  assert.equal(parsed.minPrice, undefined);
+  assert.equal(parsed.maxPrice, undefined);
+  assert.deepEqual(parsed.terms, ['unknown', 'object', '2020']);
 });
 
-test('normalizes common Arabic writing differences for marketplace search', () => {
+test('only contextual equivalents from the model expand a search term', t => {
+  const output = textAnalysis({ aliases: [{ term: 'Patrol', variants: ['بترول', 'باترول', 'patrol'] }] });
+  t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => text === 'vehicle request' ? output : null);
+  assert.ok(getMarketplaceSearchTermVariants('Patrol', 'vehicle request').includes('باترول'));
+  assert.ok(!getMarketplaceSearchTermVariants('Patrol', 'fuel request').includes('باترول'));
+});
+
+test('normalizes common writing and digit differences without semantic dictionaries', () => {
   assert.equal(normalizeMarketplaceSearchText('آيفون ١٥'), 'ايفون 15');
   assert.equal(normalizeMarketplaceSearchText('إكس تريل ۲۰۲۵'), 'اكس تريل 2025');
   assert.equal(normalizeMarketplaceSearchText('کیا جدید'), 'كيا جديد');
-});
-
-test('expands Arabic definite article and conjunction variants', () => {
-  const sofaVariants = getMarketplaceSearchTermVariants('والكنبة');
-
-  assert.equal(sofaVariants.includes('والكنبه'), true);
-  assert.equal(sofaVariants.includes('الكنبه'), true);
-  assert.equal(sofaVariants.includes('كنبه'), true);
-  assert.equal(sofaVariants.includes('كنبة'), true);
 });

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { beforeEach } from 'node:test';
+import { mockSearchModel } from './helpers/search-model-fixtures';
 
 import {
   rankMarketplaceListings,
@@ -10,6 +11,7 @@ import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
 import {
   getMarketplaceSearchState,
   resetMarketplaceSearchState,
+  updateMarketplaceSearchState,
 } from '@/agent/marketplace/search-state';
 import { parseStructuredSearchIntent } from '@/agent/marketplace/structured-search-intent';
 import {
@@ -19,8 +21,88 @@ import {
   type ListingRecord,
 } from '@/agent/marketplace/store';
 
-beforeEach(() => {
+beforeEach(context => {
+  mockSearchModel(context);
   resetMarketplaceStoreForTests();
+});
+
+test('a repeated product search without explicit refinement drops all prior constraints and restores results', async () => {
+  const ownerKey = 'test:independent-same-product-search';
+  await resetMarketplaceSearchState(ownerKey);
+  const listing = publishTestListing({
+    id: 'same-product-fresh-result', title: 'Toyota Camry 2024', price: 90000,
+    year: 2024, mileage: 30000, city: 'Riyadh',
+  });
+  const restrictive = await searchMarketplaceWithState({
+    ownerKey, query: 'Toyota Camry', understoodIntent: {
+      category: 'cars', brand: 'Toyota', model: 'Camry', city: 'Tabuk',
+      minPrice: 1, maxPrice: 100, yearMin: 2020, yearMax: 2021,
+      mileageMin: 1, mileageMax: 100, condition: 'new', color: 'black',
+      requiredFeatures: ['old_feature'], excludedFeatures: ['hybrid'], excludedColors: ['white'],
+      rankingPreferences: ['price'], sortPreference: 'cheapest', locationPreference: 'same_city',
+      descriptiveTerms: ['unrelated-old-term'],
+    },
+  });
+  assert.equal(restrictive.listings.some(result => result.listing.id === listing.id), false);
+  const fresh = await searchMarketplaceWithState({
+    ownerKey, query: 'Toyota Camry',
+    understoodIntent: { category: 'cars', brand: 'Toyota', model: 'Camry' },
+  });
+  const state = await getMarketplaceSearchState(ownerKey);
+  assert.equal(fresh.searchState.searchMode, 'new_search');
+  for (const field of ['city', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'mileageMin', 'mileageMax', 'condition', 'color', 'sortPreference', 'locationPreference'] as const) {
+    assert.equal(state?.[field], undefined, field);
+  }
+  for (const field of ['terms', 'requiredFeatures', 'excludedFeatures', 'excludedColors', 'rankingPreferences'] as const) {
+    assert.deepEqual(state?.[field], [], field);
+  }
+  assert.equal(fresh.listings.some(result => result.listing.id === listing.id), true);
+});
+
+test('an explicit refinement may add descriptive terms without clearing the current product filters', async () => {
+  const ownerKey = 'test:explicit-descriptive-refinement';
+  await resetMarketplaceSearchState(ownerKey);
+  await updateMarketplaceSearchState(ownerKey, {
+    ...parseStructuredSearchIntent('Toyota Camry'), city: 'Riyadh', terms: ['hybrid'],
+  });
+  const refined = await updateMarketplaceSearchState(ownerKey, {
+    ...parseStructuredSearchIntent(''), searchMode: 'refine', terms: ['leather'],
+  });
+  assert.equal(refined.searchMode, 'refine');
+  assert.equal(refined.model, 'Camry');
+  assert.equal(refined.city, 'Riyadh');
+  assert.deepEqual(refined.terms, ['hybrid', 'leather']);
+});
+
+test('database-backed state writes replace prior constraints for an independent search', async () => {
+  const { prisma } = await import('@/lib/db/prisma');
+  const previousStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  let stored: unknown = null;
+  const delegate = prisma.marketplaceSearchState;
+  const original = { findUnique: delegate.findUnique, upsert: delegate.upsert };
+  Object.assign(delegate, {
+    findUnique: async () => stored ? { state: stored } : null,
+    upsert: async (args: { update: { state: unknown } }) => {
+      stored = args.update.state;
+      return {};
+    },
+  });
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  try {
+    await updateMarketplaceSearchState('test:database-independent-search', {
+      ...parseStructuredSearchIntent('Toyota Camry'), city: 'Riyadh', maxPrice: 100, terms: ['old'],
+    });
+    await updateMarketplaceSearchState('test:database-independent-search', parseStructuredSearchIntent('Toyota Camry'));
+    const state = await getMarketplaceSearchState('test:database-independent-search');
+    assert.equal(state?.searchMode, 'new_search');
+    assert.equal(state?.city, undefined);
+    assert.equal(state?.maxPrice, undefined);
+    assert.deepEqual(state?.terms, []);
+  } finally {
+    Object.assign(delegate, original);
+    if (previousStore === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previousStore;
+  }
 });
 
 function publishTestListing(input: {
@@ -101,11 +183,12 @@ test('keeps one accumulated server search state across buyer followups', async (
   });
 
   await searchMarketplaceWithState({ ownerKey, query: 'أريد كامري في تبوك' });
-  await searchMarketplaceWithState({ ownerKey, query: '2022 وفوق' });
-  await searchMarketplaceWithState({ ownerKey, query: 'حدي 80 ألف' });
+  await searchMarketplaceWithState({ ownerKey, query: '2022 وفوق', understoodIntent: { searchMode: 'refine' } });
+  await searchMarketplaceWithState({ ownerKey, query: 'حدي 80 ألف', understoodIntent: { searchMode: 'refine' } });
   const result = await searchMarketplaceWithState({
     ownerKey,
     query: 'الأهم ممشى قليل',
+    understoodIntent: { searchMode: 'refine' },
   });
 
   assert.equal(result.searchState.category, 'cars');
@@ -131,6 +214,7 @@ test('keeps one accumulated server search state across buyer followups', async (
   const relaxedBudget = await searchMarketplaceWithState({
     ownerKey,
     query: 'خل الميزانية 90 ألف',
+    understoodIntent: { searchMode: 'refine' },
   });
   assert.equal(relaxedBudget.searchState.maxPrice, 90000);
   assert.equal(relaxedBudget.searchState.model, 'Camry');
@@ -138,6 +222,7 @@ test('keeps one accumulated server search state across buyer followups', async (
   const withoutWhite = await searchMarketplaceWithState({
     ownerKey,
     query: 'لا أريد أبيض',
+    understoodIntent: { searchMode: 'refine' },
   });
   assert.equal(withoutWhite.searchState.excludedColors.includes('أبيض'), true);
 });
@@ -197,6 +282,7 @@ test('refined chat searches replace smart cards with accumulated matching listin
     ownerKey,
     query: 'model 2025',
     understoodIntent: {
+      searchMode: 'refine',
       yearMin: 2025,
       yearMax: 2025,
     },
@@ -214,6 +300,7 @@ test('refined chat searches replace smart cards with accumulated matching listin
     ownerKey,
     query: 'between 90000 and 100000',
     understoodIntent: {
+      searchMode: 'refine',
       minPrice: 90000,
       maxPrice: 100000,
     },
@@ -519,6 +606,7 @@ test('changed buyer product intent starts a fresh search without old listing fil
     ownerKey,
     query: 'in Riyadh',
     understoodIntent: {
+      searchMode: 'refine',
       city: 'Riyadh',
     },
   });

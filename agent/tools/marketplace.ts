@@ -14,18 +14,14 @@ import {
 } from '@/agent/marketplace/listing-limits';
 import {
   createListingDraft,
-  deleteListingImageForSeller,
   getListing,
   listMarketplaceListings,
   listSellerListings,
-  reportListing,
-  setListingStatusForSeller,
-  setPrimaryListingImageForSeller,
-  toggleFavoriteListing,
   updateListingForSeller,
   type CreateListingInput,
 } from '@/agent/marketplace/repository';
 import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
+import { prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
 import { marketplaceSearchUnderstandingSchema } from '@/agent/marketplace/search-understanding-schema';
 import { compareMarketplaceListings as compareListingsWithEngine } from '@/agent/marketplace/comparison-engine';
 import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
@@ -149,7 +145,6 @@ const updateListingDetailsInputSchema = listingDetailsInputSchema
   });
 
 type ListingDetailsInput = z.infer<typeof listingDetailsInputSchema>;
-type ListingStatusAction = 'paused' | 'sold' | 'deleted';
 
 function normalizeListingDetailsInput(
   input: Partial<ListingDetailsInput>,
@@ -186,39 +181,6 @@ function confirmationRequired(message: string) {
   };
 }
 
-function getFallbackStatusesForAction(status: ListingStatusAction) {
-  if (status === 'paused' || status === 'sold') {
-    return new Set(['published']);
-  }
-
-  return new Set(['draft', 'pending', 'paused', 'published', 'rejected']);
-}
-
-async function getCurrentSellerListingForStatusAction({
-  sellerId,
-  listingId,
-  status,
-}: {
-  sellerId: string;
-  listingId?: string;
-  status: ListingStatusAction;
-}) {
-  if (listingId) {
-    const listing = await getListing(listingId);
-    return listing && listing.sellerId === sellerId ? listing : null;
-  }
-
-  const allowedStatuses = getFallbackStatusesForAction(status);
-  const listings = await listSellerListings(sellerId);
-
-  return (
-    listings.find(
-      (listing) =>
-        allowedStatuses.has(listing.status) &&
-        listing.compliance.decision !== 'block',
-    ) ?? null
-  );
-}
 
 async function getCurrentEditableSellerListing({
   sellerId,
@@ -236,7 +198,7 @@ async function getCurrentEditableSellerListing({
 
   return (
     listings.find((listing) =>
-      ['draft', 'pending', 'paused'].includes(listing.status),
+      listing.status === 'draft',
     ) ?? null
   );
 }
@@ -279,7 +241,7 @@ export function createMarketplaceTools(
           market: searchResult.market,
           relaxedSuggestion: searchResult.relaxedSuggestion,
           note:
-            'Search state is accumulated on the server. Return only the visible ranked matches and explain scores using the provided reasons. Do not invent unavailable listings or market averages.',
+            'Each search replaces the prior server filters unless searchMode="refine" explicitly continues the current search. Return only the latest visible ranked matches and explain scores using the provided reasons. Do not invent unavailable listings or market averages.',
         };
       },
     }),
@@ -314,10 +276,10 @@ export function createMarketplaceTools(
             : {
                 category: targetListing.category,
                 city: targetListing.city,
-                terms: [targetListing.title ?? ''].filter(Boolean),
                 limit: Math.max(limit + 24, 30),
               },
         );
+        await prepareListingUnderstanding([targetListing, ...listings]);
         const comparison = compareListingsWithEngine(
           targetListing,
           listings,
@@ -342,19 +304,15 @@ export function createMarketplaceTools(
       inputSchema: listingDetailsInputSchema,
       execute: async (input) => {
         const listingInput = normalizeListingDetailsInput(
-          input,
+          listingDetailsInputSchema.parse(input),
         ) as CreateListingInput;
         const comparableListings = await listMarketplaceListings({
           category: listingInput.category,
           city: listingInput.city,
-          terms: [
-            listingInput.title ?? '',
-            String(listingInput.attributes?.brand ?? ''),
-            String(listingInput.attributes?.model ?? ''),
-          ].filter(Boolean),
           limit: 80,
         });
 
+        await prepareListingUnderstanding([{ ...listingInput, attributes: listingInput.attributes ?? {} }, ...comparableListings]);
         return recommendListingPrice(listingInput, comparableListings);
       },
     }),
@@ -380,10 +338,10 @@ export function createMarketplaceTools(
         const comparableListings = await listMarketplaceListings({
           category: listing.category,
           city: listing.city,
-          terms: [listing.title ?? ''].filter(Boolean),
           limit: 80,
         });
 
+        await prepareListingUnderstanding([listing, ...comparableListings]);
         return {
           status: 'evaluated',
           advice: evaluateNegotiationOffer(
@@ -407,7 +365,7 @@ export function createMarketplaceTools(
         }
 
         const listingInput = normalizeListingDetailsInput(
-          input,
+          listingDetailsInputSchema.parse(input),
         ) as CreateListingInput;
         let listing: Awaited<ReturnType<typeof createListingDraft>>;
         let imageUploadUnavailable = false;
@@ -447,6 +405,7 @@ export function createMarketplaceTools(
             sellerId: session.user.id,
             images: options.latestUploadedImages,
             contentReviewStatuses: review.imageReviewStatuses,
+            draftOnly: true,
           }).catch((error: unknown) => {
             imageUploadUnavailable = true;
             console.warn(`[draft_image_upload] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
@@ -466,7 +425,7 @@ export function createMarketplaceTools(
               : imageUploadUnavailable
                 ? 'Draft created. Some photos could not be saved, but photos are optional and the seller can publish manually from Account > My listings.'
               : listing.images.some((image) => image.status === 'approved')
-                ? 'Draft created with the uploaded product image. Ask for final confirmation before publishing.'
+                ? 'Draft created with the uploaded product image. The seller must review and publish it from Account > My listings.'
                 : 'Draft created. Photos are optional. Ask for useful missing details and direct the seller to Account > My listings when they want to publish.',
           listing,
         };
@@ -475,12 +434,14 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Update a seller-owned listing after the user clearly requests a change or provides more draft details. Requires sign-in. Preserve every confirmed extra detail in structured attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. If the user clearly refers to the current draft or latest owned editable listing and no listingId is available, omit listingId so the tool can update the most recent draft/pending/paused seller listing. Do not use this tool when the latest user message describes a new standalone product for sale; create a new draft instead. For price changes, set confirmedPriceChange=true only after explicit seller confirmation.',
+        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes. Omit listingId only to select the latest owned draft. A new standalone product requires a new draft. A draft price change requires confirmedPriceChange=true.',
       inputSchema: updateListingDetailsInputSchema,
-      execute: async ({ listingId, confirmedPriceChange, ...updates }) => {
+      execute: async (input) => {
         if (!session) {
           return authRequired();
         }
+
+        const { listingId, confirmedPriceChange, ...updates } = updateListingDetailsInputSchema.parse(input);
 
         if (updates.price !== undefined && confirmedPriceChange !== true) {
           return confirmationRequired(
@@ -501,10 +462,15 @@ export function createMarketplaceTools(
           };
         }
 
+        if (targetListing.status !== 'draft') {
+          return { status: 'user_action_required', message: 'Only unpublished drafts can be prepared in chat. Review and edit this listing yourself from Account > My listings.' };
+        }
+
         const listing = await updateListingForSeller(
           targetListing.id,
           session.user.id,
           normalizeListingDetailsInput(updates),
+          { draftOnly: true },
         );
 
         if (!listing) {
@@ -532,7 +498,7 @@ export function createMarketplaceTools(
 
     addUploadedImagesToListing: tool({
       description:
-        'Attach the latest uploaded chat images to a seller-owned listing after the user clearly asks to add/update listing photos. Requires sign-in and a clear listingId. Use only truth-preserving product images already uploaded in this chat turn or retained listing image context.',
+        'Prepare uploaded chat images on an owned unpublished draft only. Requires sign-in and a clear listingId. Never change images on published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings.',
       inputSchema: z.object({
         listingId: z.string().min(1),
       }),
@@ -558,6 +524,10 @@ export function createMarketplaceTools(
           };
         }
 
+        if (targetListing.status !== 'draft') {
+          return { status: 'user_action_required', message: 'Change images for non-draft listings yourself from Account > My listings.' };
+        }
+
         const review = await reviewListingImageContent(options.latestUploadedImages, targetListing.images);
         if (review.status === 'blocked') {
           return { status: review.status, message: review.message, listing: targetListing, compliance: review.compliance };
@@ -567,6 +537,7 @@ export function createMarketplaceTools(
           sellerId: session.user.id,
           images: options.latestUploadedImages,
           contentReviewStatuses: review.imageReviewStatuses,
+          draftOnly: true,
         });
 
         if (!listing) {
@@ -584,152 +555,6 @@ export function createMarketplaceTools(
       },
     }),
 
-    deleteListingImage: tool({
-      description:
-        'Delete one image from a seller-owned listing. Requires sign-in, clear listingId and imageId, and explicit user confirmation.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        imageId: z.string().min(1),
-        confirmed: z
-          .boolean()
-          .describe(
-            'Set true only after the seller explicitly confirms deleting this listing image.',
-          ),
-      }),
-      execute: async ({ listingId, imageId, confirmed }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        if (confirmed !== true) {
-          return confirmationRequired(
-            'Confirm image deletion explicitly before deleting the listing image.',
-          );
-        }
-
-        const listing = await deleteListingImageForSeller(
-          listingId,
-          session.user.id,
-          imageId,
-        );
-
-        if (!listing) {
-          return {
-            status: 'not_found',
-            message: 'Listing image was not found or is not owned by this user.',
-          };
-        }
-
-        return {
-          status: 'image_deleted',
-          listing,
-        };
-      },
-    }),
-
-    setPrimaryListingImage: tool({
-      description:
-        'Set one image as the primary image for a seller-owned listing. Requires sign-in and clear listingId and imageId.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        imageId: z.string().min(1),
-        confirmed: z
-          .boolean()
-          .describe(
-            'Set true only after the seller explicitly confirms making this the primary listing image.',
-          ),
-      }),
-      execute: async ({ listingId, imageId, confirmed }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        if (confirmed !== true) {
-          return confirmationRequired(
-            'Confirm the primary image change explicitly before updating the listing image.',
-          );
-        }
-
-        const listing = await setPrimaryListingImageForSeller(
-          listingId,
-          session.user.id,
-          imageId,
-        );
-
-        if (!listing) {
-          return {
-            status: 'not_found',
-            message: 'Listing image was not found or is not owned by this user.',
-          };
-        }
-
-        return {
-          status: 'primary_image_updated',
-          listing,
-        };
-      },
-    }),
-
-    setListingStatus: tool({
-      description:
-        'Pause, mark sold, or delete a seller-owned listing. Publishing is not available to assistant chat; guide the seller to Account > My listings so they can review and press the publish button themselves. Use only after explicit user confirmation for the selected listing. If the user clearly refers to the current editable listing and no listingId is available, omit listingId so the tool can use the most recent matching seller listing.',
-      inputSchema: z.object({
-        listingId: z.string().min(1).optional(),
-        status: z.enum(['paused', 'sold', 'deleted']),
-        confirmed: z
-          .boolean()
-          .describe(
-            'Set true only after the seller explicitly confirms this pause, sold, or delete action.',
-          ),
-      }),
-      execute: async ({ listingId, status, confirmed }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        if (confirmed !== true) {
-          return confirmationRequired(
-            'Confirm this listing status action explicitly before I change the listing.',
-          );
-        }
-
-        const targetListing = await getCurrentSellerListingForStatusAction({
-          sellerId: session.user.id,
-          listingId,
-          status,
-        });
-
-        if (!targetListing) {
-          return {
-            status: 'not_found',
-            message:
-              'No matching seller listing was found for this confirmed action. If the seller has provided product details in this conversation but no saved draft exists, create the draft first, then retry the status action.',
-          };
-        }
-
-        const listing = await setListingStatusForSeller(
-          targetListing.id,
-          session.user.id,
-          status,
-        );
-
-        if (!listing) {
-          return {
-            status: 'not_found',
-            message: 'Listing was not found or is not owned by this user.',
-          };
-        }
-
-        return {
-          status: listing.status,
-          listingUrl:
-            listing.status === 'published'
-              ? getPublicListingUrl(listing.id)
-              : undefined,
-          listing,
-        };
-      },
-    }),
 
     analyzeListingImages: tool({
       description:
@@ -759,55 +584,5 @@ export function createMarketplaceTools(
       }),
     }),
 
-    toggleFavoriteListing: tool({
-      description:
-        'Save or remove a published listing from the current user favorites. Requires sign-in.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-      }),
-      execute: async ({ listingId }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        return toggleFavoriteListing(listingId, session.user);
-      },
-    }),
-
-    reportMarketplaceListing: tool({
-      description:
-        'Report a published listing for moderation review when the user says it is prohibited, fraudulent, counterfeit, misleading, abusive, or in the wrong category. Requires sign-in.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        reason: z.enum([
-          'prohibited_item',
-          'fraud',
-          'counterfeit',
-          'wrong_category',
-          'misleading_images',
-          'abusive_content',
-          'other',
-        ]),
-        details: z.string().min(2).max(1000).optional(),
-        confirmed: z
-          .boolean()
-          .describe(
-            'Set true only after the user explicitly confirms submitting this report.',
-          ),
-      }),
-      execute: async ({ listingId, reason, details, confirmed }) => {
-        if (!session) {
-          return authRequired();
-        }
-
-        if (confirmed !== true) {
-          return confirmationRequired(
-            'Confirm that you want to submit this report before I send it for moderation review.',
-          );
-        }
-
-        return reportListing(listingId, session.user, reason, details);
-      },
-    }),
   };
 }

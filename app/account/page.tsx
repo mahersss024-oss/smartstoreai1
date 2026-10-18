@@ -1,5 +1,7 @@
 'use client';
 
+import { getArabicCustomerMessage } from '@/lib/customer-language';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -163,8 +165,8 @@ export default function AccountPage() {
         setProfileNotice({
           tone: 'danger',
           message:
-            payload?.message ??
-            payload?.error ??
+            (getArabicCustomerMessage(payload?.message, '') || undefined) ??
+            (getArabicCustomerMessage(payload?.error, '') || undefined) ??
             'تعذر حفظ بيانات الحساب الآن. حاول مرة أخرى.',
         });
         return;
@@ -261,8 +263,8 @@ export default function AccountPage() {
         setProfileNotice({
           tone: 'danger',
           message:
-            payload?.message ??
-            payload?.error ??
+            (getArabicCustomerMessage(payload?.message, '') || undefined) ??
+            (getArabicCustomerMessage(payload?.error, '') || undefined) ??
             'تعذر رفع صورة الحساب الآن. حاول مرة أخرى.',
         });
         return;
@@ -346,8 +348,8 @@ export default function AccountPage() {
         setProfileNotice({
           tone: 'danger',
           message:
-            payload?.message ??
-            payload?.error ??
+            (getArabicCustomerMessage(payload?.message, '') || undefined) ??
+            (getArabicCustomerMessage(payload?.error, '') || undefined) ??
             'تعذر إزالة صورة الحساب الآن. حاول مرة أخرى.',
         });
         return;
@@ -472,7 +474,7 @@ export default function AccountPage() {
                 <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                   <a href="/api/auth/google/start">
                     <GoogleMark className="size-5" />
-                    دخول Google
+                    دخول جوجل
                   </a>
                 </Button>
               ) : null}
@@ -480,7 +482,7 @@ export default function AccountPage() {
                 <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
                   <a href="/api/auth/apple/start">
                     <AppleMark className="size-5" />
-                    دخول Apple
+                    دخول آبل
                   </a>
                 </Button>
               ) : null}
@@ -695,7 +697,7 @@ export default function AccountPage() {
                         dir="ltr"
                         inputMode="tel"
                         name="profilePhoneNumber"
-                        placeholder="05xxxxxxxx"
+                        placeholder="05..."
                         type="tel"
                         value={profilePhone}
                         onChange={(event) => setProfilePhone(event.target.value)}

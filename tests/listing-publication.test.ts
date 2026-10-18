@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Prisma } from '@prisma/client';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+test.beforeEach(mockAllowedTextAnalysis);
 
 import {
   comparePublicationFeed,

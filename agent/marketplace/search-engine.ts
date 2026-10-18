@@ -21,6 +21,7 @@ import {
   type MarketplaceSearchUnderstandingInput,
 } from './search-understanding-schema';
 import { resolveMarketplaceSearchUnderstanding } from './search-understanding';
+import { prepareListingUnderstanding } from './text-understanding';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import type { AppLanguage } from '@/app/i18n';
 
@@ -147,7 +148,7 @@ export async function searchMarketplaceWithState(input: {
   language?: AppLanguage;
   useModelUnderstanding?: boolean;
 }) {
-  const understoodIntent = input.useModelUnderstanding
+  const understoodIntent = input.useModelUnderstanding !== false
     ? await resolveMarketplaceSearchUnderstanding({
         query: input.query,
         language: input.language,
@@ -160,9 +161,8 @@ export async function searchMarketplaceWithState(input: {
   );
   const searchState = await updateMarketplaceSearchState(input.ownerKey, intent);
   const results = await retrieveAndRankMarketplaceListings(searchState);
-  const market = analyzeMarketForRankedListings(
-    results.ranked.map((result) => result.listing),
-  );
+  await prepareListingUnderstanding(results.shown.map(result => result.listing));
+  const market = analyzeMarketForRankedListings(results.shown.map(result => result.listing));
   const recommendations = buildMarketplaceRecommendations(results.shown, market);
   const visibleListingIds = results.shown.map((result) => result.listing.id);
 

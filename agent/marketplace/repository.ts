@@ -20,9 +20,10 @@ import {
 import { Prisma, type AdminAuditAction } from '@prisma/client';
 
 import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
-import { resolveListingCategory } from './listing-category';
+import { resolveListingCategoryWithModel } from './listing-category-model';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { getComparableListings } from './market-intelligence';
+import { listingSemanticText, marketplaceTextAnalyzer, prepareListingUnderstanding } from './text-understanding';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -304,6 +305,7 @@ export type MarketplaceListingFilters = {
   query?: string;
   category?: string;
   city?: string;
+  cityVariants?: string[];
   minPrice?: number;
   maxPrice?: number;
   condition?: ListingCondition;
@@ -601,6 +603,11 @@ async function listSimilarListingFollowerIds(
   listing: memoryStore.ListingRecord,
 ): Promise<string[]> {
   if (!shouldUseDatabaseStore()) {
+    const references = [...memorySimilarListingFollows.values()]
+      .filter(follow => follow.userId !== listing.sellerId && follow.category === listing.category)
+      .map(follow => memoryStore.getListing(follow.listingId))
+      .filter((value): value is memoryStore.ListingRecord => Boolean(value && value.status === 'published'));
+    if (references.length) await prepareListingUnderstanding([listing, ...references]);
     return [...memorySimilarListingFollows.values()]
       .filter((follow) => follow.userId !== listing.sellerId)
       .filter((follow) => follow.category === listing.category)
@@ -629,6 +636,10 @@ async function listSimilarListingFollowerIds(
   });
 
   const followerIds: string[] = [];
+
+  if (follows.length) await prepareListingUnderstanding([listing, ...follows
+    .filter(follow => follow.userId !== listing.sellerId && follow.listing?.status === 'published')
+    .map(follow => toListingRecord(follow.listing))]);
 
   for (const follow of follows) {
     if (
@@ -990,6 +1001,12 @@ function toCommissionRecord(
 export async function listMarketplaceListings(
   filters: MarketplaceListingFilters = {},
 ) {
+  if (filters.query?.trim()) {
+    const analysis = await marketplaceTextAnalyzer.analyze(filters.query);
+    filters = { ...filters, condition: filters.condition ?? analysis?.search.condition,
+      excludedTerms: filters.excludedTerms ?? [...(analysis?.search.excludedFeatures ?? []), ...(analysis?.search.excludedColors ?? [])]
+        .flatMap(term => getMarketplaceSearchTermVariants(term, filters.query)) };
+  }
   if (!shouldUseDatabaseStore()) {
     return memoryStore.listMarketplaceListings(filters);
   }
@@ -1009,7 +1026,7 @@ export async function listMarketplaceListings(
       ? []
       : (filters.termGroups ??
         (filters.terms?.length ? filters.terms : parsedQuery.terms).map(
-          getMarketplaceSearchTermVariants,
+          term => getMarketplaceSearchTermVariants(term, filters.query),
         ));
 
   if (listingIdLookup) {
@@ -1025,7 +1042,7 @@ export async function listMarketplaceListings(
   }
 
   if (city) {
-    const cityVariants = getMarketplaceCitySearchVariants(city);
+    const cityVariants = filters.cityVariants ?? getMarketplaceCitySearchVariants(city, filters.query);
 
     searchConditions.push({
       OR: cityVariants.map((cityVariant) => ({
@@ -2282,7 +2299,8 @@ export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,
 ) {
-  input = { ...input, category: resolveListingCategory(input) };
+  await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
+  input = { ...input, category: await resolveListingCategoryWithModel(input) };
   if (!shouldUseDatabaseStore()) {
     const listing = memoryStore.createListingDraft({
       sellerId: user.id,
@@ -2304,7 +2322,7 @@ export async function createListingDraft(
 
   await ensureUser(user);
 
-  const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
+  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   let listing: DatabaseListingRecord | null = null;
 
   for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
@@ -2384,8 +2402,13 @@ export async function updateListingForSeller(
   listingId: string,
   sellerId: string,
   updates: Partial<CreateListingInput>,
+  options: { draftOnly?: boolean } = {},
 ) {
+  const current = await getListing(listingId);
+  if (!current || current.sellerId !== sellerId || (options.draftOnly && current.status !== 'draft')) return null;
+  await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } }));
   if (!shouldUseDatabaseStore()) {
+    if (options.draftOnly && memoryStore.getListing(listingId)?.status !== 'draft') return null;
     const listing = memoryStore.updateListingForSeller(
       listingId,
       sellerId,
@@ -2410,7 +2433,7 @@ export async function updateListingForSeller(
 
   const existing = await getListing(listingId);
 
-  if (!existing || existing.sellerId !== sellerId) {
+  if (!existing || existing.sellerId !== sellerId || (options.draftOnly && existing.status !== 'draft')) {
     return null;
   }
 
@@ -2426,9 +2449,9 @@ export async function updateListingForSeller(
       ...(updates.attributes ?? {}),
     },
   };
-  const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(nextInput));
+  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }));
   const listing = await prisma.listing.update({
-    where: { id: listingId },
+    where: { id: listingId, sellerId, ...(options.draftOnly ? { status: 'draft' } : {}) },
     data: {
       category: updates.category,
       title: updates.title,
@@ -2451,7 +2474,12 @@ export async function updateListingForSeller(
             : undefined,
     },
     include: { images: true },
+  }).catch((error: unknown) => {
+    if (options.draftOnly && isPrismaKnownRequestError(error, 'P2025')) return null;
+    throw error;
   });
+
+  if (!listing) return null;
 
   const mappedListing = toListingRecord(listing);
 
@@ -2628,8 +2656,10 @@ export async function addListingImageForSeller(
   listingId: string,
   sellerId: string,
   image: ListingImage,
+  options: { draftOnly?: boolean } = {},
 ) {
   if (!shouldUseDatabaseStore()) {
+    if (options.draftOnly && memoryStore.getListing(listingId)?.status !== 'draft') return null;
     const listing = memoryStore.addListingImageForSeller(
       listingId,
       sellerId,
@@ -2663,7 +2693,7 @@ export async function addListingImageForSeller(
             include: { images: true },
           });
 
-          if (!existing || existing.sellerId !== sellerId) {
+          if (!existing || existing.sellerId !== sellerId || (options.draftOnly && existing.status !== 'draft')) {
             return null;
           }
 
@@ -4020,6 +4050,8 @@ export async function addConversationMessage(
   const senderId = getActorId(sender);
 
   if (!shouldUseDatabaseStore()) {
+    const ownedConversation = memoryStore.getConversationForUser(conversationId, senderId);
+    if (ownedConversation?.status === 'open') await marketplaceTextAnalyzer.analyze(body.trim());
     const result = memoryStore.addConversationMessage(
       conversationId,
       senderId,
@@ -4095,6 +4127,7 @@ export async function addConversationMessage(
   await ensureActorUser(sender);
 
   const trimmedBody = body.trim();
+  await marketplaceTextAnalyzer.analyze(trimmedBody);
   const safety = evaluateConversationMessageSafety(trimmedBody);
 
   if (safety.decision !== 'allow') {

@@ -158,7 +158,7 @@ test('assistant attachment preview stays above the transformed chat panel withou
   const input = page.getByPlaceholder(/اكتب طلبك/);
   if (!await input.isVisible()) await page.getByRole('button', { name: /فتح حمد/ }).click();
   await expect(input).toBeVisible();
-  await page.locator('input[type="file"][title="Upload files"]')
+  await page.locator('input[type="file"][title="رفع الملفات"]')
     .setInputFiles(path.resolve('public/hamad-market-logo.webp'));
   const thumbnail = page.getByRole('button', { name: /معاينة hamad-market-logo/ });
   await thumbnail.click();

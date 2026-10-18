@@ -1,15 +1,14 @@
-import { parseMarketplaceSearchQuery } from './search';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 
-export function resolveListingCategory(
-  input: { category: string; autoCategory?: boolean; title?: string; description?: string },
-  infer = (text: string) => parseMarketplaceSearchQuery(text).category,
-) {
+export type ListingCategoryInput = {
+  category: string;
+  autoCategory?: boolean;
+  title?: string;
+  description?: string;
+};
+
+// Storage accepts the supplied category; model inference runs on the server.
+export function resolveListingCategory(input: ListingCategoryInput) {
   if (!input.autoCategory) return input.category;
-  try {
-    const category = infer(input.title ?? '') ?? infer(input.description ?? '');
-    return category && isMarketplaceCategory(category) ? category : 'other';
-  } catch {
-    return input.category;
-  }
+  return isMarketplaceCategory(input.category) ? input.category : 'other';
 }

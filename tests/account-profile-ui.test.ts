@@ -10,7 +10,7 @@ test('account page exposes official contact profile settings', () => {
   assert.match(page, /method: 'DELETE'/);
   assert.match(page, /profilePhoneNumber/);
   assert.match(page, /inputMode="tel"/);
-  assert.match(page, /placeholder="05xxxxxxxx"/);
+  assert.match(page, /placeholder="05\.\.\."/);
   assert.match(page, /profileDisplayName/);
   assert.match(page, /profilePictureFile/);
   assert.match(page, /\/api\/account\/profile\/picture/);

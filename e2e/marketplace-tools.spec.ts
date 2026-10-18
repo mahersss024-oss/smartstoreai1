@@ -472,7 +472,7 @@ test('chat search preserves the market scroll, filters and pagination while keep
       favoriteCount: 0, createdAt: '2026-10-13T08:00:00.000Z',
     }] } },
     { type: 'text-start', id: 'isolation-text' },
-    { type: 'text-delta', id: 'isolation-text', delta: 'Assistant result ready' },
+    { type: 'text-delta', id: 'isolation-text', delta: 'نتيجة المساعد جاهزة' },
     { type: 'text-end', id: 'isolation-text' },
     { type: 'finish' },
   ];
@@ -501,7 +501,7 @@ test('chat search preserves the market scroll, filters and pagination while keep
   page.on('request', countMarketRequests);
   await page.getByPlaceholder(/اكتب طلبك/).fill('ابحث عن جوال');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
-  await expect(page.getByText('Assistant result ready', { exact: true })).toBeVisible();
+  await expect(page.getByText('نتيجة المساعد جاهزة', { exact: true })).toBeVisible();
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
   const chat = page.getByTestId('assistant-panel');
   const rect = (await chat.boundingBox())!;

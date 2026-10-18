@@ -5,7 +5,7 @@ import {
 } from './ranking-engine';
 import { normalizeMarketplaceSearchText } from './search';
 import type { ListingRecord } from './store';
-import { canonicalProductTokens, getHeavyVehicleConfiguration, getProductIdentity, getProductOfferKind } from '@/lib/marketplace/product-lexicon';
+import { listingSemanticText, marketplaceTextAnalyzer } from './text-understanding';
 
 export type ListingMarketIntelligence = {
   listingId: string;
@@ -150,177 +150,18 @@ function confidence(similarListingCount: number) {
   return 'low';
 }
 
-const genericProductTokens = new Set([
-  'للبيع',
-  'بيع',
-  'مستعمل',
-  'مستعمله',
-  'مستعملة',
-  'نظيف',
-  'نظيفه',
-  'نظيفة',
-  'جديد',
-  'جديده',
-  'جديدة',
-  'ممتاز',
-  'ممتازه',
-  'ممتازة',
-  'سعر',
-  'محدد',
-  'غير',
-  'على',
-  'السوم',
-  'سيارة',
-  'سياره',
-  'سيارات',
-  'موتر',
-  'اثاث',
-  'أثاث',
-  'جوال',
-  'جوالات',
-  'هاتف',
-  'عقار',
-  'بيت',
-  'للإيجار',
-  'للايجار',
-  'sale',
-  'used',
-  'new',
-  'clean',
-  'car',
-  'cars',
-  'furniture',
-  'phone',
-]);
-
-const productIdentityAttributeKeys = [
-  'brand',
-  'make',
-  'model',
-  'series',
-  'type',
-  'product',
-  'name',
-  'material',
-  'style',
-];
-
-function normalizeProductValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  return normalizeMarketplaceSearchText(String(value));
-}
-
-function productIdentityValue(listing: ListingRecord, keys: string[]) {
-  for (const key of keys) {
-    const value = normalizeProductValue(listing.attributes[key]);
-
-    if (value) {
-      return value;
-    }
-  }
-
-  return '';
-}
-
-function productTextTokens(listing: ListingRecord) {
-  const identityAttributeValues = productIdentityAttributeKeys
-    .map((key) => listing.attributes[key])
-    .filter((value) => value !== undefined && value !== null);
-  const text = normalizeMarketplaceSearchText(
-    [
-      listing.title,
-      listing.description,
-      ...identityAttributeValues.map(String),
-    ]
-      .filter(Boolean)
-      .join(' '),
-  );
-
-  return new Set(
-    canonicalProductTokens(text)
-      .map((token) => token.trim())
-      .filter((token) => {
-        return (
-          token.length >= 3 &&
-          !/^\d+$/.test(token) &&
-          !genericProductTokens.has(token)
-        );
-      }),
-  );
-}
-
 function productSimilarityScore(target: ListingRecord, candidate: ListingRecord) {
-  if (candidate.id === target.id || candidate.category !== target.category) {
-    return 0;
-  }
-
-  const targetBrand = productIdentityValue(target, ['brand', 'make']);
-  const targetIdentity = getProductIdentity(target.title ?? '') ?? getProductIdentity(target.description ?? '');
-  const candidateIdentity = getProductIdentity(candidate.title ?? '') ?? getProductIdentity(candidate.description ?? '');
-  if (targetIdentity && candidateIdentity && targetIdentity.id !== candidateIdentity.id) return 0;
-  if (getProductOfferKind(target.title ?? '') !== getProductOfferKind(candidate.title ?? '')) return 0;
-  if (targetIdentity?.category === 'heavy_equipment') {
-    const targetConfiguration = getHeavyVehicleConfiguration(target.title ?? '');
-    const candidateConfiguration = getHeavyVehicleConfiguration(candidate.title ?? '');
-    if (targetConfiguration && candidateConfiguration && targetConfiguration !== candidateConfiguration) return 0;
-  }
-  const candidateBrand = productIdentityValue(candidate, ['brand', 'make']);
-  const targetModel = productIdentityValue(target, ['model', 'series']);
-  const candidateModel = productIdentityValue(candidate, ['model', 'series']);
-  const targetTokens = productTextTokens(target);
-  const candidateTokens = productTextTokens(candidate);
-  let score = 0;
-  let hasProductIdentityMatch = false;
-  if (targetIdentity && candidateIdentity && targetIdentity.id === candidateIdentity.id) {
-    score += 8;
-    hasProductIdentityMatch = true;
-  }
-
-  if (targetBrand && candidateBrand) {
-    if (targetBrand !== candidateBrand) {
-      return 0;
-    }
-
-    score += 5;
-    hasProductIdentityMatch = true;
-  }
-
-  if (targetModel && candidateModel) {
-    if (targetModel !== candidateModel) {
-      return 0;
-    }
-
-    score += 8;
-    hasProductIdentityMatch = true;
-  }
-
-  let sharedProductTokens = 0;
-
-  for (const token of targetTokens) {
-    if (candidateTokens.has(token)) {
-      sharedProductTokens += 1;
-    }
-  }
-
-  score += sharedProductTokens * 4;
-
-  if (!hasProductIdentityMatch && sharedProductTokens === 0) {
-    return 0;
-  }
-
-  if (target.city && candidate.city) {
-    const targetCity = normalizeMarketplaceSearchText(target.city);
-    const candidateCity = normalizeMarketplaceSearchText(candidate.city);
-
-    if (targetCity === candidateCity) {
-      score += 3;
-    }
-  }
-
-  return score;
+  if (candidate.id === target.id || candidate.category !== target.category) return 0;
+  const left = marketplaceTextAnalyzer.peek(listingSemanticText(target));
+  const right = marketplaceTextAnalyzer.peek(listingSemanticText(candidate));
+  if (!left || !right || left.confidence < 0.8 || right.confidence < 0.8) return 0;
+  if (!left.product || !right.product || left.product !== right.product) return 0;
+  if (left.offerKind === 'unknown' || left.offerKind !== right.offerKind) return 0;
+  if (left.configuration && right.configuration && left.configuration !== right.configuration) return 0;
+  if (left.brand && right.brand && left.brand !== right.brand) return 0;
+  if (left.model && right.model && left.model !== right.model) return 0;
+  return 8 + (left.brand && left.brand === right.brand ? 5 : 0) + (left.model && left.model === right.model ? 8 : 0)
+    + (target.city && target.city === candidate.city ? 3 : 0);
 }
 
 function buildInsights(input: {

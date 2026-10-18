@@ -23,10 +23,7 @@ import {
   getComplianceBlockResponse,
   getComplianceReviewResponse,
 } from '@/agent/marketplace/policy';
-import {
-  getAmbiguousRootsNeedingModel,
-  resolveAmbiguousForbiddenRoots,
-} from '@/agent/marketplace/forbidden-terms-model';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import {
   checkImageMarketplaceCompliance,
   inferExpectedMarketplaceCategory,
@@ -63,7 +60,8 @@ import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import type { AppLanguage } from '@/app/i18n';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
-import { getSafeAssistantText } from '@/lib/chat-response-safety';
+import { getSafeAssistantText, chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
+import { customerLanguageInstructions, resolveCustomerLanguage } from '@/lib/customer-language';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { getPublicListingUrl } from '@/lib/listing-url';
 import {
@@ -121,44 +119,11 @@ function isPolicyFacilitationIntent(intent: string) {
   return policyFacilitationIntents.has(intent);
 }
 
-/**
- * Re-evaluates a blocked text policy decision when the only reason it blocked
- * was one or more ambiguous roots (e.g. "حشيش" with no decisive context).
- *
- * The deterministic checker stays the source of truth for every other caller.
- * This extra step runs ONLY in the chat route and ONLY when the deterministic
- * result is an ambiguous-only block. It is fail-closed: any model error keeps
- * the original block decision.
- */
 async function resolveAmbiguousTextPolicyDecision(
   userRequest: string,
-  decision: ReturnType<typeof evaluateSaudiMarketplaceCompliance>,
 ): Promise<ReturnType<typeof evaluateSaudiMarketplaceCompliance>> {
-  if (decision.decision !== 'block' || !userRequest.trim()) {
-    return decision;
-  }
-
-  const ambiguousRoots = getAmbiguousRootsNeedingModel(userRequest);
-
-  if (ambiguousRoots.length === 0) {
-    return decision;
-  }
-
-  const resolution = await resolveAmbiguousForbiddenRoots(
-    userRequest,
-    ambiguousRoots,
-  );
-
-  if (resolution.prohibited) {
-    return decision;
-  }
-
-  return {
-    decision: 'allow',
-    reasons: [],
-    jurisdiction: 'SA',
-    shariaSensitive: false,
-  };
+  await marketplaceTextAnalyzer.analyze(userRequest);
+  return evaluateSaudiMarketplaceCompliance(userRequest);
 }
 
 type ChatRequestBody = {
@@ -446,7 +411,7 @@ function parseSelectedListingContext(
 function buildLocationSystemMessage(settings: LocationSettings | undefined) {
   const country = cleanString(settings?.country);
   const currency = cleanString(settings?.currency);
-  const language = cleanString(settings?.language);
+  const language = resolveCustomerLanguage(settings?.language);
 
   if (!country && !currency && !language) {
     return undefined;
@@ -469,18 +434,21 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
 
   return {
     role: 'system',
-    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. If this request reaches an AI model, the user has already passed sign-in. Do not ask whether the user is signed in. For confirmed account-bound marketplace actions, use the available tools instead of asking the user to sign in again.`,
+    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. The user has already passed sign-in; do not ask again. Authentication or chat confirmation does not authorize sensitive actions. Tools may prepare unpublished drafts only; direct the user to perform all sensitive actions themselves in the marketplace UI.`,
   } satisfies ModelMessage;
 }
 
 function getRequestLanguage(settings: LocationSettings | undefined): AppLanguage {
-  return settings?.language === 'en' ? 'en' : 'ar';
+  return resolveCustomerLanguage(settings?.language);
 }
 
 function createTextUIResponse(
   text: string,
   options: { toolResults?: AssistantSearchToolResult[] } = {},
 ) {
+  text = getSafeAssistantText(text) || (text.includes(authRequiredMarker)
+    ? `${authRequiredMarker} يرجى تسجيل الدخول أولًا لمتابعة المساعدة في سوق حمد.`
+    : chatServiceUnavailableMessage);
   const timestamp = Date.now();
   const messageId = `guard-message-${timestamp}`;
   const textId = `guard-text-${timestamp}`;
@@ -673,7 +641,7 @@ async function buildMarketplaceInterfaceContext({
 - selectedListing is the listing most recently clicked or targeted in the UI. If the user says "this listing", "this ad", "the selected ad", "تواصل معه", "هذا الإعلان", or similar, use selectedListing.id as the target listing for explanation and links only.
 - sellerListings are listings owned by the signed-in user. Use them when the user asks about "my listings", "my ad", editing, pausing, deleting, marking sold, or adding listing details.
 - For buyer-seller contact, do not create or open conversations from assistant chat. If selectedListing.ownership is other_seller, guide the user to open /listings/{selectedListing.id} and press the contact button. If selectedListing.ownership is current_user, explain that the user cannot contact themselves.
-- For seller listing edits, use updateListing only when the target is owned by the signed-in user and the requested change is clear. Ask for confirmation before destructive or price-changing actions.
+- Use updateListing only to prepare an owned unpublished draft. For any non-draft changes, deletion, status change or other sensitive action, guide the user to operate Account > My listings themselves. Chat confirmation never substitutes for this user-interface action.
 ${JSON.stringify(
   {
     selectedListing: verifiedSelectedListing,
@@ -1137,7 +1105,7 @@ For text policy issues, say the item/action cannot proceed because it may confli
 For scope issues, redirect naturally to سوق حمد marketplace actions without sounding like an error template.
 For auth_required, explain that Hamad chat requires sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
-Use the user's language. Language=${input.language}.`,
+${customerLanguageInstructions}`,
           messages: [
             {
               role: 'user',
@@ -1194,7 +1162,7 @@ export async function POST(request: Request) {
   const oversizedRequestResponse = rejectOversizedRequest(
     request,
     maxChatRequestBytes,
-    'Chat request body is too large.',
+    'حجم طلب المحادثة أكبر من الحد المسموح.',
   );
 
   if (oversizedRequestResponse) {
@@ -1206,17 +1174,17 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as ChatRequestBody;
   } catch {
-    return new Response('Invalid JSON body.', { status: 400 });
+    return new Response('تعذر قراءة طلب المحادثة.', { status: 400 });
   }
 
   const { messages = [] } = body;
 
   if (!Array.isArray(messages)) {
-    return new Response('Invalid request body.', { status: 400 });
+    return new Response('طلب المحادثة غير صالح.', { status: 400 });
   }
 
   if (messages.length > maxMessagesPerRequest) {
-    return new Response('Too many messages in one request.', { status: 413 });
+    return new Response('عدد الرسائل يتجاوز الحد المسموح في الطلب الواحد.', { status: 413 });
   }
 
   const totalTextCharacters = messages.reduce<number>(
@@ -1225,7 +1193,7 @@ export async function POST(request: Request) {
   );
 
   if (totalTextCharacters > maxTextCharactersPerRequest) {
-    return new Response('Message is too long.', { status: 413 });
+    return new Response('الرسالة أطول من الحد المسموح.', { status: 413 });
   }
 
   // Filter out empty assistant messages rejected by some model APIs.
@@ -1285,10 +1253,10 @@ export async function POST(request: Request) {
     });
     }
 
+  await marketplaceTextAnalyzer.analyze(preliminaryUserRequest);
   const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
   const preliminaryComplianceDecision = await resolveAmbiguousTextPolicyDecision(
     preliminaryUserRequest,
-    evaluateSaudiMarketplaceCompliance(preliminaryUserRequest),
   );
 
   if (preliminaryComplianceDecision.decision === 'block') {
@@ -1399,7 +1367,6 @@ export async function POST(request: Request) {
   const marketplaceIntent = classifyMarketplaceIntent(userRequest);
   const complianceDecision = await resolveAmbiguousTextPolicyDecision(
     userRequest,
-    evaluateSaudiMarketplaceCompliance(userRequest),
   );
 
   if (complianceDecision.decision === 'block') {

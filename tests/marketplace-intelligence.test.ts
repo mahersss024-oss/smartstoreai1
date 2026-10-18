@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { beforeEach } from 'node:test';
+import { mockStructuredProductAnalysis } from './helpers/text-understanding';
+
+beforeEach(mockStructuredProductAnalysis);
 
 import { compareMarketplaceListings } from '@/agent/marketplace/comparison-engine';
 import {

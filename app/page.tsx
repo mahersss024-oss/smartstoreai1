@@ -1,7 +1,9 @@
 'use client';
+
+import { getArabicCustomerMessage } from '@/lib/customer-language';
 /* eslint-disable @next/next/no-img-element */
 
-import { formatMarketplaceCategory as formatCategory, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
+import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
 import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
@@ -76,6 +78,7 @@ import { ListingShareButton } from '@/components/listing-share-button';
 import { ThemeSync } from '@/components/theme-toggle';
 import {
   chatServiceUnavailableMessage,
+  getSafeAssistantText,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
 import {
@@ -1196,7 +1199,7 @@ function SignInCard({ text }: { text: string }) {
         <Button asChild className="h-10 w-full justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
           <a href={googleHref}>
             <GoogleMark className="size-5" />
-            <span>المتابعة باستخدام Google</span>
+            <span>المتابعة باستخدام جوجل</span>
           </a>
         </Button>
       ) : null}
@@ -1204,7 +1207,7 @@ function SignInCard({ text }: { text: string }) {
         <Button asChild className="h-10 w-full justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
           <a href={appleHref}>
             <AppleMark className="size-5" />
-            <span>المتابعة باستخدام Apple</span>
+            <span>المتابعة باستخدام آبل</span>
           </a>
         </Button>
       ) : null}
@@ -1277,7 +1280,7 @@ function AuthProviderMenu() {
               href={googleHref}
               role="menuitem"
             >
-              <span>دخول Google</span>
+              <span>دخول جوجل</span>
               <GoogleMark className="size-5" />
             </a>
           ) : null}
@@ -1287,7 +1290,7 @@ function AuthProviderMenu() {
               href={appleHref}
               role="menuitem"
             >
-              <span>دخول Apple</span>
+              <span>دخول آبل</span>
               <AppleMark className="size-5 text-foreground" />
             </a>
           ) : null}
@@ -1546,14 +1549,16 @@ function renderTextMessagePart(
 function renderMessageParts(
   parts: UIMessage['parts'],
   listingsById: ReadonlyMap<string, ListingCard>,
+  assistant = false,
 ): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
-      if (part.text.includes(authRequiredMarker)) {
-        return [<SignInCard key={`auth-${index}`} text={part.text} />];
+      const text = assistant ? getSafeAssistantText(part.text) || 'تعذر عرض هذا الرد بالعربية. يرجى إعادة إرسال طلبك.' : part.text;
+      if (text.includes(authRequiredMarker) || (assistant && part.text.includes(authRequiredMarker))) {
+        return [<SignInCard key={`auth-${index}`} text={assistant ? getSafeAssistantText(part.text) || `${authRequiredMarker} يرجى تسجيل الدخول للمتابعة.` : text} />];
       }
 
-      return renderTextMessagePart(part.text, index, listingsById);
+      return renderTextMessagePart(text, index, listingsById);
     }
 
     if (part.type === 'file') {
@@ -1970,19 +1975,37 @@ export default function Page() {
   const [isManualListingOpen, setIsManualListingOpen] = useState(false);
   const [manualListingForm, setManualListingForm] =
     useState<ManualListingForm>(defaultManualListingForm);
-  const refreshManualCategorySuggestion = useCallback(async () => {
-    try {
-      const { resolveListingCategory } = await import('@/agent/marketplace/listing-category');
-      setManualListingForm(form => form.autoCategory ? { ...form, category: resolveListingCategory(form) } : form);
-    } catch {
-      // Category suggestions must never prevent manual creation.
-    }
-  }, []);
+  const [manualCategoryStatus, setManualCategoryStatus] = useState<'idle' | 'loading' | 'suggested' | 'uncertain' | 'unavailable'>('idle');
   useEffect(() => {
     if (!isManualListingOpen || !manualListingForm.autoCategory) return;
-    const timeout = setTimeout(() => { void refreshManualCategorySuggestion(); }, 300);
-    return () => clearTimeout(timeout);
-  }, [isManualListingOpen, manualListingForm.autoCategory, manualListingForm.title, manualListingForm.description, refreshManualCategorySuggestion]);
+    const title = manualListingForm.title;
+    const description = manualListingForm.description;
+    setManualListingForm(form => form.autoCategory ? { ...form, category: 'other' } : form);
+    setManualCategoryStatus('idle');
+    if (!session.authenticated || (title.trim().length < 2 && description.trim().length < 2)) return;
+    let active = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setManualCategoryStatus('loading');
+      try {
+        const response = await fetch('/api/marketplace/listing-category', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description }), signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('category_unavailable');
+        const result = await response.json() as { category?: unknown; status?: string };
+        if (!active) return;
+        const category = typeof result.category === 'string' && isMarketplaceCategory(result.category)
+          && result.status === 'suggested' ? result.category : null;
+        setManualListingForm(form => form.autoCategory && form.title === title && form.description === description
+          ? { ...form, category: category ?? 'other' } : form);
+        setManualCategoryStatus(category ? 'suggested' : 'uncertain');
+      } catch {
+        if (active) setManualCategoryStatus('unavailable');
+      }
+    }, 900);
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [isManualListingOpen, manualListingForm.autoCategory, manualListingForm.title, manualListingForm.description, session.authenticated]);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
   const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
     useState<string[]>([]);
@@ -3718,8 +3741,8 @@ export default function Page() {
         setManualListingNotice({
           tone: responsePayload?.error === 'listing_blocked' ? 'danger' : 'warning',
           message:
-            responsePayload?.message ??
-            responsePayload?.error ??
+            (getArabicCustomerMessage(responsePayload?.message, '') || undefined) ??
+            (getArabicCustomerMessage(responsePayload?.error, '') || undefined) ??
             'تعذر حفظ الإعلان اليدوي الآن. حاول مرة أخرى.',
         });
         return;
@@ -3782,7 +3805,7 @@ export default function Page() {
         } else {
           publishStatus = 'blocked';
           publishMessage =
-            publishPayload?.message ??
+            (getArabicCustomerMessage(publishPayload?.message, '') || undefined) ??
             'لم يتم نشر الإعلان بنجاح، ويتطلب بيانات إضافية. الرجاء الذهاب إلى حسابي ثم إعلاناتي لإدارة الإعلان واستكمال البيانات ثم نشره.';
         }
       }
@@ -4573,7 +4596,6 @@ export default function Page() {
                         className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
                         maxLength={140}
                         value={manualListingForm.title}
-                        onBlur={refreshManualCategorySuggestion}
                         onChange={(event) =>
                           setManualListingForm((form) => ({
                             ...form,
@@ -4615,6 +4637,9 @@ export default function Page() {
                           </option>
                         ))}
                       </select>
+                      {manualListingForm.autoCategory && manualCategoryStatus === 'loading' && <span role="status">جار اقتراح التصنيف...</span>}
+                      {manualListingForm.autoCategory && manualCategoryStatus === 'uncertain' && <span role="status">التصنيف غير واضح. اختره يدويًا.</span>}
+                      {manualListingForm.autoCategory && manualCategoryStatus === 'unavailable' && <span role="status">تعذر اقتراح التصنيف. يمكنك اختياره يدويًا.</span>}
                     </label>
                     <label className="grid gap-1 text-xs font-semibold">
                       حالة المنتج
@@ -4680,7 +4705,6 @@ export default function Page() {
                       className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
                       maxLength={4000}
                       value={manualListingForm.description}
-                      onBlur={refreshManualCategorySuggestion}
                       onChange={(event) =>
                         setManualListingForm((form) => ({
                           ...form,
@@ -5335,7 +5359,7 @@ export default function Page() {
                               {message.role === 'assistant' ? (
                                 <AssistantMessageFrame>
                                   <MessageContent>
-                                    {renderMessageParts(message.parts, chatListingCardsById)}
+                                    {renderMessageParts(message.parts, chatListingCardsById, true)}
                                   </MessageContent>
                                 </AssistantMessageFrame>
                               ) : (

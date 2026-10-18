@@ -14,6 +14,7 @@ import type { AuthSession } from '@/lib/auth/session';
 import { classifyMarketplaceIntent } from './policy';
 import { parseMarketplaceSearchQuery } from './search';
 import type { MarketplaceIntent } from './types';
+import { marketplaceTextAnalyzer } from './text-understanding';
 
 function readTimeoutMs(envKey: string, fallbackMs: number) {
   const value = Number.parseInt(process.env[envKey] ?? '', 10);
@@ -580,6 +581,18 @@ export async function resolveAdaptiveMarketplaceIntent({
     return fallback;
   }
 
+  const shared = marketplaceTextAnalyzer.peek(latestRequest);
+  if (shared && shared.confidence >= 0.8 && shared.intent !== 'general_info') {
+    const execution = getExecutionForIntent(shared.intent);
+    const userInterfaceOnly = ['set_listing_status', 'open_conversation', 'favorite_listing', 'report_listing'].includes(execution);
+    return {
+      ...fallback, intent: shared.intent, execution: userInterfaceOnly ? 'answer' as const : execution,
+      confidence: shared.confidence, reasonCode: 'shared_text_understanding',
+      searchQuery: shared.intent === 'search_listing' || shared.intent === 'compare_listings' ? latestRequest : undefined,
+      requiresAuth: authRequiredIntents.has(shared.intent),
+    } satisfies AdaptiveMarketplaceIntent;
+  }
+
   try {
     const context = buildScopeContext(messages);
     const result = await withTimeout(adaptiveIntentTimeoutMs, (signal) =>
@@ -598,7 +611,7 @@ If the latest user message contains images, set execution="analyze_images" unles
 For seller listing creation, set execution="create_listing_draft" as soon as seller intent and a minimum product signal are clear. Minimum product signal can be a product image, product name, category, or short description. Missing price, city, condition, title, or long description are optional improvements, not blockers.
 If the latest user message describes a new standalone product for sale, classify it as create_listing with execution="create_listing_draft" even if the same chat already contains an earlier draft/listing. Classify it as update_listing only when the user explicitly refers to the current/previous listing or gives follow-up fields without a new product identity.
 For account-bound actions, requiresAuth must be true. The user is currently ${session ? 'signed in' : 'not signed in'}. In production chat, reaching this router normally means the user has already passed sign-in with an available provider; when signed in, do not ask for sign-in again.
-Dangerous or final actions such as delete, mark sold, price change, and open seller chat require confirmation. Publishing cannot be executed by assistant chat; prepare or update a draft and direct the user to Account > My listings to publish manually. Negotiation is advisory only; do not classify private price guidance as permission to accept, reject, send, or commit to a deal.
+Sensitive actions such as publishing, deletion, status changes, editing non-draft listings, opening conversations, sending messages, favorites and reports are user-interface-only. For these requests return execution="answer" with guidance for the user, not an executable mutation plan. Chat confirmation does not grant authority. Draft preparation and private negotiation guidance are allowed; never accept, reject, send or commit to a deal.
 If the latest user message confirms a complete listing preview with words like approve, yes, publish, proceed, اعتمد, نعم, انشر, اوك, or موافق, use the prior conversation to infer create_listing with execution="create_listing_draft" if no listing id exists yet, or update_listing with execution="update_listing" if a listing id exists. Do not classify this as general_info.
 Keep decisions within allowed Saudi marketplace work. Language=${language}.`,
         prompt: JSON.stringify({
@@ -652,6 +665,6 @@ export function buildAdaptiveIntentSystemMessage(
     content: `Adaptive marketplace intent:
 ${JSON.stringify(intent, null, 2)}
 
-Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. For buyer search, never ask for narrowing before the search tool runs; ask narrowing questions only after visible matches exist or after the tool confirms no matches. If the user asks to compare one visible listing and provides a listing id, call compareMarketplaceListings with that listingId. If execution is create_listing_draft, do not call searchMarketplaceListings; create the draft from the minimum reliable product signal and then ask for optional missing improvements naturally. If the latest user message describes a new standalone product for sale, create a new draft even if a prior draft exists in the same chat. If execution is update_listing, update the current draft only when the user clearly refers to it or only provides follow-up fields without a new product identity. If the user has already confirmed publishing and is signed in, create or update the draft when needed, then direct the user to Account > My listings to publish it manually; never call setListingStatus with status="published". If execution changes a listing, opens chat, favorites, reports, or marks sold, require the needed account state and confirmation before the final action. Do not expose this JSON to the user.`,
+Follow this internal plan. If execution is search_listings, call searchMarketplaceListings with searchQuery and summarize the visible matches naturally. For buyer search, never ask for narrowing before the search tool runs; ask narrowing questions only after visible matches exist or after the tool confirms no matches. If the user asks to compare one visible listing and provides a listing id, call compareMarketplaceListings with that listingId. If execution is create_listing_draft, do not call searchMarketplaceListings; create the draft from the minimum reliable product signal and then ask for optional missing improvements naturally. If the latest user message describes a new standalone product for sale, create a new draft even if a prior draft exists in the same chat. If execution is update_listing, update the current draft only when the user clearly refers to it or only provides follow-up fields without a new product identity. If the user has already confirmed publishing and is signed in, create or update the draft when needed, then direct the user to Account > My listings to publish it manually; never call setListingStatus with status="published". If execution implies a sensitive action, do not execute it even after chat confirmation. Guide the user to perform it themselves in the marketplace UI. Only an owned unpublished draft may be prepared or updated by tools. Do not expose this JSON to the user.`,
   };
 }

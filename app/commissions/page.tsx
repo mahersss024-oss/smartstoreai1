@@ -364,7 +364,7 @@ export default function CommissionsPage() {
                 <Button asChild className="justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                   <a href="/api/auth/google/start">
                     <GoogleMark className="size-5" />
-                    دخول Google
+                    دخول جوجل
                   </a>
                 </Button>
               ) : null}
@@ -372,7 +372,7 @@ export default function CommissionsPage() {
                 <Button asChild className="justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
                   <a href="/api/auth/apple/start">
                     <AppleMark className="size-5" />
-                    دخول Apple
+                    دخول آبل
                   </a>
                 </Button>
               ) : null}

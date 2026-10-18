@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
+import { beforeEach } from 'node:test';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+beforeEach(mockAllowedTextAnalysis);
 import test from 'node:test';
 
 import { POST } from '@/app/api/marketplace/listings/route';
 import { PATCH } from '@/app/api/marketplace/listings/[listingId]/route';
 import { createSessionCookie } from '@/lib/auth/session';
+import { listingCategoryClassifier } from '@/agent/marketplace/listing-category-model';
 
-test('existing routes support photo-free publication, auto category and unchanged ownership', async () => {
+test('existing routes support photo-free publication, model category and unchanged ownership', async t => {
+  t.mock.method(listingCategoryClassifier, 'suggest', async () => ({ category: 'mobile_phones', status: 'suggested' }));
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
   try {

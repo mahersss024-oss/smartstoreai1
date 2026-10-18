@@ -15,6 +15,9 @@ import {
   reserveIdempotencyKey,
 } from '@/lib/api/idempotency';
 import { createSessionCookie } from '@/lib/auth/session';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+test.beforeEach(mockAllowedTextAnalysis);
 
 test('returns the stored idempotent response for duplicate keys', async () => {
   const request = new Request('https://smartstore.test/api', {

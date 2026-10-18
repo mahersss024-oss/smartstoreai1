@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { beforeEach } from 'node:test';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+beforeEach(mockAllowedTextAnalysis);
 
 import { POST } from '@/app/api/chat/route';
 import { POST as RESET_CHAT_POST } from '@/app/api/chat/reset/route';
@@ -140,7 +144,7 @@ test('rejects oversized chat bodies before model or auth work', async () => {
   );
 
   assert.equal(response.status, 413);
-  assert.equal(await response.text(), 'Chat request body is too large.');
+  assert.equal(await response.text(), 'حجم طلب المحادثة أكبر من الحد المسموح.');
 });
 
 test('hides missing AI provider configuration details from chat users', async () => {

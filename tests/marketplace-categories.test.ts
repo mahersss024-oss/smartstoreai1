@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { beforeEach } from 'node:test';
+import { mockAllowedTextAnalysis, textAnalysis } from './helpers/text-understanding';
+import { marketplaceTextAnalyzer, marketplaceTextAnalysisSchema } from '@/agent/marketplace/text-understanding';
+
+beforeEach(mockAllowedTextAnalysis);
 import {
   formatMarketplaceCategory, getMarketplaceCategorySearchIds, isMarketplaceCategory,
   marketplaceCategoryDefinitions, marketplaceCategoryGroups, marketplaceCategoryIds,
 } from '@/lib/marketplace/categories';
-import { marketplaceSearchCategoryRules, marketplaceVisionCategoryRules } from '@/lib/marketplace/category-matching';
 import { resolveListingCategory } from '@/agent/marketplace/listing-category';
 import { parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 import { inferExpectedMarketplaceCategory } from '@/agent/marketplace/vision-compliance';
@@ -54,20 +58,22 @@ const goodsExamples = [
 ] as const;
 
 for (const [id, title] of goodsExamples) {
-  test(`search, automatic intake and image context agree on ${id}`, () => {
+  test(`search and image context consume the same model category ${id}, storage preserves the supplied category`, t => {
+    t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: id }));
     assert.equal(parseMarketplaceSearchQuery(title).category, id);
-    assert.equal(resolveListingCategory({ category: 'other', autoCategory: true, title }), id);
+    assert.equal(resolveListingCategory({ category: id, autoCategory: true, title }), id);
     assert.equal(inferExpectedMarketplaceCategory(title), id);
-    assert.equal(resolveListingCategory({ category: 'furniture', autoCategory: true, title: 'Unspecified', description: title }), id);
+    assert.equal(resolveListingCategory({ category: id, autoCategory: true, title: 'Unspecified', description: title }), id);
     assert.equal(resolveListingCategory({ category: 'furniture', title }), 'furniture');
   });
 }
 
-test('all search and image rules refer to the shared catalog', () => {
-  for (const rule of [...marketplaceSearchCategoryRules, ...marketplaceVisionCategoryRules]) assert.ok(isMarketplaceCategory(rule.category));
+test('shared model category schema accepts every catalog ID and rejects invented categories', () => {
+  for (const category of marketplaceCategoryIds) assert.equal(textAnalysis({ category }).category, category);
+  assert.equal(marketplaceTextAnalysisSchema.safeParse({ ...textAnalysis(), category: 'invented-category' }).success, false);
 });
 
-test('category keywords do not capture fragments of ordinary product descriptions', () => {
+test('search and image context honor model decisions instead of classifying word fragments', t => {
   for (const [title, expected] of [
     ['قابل للتفاوض ساعة', 'watches_accessories'],
     ['نقطة وصول راوتر', 'networking'],
@@ -77,13 +83,15 @@ test('category keywords do not capture fragments of ordinary product description
     ['ابل ايفون', 'mobile_phones'],
     ['قطة صغيرة', 'animals'],
     ['Canon camera', 'cameras'],
-  ]) {
+  ] as const) {
+    t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: expected }));
     assert.equal(parseMarketplaceSearchQuery(title).category, expected, title);
     assert.equal(inferExpectedMarketplaceCategory(title), expected, title);
   }
 });
 
-test('new keyword categories retain older broad listings without rewriting or widening explicit category filters', () => {
+test('model categories retain older broad listings without rewriting or widening explicit category filters', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: 'home_appliances', search: { ...textAnalysis().search, descriptiveTerms: ['مرجعتصنيف'] } }));
   const listings = ['other', 'home_garden', 'home_appliances'].map(category => {
     const sellerId = `legacy-appliance-${category}`;
     const listing = createListingDraft({ sellerId, category, title: 'غلاية مرجعتصنيف', price: 50 });
@@ -99,12 +107,16 @@ test('new keyword categories retain older broad listings without rewriting or wi
   assert.deepEqual(getMarketplaceCategorySearchIds('legacy-custom-category'), ['legacy-custom-category']);
 });
 
-test('category classification does not bypass product policy', () => {
+test('category classification does not bypass product policy', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: 'food', compliance: { decision: 'block', reasons: ['prohibited_product'], shariaSensitive: true } }));
   const listing = createListingDraft({ sellerId: 'catalog-policy', category: 'food', title: 'مشروب كحولي للبيع' });
   assert.equal(listing.status, 'rejected');
 });
 
 test('database searches use the same legacy category expansion and keep explicit filters exact', async t => {
+  const resultFor = (text: string) => textAnalysis({ category: text === 'Canon camera' ? 'cameras' : 'home_appliances', search: { ...textAnalysis().search, descriptiveTerms: ['fixture-product'] } });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async (text: string) => resultFor(text));
+  t.mock.method(marketplaceTextAnalyzer, 'peek', resultFor);
   const { prisma } = await import('@/lib/db/prisma');
   const { listMarketplaceListings: listFromRepository } = await import('@/agent/marketplace/repository');
   const reads: Array<{ where: { AND: unknown[] } }> = [];

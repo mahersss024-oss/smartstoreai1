@@ -486,20 +486,23 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {pagination && <section className="admin-statistics sm:grid-cols-3">
+        <section
+          className={`admin-statistics sm:grid-cols-3${pagination ? '' : ' invisible'}`}
+          aria-hidden={!pagination}
+        >
           <div>
-            <div className="text-xs text-muted-foreground">{pagination.total !== undefined ? 'النتائج المطابقة' : 'المستخدمون المحمّلون'}</div>
-            <div className="mt-1 text-xl font-bold">{formatNumber(totalUsers)}</div>
+            <div className="text-xs text-muted-foreground">{pagination?.total !== undefined ? 'النتائج المطابقة' : 'المستخدمون المحمّلون'}</div>
+            <div className="mt-1 min-h-7 text-xl font-bold">{pagination ? formatNumber(totalUsers) : null}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">أرقام تواصل في السجلات المحمّلة</div>
-            <div className="mt-1 text-xl font-bold">{formatNumber(usersWithPhone)}</div>
+            <div className="mt-1 min-h-7 text-xl font-bold">{pagination ? formatNumber(usersWithPhone) : null}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">المعروض حاليًا</div>
-            <div className="mt-1 text-xl font-bold">{formatNumber(users.length)}</div>
+            <div className="mt-1 min-h-7 text-xl font-bold">{pagination ? formatNumber(users.length) : null}</div>
           </div>
-        </section>}
+        </section>
 
         <section className="admin-filterbar">
           <form

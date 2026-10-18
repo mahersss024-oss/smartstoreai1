@@ -71,7 +71,15 @@ test('manual creation and account editing expose identical category IDs and labe
   await page.screenshot({ path: info.outputPath('account-categories.png') });
 });
 
-test('manual title recognizes colloquial products while typing and preserves explicit category selection', async ({ page }) => {
+test('manual title uses model suggestions while typing and preserves explicit category selection', async ({ page }) => {
+  await page.route('**/api/marketplace/listing-category', route => {
+    const { title } = route.request().postDataJSON();
+    const fixtures: Record<string, string> = {
+      'وايت سكس للبيع': 'heavy_equipment', 'تريله للبيع': 'heavy_equipment', 'سطحه للبيع': 'heavy_equipment',
+      'قطع غيار تريله': 'auto_parts', 'كنبة للبيع': 'furniture',
+    };
+    return route.fulfill({ json: { category: fixtures[title] ?? null, status: fixtures[title] ? 'suggested' : 'uncertain' } });
+  });
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
   await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
@@ -89,8 +97,62 @@ test('manual title recognizes colloquial products while typing and preserves exp
   await expect(select).toHaveValue('furniture');
   await select.selectOption('cameras');
   await title.fill('وايت سكس للبيع');
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(1200);
   await expect(select).toHaveValue('cameras');
   await form.locator('textarea').focus();
   await expect(select).toHaveValue('cameras');
+});
+
+test('model suggestions debounce input and discard stale responses without overriding manual choice', async ({ page }) => {
+  let calls = 0;
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/marketplace/listing-category', async route => {
+    calls++;
+    const { title } = route.request().postDataJSON();
+    if (title === 'طلب قديم') await delayed;
+    await route.fulfill({ json: { category: title === 'طلب قديم' ? 'cars' : 'networking', status: 'suggested' } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
+  const form = page.locator('.marketplace-home-controls form');
+  const title = form.locator('input[maxlength="140"]');
+  const select = form.locator('select').first();
+  try {
+    await title.pressSequentially('طلب قديم', { delay: 30 });
+    expect(calls).toBe(0);
+    await expect.poll(() => calls).toBe(1);
+    await title.fill('طلب جديد');
+    await expect(select).toHaveValue('networking');
+    release();
+    await page.waitForTimeout(300);
+    await expect(select).toHaveValue('networking');
+    await select.selectOption('cameras');
+    await title.fill('طلب آخر');
+    await page.waitForTimeout(1200);
+    await expect(select).toHaveValue('cameras');
+    expect(calls).toBe(2);
+  } finally { release(); }
+});
+
+test('unavailable or uncertain model suggestions leave manual classification available without keyword fallback', async ({ page }) => {
+  let unavailable = true;
+  await page.route('**/api/marketplace/listing-category', route => route.fulfill({
+    status: unavailable ? 503 : 200,
+    json: { category: null, status: unavailable ? 'unavailable' : 'uncertain' },
+  }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
+  const form = page.locator('.marketplace-home-controls form');
+  const title = form.locator('input[maxlength="140"]');
+  const select = form.locator('select').first();
+  await title.fill('iPhone');
+  await expect(form.getByText('تعذر اقتراح التصنيف. يمكنك اختياره يدويًا.')).toBeVisible();
+  await expect(select).toHaveValue('other');
+  unavailable = false;
+  await title.fill('Toyota Camry');
+  await expect(form.getByText('التصنيف غير واضح. اختره يدويًا.')).toBeVisible();
+  await expect(select).toHaveValue('other');
+  await select.selectOption('cars');
+  await expect(select).toHaveValue('cars');
 });

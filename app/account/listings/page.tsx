@@ -1,5 +1,7 @@
 'use client';
 
+import { getArabicCustomerMessage } from '@/lib/customer-language';
+
 import { formatMarketplaceCategory as formatCategory, marketplaceCategoryIds as listingCategoryOptions } from '@/lib/marketplace/categories';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -632,7 +634,7 @@ export default function AccountListingsPage() {
             listingId: listing.id,
             tone: 'warning',
             message:
-              payload?.message ??
+              (getArabicCustomerMessage(payload?.message, '') || undefined) ??
               'لا يمكن نشر الإعلان الآن. تأكد من وجود صورة حقيقية مطابقة وأن بيانات الإعلان لا تخالف سياسة السوق.',
           });
         }
@@ -669,8 +671,8 @@ export default function AccountListingsPage() {
           setActionResult({
             listingId: listing.id,
             title:
-              payload?.message ??
-              payload?.error ??
+              (getArabicCustomerMessage(payload?.message, '') || undefined) ??
+              (getArabicCustomerMessage(payload?.error, '') || undefined) ??
               'تعذر تنفيذ الإجراء الآن. حاول مرة أخرى.',
             tone: 'danger',
           });
@@ -761,7 +763,7 @@ export default function AccountListingsPage() {
           listingId: listing.id,
           tone: 'warning',
           message:
-            payload?.message ??
+            (getArabicCustomerMessage(payload?.message, '') || undefined) ??
             'لا يمكن نشر الإعلان الآن. تأكد أن بيانات الإعلان لا تخالف سياسة السوق.',
         });
       }
@@ -889,8 +891,8 @@ export default function AccountListingsPage() {
             listingId: listing.id,
             tone: 'danger',
             message:
-              responsePayload?.message ??
-              responsePayload?.error ??
+              (getArabicCustomerMessage(responsePayload?.message, '') || undefined) ??
+              (getArabicCustomerMessage(responsePayload?.error, '') || undefined) ??
               'تعذر تحديث الإعلان الآن. حاول مرة أخرى بعد قليل.',
           });
           return;
@@ -1025,7 +1027,7 @@ export default function AccountListingsPage() {
                 listingId: listing.id,
                 tone: 'warning',
                 message:
-                  payload.message ??
+                  (getArabicCustomerMessage(payload.message, '') || undefined) ??
                   `وصل الإعلان إلى الحد الأقصى (${payload.maxImages ?? 8}) من الصور. احذف صورة قديمة قبل رفع صورة جديدة.`,
               });
               return;
@@ -1034,8 +1036,8 @@ export default function AccountListingsPage() {
             setImageActionNotice({
               listingId: listing.id,
               message:
-                payload?.message ??
-                payload?.error ??
+                (getArabicCustomerMessage(payload?.message, '') || undefined) ??
+                (getArabicCustomerMessage(payload?.error, '') || undefined) ??
                 'تعذر رفع الصورة. تأكد من إعداد تخزين الصور ثم حاول مرة أخرى.',
               tone: 'danger',
             });
@@ -1145,7 +1147,7 @@ export default function AccountListingsPage() {
 
         if (!response.ok) {
           const payload = await response.json().catch(() => null) as { message?: string } | null;
-          setImageDeleteError(payload?.message ?? 'تعذر حذف الصورة الآن.');
+          setImageDeleteError((getArabicCustomerMessage(payload?.message, '') || undefined) ?? 'تعذر حذف الصورة الآن.');
           return;
         }
 
@@ -1586,7 +1588,7 @@ export default function AccountListingsPage() {
                 <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md border border-slate-200 bg-white text-[#1f1f1f] shadow-sm hover:bg-slate-50 dark:border-white/10">
                   <a href="/api/auth/google/start">
                     <GoogleMark className="size-5" />
-                    دخول Google
+                    دخول جوجل
                   </a>
                 </Button>
               ) : null}
@@ -1594,7 +1596,7 @@ export default function AccountListingsPage() {
                 <Button asChild className="w-full max-w-sm justify-center gap-2 rounded-md bg-[#050914] text-white shadow-sm ring-1 ring-white/10 hover:bg-[#111827]">
                   <a href="/api/auth/apple/start">
                     <AppleMark className="size-5" />
-                    دخول Apple
+                    دخول آبل
                   </a>
                 </Button>
               ) : null}

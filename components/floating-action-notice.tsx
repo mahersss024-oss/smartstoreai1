@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { getArabicCustomerMessage } from '@/lib/customer-language';
 import { useOverlayViewport } from '@/hooks/use-overlay-viewport';
 
 type FloatingActionNoticeTone = 'success' | 'warning' | 'danger' | 'info';
@@ -84,6 +85,8 @@ export function FloatingActionNotice({
   title,
   tone,
 }: FloatingActionNoticeProps) {
+  message = message ? getArabicCustomerMessage(message,
+    tone === 'success' ? 'تم إكمال الإجراء بنجاح.' : 'تعذر إكمال الإجراء الآن. راجع البيانات وحاول مجددًا.') : message;
   const toneConfig = toneClasses[tone];
   const Icon = toneConfig.Icon;
   const isRichNotice = Boolean(title || action || statusLabel);

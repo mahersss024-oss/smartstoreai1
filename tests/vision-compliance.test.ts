@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
 
 import type { ModelMessage } from 'ai';
 
@@ -21,6 +23,21 @@ test('prohibited-only mode ignores manual review and preserves prohibited blocks
   }
 });
 
+test('quality and unreadable-image uncertainty never require publication review', () => {
+  for (const review_basis of ['image_quality', 'unreadable', 'category_mismatch']) {
+    const result = parseImageComplianceDecision(JSON.stringify({
+      decision: 'needs_review', confidence: 0.4, reasons: ['advisory only'], review_basis,
+    }));
+    assert.equal(result.decision, 'allow');
+  }
+  assert.equal(parseImageComplianceDecision(JSON.stringify({
+    decision: 'needs_review', confidence: 0.8, reasons: ['regulated item'], review_basis: 'policy',
+  })).decision, 'needs_review');
+  assert.equal(parseImageComplianceDecision(JSON.stringify({
+    decision: 'block', confidence: 0.95, reasons: ['prohibited item'], review_basis: 'image_quality',
+  })).decision, 'block');
+});
+
 test('parses image compliance block JSON', () => {
   const decision = parseImageComplianceDecision(`text before
 {
@@ -40,7 +57,7 @@ text after`);
   assert.equal(decision.shariaSensitive, true);
 });
 
-test('routes category mismatches to manual review', () => {
+test('reports category mismatches without blocking lawful images', () => {
   const decision = parseImageComplianceDecision(`{
   "decision": "allow",
   "confidence": 0.9,
@@ -52,13 +69,12 @@ test('routes category mismatches to manual review', () => {
   "sharia_sensitive": false
 }`);
 
-  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.decision, 'allow');
   assert.equal(decision.detectedCategory, 'computers');
   assert.equal(decision.expectedCategory, 'mobile_phones');
   assert.equal(decision.categoryMatch, 'mismatch');
   assert.deepEqual(decision.reasons, [
     'visible product is a laptop',
-    'image_category_mismatch',
   ]);
 });
 
@@ -117,7 +133,7 @@ test('parses tolerant image compliance values from vision', () => {
   assert.equal(decision.shariaSensitive, false);
 });
 
-test('parses professional model review wording without failing closed', () => {
+test('parses advisory model mismatch wording without blocking lawful content', () => {
   const decision = parseImageComplianceDecision(`{
   "status": "manual-review",
   "confidence": "0.71",
@@ -128,37 +144,43 @@ test('parses professional model review wording without failing closed', () => {
   "sharia_sensitive": "no"
 }`);
 
-  assert.equal(decision.decision, 'needs_review');
+  assert.equal(decision.decision, 'allow');
   assert.equal(decision.confidence, 0.71);
   assert.deepEqual(decision.reasons, [
     'visible product needs closer marketplace review',
-    'image_category_mismatch',
   ]);
   assert.equal(decision.categoryMatch, 'mismatch');
   assert.equal(decision.shariaSensitive, false);
 });
 
-test('infers expected marketplace categories from user text', async () => {
+test('reads expected marketplace categories from shared model analysis', async t => {
   const { inferExpectedMarketplaceCategory } = await import(
     '@/agent/marketplace/vision-compliance'
   );
+
+  let expected: 'mobile_phones' | 'cars' | 'cameras' | 'women_supplies' | 'men_supplies' = 'mobile_phones';
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: expected }));
 
   assert.equal(
     inferExpectedMarketplaceCategory('أريد بيع آيفون 14 برو'),
     'mobile_phones',
   );
+  expected = 'cars';
   assert.equal(
     inferExpectedMarketplaceCategory('كامري 2020 في الرياض'),
     'cars',
   );
+  expected = 'cameras';
   assert.equal(
     inferExpectedMarketplaceCategory('اريد كاميرا تصوير من نوع كانون'),
     'cameras',
   );
+  expected = 'women_supplies';
   assert.equal(
     inferExpectedMarketplaceCategory('women supplies abaya'),
     'women_supplies',
   );
+  expected = 'men_supplies';
   assert.equal(
     inferExpectedMarketplaceCategory('men supplies shemagh'),
     'men_supplies',

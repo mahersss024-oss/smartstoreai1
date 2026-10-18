@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { beforeEach } from 'node:test';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+beforeEach(mockAllowedTextAnalysis);
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -7,7 +11,6 @@ import { mockImageContentReview } from './helpers/image-content';
 
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import {
-  addListingImageForSeller,
   createListingDraft,
   publishListing,
 } from '@/agent/marketplace/store';
@@ -25,40 +28,20 @@ function createTestSession(userId: string): AuthSession {
   };
 }
 
-test('pauses the latest matching seller listing when listingId is omitted', async () => {
-  const sellerId = 'seller:tool-pause-current-listing';
-  const listing = createListingDraft({
-    sellerId,
-    category: 'cars',
-    title: 'Toyota Camry',
-  });
-
-  addListingImageForSeller(listing.id, sellerId, {
-    id: 'tool-pause-current-listing-image',
-    listingId: listing.id,
-    originalUrl: 'https://images.example.test/camry-original.jpg',
-    displayUrl: 'https://images.example.test/camry-display.jpg',
-    thumbnailUrl: 'https://images.example.test/camry-thumb.jpg',
-    isPrimary: true,
-    qualityScore: 92,
-    status: 'approved',
-    enhancements: [],
-  });
-  publishListing(listing.id);
-
-  const tools = createMarketplaceTools(createTestSession(sellerId));
-  const executeSetListingStatus = tools.setListingStatus.execute as unknown as (
-    input: { status: 'paused'; confirmed: boolean },
-    options: Record<string, never>,
-  ) => Promise<{ status: string; listingUrl?: string; listing: { id: string } }>;
-  const result = await executeSetListingStatus(
-    { status: 'paused', confirmed: true },
-    {},
-  );
-
-  assert.equal(result?.status, 'paused');
-  assert.equal(result?.listing.id, listing.id);
-  assert.equal(result?.listingUrl, undefined);
+test('chat exposes no sensitive action tools even for signed-in users', () => {
+  for (const session of [null, createTestSession('buyer'), { ...createTestSession('owner'), user: { ...createTestSession('owner').user, role: 'owner' as const } }]) {
+    const tools = createMarketplaceTools(session);
+    assert.deepEqual(Object.keys(tools).sort(), [
+      'searchMarketplaceListings', 'compareMarketplaceListings', 'estimateListingPrice',
+      'evaluateNegotiationOffer', 'createListingDraft', 'updateListing',
+      'addUploadedImagesToListing', 'analyzeListingImages',
+    ].sort());
+    for (const name of ['setListingStatus', 'deleteListingImage', 'setPrimaryListingImage',
+      'toggleFavoriteListing', 'reportMarketplaceListing', 'openMarketplaceConversation',
+      'sendMessage', 'deleteAccount', 'changePermissions', 'payCommission']) {
+      assert.equal(name in tools, false, name);
+    }
+  }
 });
 
 test('marketplace tools do not let assistant chat open buyer seller conversations', () => {
@@ -145,60 +128,38 @@ test('adds many follow-up details to the current draft when listingId is omitted
   ]);
 });
 
-test('sensitive marketplace tools require explicit confirmation flags', async () => {
-  const sellerId = 'seller:tool-confirmation-lock';
-  const listing = createListingDraft({
-    sellerId,
-    category: 'cars',
-    title: 'Confirmed Camry',
-  });
-
-  addListingImageForSeller(listing.id, sellerId, {
-    id: 'tool-confirmation-image',
-    listingId: listing.id,
-    originalUrl: 'https://images.example.test/confirmed-original.jpg',
-    displayUrl: 'https://images.example.test/confirmed-display.jpg',
-    thumbnailUrl: 'https://images.example.test/confirmed-thumb.jpg',
-    isPrimary: true,
-    qualityScore: 88,
-    status: 'approved',
-    enhancements: [],
-  });
+test('chat cannot change a published listing even with model-generated confirmation flags', async () => {
+  const sellerId = 'seller:chat-sensitive-boundary';
+  const listing = createListingDraft({ sellerId, category: 'cars', title: 'Camry for sale', price: 100 });
   publishListing(listing.id);
+  const before = structuredClone(listing);
+  const tools = createMarketplaceTools(createTestSession(sellerId), {
+    latestUploadedImages: [{ data: new Uint8Array([1]), mediaType: 'image/png' }],
+  });
+  const update = tools.updateListing.execute as unknown as (
+    input: Record<string, unknown>, options: Record<string, never>,
+  ) => Promise<{ status: string }>;
+  const attach = tools.addUploadedImagesToListing.execute as unknown as (
+    input: { listingId: string }, options: Record<string, never>,
+  ) => Promise<{ status: string }>;
+  assert.equal((await update({ listingId: listing.id, price: 999, title: 'Changed', confirmedPriceChange: true, confirmed: true, draftOnly: false }, {})).status, 'user_action_required');
+  assert.equal((await attach({ listingId: listing.id }, {})).status, 'user_action_required');
+  const { getListing } = await import('@/agent/marketplace/store');
+  assert.deepEqual(getListing(listing.id), before);
+});
 
+test('chat draft updates cannot inject owner identity or status fields', async () => {
+  const sellerId = 'seller:chat-draft-boundary';
+  const listing = createListingDraft({ sellerId, category: 'other', title: 'Desk' });
   const tools = createMarketplaceTools(createTestSession(sellerId));
-  const executeSetListingStatus = tools.setListingStatus.execute as unknown as (
-    input: { listingId: string; status: 'paused'; confirmed: boolean },
-    options: Record<string, never>,
-  ) => Promise<{ status: string; message: string }>;
-  const executeDeleteListingImage = tools.deleteListingImage.execute as unknown as (
-    input: { listingId: string; imageId: string; confirmed: boolean },
-    options: Record<string, never>,
-  ) => Promise<{ status: string; message: string }>;
-  const executeUpdateListing = tools.updateListing.execute as unknown as (
-    input: { listingId: string; price: number; confirmedPriceChange?: boolean },
-    options: Record<string, never>,
-  ) => Promise<{ status: string; message: string }>;
-
-  const pauseResult = await executeSetListingStatus(
-    { listingId: listing.id, status: 'paused', confirmed: false },
-    {},
-  );
-  const imageDeleteResult = await executeDeleteListingImage(
-    { listingId: listing.id, imageId: 'tool-confirmation-image', confirmed: false },
-    {},
-  );
-  const priceResult = await executeUpdateListing(
-    { listingId: listing.id, price: 87000 },
-    {},
-  );
-
-  assert.equal(pauseResult.status, 'needs_confirmation');
-  assert.match(pauseResult.message, /Confirm/);
-  assert.equal(imageDeleteResult.status, 'needs_confirmation');
-  assert.match(imageDeleteResult.message, /Confirm/);
-  assert.equal(priceResult.status, 'needs_confirmation');
-  assert.match(priceResult.message, /Confirm/);
+  const update = tools.updateListing.execute as unknown as (
+    input: Record<string, unknown>, options: Record<string, never>,
+  ) => Promise<{ status: string; listing: { id: string; sellerId: string; status: string } }>;
+  const result = await update({ listingId: listing.id, title: 'Prepared desk', id: 'forged', sellerId: 'attacker', status: 'published', confirmed: true }, {});
+  assert.equal(result.status, 'updated');
+  assert.equal(result.listing.id, listing.id);
+  assert.equal(result.listing.sellerId, sellerId);
+  assert.equal(result.listing.status, 'draft');
 });
 
 test('chat image attachment checks prohibited content without quality or category conditions', () => {
@@ -208,7 +169,7 @@ test('chat image attachment checks prohibited content without quality or categor
   );
   const addImagesTool = source.slice(
     source.indexOf('addUploadedImagesToListing: tool({'),
-    source.indexOf('deleteListingImage: tool({'),
+    source.indexOf('analyzeListingImages: tool({'),
   );
 
   assert.doesNotMatch(addImagesTool, /checkImageMarketplaceCompliance/);

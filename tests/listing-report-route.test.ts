@@ -4,6 +4,9 @@ import test from 'node:test';
 import { createListingDraft, publishListing } from '@/agent/marketplace/store';
 import { GET, POST } from '@/app/api/marketplace/listings/[listingId]/reports/route';
 import { createSessionCookie } from '@/lib/auth/session';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+test.beforeEach(mockAllowedTextAnalysis);
 
 test('report endpoint persists state and deduplicates different request keys', async () => {
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;

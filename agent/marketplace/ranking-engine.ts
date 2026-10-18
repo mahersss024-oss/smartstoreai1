@@ -46,11 +46,6 @@ const baseWeights: RankingWeights = {
   freshness: 0.05,
   engagement: 0.03,
 };
-const featureScoreTerms = new Map([
-  ['hybrid', ['hybrid', 'هايبرد', 'هجين']],
-  ['clean', ['clean', 'نظيف', 'نظيفة', 'ممتاز', 'ممتازة']],
-  ['no_accident_history', ['بدون حوادث', 'لا يوجد حوادث']],
-]);
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -226,7 +221,7 @@ function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
     state.model,
     ...state.terms,
     ...state.requiredFeatures.flatMap(
-      (feature) => featureScoreTerms.get(feature) ?? [feature],
+      (feature) => getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases),
     ),
   ].filter((value): value is string => Boolean(value));
 
@@ -235,7 +230,7 @@ function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
   }
 
   const matched = desiredTerms.filter((term) => {
-    const variants = getMarketplaceSearchTermVariants(term);
+    const variants = getMarketplaceSearchTermVariants(term, state.rawQuery, state.termAliases);
     return textIncludesAny(text, variants);
   }).length;
 
@@ -354,7 +349,7 @@ function scoreSpecifications(listing: ListingRecord, state: MarketplaceSearchSta
   if (state.requiredFeatures.length) {
     const text = listingText(listing);
     const matched = state.requiredFeatures.filter((feature) =>
-      textIncludesAny(text, featureScoreTerms.get(feature) ?? [feature]),
+      textIncludesAny(text, getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases)),
     ).length;
 
     score = Math.min(score, clampScore((matched / state.requiredFeatures.length) * 100));

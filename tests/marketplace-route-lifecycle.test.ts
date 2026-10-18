@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { beforeEach } from 'node:test';
+import { mockAllowedTextAnalysis } from './helpers/text-understanding';
+
+beforeEach(mockAllowedTextAnalysis);
 import test from 'node:test';
 
 import { POST as createListing } from '@/app/api/marketplace/listings/route';

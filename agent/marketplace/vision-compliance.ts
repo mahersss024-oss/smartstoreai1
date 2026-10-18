@@ -1,5 +1,5 @@
-import { marketplaceVisionCategoryRules as categoryRules } from '@/lib/marketplace/category-matching';
-import { getProductCategory } from '@/lib/marketplace/product-lexicon';
+import { marketplaceTextAnalyzer } from './text-understanding';
+import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { generateText, type ModelMessage } from 'ai';
 import { z } from 'zod';
 
@@ -151,6 +151,7 @@ const imageComplianceSchema = z.preprocess((value) => {
   detectedProduct: optionalModelText(240),
   sharia_sensitive: booleanSchema,
   shariaSensitive: booleanSchema,
+  review_basis: z.enum(['policy', 'image_quality', 'category_mismatch', 'unreadable']).optional(),
 }));
 
 export type ImageComplianceDecision = {
@@ -214,9 +215,8 @@ export function inferExpectedMarketplaceCategory(text: string) {
     return undefined;
   }
 
-  return getProductCategory(normalized) ?? categoryRules.find((rule) =>
-    rule.patterns.some((pattern) => pattern.test(normalized)),
-  )?.category;
+  const analysis = marketplaceTextAnalyzer.peek(normalized);
+  return analysis && analysis.confidence >= 0.8 ? analysis.category ?? undefined : undefined;
 }
 
 function extractJsonObject(text: string) {
@@ -281,7 +281,7 @@ function wait(ms: number) {
   });
 }
 
-export function parseImageComplianceDecision(text: string, ignoreCategoryMismatch = false): ImageComplianceDecision {
+export function parseImageComplianceDecision(text: string): ImageComplianceDecision {
   const parsed = imageComplianceSchema.parse(
     JSON.parse(extractJsonObject(text)),
   );
@@ -292,12 +292,9 @@ export function parseImageComplianceDecision(text: string, ignoreCategoryMismatc
   const reasons = parsed.reasons.map((reason) =>
     reason.length > 180 ? `${reason.slice(0, 177)}...` : reason,
   );
-  const decision =
-    !ignoreCategoryMismatch && parsed.decision === 'allow' &&
-    expectedCategory &&
-    categoryMatch === 'mismatch'
-      ? 'needs_review'
-      : parsed.decision;
+  const advisoryOnly = ['image_quality', 'unreadable', 'category_mismatch'].includes(parsed.review_basis ?? '')
+    || (!parsed.review_basis && categoryMatch === 'mismatch' && !parsed.prohibited_category && !parsed.prohibitedCategory);
+  const decision = parsed.decision === 'needs_review' && advisoryOnly ? 'allow' : parsed.decision;
 
   if (decision === 'needs_review' && categoryMatch === 'mismatch') {
     reasons.push('image_category_mismatch');
@@ -586,6 +583,9 @@ async function generateImageComplianceText(imageMessage: ModelMessage, prohibite
 }
 
 export const imageComplianceSystemPrompt = `You are the سوق حمد visual compliance checker for a Saudi marketplace.
+
+Existing category IDs: ${marketplaceCategoryPrompt}. Infer meaning from the image and supplied listing context, never word roots. Never invent category IDs.
+Photo resolution, lighting, blur or inability to identify the product are informational, never reasons to reject or require manual review. For those uncertainties return allow with category_match=unclear and review_basis=image_quality or unreadable. A category mismatch alone is informational: return allow with review_basis=category_mismatch. A clearly prohibited product still requires block; genuine regulated-content uncertainty requires needs_review with review_basis=policy.
 Return JSON only. Do not answer the user.
 
 Classify every attached marketplace product image before the chat assistant responds.
@@ -593,11 +593,11 @@ Classify every attached marketplace product image before the chat assistant resp
 Multi-image rule:
 - Inspect every attached image, not only the first image.
 - If any attached image contains a prohibited product or prohibited content, the final decision must be block.
-- If any attached image is regulated, sensitive, prohibited-adjacent, or clearly mismatches a single expected category/listing text, the final decision must be needs_review unless another image requires block.
+- If any attached image shows genuine regulated or sensitive content, the final decision must be needs_review with review_basis=policy unless another image requires block.
 - Do not use needs_review merely because the image is low quality, dim, slightly blurry, distant, partially cropped, or has a busy background when an ordinary lawful product is still recognizable.
-- Use needs_review for clarity only when the product cannot be identified at all, the image is blank/black/corrupt, or the visible item cannot be reasonably understood.
+- If the product cannot be identified or the image is blank/black, return allow with review_basis=unreadable. Corrupt files are handled by separate technical validation.
 - If multiple attached images show different ordinary lawful products and the user appears to be asking for multiple listings or has not supplied a single expected category, do not treat that as a policy violation. Use allow, set detected_category to "multiple" when appropriate, and include "multiple_distinct_products_in_images" in reasons.
-- If the user supplied one expected category/listing text and a visible image clearly belongs to a different category, use needs_review unless the visible product is prohibited, then use block.
+- If the user supplied an expected category and a visible image is different, report category_match=mismatch without blocking on that fact alone. Independently enforce prohibited-content rules.
 - Use allow when all attached images are ordinary lawful marketplace products and any quality issues still leave the product recognizable.
 - Mention the number of inspected images in reasons when there is more than one image.
 
@@ -627,13 +627,14 @@ Also compare the visible product against the expected category/listing text supp
 - category_match="match" if the visible product reasonably matches the expected category.
 - category_match="mismatch" if the visible product is clearly a different category, such as a weapon image for a phone listing or alcohol image for a furniture listing.
 - category_match="unclear" if no expected category was supplied, if multiple different allowed products are visible, or if the image is too unclear to identify the product.
-- If category_match is mismatch, use needs_review unless the visible product is prohibited, then use block.
+- Category mismatch alone is not a prohibition. Return allow unless independent visible content requires block or policy review.
 
 Use allow only for ordinary lawful marketplace products and listings.
 
 Return this exact JSON shape:
 {
   "decision": "allow" | "block" | "needs_review",
+  "review_basis": "policy" | "image_quality" | "category_mismatch" | "unreadable",
   "confidence": 0.0,
   "reasons": ["short reason"],
   "prohibited_category": "category_or_omitted",
@@ -695,7 +696,7 @@ export async function checkImageMarketplaceCompliance({
     };
     for (const imageMessage of imageMessages.slice(0, 3)) {
       try {
-        latest = parseImageComplianceDecision(await generateImageComplianceText(imageMessage, prohibitedOnly), prohibitedOnly);
+        latest = parseImageComplianceDecision(await generateImageComplianceText(imageMessage, prohibitedOnly));
       } catch (error) {
         if (!prohibitedOnly) throw error;
         console.warn(`[image_content_review] failure=${error instanceof Error ? error.name : 'UnknownError'}`);

@@ -20,6 +20,7 @@ import {
   listMarketplaceListings,
 } from '@/agent/marketplace/repository';
 import { getComparableListings } from '@/agent/marketplace/market-intelligence';
+import { prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
 import type { ListingRecord } from '@/agent/marketplace/store';
 import type { ListingCondition } from '@/agent/marketplace/types';
 import { getAuthSession } from '@/lib/auth/session';
@@ -52,7 +53,7 @@ type PageProps = {
 export const dynamic = 'force-dynamic';
 
 const missingListingImageDataUrl =
-  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221200%22 height=%22750%22 viewBox=%220 0 1200 750%22%3E%3Crect width=%221200%22 height=%22750%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M514 308h172a34 34 0 0 1 34 34v120a34 34 0 0 1-34 34H514a34 34 0 0 1-34-34V342a34 34 0 0 1 34-34z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2216%22/%3E%3Ccircle cx=%22558%22 cy=%22372%22 r=%2224%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m514 462 65-68 52 52 32-34 57 50%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2216%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22600%22 y=%22562%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2236%22 font-weight=%22700%22 fill=%22%2364758b%22%3ENo real photo%3C/text%3E%3C/svg%3E';
+  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221200%22 height=%22750%22 viewBox=%220 0 1200 750%22%3E%3Crect width=%221200%22 height=%22750%22 fill=%22%23f1f5f9%22/%3E%3Cpath d=%22M514 308h172a34 34 0 0 1 34 34v120a34 34 0 0 1-34 34H514a34 34 0 0 1-34-34V342a34 34 0 0 1 34-34z%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2216%22/%3E%3Ccircle cx=%22558%22 cy=%22372%22 r=%2224%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22m514 462 65-68 52 52 32-34 57 50%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%2216%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Ctext x=%22600%22 y=%22562%22 text-anchor=%22middle%22 font-family=%22Arial, sans-serif%22 font-size=%2236%22 font-weight=%22700%22 fill=%22%2364758b%22%3E%D9%84%D8%A7%20%D8%AA%D9%88%D8%AC%D8%AF%20%D8%B5%D9%88%D8%B1%D8%A9%3C/text%3E%3C/svg%3E';
 
 function getDurableImageUrl(...urls: Array<string | undefined>) {
   return urls.find((url) => {
@@ -622,7 +623,8 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
     city: listing.city,
     limit: 48,
   });
-  let similarListings = getDetailSimilarListings(
+    await prepareListingUnderstanding([listing, ...candidateSimilarListings]);
+    let similarListings = getDetailSimilarListings(
     listing,
     candidateSimilarListings,
   );
@@ -633,7 +635,8 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
       limit: 48,
     });
 
-    similarListings = getDetailSimilarListings(
+      await prepareListingUnderstanding(widerSimilarListings);
+      similarListings = getDetailSimilarListings(
       listing,
       [...candidateSimilarListings, ...widerSimilarListings],
     );

@@ -1,3 +1,5 @@
+import { isArabicCustomerText } from './customer-language';
+
 export const chatServiceUnavailableMessage =
   'تعذر إكمال الطلب الآن بسبب انقطاع مؤقت في الخدمة. أعد المحاولة بعد لحظات، ولن يتم نشر أي إعلان حتى تكتمل المراجعة بنجاح.';
 
@@ -16,5 +18,5 @@ export function isRawServiceErrorResponse(text: string) {
 export function getSafeAssistantText(text: string) {
   const trimmed = text.trim();
 
-  return isRawServiceErrorResponse(trimmed) ? '' : trimmed;
+  return isRawServiceErrorResponse(trimmed) || !isArabicCustomerText(trimmed) ? '' : trimmed;
 }

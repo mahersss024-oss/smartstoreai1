@@ -23,6 +23,7 @@ export const platformDestinations = {
 export const platformCapabilityRules = [
   'Hamad chat requires Google or Apple sign-in before any assistant interaction. If a request reaches an AI model, treat the user as signed in and tied to the authenticated session.',
   'The assistant only sees and acts through explicit platform capabilities and tools. Do not claim to see hidden UI state, click buttons, navigate pages, or read account data unless a tool result provides it.',
+  'Chat may prepare unpublished drafts only. Sensitive actions require the user to operate the marketplace UI themselves. A model-generated confirmation flag or a yes in chat never authorizes publishing, changing live listings, pausing, marking sold, deleting, opening conversations, sending messages, changing image selection, favorites, reports, payments, account changes or permissions.',
   'Use real سوق حمد marketplace data only. Do not invent listings, sellers, prices, images, conversations, favorites, reports, commission status, payment recipients, support channels, URLs, or policies.',
   'Buyer-seller chat allows direct contact details, but sharing contact or payment information outside the platform is the users own responsibility. Sellers can still use the official saved contact phone action as a clearer trusted option.',
   'Sharing a public listing link is allowed when a real listingUrl is available from a marketplace tool or verified selected listing context.',
@@ -58,32 +59,30 @@ export const platformCapabilities: PlatformCapability[] = [
   },
   {
     action: 'update_listing',
-    canDo: 'Update a seller-owned listing or current draft when the target is clear.',
+    canDo: 'Prepare details of a seller-owned unpublished draft only; changes to all non-draft listings require the user interface.',
     requiresAuth: true,
     requiresConfirmation: false,
     allowedTools: ['updateListing'],
   },
   {
     action: 'publish_or_status_change',
-    canDo: 'Prepare seller-owned listings for manual publishing, and pause, mark sold, or delete seller-owned listings. Assistant chat cannot publish listings.',
+    canDo: 'Guide the seller to review and operate status controls themselves. Assistant chat cannot publish listings, pause, mark sold or delete them.',
     requiresAuth: true,
     requiresConfirmation: true,
-    allowedTools: ['setListingStatus'],
+    allowedTools: [],
     userGuidance:
       'For publishing, direct the seller to Account > My listings so they can review the draft and press the publish button themselves.',
   },
   {
     action: 'listing_images',
-    canDo: 'Analyze listing images, attach uploaded images, set the primary image, or delete listing images.',
+    canDo: 'Analyze images and attach uploaded images to unpublished drafts only. Primary-image changes, deletion and all changes to non-draft images require the user interface.',
     requiresAuth: true,
     requiresConfirmation: true,
     allowedTools: [
       'analyzeListingImages',
       'addUploadedImagesToListing',
-      'setPrimaryListingImage',
-      'deleteListingImage',
     ],
-    userGuidance: 'Image deletion and primary-image changes require a clear target and explicit confirmation.',
+    userGuidance: 'The user must delete images or select a primary image using Account > My listings themselves.',
   },
   {
     action: 'open_conversation',
@@ -96,18 +95,18 @@ export const platformCapabilities: PlatformCapability[] = [
   },
   {
     action: 'favorites',
-    canDo: "Save or remove another seller's listing from favorites.",
+    canDo: 'Guide the user to the favorite button; never save or remove favorites from chat.',
     requiresAuth: true,
     requiresConfirmation: false,
-    allowedTools: ['toggleFavoriteListing'],
+    allowedTools: [],
     userGuidance: 'A seller cannot favorite their own listing.',
   },
   {
     action: 'reports',
-    canDo: 'Report a specific listing for fraud, abuse, misleading content, prohibited products, or wrong category.',
+    canDo: 'Explain reporting and guide the user to submit a report from the listing UI themselves; never submit reports from chat.',
     requiresAuth: true,
     requiresConfirmation: true,
-    allowedTools: ['reportMarketplaceListing'],
+    allowedTools: [],
   },
   {
     action: 'pricing_guidance',

@@ -1,7 +1,6 @@
 export type AppLanguage = 'ar' | 'en';
 
-export const appCopy = {
-  ar: {
+const arabicCopy = {
     direction: 'rtl',
     assistantLabel: 'مساعد السوق الذكي',
     newChat: 'محادثة جديدة',
@@ -17,7 +16,7 @@ export const appCopy = {
     currency: 'العملة',
     language: 'لغة الواجهة والرد',
     arabic: 'العربية',
-    english: 'English',
+    english: 'الإنجليزية',
     savedLocally: 'يتم الحفظ تلقائيًا على هذا المتصفح.',
     close: 'إغلاق',
     emptyTitle: 'ماذا تريد أن تفعل في السوق اليوم؟',
@@ -72,77 +71,7 @@ export const appCopy = {
       EG: 'مصر',
       JO: 'الأردن',
     },
-  },
-  en: {
-    direction: 'ltr',
-    assistantLabel: 'Smart marketplace assistant',
-    newChat: 'New chat',
-    historyTitle: 'Chat history',
-    historyEmpty: 'Your previous conversations will appear here after your first message.',
-    clearHistory: 'Clear all chats',
-    clearHistoryConfirm: 'Do you want to delete all saved conversations?',
-    deleteChat: 'Delete chat',
-    settings: 'Marketplace settings',
-    settingsDescription:
-      'These settings help the assistant tailor marketplace work by country, currency, and language.',
-    country: 'Country',
-    currency: 'Currency',
-    language: 'Interface and reply language',
-    arabic: 'العربية',
-    english: 'English',
-    savedLocally: 'Saved automatically on this browser.',
-    close: 'Close',
-    emptyTitle: 'What do you want to do in the marketplace today?',
-    emptyDescription:
-      'Ask naturally: search for a listing, sell an item, upload listing images, or ask about buyer-seller chat.',
-    inputPlaceholder: 'Type your request or attach product images...',
-    fallbackChatTitle: 'New chat',
-    imageAlt: 'سوق حمد logo',
-    themeToDark: 'Switch to dark mode',
-    themeToLight: 'Switch to light mode',
-    privacyPolicy: 'Privacy policy',
-    quickPrompts: [
-      {
-        title: 'Search listings',
-        prompt: 'Find me a car in Riyadh',
-      },
-      {
-        title: 'Sell an item',
-        prompt: 'I have an iPhone 14 Pro for sale',
-      },
-      {
-        title: 'Review listing images',
-        prompt: 'Review these product images before publishing',
-      },
-      {
-        title: 'Prepare a listing',
-        prompt: 'Help me prepare a clear policy-compliant listing',
-      },
-    ],
-    status: {
-      marketplace: [
-        { title: 'Understanding request', detail: 'Detecting whether this is search, selling, or messaging' },
-        { title: 'Checking marketplace', detail: 'Looking through matching سوق حمد listings' },
-        { title: 'Verifying policy', detail: 'Reviewing category and marketplace safety before replying' },
-        { title: 'One moment', detail: 'Preparing the right next step' },
-      ],
-      thinking: [
-        { title: 'Preparing the reply', detail: 'Reviewing your request and organizing the next step' },
-        { title: 'One moment', detail: 'Understanding intent and choosing the best path' },
-        { title: 'Analyzing', detail: 'Turning the request into a marketplace action' },
-        { title: 'Almost ready', detail: 'Preparing a short and useful response' },
-      ],
-      queryPrefix: 'Searching for',
-    },
-    countries: {
-      SA: 'Saudi Arabia',
-      AE: 'United Arab Emirates',
-      KW: 'Kuwait',
-      QA: 'Qatar',
-      BH: 'Bahrain',
-      OM: 'Oman',
-      EG: 'Egypt',
-      JO: 'Jordan',
-    },
-  },
-} as const;
+  } as const;
+
+// Old language preferences remain readable, but all customer copy is Arabic.
+export const appCopy = { ar: arabicCopy, en: arabicCopy } as const;

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { mockAllowedTextAnalysis, textAnalysis } from './helpers/text-understanding';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
 import { ListingLimitReachedError } from '@/agent/marketplace/listing-limits';
@@ -39,6 +41,18 @@ import {
   updateCommissionSaleAmountForSeller,
 } from '@/agent/marketplace/store';
 
+test.beforeEach(t => {
+  if (!('mock' in t)) throw new Error('Store fixtures require a test context');
+  mockAllowedTextAnalysis(t);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => {
+    const result = textAnalysis({ category: null });
+    try { JSON.parse(text); } catch {
+      result.search.descriptiveTerms = text ? [text] : [];
+    }
+    return result;
+  });
+});
+
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
@@ -58,7 +72,10 @@ test('creates an allowed marketplace listing draft', () => {
   assert.equal(listing.sellerId, 'seller:test-1');
 });
 
-test('rejects a blocked listing draft before publishing', () => {
+test('rejects a model-blocked listing draft before publishing', (t) => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({
+    compliance: { decision: 'block', reasons: ['prohibited_content'], shariaSensitive: false },
+  }));
   const listing = createListingDraft({
     sellerId: 'seller:test-2',
     category: 'prohibited',
@@ -745,7 +762,17 @@ test('listing reports stay unique per reporter even after moderation', () => {
   assert.equal(getListingReport(listing.id, 'unrelated-buyer'), null);
 });
 
-test('lists moderation queue and prevents publishing blocked listings', () => {
+test('lists moderation queue and prevents publishing model-blocked listings', (t) => {
+  const decisions = new Map<string, 'needs_review' | 'block'>([
+    ['فيب للبيع', 'needs_review'], ['مشروب كحولي للبيع', 'block'],
+  ] as const);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => {
+    const title = JSON.parse(text).title as string;
+    return textAnalysis({ compliance: {
+      decision: decisions.get(title) ?? 'allow',
+      reasons: ['policy_fixture'], shariaSensitive: false,
+    } });
+  });
   const sensitiveListing = createListingDraft({
     sellerId: 'seller:moderation-1',
     category: 'other',
@@ -849,7 +876,11 @@ test('lets admins update commission payment status', () => {
   assert.equal(paid.commission?.paidAt !== undefined, true);
 });
 
-test('searches published marketplace listings by buyer query', () => {
+test('searches published marketplace listings by model-understood buyer query', (t) => {
+  const result = textAnalysis({ category: 'watches_accessories', product: 'ساعة',
+    search: { ...textAnalysis().search, city: 'الرياض', color: 'زرقاء' },
+  });
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => result);
   const listing = createListingDraft({
     sellerId: 'seller:search-1',
     category: 'watches_accessories',
@@ -957,15 +988,15 @@ test('hides deleted seller listings from account views', () => {
   );
 });
 
-test('flags low resolution images for retake', () => {
+test('accepts low resolution images with optional enhancement instead of requiring a retake', () => {
   const result = analyzeImageQuality({
     mimeType: 'image/jpeg',
     width: 320,
     height: 240,
   });
 
-  assert.equal(result.recommendedAction, 'request_retake');
-  assert.equal(result.listingImageStatus, 'needs_retake');
+  assert.equal(result.recommendedAction, 'enhance');
+  assert.equal(result.listingImageStatus, 'approved');
 });
 
 test('recommends blurring sensitive information without rejecting a useful image', () => {

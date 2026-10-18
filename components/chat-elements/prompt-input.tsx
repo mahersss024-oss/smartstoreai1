@@ -308,7 +308,7 @@ export function PromptInputAttachment({
     data.mediaType?.startsWith("image/") && data.url ? "image" : "file";
   const isImage = mediaType === "image";
 
-  const attachmentLabel = filename || (isImage ? "Image" : "Attachment");
+  const attachmentLabel = filename || (isImage ? "صورة" : "مرفق");
 
   return (
     <PromptInputHoverCard>
@@ -325,7 +325,7 @@ export function PromptInputAttachment({
             <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
               {isImage ? (
                 <img
-                  alt={filename || "attachment"}
+                  alt={filename || "مرفق"}
                   className="size-5 object-cover"
                   height={20}
                   src={data.url}
@@ -338,7 +338,7 @@ export function PromptInputAttachment({
               )}
             </div>
             <Button
-              aria-label="Remove attachment"
+              aria-label="إزالة المرفق"
               className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
               onClick={(e) => {
                 e.stopPropagation();
@@ -348,7 +348,7 @@ export function PromptInputAttachment({
               variant="ghost"
             >
               <XIcon />
-              <span className="sr-only">Remove</span>
+              <span className="sr-only">إزالة</span>
             </Button>
           </div>
 
@@ -423,7 +423,7 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 };
 
 export const PromptInputActionAddAttachments = ({
-  label = "Add photos or files",
+  label = "إضافة صور أو ملفات",
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
   const attachments = usePromptInputAttachments();
@@ -551,7 +551,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: "نوع الملفات المحددة غير مدعوم.",
         });
         return;
       }
@@ -561,7 +561,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: "جميع الملفات تتجاوز الحجم المسموح.",
         });
         return;
       }
@@ -576,7 +576,7 @@ export const PromptInput = ({
         if (typeof capacity === "number" && sized.length > capacity) {
           onError?.({
             code: "max_files",
-            message: "Too many files. Some were not added.",
+            message: "تجاوزت عدد الملفات المسموح؛ لم تتم إضافة بعض الملفات.",
           });
         }
         const next = createPromptInputAttachments(capped);
@@ -844,7 +844,7 @@ export const PromptInput = ({
     }).catch(() => {
       onError?.({
         code: "accept",
-        message: "Could not read the selected attachment. Remove it and attach it again.",
+        message: "تعذر قراءة المرفق المحدد. أزله ثم أرفقه مجددًا.",
       });
     });
   };
@@ -856,14 +856,14 @@ export const PromptInput = ({
       {allowAttachments && (
         <input
           accept={accept}
-          aria-label="Upload files"
+          aria-label="رفع الملفات"
           className="hidden"
           id="smartstore-chat-attachments"
           multiple={multiple}
           name="attachments"
           onChange={handleChange}
           ref={inputRef}
-          title="Upload files"
+          title="رفع الملفات"
           type="file"
         />
       )}
@@ -907,7 +907,7 @@ export type PromptInputTextareaProps = ComponentProps<
 export const PromptInputTextarea = ({
   onChange,
   className,
-  placeholder = "What would you like to know?",
+  placeholder = "اكتب طلبك هنا...",
   ...props
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
@@ -1130,7 +1130,7 @@ export const PromptInputSubmit = ({
 
   return (
     <InputGroupButton
-      aria-label="Submit"
+      aria-label="إرسال"
       className={cn(className)}
       size={size}
       type="submit"
@@ -1222,7 +1222,7 @@ export const PromptInputSpeechButton = ({
 
       speechRecognition.continuous = true;
       speechRecognition.interimResults = true;
-      speechRecognition.lang = "en-US";
+      speechRecognition.lang = "ar-SA";
 
       speechRecognition.onstart = () => {
         setIsListening(true);

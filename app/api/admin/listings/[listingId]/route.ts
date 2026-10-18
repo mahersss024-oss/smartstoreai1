@@ -1,3 +1,4 @@
+import { listingSemanticText, marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { z } from 'zod';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
@@ -196,18 +197,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   const contentChanged = ['category', 'title', 'description', 'city', 'condition'].some(
     (key) => key in parsed.data,
   );
+  if (contentChanged) await marketplaceTextAnalyzer.analyze(listingSemanticText(nextListing));
   const compliance = contentChanged
-    ? evaluateSaudiMarketplaceCompliance(
-        [
-          nextListing.category,
-          nextListing.title,
-          nextListing.description,
-          nextListing.city,
-          nextListing.condition,
-        ]
-          .filter(Boolean)
-          .join(' '),
-      )
+    ? evaluateSaudiMarketplaceCompliance(listingSemanticText(nextListing))
     : null;
   const priceMode =
     'priceMode' in parsed.data ? parsed.data.priceMode : existing.priceMode;

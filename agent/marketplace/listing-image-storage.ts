@@ -196,16 +196,18 @@ export async function saveUploadedListingImagesForSeller({
   sellerId,
   images,
   contentReviewStatuses,
+  draftOnly = false,
 }: {
   listingId: string;
   sellerId: string;
   images: UploadedListingImage[];
   contentReviewStatuses?: ImageContentReviewStatus[];
+  draftOnly?: boolean;
 }) {
   const maxImages = getMaxListingImagesPerListing();
   const existingListing = await getListing(listingId);
 
-  if (!existingListing || existingListing.sellerId !== sellerId) {
+  if (!existingListing || existingListing.sellerId !== sellerId || (draftOnly && existingListing.status !== 'draft')) {
     return null;
   }
 
@@ -270,6 +272,7 @@ export async function saveUploadedListingImagesForSeller({
       listingId,
       sellerId,
       image,
+      { draftOnly },
     ).catch(async (error: unknown) => {
       await discardUnattachedListingImage(image);
       throw error;

@@ -230,6 +230,6 @@ test('returns localized safe responses without internal decision details', () =>
   );
   assert.equal(
     getSafeScopeResponse('UNCLEAR', 'en'),
-    'I can help once you clarify the marketplace product, listing, buyer search, or seller action you need.',
+    'يسعدني مساعدتك، وضّح المنتج أو الإعلان أو عملية البيع والشراء التي تريدها داخل السوق.',
   );
 });

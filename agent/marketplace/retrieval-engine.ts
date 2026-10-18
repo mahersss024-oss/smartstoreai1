@@ -5,6 +5,7 @@ import {
 } from './ranking-engine';
 import { getMarketplaceSearchTermVariants } from './search';
 import type { MarketplaceSearchState } from './search-state';
+import { listingSemanticText, marketplaceTextAnalyzer, prepareListingUnderstanding } from './text-understanding';
 
 export type MarketplaceSearchEngineResult = {
   searchState: MarketplaceSearchState;
@@ -16,21 +17,16 @@ export type MarketplaceSearchEngineResult = {
 
 const internalCandidateLimit = 100;
 const finalResultLimit = 6;
-const featureSearchTerms = new Map([
-  ['hybrid', ['hybrid', 'هايبرد', 'هجين']],
-  ['clean', ['clean', 'نظيف', 'نظيفة', 'ممتاز', 'ممتازة']],
-  ['no_accident_history', ['بدون حوادث', 'لا يوجد حوادث']],
-]);
 
 export function buildRetrievalTermGroups(state: MarketplaceSearchState) {
   return [
-    ...(state.brand ? [getMarketplaceSearchTermVariants(state.brand)] : []),
-    ...(state.model ? [getMarketplaceSearchTermVariants(state.model)] : []),
-    ...(state.color ? [getMarketplaceSearchTermVariants(state.color)] : []),
+    ...(state.brand ? [getMarketplaceSearchTermVariants(state.brand, state.rawQuery, state.termAliases)] : []),
+    ...(state.model ? [getMarketplaceSearchTermVariants(state.model, state.rawQuery, state.termAliases)] : []),
+    ...(state.color ? [getMarketplaceSearchTermVariants(state.color, state.rawQuery, state.termAliases)] : []),
     ...state.requiredFeatures.map(
-      (feature) => featureSearchTerms.get(feature) ?? [feature],
+      (feature) => getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases),
     ),
-    ...state.terms.map((term) => getMarketplaceSearchTermVariants(term)),
+    ...state.terms.map((term) => getMarketplaceSearchTermVariants(term, state.rawQuery, state.termAliases)),
   ];
 }
 
@@ -54,8 +50,10 @@ export async function retrieveAndRankMarketplaceListings(
   state: MarketplaceSearchState,
 ): Promise<MarketplaceSearchEngineResult> {
   const candidates = await listMarketplaceListings({
+    query: state.rawQuery,
     category: state.category,
     city: state.city,
+    cityVariants: state.city ? getMarketplaceSearchTermVariants(state.city, state.rawQuery, state.termAliases) : undefined,
     minPrice: state.minPrice,
     maxPrice: state.maxPrice,
     condition: state.condition,
@@ -65,7 +63,16 @@ export async function retrieveAndRankMarketplaceListings(
     excludedTerms: [...state.excludedFeatures, ...state.excludedColors],
     limit: internalCandidateLimit,
   });
-  const ranked = rankMarketplaceListings(candidates, state);
+  const queryAnalysis = marketplaceTextAnalyzer.peek(state.rawQuery ?? '');
+  if (queryAnalysis?.product && queryAnalysis.confidence >= 0.8) await prepareListingUnderstanding(candidates);
+  const relevantCandidates = candidates.filter(listing => {
+    if (!queryAnalysis?.product || queryAnalysis.confidence < 0.8) return true;
+    const analysis = marketplaceTextAnalyzer.peek(listingSemanticText(listing));
+    if (!analysis?.product || analysis.confidence < 0.8) return true;
+    return analysis.product === queryAnalysis.product && (queryAnalysis.offerKind === 'unknown'
+      || analysis.offerKind === 'unknown' || analysis.offerKind === queryAnalysis.offerKind);
+  });
+  const ranked = rankMarketplaceListings(relevantCandidates, state);
 
   return {
     searchState: state,

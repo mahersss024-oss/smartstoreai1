@@ -7,6 +7,7 @@ import {
 } from '@/agent/platform-capabilities';
 import { marketplaceSystemInstructions } from '@/agent/marketplace/agents';
 import { systemPrompt } from '@/agent/system-prompt';
+import { createMarketplaceTools } from '@/agent/tools/marketplace';
 
 test('platform capabilities define what chat can do and what requires confirmation', () => {
   const byAction = new Map(
@@ -31,6 +32,12 @@ test('platform capabilities define what chat can do and what requires confirmati
     /Never open a buyer-seller conversation from chat/,
   );
   assert.equal(byAction.get('reports')?.requiresConfirmation, true);
+  for (const action of ['publish_or_status_change', 'open_conversation', 'favorites', 'reports']) {
+    assert.deepEqual(byAction.get(action)?.allowedTools, [], action);
+  }
+  const actualTools = Object.keys(createMarketplaceTools(null)).sort();
+  const describedTools = [...new Set(platformCapabilities.flatMap(capability => capability.allowedTools))].sort();
+  assert.deepEqual(describedTools, actualTools);
   assert.equal(byAction.get('platform_help')?.allowedTools.length, 0);
 });
 

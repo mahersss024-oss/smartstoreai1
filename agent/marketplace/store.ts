@@ -1,3 +1,4 @@
+import { listingSemanticText } from './text-understanding';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -103,6 +104,7 @@ export type MarketplaceListingFilters = {
   query?: string;
   category?: string;
   city?: string;
+  cityVariants?: string[];
   minPrice?: number;
   maxPrice?: number;
   condition?: ListingDraft['condition'];
@@ -283,26 +285,14 @@ function loadStore() {
   }
 }
 
-function toSearchText(input: CreateListingDraftInput) {
-  return [
-    input.category,
-    input.title,
-    input.description,
-    input.city,
-    Object.values(input.attributes ?? {}).join(' '),
-  ]
-    .filter(Boolean)
-    .join(' ');
-}
-
 function normalizeSearchText(value: string) {
   return normalizeMarketplaceSearchText(value);
 }
 
-function matchesCityFilter(listingCity: string | undefined, requestedCity: string) {
+function matchesCityFilter(listingCity: string | undefined, requestedCity: string, variants?: string[]) {
   const normalizedListingCity = normalizeSearchText(listingCity ?? '');
 
-  return getMarketplaceCitySearchVariants(requestedCity).some((cityVariant) =>
+  return (variants ?? getMarketplaceCitySearchVariants(requestedCity)).some((cityVariant) =>
     normalizedListingCity.includes(normalizeSearchText(cityVariant)),
   );
 }
@@ -315,7 +305,7 @@ function getFilterTermGroups(filters: MarketplaceListingFilters) {
   const parsedQuery = parseMarketplaceSearchQuery(filters.query);
   const terms = filters.terms?.length ? filters.terms : parsedQuery.terms;
 
-  return terms.map(getMarketplaceSearchTermVariants);
+  return terms.map(term => getMarketplaceSearchTermVariants(term, filters.query));
 }
 
 function toListingSearchText(listing: ListingRecord) {
@@ -424,7 +414,7 @@ export function createListingDraft(input: CreateListingDraftInput): ListingRecor
     throw new ListingLimitReachedError();
   }
 
-  const compliance = evaluateSaudiMarketplaceCompliance(toSearchText(input));
+  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   const timestamp = nowIso();
   const listing: ListingRecord = {
     id: input.id ?? randomUUID(),
@@ -505,17 +495,9 @@ export function updateListingForSeller(
     return null;
   }
 
-  const compliance = evaluateSaudiMarketplaceCompliance(
-    [
-      updates.category ?? listing.category,
-      updates.title ?? listing.title,
-      updates.description ?? listing.description,
-      updates.city ?? listing.city,
-      Object.values({ ...listing.attributes, ...updates.attributes }).join(' '),
-    ]
-      .filter(Boolean)
-      .join(' '),
-  );
+  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({
+    ...listing, ...updates, attributes: { ...listing.attributes, ...updates.attributes },
+  }));
 
   const nextListing: ListingRecord = {
     ...listing,
@@ -720,7 +702,7 @@ export function listMarketplaceListings(filters: MarketplaceListingFilters = {})
       return false;
     }
 
-    if (city && !matchesCityFilter(listing.city, city)) {
+    if (city && !matchesCityFilter(listing.city, city, filters.cityVariants ?? getMarketplaceCitySearchVariants(city, filters.query))) {
       return false;
     }
 

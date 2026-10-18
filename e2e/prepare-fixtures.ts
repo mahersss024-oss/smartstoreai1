@@ -14,5 +14,10 @@ for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
     city: 'الرياض',
     price: 100,
   });
+  // This synthetic fixture has an explicit policy outcome; no live provider is used.
+  listing.compliance = {
+    decision: 'allow', reasons: [], jurisdiction: 'SA', shariaSensitive: false,
+    checkStatus: 'completed',
+  };
   publishListing(listing.id);
 }
