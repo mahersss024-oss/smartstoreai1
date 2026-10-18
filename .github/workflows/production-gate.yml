@@ -53,9 +53,15 @@ jobs:
         run: pnpm audit --audit-level moderate
 
   e2e:
-    name: Browser E2E
+    name: Browser E2E (${{ matrix.project }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - desktop-chromium
+          - mobile-chromium-layout
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,11 +85,24 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E journey tests
-        run: pnpm test:e2e
+        timeout-minutes: 35
+        run: pnpm test:e2e --project=${{ matrix.project }}
         env:
           AUTH_SECRET: ci-only-smartstore-auth-secret-with-enough-length
           DEEPSEEK_API_KEY: ci-placeholder
           SMARTSTORE_MARKETPLACE_STORE: file
+
+      - name: Upload Playwright reports
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.project }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
   optional-db-integration:
     name: Optional Staging DB Integration

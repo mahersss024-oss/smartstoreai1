@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".patch-work/**",
     "out/**",
     "build/**",
     "coverage/**",
