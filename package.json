@@ -90,6 +90,7 @@
   },
   "pnpm": {
     "overrides": {
+      "@next/eslint-plugin-next@16.4.0>fast-glob": "npm:tinyglobby@0.2.17",
       "@humanfs/node@<0.16.8": "0.16.8",
       "@babel/core": "7.29.6",
       "ajv@<6.14.0": "6.14.0",
@@ -108,7 +109,7 @@
       "source-map-js@<1.2.2": "1.2.2"
     },
     "patchedDependencies": {
-      "braces@3.0.3": "patches/braces@3.0.3.patch"
+      "@next/eslint-plugin-next@16.4.0": "patches/@next__eslint-plugin-next@16.4.0.patch"
     }
   }
 }

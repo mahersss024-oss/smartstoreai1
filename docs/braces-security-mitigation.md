@@ -1,80 +1,68 @@
-# Braces Depth Mitigation
+# Removal Of The Braces Dependency
 
 Reviewed 2026-10-18. Advisory: GHSA-vfj7-8cjw-p6xm / CVE-2026-93687.
 
-## Exposure Review
+## Resolution
 
-`pnpm why braces` resolves one installed version, 3.0.3, through:
+The original chain was `eslint-config-next -> @next/eslint-plugin-next ->
+fast-glob -> micromatch -> braces`. The previous local braces depth patch
+mitigated recursive input but did not make the version-based audit pass.
+That patch and its regression tests have now been removed and superseded.
 
-`eslint-config-next -> @next/eslint-plugin-next -> fast-glob -> micromatch -> braces`.
+The version-scoped pnpm override
+`@next/eslint-plugin-next@16.4.0>fast-glob: npm:tinyglobby@0.2.17` substitutes
+only this plugin's glob dependency. Tinyglobby uses fdir and picomatch instead
+of micromatch/braces. The locked dependency graph contains neither braces nor
+micromatch nor the original fast-glob package. No advisory is ignored, no
+version is falsified, and the CI audit command is unchanged.
 
-The root dependency is a development dependency. No application source import
-of braces, micromatch or fast-glob was found. All 93 local optimized Next.js
-dependency traces were inspected; none referenced this braces package. The
-App Runner startup script starts Next.js and optionally Prisma migrations,
-not ESLint. Its install step includes development tooling, so the package may
-still be present on disk. These findings support absence from the traced
-customer runtime, not a claim that a deployed AWS filesystem was inspected.
+The plugin uses just `globSync(pattern, { onlyDirectories: true })` in its
+root-directory discovery helper. Tinyglobby returns relative paths by default,
+including for absolute inputs. A small version-pinned Next.js plugin patch
+adds `absolute: require('node:path').isAbsolute(rootDir)` to preserve the
+original absolute/relative behavior. The patch is a compatibility adjustment,
+not a hidden security exception. Its hash is tracked in pnpm-lock.yaml.
 
-## Upstream Check
-
-The registry reports braces 3.0.3 as latest. The advisory lists no patched
-release. The latest Next.js ESLint plugin, 16.4.2, still depends on fast-glob
-3.3.1; latest micromatch is 4.0.8. An unrelated Next.js upgrade was not made
-because this chain still includes the affected package.
-
-Sources:
-- https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
-- https://github.com/micromatch/braces/issues/70
-
-## Local Mitigation
-
-`patches/braces@3.0.3.patch` is registered in `pnpm.patchedDependencies` and
-hashed in `pnpm-lock.yaml`. Normal installations, including frozen-lockfile
-installations, apply it without a runtime monkey patch or application wrapper.
-
-- Limit parser nesting to a fixed depth of 128, including parentheses.
-- Check AST child edges iteratively before compile, expand and stringify.
-- Reject excessive AST depth and repeated child nodes/cycles with a deliberate
-  RangeError, rather than descending until the native call stack is exhausted.
-- Parent/previous links are not traversed; normal parser-produced ASTs contain
-  those intentional back-references.
-- The configured limit cannot be raised using caller-supplied options.
-
-This changes only pathological glob/AST input handling. It is not a general
-resource-exhaustion defense or proof that every braces issue is fixed. Callers
-must still handle invalid-pattern exceptions; an uncaught deliberate exception
-can also terminate a process. No claim of remote customer exposure is made.
-
-## Audit Behavior
-
-The former `ignoreGhsas` entry was removed. `pnpm audit --prod --audit-level
-moderate` reports no known vulnerabilities. Full `pnpm audit --audit-level
-moderate` still reports this high advisory and exits nonzero: the registry
-scanner matches the unchanged version, not local patched source.
-
-Consequently `pnpm verify` and the existing CI audit gate will remain red at
-the audit step until upstream metadata/dependencies are fixed or a separately
-reviewed audit policy is adopted. No exception, fake version, disabled check
-or new allowlist was introduced to force a green audit.
+No application, authorization, database or marketplace behavior was changed.
+The 113 effective ESLint rules and their options have an identical SHA-256
+fingerprint before and after replacement for both TSX and TypeScript inputs.
+The existing React Hooks exceptions are unchanged. A live lint test confirms
+that the Next.js synchronous-script rule still detects a violation.
 
 ## Verification
 
-Seven focused security regression tests pass: ordinary compilation/expansion
-and glob matching, four child-process checks with 4,000 levels below the
-existing input-length ceiling, direct deep/cyclic AST entry points, and patch/
-audit configuration. Each child confirms it can catch the bounded rejection
-and continue normally. Frozen-lockfile installation also passes.
+Focused tests cover the locked graph, literal/absolute/glob/brace/array roots,
+directory-only results, nonexistent roots, Unicode paths, negative patterns,
+the exact effective rule fingerprint and an actual Next.js rule violation.
+`pnpm verify` passed end to end: TypeScript, full ESLint, 742 Node tests
+(12 database-gated skips, zero failures), optimized production build and the
+unchanged full audit command. The audit reports no known vulnerabilities and
+exits zero. Four focused replacement/compatibility tests passed as part of
+the full suite. Browser end-to-end tests were not rerun for this tooling-only
+change; no claim of a fresh full browser matrix is made.
 
-TypeScript and optimized build passed. The complete Node regression passed:
-742 passed, 12 database-gated skips, zero failures. The rebuilt 93 dependency
-traces again contain no braces reference. Full ESLint passed after excluding
-the temporary `.patch-work` vendor editing directory; application
-and test rules remain unchanged. Cleanup of that temporary directory was
-blocked by execution policy, so it remains ignored by Git and ESLint.
+An independent clean `pnpm install --frozen-lockfile --ignore-scripts` also
+passed using copied manifests and the compatibility patch. Resolving modules
+inside that clean installation confirmed that neither braces nor micromatch
+exists in its module resolution chain. No real service credentials were used.
 
-The user subsequently authorized committing and pushing this mitigation and
-the browser CI changes on 2026-10-18, with the remaining audit failure disclosed.
-This authorization does not certify successful CI or production deployment.
-Revisit and retire the patch when an upstream fix is
-available, rerunning these tests before removing it.
+Old local node_modules entries can remain on disk from earlier installations;
+their presence is not the resolved dependency graph. The separate clean-install
+check verifies absence without relying on these cached artifacts.
+
+## Maintenance
+
+The override and compatibility patch are intentionally scoped to plugin 16.4.0.
+On a plugin upgrade, review every glob call and run the compatibility tests
+and full audit. Prefer an upstream dependency removal when available. The
+tests deliberately fail if the old affected chain returns or rules change
+without review. This is not a promise that the replacement has no possible
+future vulnerabilities; the normal audit gate remains enabled.
+
+Sources:
+- https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+- https://github.com/SuperchupuDev/tinyglobby
+
+After successful local verification, the user authorized committing and pushing
+this dependency removal on 2026-10-18. Remote CI and production deployment must
+still be checked independently; local verification does not certify either.

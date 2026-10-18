@@ -30,5 +30,5 @@ both projects. It does not execute GitHub Actions or claim remote CI success.
 Verified locally on 2026-10-18: all three workflow contract tests passed;
 targeted ESLint and TypeScript passed; Playwright listed 285 cases per project
 (570 total in 20 files). No full browser rerun was necessary for this workflow-
-only change. Existing uncommitted braces mitigation is separate; removing its
-audit exception means the full dependency audit still fails on that advisory.
+only change. The subsequent removal of the braces dependency is documented
+separately in `braces-security-mitigation.md`; the full audit gate is unchanged.
