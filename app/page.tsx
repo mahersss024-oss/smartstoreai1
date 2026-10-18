@@ -25,7 +25,7 @@ import { DefaultChatTransport, type ChatStatus, type FileUIPart, type UIMessage 
 import { useChat } from '@ai-sdk/react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
@@ -1943,6 +1943,7 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
 
 export default function Page() {
   useAppBridge();
+  const pathname = usePathname();
   const router = useRouter();
   const chatTransport = useMemo(
     () =>
@@ -3986,7 +3987,7 @@ export default function Page() {
   const isAssistantContentVisible =
     !isCompactViewport || isAssistantExpanded || isCompactChatView;
   const shouldRenderAssistantBubble =
-    isCompactViewport && !isMobileChatViewOpen && assistantBubblePosition;
+    pathname === '/' && isCompactViewport && !isMobileChatViewOpen && assistantBubblePosition;
   const assistantBubbleState = isLoading
     ? 'active'
     : hasAssistantBubbleAttention

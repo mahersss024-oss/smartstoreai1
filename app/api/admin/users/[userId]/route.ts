@@ -9,6 +9,7 @@ import {
   hasVerifiedAdminAccess,
 } from '@/lib/auth/authorization';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
+import { getRegistrationIdentityEmail } from '@/lib/auth/registration';
 import { getAuthSession, isConfiguredAdminEmail } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
@@ -213,7 +214,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  if (isConfiguredAdminEmail(existing.email)) {
+  const identityEmail = await getRegistrationIdentityEmail(prisma, existing);
+  if (isConfiguredAdminEmail(identityEmail)) {
     return Response.json(
       {
         error: 'owner_account_protected',
@@ -400,7 +402,8 @@ async function deleteUser(request: Request, context: RouteContext) {
     );
   }
 
-  if (isConfiguredAdminEmail(existing.email)) {
+  const identityEmail = await getRegistrationIdentityEmail(prisma, existing);
+  if (isConfiguredAdminEmail(identityEmail)) {
     return Response.json(
       {
         error: 'owner_account_protected',
@@ -447,7 +450,7 @@ async function deleteUser(request: Request, context: RouteContext) {
         metadata: {
           operation: 'admin_user_delete',
           mode: deleteMode,
-          email: existing.email,
+          email: identityEmail,
           role: existing.role,
           hadPhoneNumber: Boolean(existing.phoneNumber),
         },

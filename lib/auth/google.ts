@@ -3,18 +3,8 @@ import type { JsonWebKey as CryptoJsonWebKey } from 'node:crypto';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { normalizeAuthEmail } from '@/lib/auth/identity';
-import {
-  commissionAgreementVersion,
-  commissionPolicyVersion,
-  getCommissionAgreement,
-  getConfiguredRoleForEmail,
-  listingPolicyVersion,
-  platformAgreementVersion,
-  privacyPolicyVersion,
-  termsVersion,
-  type AuthSessionUser,
-} from '@/lib/auth/session';
-import { prisma } from '@/lib/db/prisma';
+import { persistUserRegistration } from '@/lib/auth/registration';
+import type { AuthSessionUser } from '@/lib/auth/session';
 
 const googleIssuer = 'https://accounts.google.com';
 const googleIssuerLegacy = 'accounts.google.com';
@@ -144,93 +134,9 @@ export async function verifyGoogleIdentityToken(
   };
 }
 
-function shouldPersistUserRegistration() {
-  return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
-}
-
 export async function persistGoogleUserRegistration(
   request: Request,
   user: AuthSessionUser,
 ) {
-  if (!shouldPersistUserRegistration()) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('DATABASE_USER_REGISTRATION_REQUIRED');
-    }
-
-    return user;
-  }
-
-  const commissionAgreement = getCommissionAgreement(request);
-  const registrationData = {
-    email: user.email,
-    name: user.name,
-    picture: user.picture,
-    commissionAgreementVersion: commissionAgreement
-      ? commissionAgreementVersion
-      : undefined,
-    commissionAgreementAccepted: commissionAgreement
-      ? new Date(commissionAgreement.acceptedAt * 1000)
-      : undefined,
-    platformAgreementVersion: commissionAgreement
-      ? platformAgreementVersion
-      : undefined,
-    platformAgreementAccepted: commissionAgreement
-      ? new Date(commissionAgreement.acceptedAt * 1000)
-      : undefined,
-    termsVersion: commissionAgreement ? termsVersion : undefined,
-    privacyPolicyVersion: commissionAgreement ? privacyPolicyVersion : undefined,
-    listingPolicyVersion: commissionAgreement ? listingPolicyVersion : undefined,
-    commissionPolicyVersion: commissionAgreement
-      ? commissionPolicyVersion
-      : undefined,
-  };
-
-  const existingUserByEmail = await prisma.user.findUnique({
-    where: { email: user.email },
-  });
-
-  if (existingUserByEmail?.deletedAt) {
-    throw new Error('ACCOUNT_SOFT_DELETED');
-  }
-
-  if (existingUserByEmail && existingUserByEmail.id !== user.id) {
-    const updatedUser = await prisma.user.update({
-      where: { email: user.email },
-      data: {
-        ...registrationData,
-        name: existingUserByEmail.name ?? user.name,
-        picture: existingUserByEmail.picture ?? user.picture,
-      },
-    });
-
-    return {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      name: updatedUser.name ?? undefined,
-      picture: updatedUser.picture ?? undefined,
-      role: updatedUser.role,
-    };
-  }
-
-  const updatedUser = await prisma.user.upsert({
-    where: { id: user.id },
-    create: {
-      id: user.id,
-      role: getConfiguredRoleForEmail(user.email),
-      ...registrationData,
-    },
-    update: {
-      ...registrationData,
-      name: existingUserByEmail?.name ?? user.name,
-      picture: existingUserByEmail?.picture ?? user.picture,
-    },
-  });
-
-  return {
-    id: updatedUser.id,
-    email: updatedUser.email,
-    name: updatedUser.name ?? undefined,
-    picture: updatedUser.picture ?? undefined,
-    role: updatedUser.role,
-  };
+  return persistUserRegistration(request, user);
 }

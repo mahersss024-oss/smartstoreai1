@@ -5,6 +5,10 @@ import { prisma } from '@/lib/db/prisma';
 import { actOnCaseEvidence, copyEvidenceAssets, evidenceHash, hasProtectedUserEvidence, readCaseEvidence } from '@/agent/marketplace/evidence';
 import { createSessionCookie } from '@/lib/auth/session';
 import { DELETE as deleteAccount } from '@/app/api/account/profile/route';
+import { DELETE as adminDeleteAccount, PATCH as adminUpdateAccount } from '@/app/api/admin/users/[userId]/route';
+import { GET as getAuthSession } from '@/app/api/auth/session/route';
+import { persistGoogleUserRegistration } from '@/lib/auth/google';
+import { persistUserRegistration, selfAccountDeletionOperation } from '@/lib/auth/registration';
 import { acknowledgeReportNotification, listReportNotifications } from '@/lib/admin/report-notifications';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
@@ -49,7 +53,7 @@ async function fixture() {
   return { seller, buyer, other, listing, conversation, unrelated };
 }
 
-async function cleanup(f: Awaited<ReturnType<typeof fixture>>) {
+async function cleanup(f: Awaited<ReturnType<typeof fixture>>, extraUsers: string[] = []) {
   const cases = await prisma.evidenceCase.findMany({ where: { OR: [{ listingId: f.listing.id }, { sourceId: { in: (await prisma.report.findMany({ where: { listingId: f.listing.id }, select: { id: true } })).map(r => r.id) } }] }, select: { id: true } });
   const ids = cases.map(c => c.id);
   // Dedicated integration database only: fixture cleanup is not a product operation.
@@ -58,7 +62,9 @@ async function cleanup(f: Awaited<ReturnType<typeof fixture>>) {
   await prisma.evidenceAsset.deleteMany({ where: { caseId: { in: ids } } });
   await prisma.evidenceCase.updateMany({ where: { id: { in: ids } }, data: { status: 'disposed', snapshot: {}, snapshotHash: '', participantIds: [], conversationIds: [], listingId: null } });
   await prisma.evidenceCase.deleteMany({ where: { id: { in: ids } } });
-  await prisma.user.deleteMany({ where: { id: { in: [f.seller.id, f.buyer.id, f.other.id] } } });
+  const userIds = [f.seller.id, f.buyer.id, f.other.id, ...extraUsers];
+  await prisma.adminAuditLog.deleteMany({ where: { targetType: 'user', targetId: { in: userIds } } });
+  await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }
 
 test('database evidence captures all related messages, excludes other buyers, preserves versions and guards cascades', { skip: !enabled }, async () => {
@@ -125,12 +131,15 @@ test('database evidence preserves image sources on failed copy and permits unrel
   } finally { await cleanup(f); if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE; else process.env.SMARTSTORE_MARKETPLACE_STORE = previous; }
 });
 
-test('database account deletion disables the reported account and keeps the dispute records', { skip: !enabled }, async () => {
+test('database self-deletion permits fresh registration while retaining evidence and rejecting old sessions', { skip: !enabled }, async () => {
   const f = await fixture();
+  const extraUsers: string[] = [];
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
   try {
-    await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+    const report = await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+    const evidence = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
+    await prisma.user.update({ where: { id: f.seller.id }, data: { role: 'moderator' } });
     await prisma.pushSubscription.create({ data: { userId: f.seller.id, endpoint: `https://push.example.test/${f.seller.id}`, p256dh: 'synthetic', auth: 'synthetic' } });
     await prisma.mobilePushToken.create({ data: { userId: f.seller.id, token: `synthetic-${f.seller.id}`, platform: 'android' } });
     const cookie = createSessionCookie({ id: f.seller.id, email: f.seller.email }).split(';')[0];
@@ -144,7 +153,120 @@ test('database account deletion disables the reported account and keeps the disp
     assert.equal(await prisma.mobilePushToken.count({ where: { userId: f.seller.id } }), 0);
     assert.equal(await prisma.conversationMessage.count({ where: { conversationId: f.conversation.id } }), 65);
     assert.equal(await prisma.report.count({ where: { listingId: f.listing.id } }), 1);
-  } finally { await cleanup(f); if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE; else process.env.SMARTSTORE_MARKETPLACE_STORE = previous; }
+    const marker = await prisma.adminAuditLog.findFirstOrThrow({ where: {
+      targetType: 'user', targetId: f.seller.id, action: 'delete_user',
+      metadata: { path: ['operation'], equals: selfAccountDeletionOperation },
+    } });
+    assert.equal(marker.adminId, null);
+    const registration = await persistGoogleUserRegistration(new Request('http://localhost/register'), {
+      id: f.seller.id, email: f.seller.email, name: 'Returning customer',
+    });
+    extraUsers.push(registration.id);
+    assert.notEqual(registration.id, f.seller.id);
+    assert.equal(registration.role, 'user');
+    assert.ok((await prisma.user.findUniqueOrThrow({ where: { id: f.seller.id } })).deletedAt);
+    assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: f.listing.id } })).status, 'deleted');
+    assert.equal((await prisma.conversation.findUniqueOrThrow({ where: { id: f.conversation.id } })).status, 'closed');
+    assert.equal(await prisma.listing.count({ where: { sellerId: registration.id } }), 0);
+    assert.equal(await prisma.conversationMessage.count({ where: { senderId: registration.id } }), 0);
+    const after = await prisma.evidenceCase.findUniqueOrThrow({ where: { id: evidence.id } });
+    assert.deepEqual(after.snapshot, evidence.snapshot);
+    assert.equal(after.snapshotHash, evidence.snapshotHash);
+    const oldSession = await getAuthSession(new Request('http://localhost/api/auth/session', { headers: { Cookie: cookie } }));
+    assert.equal((await oldSession.json()).authenticated, false);
+    const newSession = await getAuthSession(new Request('http://localhost/api/auth/session', {
+      headers: { Cookie: createSessionCookie(registration).split(';')[0] },
+    }));
+    assert.equal((await newSession.json()).authenticated, true);
+    const repeated = await persistUserRegistration(new Request('http://localhost/register'), {
+      id: `apple:${f.seller.id}`, email: f.seller.email,
+    });
+    assert.equal(repeated.id, registration.id);
+
+    // A later administrative deletion of the retained identity must still
+    // prevent sign-in, including through a different identity provider.
+    const previousOwners = process.env.SMARTSTORE_ADMIN_EMAILS;
+    process.env.SMARTSTORE_ADMIN_EMAILS = f.other.email;
+    try {
+      const response = await adminDeleteAccount(new Request(`http://localhost/api/admin/users/${f.seller.id}`, {
+        method: 'DELETE', headers: { Cookie: createSessionCookie({ id: f.other.id, email: f.other.email }).split(';')[0] },
+      }), { params: Promise.resolve({ userId: f.seller.id }) });
+      assert.equal(response.status, 200);
+      await assert.rejects(persistUserRegistration(new Request('http://localhost/register'), {
+        id: `apple:${f.seller.id}`, email: f.seller.email,
+      }), /ACCOUNT_SOFT_DELETED/);
+    } finally {
+      if (previousOwners === undefined) delete process.env.SMARTSTORE_ADMIN_EMAILS;
+      else process.env.SMARTSTORE_ADMIN_EMAILS = previousOwners;
+    }
+  } finally { await cleanup(f, extraUsers); if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE; else process.env.SMARTSTORE_MARKETPLACE_STORE = previous; }
+});
+
+test('database permanent self-deletion supports concurrent cross-provider registration without restoring old cookies', { skip: !enabled }, async () => {
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  const suffix = randomUUID();
+  const user = await prisma.user.create({ data: { id: `google:self-${suffix}`, email: `self-${suffix}@example.test` } });
+  const createdIds: string[] = [];
+  try {
+    const cookie = createSessionCookie({ id: user.id, email: user.email }).split(';')[0];
+    const response = await deleteAccount(new Request('http://localhost/api/account/profile', {
+      method: 'DELETE', headers: { Cookie: cookie },
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(await prisma.user.findUnique({ where: { id: user.id } }), null);
+    const identity = { id: user.id, email: user.email };
+    const results = await Promise.all([
+      persistGoogleUserRegistration(new Request('http://localhost/register'), identity),
+      persistUserRegistration(new Request('http://localhost/register'), { ...identity, id: `apple:self-${suffix}` }),
+    ]);
+    createdIds.push(...results.map(result => result.id));
+    assert.equal(results[0].id, results[1].id);
+    assert.notEqual(results[0].id, user.id);
+    assert.equal(await prisma.user.count({ where: { email: user.email } }), 1);
+    assert.equal((await (await getAuthSession(new Request('http://localhost/api/auth/session', {
+      headers: { Cookie: cookie },
+    }))).json()).authenticated, false);
+  } finally {
+    await prisma.adminAuditLog.deleteMany({ where: { targetType: 'user', targetId: user.id } });
+    await prisma.user.deleteMany({ where: { OR: [{ id: { in: [user.id, ...createdIds] } }, { email: user.email }] } });
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
+test('database administrative deletion blocks re-registration until explicit reactivation and survives permanent removal', { skip: !enabled }, async () => {
+  const previous = { store: process.env.SMARTSTORE_MARKETPLACE_STORE, owners: process.env.SMARTSTORE_ADMIN_EMAILS };
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  const suffix = randomUUID();
+  const owner = await prisma.user.create({ data: { id: `owner-${suffix}`, email: `owner-${suffix}@example.test` } });
+  const user = await prisma.user.create({ data: { id: `google:admin-deleted-${suffix}`, email: `admin-deleted-${suffix}@example.test` } });
+  process.env.SMARTSTORE_ADMIN_EMAILS = owner.email;
+  const headers = { Cookie: createSessionCookie({ id: owner.id, email: owner.email }).split(';')[0], 'Content-Type': 'application/json' };
+  const context = { params: Promise.resolve({ userId: user.id }) };
+  const url = `http://localhost/api/admin/users/${user.id}`;
+  const identity = { id: user.id, email: user.email };
+  try {
+    assert.equal((await adminDeleteAccount(new Request(url, { method: 'DELETE', headers }), context)).status, 200);
+    await assert.rejects(persistGoogleUserRegistration(new Request('http://localhost/register'), identity), /ACCOUNT_SOFT_DELETED/);
+    assert.equal((await adminUpdateAccount(new Request(url, {
+      method: 'PATCH', headers, body: JSON.stringify({ accountStatus: 'active' }),
+    }), context)).status, 200);
+    assert.equal((await persistGoogleUserRegistration(new Request('http://localhost/register'), identity)).id, user.id);
+    assert.equal((await adminDeleteAccount(new Request(url, { method: 'DELETE', headers }), context)).status, 200);
+    assert.equal((await adminDeleteAccount(new Request(`${url}?mode=permanent`, { method: 'DELETE', headers }), context)).status, 200);
+    assert.equal(await prisma.user.findUnique({ where: { id: user.id } }), null);
+    await assert.rejects(persistUserRegistration(new Request('http://localhost/register'), {
+      id: `apple:new-${suffix}`, email: user.email,
+    }), /ACCOUNT_SOFT_DELETED/);
+  } finally {
+    await prisma.adminAuditLog.deleteMany({ where: { targetType: 'user', targetId: user.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [user.id, owner.id] } } });
+    if (previous.store === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous.store;
+    if (previous.owners === undefined) delete process.env.SMARTSTORE_ADMIN_EMAILS;
+    else process.env.SMARTSTORE_ADMIN_EMAILS = previous.owners;
+  }
 });
 
 test('database evidence verifies private image copies and original image deletion cannot remove them', { skip: !enabled }, async t => {

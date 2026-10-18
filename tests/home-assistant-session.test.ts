@@ -79,6 +79,18 @@ test('listing details does not show Hamad comparison while home can still return
   assert.doesNotMatch(homePage, /aria-label="العودة للإعلان"/);
 });
 
+test('assistant images are not preloaded globally and the floating entry point is home-only', () => {
+  const layout = readProjectFile('app', 'layout.tsx');
+  const homePage = readProjectFile('app', 'page.tsx');
+
+  assert.doesNotMatch(layout, /hamad-assistant-(?:avatar|bubble)\.webp/);
+  assert.match(homePage, /const pathname = usePathname\(\)/);
+  assert.match(homePage, /const shouldRenderAssistantBubble =\s*pathname === '\/' && isCompactViewport && !isMobileChatViewOpen && assistantBubblePosition;/);
+  assert.match(homePage, /shouldRenderAssistantBubble && \(/);
+  assert.match(homePage, /src="\/hamad-assistant-avatar\.webp"/);
+  assert.match(homePage, /src="\/hamad-assistant-bubble\.webp\?v=ask-hamad-20260927"/);
+});
+
 test('mobile chat view resets keyboard tracking when opened or closed', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

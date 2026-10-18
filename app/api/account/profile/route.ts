@@ -5,6 +5,7 @@ import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { normalizeContactPhoneNumber } from '@/lib/auth/contact-profile';
+import { getRegistrationIdentityEmail, selfAccountDeletionOperation } from '@/lib/auth/registration';
 import {
   clearSessionCookie,
   getAuthSession,
@@ -243,8 +244,21 @@ async function deleteProfile(request: Request) {
   if (user) {
     await prisma.$transaction(async tx => {
       await lockUserEvidenceEntities(tx, user.id);
-      if (await hasProtectedUserEvidence(user.id, tx)) {
-        await tx.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+      await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${user.id} FOR UPDATE`;
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (!current || current.deletedAt) return;
+      const email = await getRegistrationIdentityEmail(tx, current);
+      const deletedAt = new Date();
+      const retained = await hasProtectedUserEvidence(user.id, tx);
+      await tx.adminAuditLog.create({ data: {
+        adminId: null, action: 'delete_user', targetType: 'user', targetId: user.id,
+        metadata: {
+          operation: selfAccountDeletionOperation, actorId: session.user.id,
+          email, deletedAt: deletedAt.toISOString(), mode: retained ? 'retained' : 'permanent',
+        },
+      } });
+      if (retained) {
+        await tx.user.update({ where: { id: user.id }, data: { deletedAt } });
         await tx.listing.updateMany({ where: { sellerId: user.id, status: { not: 'deleted' } }, data: { status: 'deleted' } });
         await tx.conversation.updateMany({ where: { OR: [{ sellerId: user.id }, { buyerId: user.id }] }, data: { status: 'closed' } });
         await tx.pushSubscription.deleteMany({ where: { userId: user.id } });
