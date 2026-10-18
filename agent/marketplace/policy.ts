@@ -43,8 +43,8 @@ export function classifyMarketplaceIntent(text: string): MarketplaceIntentDecisi
 export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDecision {
   const result = marketplaceTextAnalyzer.peek(text);
   return result
-    ? { ...result.compliance, jurisdiction: 'SA', checkStatus: 'completed' }
-    : { decision: 'needs_review', checkStatus: 'unavailable', reasons: ['text_analysis_unavailable'], jurisdiction: 'SA', shariaSensitive: false };
+    ? { ...result.compliance, decision: 'allow', modelAssessment: { decision: result.compliance.decision, reasons: result.compliance.reasons }, jurisdiction: 'SA', checkStatus: 'completed' }
+    : { decision: 'allow', modelAssessment: { decision: 'needs_review', reasons: ['text_analysis_unavailable'], unavailable: true }, checkStatus: 'unavailable', reasons: ['text_analysis_unavailable'], jurisdiction: 'SA', shariaSensitive: false };
 }
 
 export function evaluateListingComplianceBestEffort(
@@ -56,7 +56,7 @@ export function evaluateListingComplianceBestEffort(
   } catch (error) {
     console.warn(`[listing_compliance] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
     return {
-      decision: 'needs_review', checkStatus: 'unavailable', reasons: ['listing_compliance_unavailable'],
+      decision: 'allow', modelAssessment: { decision: 'needs_review', reasons: ['listing_compliance_unavailable'], unavailable: true }, checkStatus: 'unavailable', reasons: ['listing_compliance_unavailable'],
       jurisdiction: 'SA', shariaSensitive: false,
     };
   }

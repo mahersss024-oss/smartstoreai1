@@ -39,9 +39,11 @@ test('system prompt guides signed-in users through platform account help safely'
   assert.match(systemPrompt, /after visible matches exist/);
 });
 
-test('system prompt makes photos optional without relaxing prohibited content or merging distinct products', () => {
+test('system prompt makes photos optional with advisory inspection and authoritative human moderation', () => {
   assert.match(systemPrompt, /Images are optional/);
-  assert.match(systemPrompt, /Identified prohibited products and genuine text-policy review requirements remain enforced/);
+  assert.match(systemPrompt, /Server image inspection is advisory and can generate administration review alerts, never an automatic rejection/);
+  assert.match(systemPrompt, /Human moderation and technical security checks remain enforced/);
+  assert.match(systemPrompt, /Never provide operational instructions for wrongdoing or bypass human moderation or technical permissions/);
   assert.match(systemPrompt, /image inspection is unavailable/);
   assert.match(systemPrompt, /Different standalone products must not be merged into one listing/);
   assert.match(systemPrompt, /multiple_distinct_products_in_images/);

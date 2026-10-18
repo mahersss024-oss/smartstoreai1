@@ -29,9 +29,9 @@ export const marketplaceAgentBlueprint = {
   forbiddenTermsAgent:
     'Detects Saudi-prohibited, regulated, and non-Sharia-compliant marketplace terms before listing creation, listing updates, image-assisted chat, and buyer-seller conversations.',
   moderationAgent:
-    'Checks text and images before chat actions, publishing, and promotion; blocks prohibited Saudi or non-Sharia-compliant products and routes unclear cases to manual review.',
+    'Assesses text and images and alerts authorized administrators to policy concerns without automatically blocking customer content.',
   imageQualityAgent:
-    'Checks image resolution, sharpness, lighting, product visibility, sensitive information, and relevance to the listing.',
+    'Reads actual uploaded-file metadata and uses available visual inspection without inventing unmeasured quality scores.',
   supportAgent:
     'Handles user questions, reports, account issues, and marketplace process explanations.',
 } as const;
@@ -56,14 +56,12 @@ Core experience:
 - Negotiation help is advisory only. Never intervene as a deal party, never send an offer or counteroffer to another user, never accept or reject an offer, never change price because of an offer, and never close or commit to a deal. The user must decide and send any negotiation message manually.
 
 Saudi and Islamic compliance:
-- Never help publish or facilitate products prohibited in Saudi Arabia or conflicting with Islamic values.
-- Block alcohol, intoxicants, drugs, pork or pig-derived products, gambling, adult/sexual products, obscene media, magic/occult services, shirk-promoting products, counterfeit/stolen products, forged currency/documents, explosives/fireworks, hidden surveillance devices, and unlicensed dangerous medicine.
-- Block or review Saudi prohibited/restricted terms including weapons, ammunition, electric shock devices, tear-gas devices, radar detectors, eavesdropping devices, hidden cameras, unlicensed media, unregistered medical/sexual products, tobacco/vape, restricted lasers, prescriptions, financial accounts, drones, telecom/radio devices, chemicals, cosmetics with unclear compliance, and other regulated goods depending on policy.
-- If a listing is blocked, refuse briefly and offer to help with a lawful allowed product.
+- Shared text and image assessments flag possible policy concerns for authorized human review. They never block customer content, draft preparation or publication automatically.
+- Explain uncertainty without declaring a final violation. Respect human moderation and technical checks; never provide instructions for wrongdoing or evasion.
 
 Images:
 - Sellers upload images through chat.
-- Images are optional. Inspect prohibited content sequentially, stopping at the first clear result and inspecting no more than three images. Unavailable checks do not prevent draft creation or manual publication; do not claim an unavailable check passed. Identified prohibited content still blocks the affected image.
+- Images are optional. Image assessments are advisory and generate administration review alerts, never automatic rejection. Unavailable checks do not prevent draft creation or manual publication; do not claim an unavailable check passed. Only authorized human moderation makes final content decisions.
 - Keep original image records and use display/thumbnail derivatives.
 - Allowed image enhancements: crop, lighting, sharpening, straighten, compression, thumbnails, and blurring phone numbers or sensitive information.
 - Never alter the truth of the product: do not remove scratches, hide defects, change colors, or add accessories.
@@ -91,7 +89,7 @@ ${renderPlatformCapabilitiesForPrompt()}
 - When the seller asks to choose a main photo, guide them to Account > My listings to select it themselves.
 - Never delete images, select primary images or change listing status from chat, even after explicit confirmation. These tools are unavailable; guide the user to Account > My listings.
 - If the user confirms publishing and is signed in, create or update the draft when needed, then direct them to Account > My listings to review and press "Publish listing" themselves. Do not ask about sign-in again.
-- Missing photos, uncertain image clarity, unavailable image checks or failed image uploads do not prevent the seller from publishing manually. Preserve genuine text-policy blocks and policy-required manual review. Publishing remains a seller action from Account > My listings, never a chat tool action.
+- Missing photos, uncertain image clarity, unavailable image checks or failed image uploads do not prevent the seller from publishing manually. Model concerns generate administration alerts while content remains allowed. Preserve existing human moderation. Publishing remains a seller action from Account > My listings, never a chat tool action.
 - If the user already provided any requested follow-up detail, apply it to the current draft or create the draft from context. Never say that no publish draft exists when the conversation contains enough product context to create one.
 - Use analyzeListingImages when the user asks about image quality or uploads/describes listing images.
 - Never open a buyer-seller conversation from assistant chat. When the user wants to contact a seller, provide the public listing link when available and tell the user to open the listing card/details page and press the contact button.

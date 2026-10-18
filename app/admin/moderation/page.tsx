@@ -35,10 +35,13 @@ type ListingRecord = {
   price?: number | 'bid' | 'negotiable';
   city?: string;
   status: string;
+  reviewSubject?: string | null;
+  reviewReasons?: string[];
   compliance: {
     decision: 'allow' | 'block' | 'needs_review';
     reasons: string[];
     prohibitedCategory?: string;
+    modelAssessment?: { reasons: string[] };
   };
 };
 
@@ -123,14 +126,12 @@ function formatPrice(price: ListingRecord['price']) {
   return 'السعر غير محدد';
 }
 
-function formatComplianceDecision(decision: ListingRecord['compliance']['decision']) {
-  const labels = {
-    allow: 'مسموح',
-    block: 'محظور',
-    needs_review: 'يحتاج مراجعة',
-  };
-
-  return labels[decision];
+function listingReviewReason(listing: ListingRecord) {
+  const reasons = listing.reviewReasons ?? listing.compliance.modelAssessment?.reasons ?? listing.compliance.reasons;
+  const readable = reasons.filter(reason => /[\u0600-\u06ff]/.test(reason));
+  return readable.length ? readable.join('، ') : listing.reviewSubject === 'image'
+    ? 'ملاحظة آلية على صور الإعلان تحتاج مراجعة بشرية.'
+    : 'محتوى الإعلان يحتاج مراجعة الإدارة.';
 }
 
 function formatUserReportResolution(resolution: UserReportResolution) {
@@ -232,28 +233,30 @@ function SensitiveListingsSection({
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-bold">{listing.title ?? 'إعلان بدون عنوان'}</h2>
                 <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                  {formatComplianceDecision(listing.compliance.decision)}
+                  {listing.status === 'published' ? 'منشور · بانتظار المراجعة' : 'بانتظار المراجعة'}
                 </span>
               </div>
               <p className="mt-2 line-clamp-2 text-sm leading-7 text-muted-foreground">
                 {listing.description ?? 'لا يوجد وصف.'}
               </p>
+              <p className="mt-2 text-sm leading-7">سبب المراجعة: {listingReviewReason(listing)}</p>
+              <Link className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600" href={`/admin/listings?listingId=${encodeURIComponent(listing.id)}`}>
+                <ExternalLink className="size-4" />عرض الإعلان
+              </Link>
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <span>{formatPrice(listing.price)}</span>
                 <span>{listing.city ?? 'السعودية'}</span>
                 <span>{listing.category}</span>
-                <span>{listing.compliance.prohibitedCategory ?? 'بدون تصنيف خطر'}</span>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <Button
                 variant="outline"
                 className="rounded-md"
-                disabled={listing.compliance.decision === 'block'}
                 onClick={() => onModerate(listing.id, 'approve')}
               >
                 <CheckCircle2 className="size-4" />
-                اعتماد
+                {listing.status === 'published' ? 'إبقاء الإعلان' : 'اعتماد'}
               </Button>
               <Button
                 variant="outline"
@@ -282,7 +285,7 @@ function SensitiveListingsSection({
     <section id="pending-listings" className="admin-section">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold">
         <ShieldCheck className="size-4 text-blue-600" />
-        الإعلانات الحساسة
+        إعلانات تحتاج مراجعة
       </div>
       {content}
     </section>
@@ -1008,7 +1011,7 @@ function AdminModerationPageContent() {
           </div>
         </section>
 
-        <nav className="admin-section-nav" aria-label="أقسام المراجعة"><a href="#listing-reports">بلاغات الإعلانات</a><a href="#conversation-reports">بلاغات المحادثات</a><a href="#pending-listings">الإعلانات الحساسة</a></nav>
+        <nav className="admin-section-nav" aria-label="أقسام المراجعة"><a href="#listing-reports">بلاغات الإعلانات</a><a href="#conversation-reports">بلاغات المحادثات</a><a href="#pending-listings">إعلانات تحتاج مراجعة</a></nav>
         <p className="text-xs text-muted-foreground">الإحصاءات للسجلات المحمّلة في هذه الصفحة.</p>
         <div className="grid gap-6">
           <ListingReportsSection

@@ -201,11 +201,11 @@ test(`chat creation and attachment continue when content review is ${reviewDecis
   const attached = await add({ listingId: created.listing.id }, {});
   assert.equal(attached.status, 'images_added');
   assert.equal(attached.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
-  assert.equal(attached.listing.images.length, 2);
+  assert.equal(attached.listing.images.length, 1, 'reattaching the same uploaded image must not duplicate it');
   assert.ok(attached.listing.images.every(image => image.status === 'approved'));
   const other = createListingDraft({ sellerId: 'seller:other-photo-owner', category: 'cars', title: 'Other car' });
   assert.equal((await add({ listingId: other.id }, {})).status, 'not_found');
-  assert.equal(networkCalls(), 2);
+  assert.equal(networkCalls(), 1, 'reuse the same content assessment when attaching the same image');
 });
 }
 

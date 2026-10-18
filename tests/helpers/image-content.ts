@@ -1,8 +1,10 @@
 import type { TestContext } from 'node:test';
+import { resetImageContentReviewCacheForTests } from '@/agent/marketplace/listing-image-content';
 
 type ReviewDecision = 'allow' | 'block' | 'needs_review' | 'unavailable';
 
 export function mockImageContentReview(t: TestContext, decisions: ReviewDecision | ReviewDecision[] = 'allow') {
+  resetImageContentReviewCacheForTests();
   const previousKey = process.env.DEEPSEEK_API_KEY;
   process.env.DEEPSEEK_API_KEY = 'test-image-review-key';
   t.after(() => {

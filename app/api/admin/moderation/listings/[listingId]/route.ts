@@ -99,12 +99,5 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
-  if (result.status === 'blocked_by_policy') {
-    return Response.json(
-      { error: 'blocked_by_policy', listing: result.listing },
-      { status: 422 },
-    );
-  }
-
   return Response.json(result);
 }

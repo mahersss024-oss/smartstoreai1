@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
   extractAssistantSearchToolResults,
+  selectAssistantSearchToolResults,
   isAssistantSearchToolOutput,
 } from '@/lib/chat-tool-results';
 
@@ -91,6 +92,13 @@ test('extracts only display-safe marketplace search and comparison tool results'
   ]);
 });
 
+test('retry preserves verified matches and respects an explicitly empty newer result', () => {
+  const first = [{ toolCallId: 'a', toolName: 'searchMarketplaceListings' as const, input: {}, output: { status: 'searched' as const, listings: [{ id: 'verified' }] } }];
+  assert.deepEqual(selectAssistantSearchToolResults(first, []), first);
+  const empty = [{ ...first[0], toolCallId: 'b', output: { status: 'searched' as const, listings: [] } }];
+  assert.deepEqual(selectAssistantSearchToolResults(first, empty), empty);
+});
+
 test('chat route streams marketplace tool outputs with guarded text responses', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
@@ -118,20 +126,20 @@ test('chat route keeps buyer search responses on the real agent path', () => {
   assert.match(route, /abortSignal: signal/);
 });
 
-test('chat blocks prohibited content only, not quality or category mismatches', () => {
+test('chat image assessments are advisory and do not block uploads or publication', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
     'utf8',
   );
   const chatVisionReview = route.slice(
-    route.indexOf('imageComplianceDecision = await checkImageMarketplaceCompliance({'),
+    route.indexOf('imageComplianceDecision = (await reviewListingImageContent('),
     route.indexOf('if ((marketplaceIntent.requiresAuth'),
   );
 
-  assert.match(chatVisionReview, /reviewMode: 'first_clear_max_three'/);
+  assert.match(chatVisionReview, /reviewListingImageContent\(latestUploadedImages\)/);
   assert.doesNotMatch(chatVisionReview, /reviewMode: 'primary_only'/);
-  assert.match(chatVisionReview, /prohibitedOnly: true/);
-  assert.match(chatVisionReview, /kind: 'image_policy_block'/);
+  assert.doesNotMatch(chatVisionReview, /kind: 'image_policy_block'/);
+  assert.match(chatVisionReview, /await recordModelReview/);
   assert.doesNotMatch(chatVisionReview, /kind: 'image_inspection_unavailable'/);
   assert.match(chatVisionReview, /Do not claim that the images were checked/);
   assert.doesNotMatch(chatVisionReview, /kind: 'image_manual_review'/);

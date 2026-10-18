@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { getMarketplaceTitleTerms, publicListingFiltersSql, titleSearchNumberSql, titleSearchConditionSql, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { createAdminAuditLog } from '@/lib/admin/audit';
+import { recordModelReview } from '@/lib/admin/model-review';
 import {
   type PaginationInput,
   normalizePagination,
@@ -996,6 +998,39 @@ function toCommissionRecord(
     updatedAt: commission.updatedAt.toISOString(),
     listing: commission.listing ? toListingRecord(commission.listing) : null,
   };
+}
+
+export async function listPublicMarketplaceListings(filters: PublicMarketplaceListingFilters = {}) {
+  if (!shouldUseDatabaseStore()) {
+    return memoryStore.listPublicMarketplaceListings(filters);
+  }
+  const terms = getMarketplaceTitleTerms(filters.query);
+  const pagination = getListingPagination(filters);
+  const defaultOrder = terms.length || filters.sort === 'newest'
+    ? Prisma.sql`"updatedAt" DESC, "id" DESC`
+    : Prisma.sql`"firstPublishedAt" DESC NULLS LAST,
+        CASE WHEN "firstPublishedAt" IS NULL THEN "updatedAt" END DESC, "id" DESC`;
+  const order = filters.sort === 'cheapest' ? Prisma.sql`"price" ASC NULLS LAST, ${defaultOrder}`
+    : filters.sort === 'lowest_mileage' ? Prisma.sql`${titleSearchNumberSql('mileage')} ASC NULLS LAST, ${defaultOrder}`
+      : filters.sort === 'best_condition' ? Prisma.sql`${titleSearchConditionSql()} DESC, ${defaultOrder}` : defaultOrder;
+  return prisma.$transaction(async db => {
+    const ids = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "Listing"
+      WHERE "status" = 'published' AND ${publicListingFiltersSql(filters)}
+      ORDER BY ${order}
+      LIMIT ${pagination.take} OFFSET ${pagination.skip}
+    `);
+    if (!ids.length) return [];
+    const records = await db.listing.findMany({
+      where: { status: 'published', id: { in: ids.map(item => item.id) } },
+      include: {
+        images: { where: { status: 'approved' }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], take: 1 },
+      },
+    });
+    const positions = new Map(ids.map((item, index) => [item.id, index]));
+    records.sort((left, right) => positions.get(left.id)! - positions.get(right.id)!);
+    return records.map(toListingRecord);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
 export async function listMarketplaceListings(
@@ -2298,14 +2333,32 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
 export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,
+  options: { idempotencyKey?: string } = {},
 ) {
+  const id = options.idempotencyKey ? `chat-draft-${options.idempotencyKey}` : undefined;
+  if (id) {
+    const saved = await getListing(id);
+    if (saved) {
+      if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
+      return saved;
+    }
+  }
   await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   input = { ...input, category: await resolveListingCategoryWithModel(input) };
   if (!shouldUseDatabaseStore()) {
+    if (id) {
+      const saved = memoryStore.getListing(id);
+      if (saved) {
+        if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
+        return saved;
+      }
+    }
     const listing = memoryStore.createListingDraft({
+      id,
       sellerId: user.id,
       ...input,
     });
+    if (listing.compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listing.id, listingId: listing.id, userId: user.id, text: listingSemanticText(listing), assessment: listing.compliance.modelAssessment });
 
     safelyPublishRealtimeEvent({
       type: 'ad_created',
@@ -2329,6 +2382,13 @@ export async function createListingDraft(
     try {
       listing = await prisma.$transaction(
         async (tx) => {
+          if (id) {
+            const saved = await tx.listing.findUnique({ where: { id }, include: { images: true } });
+            if (saved) {
+              if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
+              return saved;
+            }
+          }
           const sellerListingCount = await tx.listing.count({
             where: {
               sellerId: user.id,
@@ -2340,8 +2400,9 @@ export async function createListingDraft(
             throw new ListingLimitReachedError();
           }
 
-          return tx.listing.create({
+          const created = await tx.listing.create({
             data: {
+              id,
               sellerId: user.id,
               category: input.category,
               title: input.title,
@@ -2360,13 +2421,15 @@ export async function createListingDraft(
             },
             include: { images: true },
           });
+          if (compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: created.id, listingId: created.id, userId: user.id, text: listingSemanticText({ ...input, attributes: input.attributes ?? {} }), assessment: compliance.modelAssessment }, tx);
+          return created;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
       break;
     } catch (error) {
       if (
-        !isPrismaKnownRequestError(error, 'P2034') ||
+        !(isPrismaKnownRequestError(error, 'P2034') || (id && isPrismaKnownRequestError(error, 'P2002'))) ||
         attempt === maxSerializableWriteAttempts - 1
       ) {
         throw error;
@@ -2416,6 +2479,7 @@ export async function updateListingForSeller(
     );
 
     if (listing) {
+      if (listing.compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listing.id, listingId: listing.id, userId: sellerId, text: listingSemanticText(listing), assessment: listing.compliance.modelAssessment });
       safelyPublishRealtimeEvent({
         type: 'ad_updated',
         payload: {
@@ -2449,9 +2513,13 @@ export async function updateListingForSeller(
       ...(updates.attributes ?? {}),
     },
   };
-  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }));
-  const listing = await prisma.listing.update({
-    where: { id: listingId, sellerId, ...(options.draftOnly ? { status: 'draft' } : {}) },
+  const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }));
+  const compliance = existing.compliance.humanDecision === 'block'
+    ? { ...assessedCompliance, humanDecision: 'block' as const, decision: existing.compliance.decision }
+    : assessedCompliance;
+  const listing = await prisma.$transaction(async tx => {
+    const updated = await tx.listing.update({
+    where: { id: listingId, sellerId, ...(options.draftOnly ? { status: 'draft' } : { status: existing.status, compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } }) },
     data: {
       category: updates.category,
       title: updates.title,
@@ -2474,8 +2542,11 @@ export async function updateListingForSeller(
             : undefined,
     },
     include: { images: true },
+    });
+    if (compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listingId, listingId, userId: sellerId, text: listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }), assessment: compliance.modelAssessment }, tx);
+    return updated;
   }).catch((error: unknown) => {
-    if (options.draftOnly && isPrismaKnownRequestError(error, 'P2025')) return null;
+    if (isPrismaKnownRequestError(error, 'P2025')) return null;
     throw error;
   });
 
@@ -2553,6 +2624,7 @@ export async function setListingStatusForSeller(
     return null;
   }
 
+  if (status === 'published' && (existing.compliance.humanDecision === 'block' || existing.status === 'deleted' || existing.status === 'rejected')) return existing;
   const nextStatus =
     status === 'published' && existing.compliance.decision !== 'allow'
       ? existing.compliance.decision === 'block'
@@ -2562,7 +2634,7 @@ export async function setListingStatusForSeller(
   const listing = await prisma.$transaction(async (tx) => {
     await recordDatabaseFirstPublication(tx, listingId, nextStatus);
     const updatedListing = await tx.listing.update({
-      where: { id: listingId },
+      where: { id: listingId, sellerId, ...(status === 'published' ? { status: existing.status, compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } } : {}) },
       data: { status: nextStatus },
       include: { images: true },
     });
@@ -2585,7 +2657,15 @@ export async function setListingStatusForSeller(
     });
 
     return updatedListing;
+  }).catch((error: unknown) => {
+    if (isPrismaKnownRequestError(error, 'P2025')) return null;
+    throw error;
   });
+  if (!listing) {
+    const current = status === 'published' ? await getListing(listingId) : null;
+    return current?.sellerId === sellerId && current.status === 'published' && current.compliance.humanDecision !== 'block'
+      ? current : null;
+  }
 
   const mappedListing = toListingRecord(listing);
   const previousStatus = existing.status;
@@ -2697,6 +2777,7 @@ export async function addListingImageForSeller(
             return null;
           }
 
+          if (existing.images.some(saved => saved.id === image.id)) return existing;
           if (hasReachedListingImageLimit(existing.images)) {
             return existing;
           }
@@ -2733,6 +2814,10 @@ export async function addListingImageForSeller(
       );
       break;
     } catch (error) {
+      if (isPrismaKnownRequestError(error, 'P2002')) {
+        const saved = await getListing(listingId);
+        if (saved?.sellerId === sellerId && saved.images.some(current => current.id === image.id)) return saved;
+      }
       if (
         !isPrismaKnownRequestError(error, 'P2034') ||
         attempt === maxSerializableWriteAttempts - 1
@@ -4057,6 +4142,10 @@ export async function addConversationMessage(
       senderId,
       body,
     );
+    if (result.message && ownedConversation) {
+      const assessment = evaluateSaudiMarketplaceCompliance(body.trim()).modelAssessment;
+      if (assessment) await recordModelReview({ subject: 'message', subjectId: conversationId, listingId: ownedConversation.listingId, userId: senderId, text: body.trim(), assessment });
+    }
 
     if (result.conversation && result.message) {
       safelyPublishRealtimeEvent({
@@ -4139,7 +4228,8 @@ export async function addConversationMessage(
     };
   }
 
-  const message = await prisma.conversationMessage.create({
+  const message = await prisma.$transaction(async tx => {
+    const created = await tx.conversationMessage.create({
     data: {
       conversationId,
       senderId,
@@ -4149,6 +4239,10 @@ export async function addConversationMessage(
       reasons: safety.reasons,
       metadata: toPrismaJsonObject({}),
     },
+    });
+    const assessment = evaluateSaudiMarketplaceCompliance(trimmedBody).modelAssessment;
+    if (assessment) await recordModelReview({ subject: 'message', subjectId: conversationId, listingId: conversation.listingId, userId: senderId, text: trimmedBody, assessment }, tx);
+    return created;
   });
 
   await prisma.conversation.update({
@@ -4739,21 +4833,54 @@ export async function reportListing(
   };
 }
 
+async function listListingsNeedingReview(pagination?: { skip: number; take: number }) {
+  // Reading a notification is not a moderation decision. Only later human
+  // listing decisions close an assessment; newer assessments reopen review.
+  const rows = await prisma.$queryRaw<{ id: string; reviewReasons: unknown; reviewSubject: string | null }[]>(Prisma.sql`
+    SELECT "Listing"."id", review.metadata->'assessment'->'reasons' AS "reviewReasons",
+      review.metadata->>'subject' AS "reviewSubject"
+    FROM "Listing"
+    LEFT JOIN LATERAL (
+      SELECT alert.metadata FROM "AdminAuditLog" alert
+      WHERE alert."targetType" = 'ModelReview' AND alert."adminId" IS NULL
+        AND alert.metadata->>'listingId' = "Listing"."id"
+        AND alert.metadata->>'subject' IN ('listing', 'image')
+        AND NOT EXISTS (
+          SELECT 1 FROM "AdminAuditLog" decision
+          WHERE decision."targetType" = 'listing' AND decision."targetId" = "Listing"."id"
+            AND (decision.action IN ('approve_listing', 'reject_listing', 'delete_listing')
+              OR (decision.action = 'update_listing' AND decision.metadata->'updates'->>'status' IS NOT NULL))
+            AND decision."createdAt" >= alert."createdAt"
+        )
+      ORDER BY alert."createdAt" DESC, alert.id DESC LIMIT 1
+    ) review ON TRUE
+    WHERE "Listing".status = 'pending'
+      OR ("Listing".status = 'published' AND review.metadata IS NOT NULL)
+    ORDER BY "Listing"."updatedAt" DESC, "Listing".id DESC
+    ${pagination ? Prisma.sql`LIMIT ${pagination.take} OFFSET ${pagination.skip}` : Prisma.empty}
+  `);
+  if (!rows.length) return [];
+  const listings = await prisma.listing.findMany({
+    where: { id: { in: rows.map(row => row.id) } },
+    include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], take: 4 } },
+  });
+  const byId = new Map(listings.map(listing => [listing.id, listing]));
+  return rows.flatMap(row => {
+    const listing = byId.get(row.id);
+    return listing ? [{ ...toListingRecord(listing),
+      reviewSubject: row.reviewSubject,
+      reviewReasons: Array.isArray(row.reviewReasons) ? row.reviewReasons.filter((reason): reason is string => typeof reason === 'string') : [],
+    }] : [];
+  });
+}
+
 export async function listModerationQueue() {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.listModerationQueue();
   }
 
   const [listings, reports] = await Promise.all([
-    prisma.listing.findMany({
-      where: { status: { in: ['pending', 'rejected'] } },
-      include: {
-        images: {
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-    }),
+    listListingsNeedingReview(),
     prisma.report.findMany({
       include: {
         listing: {
@@ -4769,7 +4896,7 @@ export async function listModerationQueue() {
   ]);
 
   return {
-    listings: listings.map(toListingRecord),
+    listings,
     reports: reports.map(toReportRecord),
   };
 }
@@ -4826,18 +4953,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}, foc
   }
 
   const [listings, reports, userReports] = await Promise.all([
-    prisma.listing.findMany({
-      where: { status: { in: ['pending', 'rejected'] }, ...(focus ? { id: { in: [] } } : {}) },
-      include: {
-        images: {
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 4,
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-      skip: pagination.skip,
-      take: pagination.take,
-    }),
+    focus ? Promise.resolve([]) : listListingsNeedingReview(pagination),
     prisma.report.findMany({
       ...(focus ? { where: { id: focus.sourceType === 'Report' ? focus.reportId : { in: [] } } } : {}),
       include: {
@@ -4875,7 +4991,7 @@ export async function listModerationQueuePage(filters: PaginationInput = {}, foc
       take: pagination.take,
     }),
   ]);
-  const listingPage = toPaginatedResponse(listings.map(toListingRecord), pagination);
+  const listingPage = toPaginatedResponse(listings, pagination);
   const reportPage = toPaginatedResponse(reports.map(toReportRecord), pagination);
   const mappedUserReports = userReports.map((report) => ({
     id: report.id,
@@ -5104,13 +5220,6 @@ export async function setListingModerationStatus(
     };
   }
 
-  if (status === 'published' && existing.compliance.decision === 'block') {
-    return {
-      status: 'blocked_by_policy' as const,
-      listing: existing,
-    };
-  }
-
   const adminId = await getAdminAuditActorId(admin);
   const action: AdminAuditAction =
     status === 'published'
@@ -5122,7 +5231,7 @@ export async function setListingModerationStatus(
     await recordDatabaseFirstPublication(tx, listingId, status);
     const updatedListing = await tx.listing.update({
       where: { id: listingId },
-      data: { status },
+      data: { status, compliance: toPrismaJsonObject({ ...existing.compliance, humanDecision: status === 'published' ? 'allow' : 'block', decision: status === 'published' ? 'allow' : existing.compliance.decision }) },
       include: {
         images: {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],

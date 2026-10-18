@@ -61,7 +61,7 @@ test('foreign assistant output is hidden while the customer own text is unchange
   const customerText = 'Find my desk please';
   await input.fill(customerText);
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
-  await expect(page.getByText('تعذر عرض هذا الرد بالعربية. يرجى إعادة إرسال طلبك.', { exact: true })).toBeVisible();
+  await expect(page.getByText('تعذر إكمال رد المساعد الآن. راجع مسوداتك قبل إعادة طلب إنشاء إعلان؛ النشر والإجراءات الحساسة تنفّذها بنفسك.', { exact: true })).toBeVisible();
   await expect(page.getByText(foreignReply, { exact: true })).toHaveCount(0);
   await expect(page.getByText(customerText, { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('arabic-reply-boundary.png'), fullPage: true });

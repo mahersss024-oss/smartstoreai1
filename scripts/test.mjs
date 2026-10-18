@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Run the Node test runner with an isolated marketplace data directory so
 // parallel test files never race on a shared `.data/marketplace-store.json`.
@@ -62,10 +63,13 @@ const coverageOptions = coverage ? [
 if (coverage) mkdirSync('coverage', { recursive: true });
 const child = spawn(
   process.execPath,
-  ['node_modules/tsx/dist/cli.mjs', '--test', ...coverageOptions, ...patterns],
+  ['--import', pathToFileURL(resolve('scripts/testing/isolated-model-provider.mjs')).href,
+    'node_modules/tsx/dist/cli.mjs', '--test', ...coverageOptions, ...patterns],
   {
     env: {
       ...process.env,
+      CI: '1',
+      DEEPSEEK_API_KEY: 'test-model-placeholder',
       // Stores use the test lifecycle to disable persistence between test cases.
       npm_lifecycle_event: 'test',
       ...(process.env.npm_lifecycle_event === 'test:db:integration'

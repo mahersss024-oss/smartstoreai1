@@ -5,14 +5,12 @@ import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import {
   buildScopeContext,
   getLatestUserRequest,
-  getMarketplaceContinuationScopeDecision,
   latestUserMessageHasImageAttachment,
 } from '@/agent/scope-guard';
 import type { AppLanguage } from '@/app/i18n';
 import type { AuthSession } from '@/lib/auth/session';
 
 import { classifyMarketplaceIntent } from './policy';
-import { parseMarketplaceSearchQuery } from './search';
 import type { MarketplaceIntent } from './types';
 import { marketplaceTextAnalyzer } from './text-understanding';
 
@@ -430,19 +428,19 @@ function getExecutionForIntent(intent: MarketplaceIntent) {
     intent === 'pause_listing' ||
     intent === 'mark_sold'
   ) {
-    return 'set_listing_status';
+    return 'answer';
   }
 
   if (intent === 'open_conversation' || intent === 'send_message') {
-    return 'open_conversation';
+    return 'answer';
   }
 
   if (intent === 'favorite_listing') {
-    return 'favorite_listing';
+    return 'answer';
   }
 
   if (intent === 'report_listing') {
-    return 'report_listing';
+    return 'answer';
   }
 
   if (intent === 'price_listing' || intent === 'negotiate') {
@@ -456,103 +454,29 @@ function getExecutionForIntent(intent: MarketplaceIntent) {
   return 'answer';
 }
 
-function hasSearchableMarketplaceSignal(text: string) {
-  const parsed = parseMarketplaceSearchQuery(text);
-
-  return Boolean(
-    parsed.category ||
-      parsed.city ||
-      parsed.minPrice !== undefined ||
-      parsed.maxPrice !== undefined ||
-      parsed.terms.length > 0,
-  );
-}
-
-function buildContextualSearchQuery(messages: unknown[]) {
-  const userTexts = buildScopeContext(messages, 8)
-    .filter((message) => message.role === 'user')
-    .map((message) => message.text.trim())
-    .filter(Boolean);
-
-  const relevantTexts = userTexts.filter((text, index) => {
-    const isLatest = index === userTexts.length - 1;
-
-    return isLatest || hasSearchableMarketplaceSignal(text);
-  });
-
-  return relevantTexts.join(' ').trim() || getLatestUserRequest(messages);
-}
-
-function isListingPublishConfirmation(text: string) {
-  return /(?:اعتمد|وافق|موافق|نعم|ايه|إيه|اوك|أوكي|انشر|أنشر|انشره|جاهز|publish|approve|approved|yes|ok|proceed)/i.test(
-    text.trim(),
-  );
-}
-
-function hasListingCreationContext(messages: unknown[]) {
-  const contextText = buildScopeContext(messages, 10)
-    .map((message) => message.text)
-    .join(' ');
-
-  return /(?:للبيع|اعلان|إعلان|معاينة|مسودة|النشر|انشر|أنشر|السعر|المدينة|التصنيف|صورة|listing|draft|preview|publish|price|city|category|image)/i.test(
-    contextText,
-  );
-}
-
 export function getFallbackAdaptiveMarketplaceIntent(
   messages: unknown[],
 ): AdaptiveMarketplaceIntent {
   const latestRequest = getLatestUserRequest(messages);
-  const context = buildScopeContext(messages);
   const latestHasImage = latestUserMessageHasImageAttachment(messages);
   const baseIntent = classifyMarketplaceIntent(latestRequest);
-  const continuationDecision = getMarketplaceContinuationScopeDecision(
-    latestRequest,
-    context,
-  );
-  const parsedSearch = parseMarketplaceSearchQuery(
-    buildContextualSearchQuery(messages),
-  );
-  const shouldCreateFromPublishConfirmation =
-    !latestHasImage &&
-    baseIntent.intent === 'general_info' &&
-    isListingPublishConfirmation(latestRequest) &&
-    hasListingCreationContext(messages);
-  const shouldSearchListings = Boolean(
-    baseIntent.intent === 'general_info' &&
-      !shouldCreateFromPublishConfirmation &&
-      (continuationDecision ||
-        parsedSearch.category ||
-        parsedSearch.city ||
-        parsedSearch.minPrice !== undefined ||
-        parsedSearch.maxPrice !== undefined ||
-        parsedSearch.terms.length),
-  );
   const inferredIntent: MarketplaceIntent = latestHasImage
     ? 'general_info'
-    : shouldCreateFromPublishConfirmation
-      ? 'create_listing'
-      : shouldSearchListings
-      ? 'search_listing'
-      : baseIntent.intent;
+    : baseIntent.intent;
 
   return {
     intent: inferredIntent,
     execution: latestHasImage
       ? 'analyze_images'
       : getExecutionForIntent(inferredIntent),
-    confidence: latestHasImage ? 0.92 : continuationDecision ? 0.9 : 0.68,
+    confidence: latestHasImage ? 0.92 : marketplaceTextAnalyzer.peek(latestRequest)?.confidence ?? 0,
     reasonCode: latestHasImage
       ? 'marketplace_image_upload'
-      : shouldCreateFromPublishConfirmation
-        ? 'listing_publish_confirmation'
-        : continuationDecision
-        ? 'contextual_marketplace_follow_up'
-        : baseIntent.reasonCode,
+      : baseIntent.reasonCode,
     normalizedRequest: latestRequest,
     searchQuery:
       inferredIntent === 'search_listing' || inferredIntent === 'compare_listings'
-        ? buildContextualSearchQuery(messages)
+        ? latestRequest
         : undefined,
     missingFields: [],
     requiresAuth: authRequiredIntents.has(inferredIntent),

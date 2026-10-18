@@ -195,17 +195,7 @@ export async function POST(request: Request, context: RouteContext) {
       return idempotency ? await idempotency.complete(responseBody, status) : Response.json(responseBody, { status });
     }
 
-    const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images);
-    if (contentReview.status === 'blocked') {
-      const responseBody = {
-        error: 'image_policy_blocked',
-        compliance: contentReview.compliance,
-      };
-      incrementRuntimeCounter('listing.image_upload.rejected', { reason: responseBody.error });
-      return idempotency
-        ? await idempotency.complete(responseBody, 422)
-        : Response.json(responseBody, { status: 422 });
-    }
+    const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images, { listingId, userId: session.user.id });
 
     const imageId = randomUUID();
     let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;

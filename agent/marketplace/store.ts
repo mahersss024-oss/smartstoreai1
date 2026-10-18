@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { normalizePagination } from '@/lib/pagination';
+import { hasPendingLocalListingReview, resolveLocalListingReviews } from '@/lib/admin/model-review';
+import { getMarketplaceTitleTerms, matchesMarketplaceTitle, matchesPublicListingFilters, getTitleSearchNumber, titleSearchConditionScore, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { comparePublicationFeed, recordFirstPublication } from './listing-publication';
 
 import { evaluateConversationMessageSafety } from './message-safety';
@@ -462,6 +464,7 @@ export function publishListing(listingId: string) {
     return null;
   }
 
+  if (listing.compliance.humanDecision === 'block' || listing.status === 'deleted') return listing;
   if (listing.compliance.decision !== 'allow') {
     listing.status = listing.compliance.decision === 'block' ? 'rejected' : 'pending';
   } else {
@@ -495,9 +498,12 @@ export function updateListingForSeller(
     return null;
   }
 
-  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({
+  const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({
     ...listing, ...updates, attributes: { ...listing.attributes, ...updates.attributes },
   }));
+  const compliance = listing.compliance.humanDecision === 'block'
+    ? { ...assessedCompliance, humanDecision: 'block' as const, decision: listing.compliance.decision }
+    : assessedCompliance;
 
   const nextListing: ListingRecord = {
     ...listing,
@@ -534,6 +540,7 @@ export function setListingStatusForSeller(
     return null;
   }
 
+  if (status === 'published' && (listing.compliance.humanDecision === 'block' || listing.status === 'deleted' || listing.status === 'rejected')) return listing;
   if (status === 'published' && listing.compliance.decision !== 'allow') {
     listing.status =
       listing.compliance.decision === 'block' ? 'rejected' : 'pending';
@@ -564,6 +571,7 @@ export function addListingImageForSeller(
     return null;
   }
 
+  if (listing.images.some(existing => existing.id === image.id)) return listing;
   if (hasReachedListingImageLimit(listing.images)) {
     return listing;
   }
@@ -655,6 +663,35 @@ export function setPrimaryListingImageForSeller(
   listings.set(listing.id, listing);
   persistStore();
   return listing;
+}
+
+export function listPublicMarketplaceListings(filters: PublicMarketplaceListingFilters = {}) {
+  seedListings();
+  const terms = getMarketplaceTitleTerms(filters.query);
+  const results = [...listings.values()].filter(listing =>
+    listing.status === 'published' &&
+    matchesPublicListingFilters(listing, filters) &&
+    matchesMarketplaceTitle(listing.title, terms),
+  );
+  const ordered = terms.length ? (left: ListingRecord, right: ListingRecord) =>
+    right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id) : comparePublicationFeed;
+  results.sort((left, right) => {
+    if (filters.sort === 'cheapest') {
+      const delta = (typeof left.price === 'number' ? left.price : Infinity) - (typeof right.price === 'number' ? right.price : Infinity);
+      if (delta && !Number.isNaN(delta)) return delta;
+    }
+    if (filters.sort === 'lowest_mileage') {
+      const delta = (getTitleSearchNumber(left, 'mileage') ?? Infinity) - (getTitleSearchNumber(right, 'mileage') ?? Infinity);
+      if (delta && !Number.isNaN(delta)) return delta;
+    }
+    if (filters.sort === 'newest') return right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id);
+    if (filters.sort === 'best_condition') {
+      const delta = titleSearchConditionScore(right.condition) - titleSearchConditionScore(left.condition);
+      if (delta) return delta;
+    }
+    return ordered(left, right);
+  });
+  return paginateListings(results, filters);
 }
 
 export function listMarketplaceListings(filters: MarketplaceListingFilters = {}) {
@@ -1626,7 +1663,7 @@ export function listModerationQueue() {
     listings: [...listings.values()]
       .filter(
         (listing) =>
-          listing.status === 'pending' || listing.status === 'rejected',
+          listing.status === 'pending' || (listing.status === 'published' && hasPendingLocalListingReview(listing.id)),
       )
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     reports: [...reports.values()]
@@ -1723,13 +1760,8 @@ export function setListingModerationStatus(
     };
   }
 
-  if (status === 'published' && listing.compliance.decision === 'block') {
-    return {
-      status: 'blocked_by_policy' as const,
-      listing,
-    };
-  }
-
+  listing.compliance = { ...listing.compliance, humanDecision: status === 'published' ? 'allow' : 'block', decision: status === 'published' ? 'allow' : listing.compliance.decision };
+  resolveLocalListingReviews(listingId);
   listing.status = status;
   listing.updatedAt = nowIso();
   recordFirstPublication(listing, listing.updatedAt);

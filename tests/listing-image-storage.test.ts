@@ -182,8 +182,7 @@ test(`accepts eight images when content review is ${reviewDecision} and rejects 
     const body = await response.json();
     assert.equal(response.status, 201);
     assert.equal(body.image.status, 'approved');
-    const reviewed = index < (reviewDecision === 'allow' ? 1 : 3);
-    assert.equal(body.contentCheck, !reviewed ? 'skipped' : reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
+    assert.equal(body.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
     if (reviewDecision === 'unavailable') assert.equal(body.compliance, null);
     assert.ok(body.image.thumbnailUrl);
     assert.ok(body.image.displayUrl);
@@ -194,12 +193,12 @@ test(`accepts eight images when content review is ${reviewDecision} and rejects 
   ), { params: Promise.resolve({ listingId: listing.id }) });
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, 'listing_image_limit_reached');
-  assert.equal(networkCalls(), reviewDecision === 'allow' ? 1 : 3);
+  assert.equal(networkCalls(), 1, 'identical image bytes reuse one content assessment');
   assert.equal(listSellerListings(listing.sellerId)[0].images.length, defaultMaxListingImages);
 });
 }
 
-test('blocks prohibited content even when the listing already has an approved image', async (t) => {
+test('model concern permits image storage with an administration review signal', async (t) => {
   mockImageContentReview(t, 'block');
   const listing = createListingDraft({ sellerId: 'seller:blocked-image', category: 'other', title: 'Desk' });
   addListingImageForSeller(listing.id, listing.sellerId, {
@@ -214,9 +213,11 @@ test('blocks prohibited content even when the listing already has an approved im
     `https://smartstore.test/api/marketplace/listings/${listing.id}/images`,
     { method: 'POST', headers: { cookie: createSessionCookie({ id: listing.sellerId, email: 'blocked@example.test' }) }, body: data },
   ), { params: Promise.resolve({ listingId: listing.id }) });
-  assert.equal(response.status, 422);
-  assert.equal((await response.json()).error, 'image_policy_blocked');
-  assert.equal(listSellerListings(listing.sellerId)[0].images.length, 1);
+  assert.equal(response.status, 201);
+  const payload = await response.json();
+  assert.equal(payload.compliance.decision, 'block');
+  assert.equal(payload.image.contentReviewStatus, 'unclear');
+  assert.equal(listSellerListings(listing.sellerId)[0].images.length, 2);
 });
 
 test('rejects listing image uploads when declared type does not match bytes', async () => {

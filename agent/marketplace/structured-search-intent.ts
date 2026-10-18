@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { parseMarketplaceSearchQuery } from './search';
 import { marketplaceTextAnalyzer } from './text-understanding';
+import { getMarketplaceTitleTerms } from '@/lib/marketplace/title-search';
+import type { MarketplaceSearchUnderstandingInput } from './search-understanding-schema';
 
 export const rankingPreferenceSchema = z.enum(['relevance', 'price', 'location', 'condition', 'mileage', 'year', 'listing_quality', 'freshness', 'engagement']);
 export const sortPreferenceSchema = z.enum(['best_match', 'cheapest', 'newest', 'closest', 'best_condition', 'lowest_mileage']);
 export const searchModeSchema = z.enum(['new_search', 'refine']);
+export const clearableSearchFilterSchema = z.enum(['category', 'brand', 'model', 'city', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'condition', 'mileageMin', 'mileageMax', 'color', 'requiredFeatures', 'excludedFeatures', 'excludedColors', 'sortPreference', 'locationPreference', 'terms']);
 export const structuredSearchIntentSchema = z.object({
   intent: z.literal('search_listing').default('search_listing'), searchMode: searchModeSchema.optional(),
   category: z.string().min(1).optional(), brand: z.string().min(1).optional(), model: z.string().min(1).optional(), city: z.string().min(1).optional(),
@@ -16,12 +19,24 @@ export const structuredSearchIntentSchema = z.object({
   excludedColors: z.array(z.string().min(1)).default([]), rankingPreferences: z.array(rankingPreferenceSchema).default([]),
   sortPreference: sortPreferenceSchema.optional(), locationPreference: z.enum(['same_city', 'nearby', 'anywhere']).optional(),
   terms: z.array(z.string()).default([]), rawQuery: z.string().optional(),
+  clearFilters: z.array(clearableSearchFilterSchema).optional(),
   termAliases: z.array(z.object({ term: z.string().min(1).max(160), variants: z.array(z.string().min(1).max(160)).max(12) })).max(40).optional(),
 });
 export type StructuredSearchIntent = z.infer<typeof structuredSearchIntentSchema>;
 export type RankingPreference = z.infer<typeof rankingPreferenceSchema>;
 export type SortPreference = z.infer<typeof sortPreferenceSchema>;
 export type SearchMode = z.infer<typeof searchModeSchema>;
+
+export function parseExplicitMarketplaceSearchIntent(query?: string, filters: MarketplaceSearchUnderstandingInput = {}): StructuredSearchIntent {
+  const titleQuery = query?.trim() ?? '';
+  const structuredTerms = getMarketplaceTitleTerms([filters.brand, filters.model, filters.color, ...(filters.requiredFeatures ?? [])].filter(Boolean).join(' '));
+  return structuredSearchIntentSchema.parse({
+    ...filters,
+    terms: getMarketplaceTitleTerms(titleQuery || (filters.descriptiveTerms ?? []).join(' ')).filter(term => !structuredTerms.includes(term)),
+    rawQuery: titleQuery,
+    termAliases: [],
+  });
+}
 
 export function parseStructuredSearchIntent(query: string | null | undefined): StructuredSearchIntent {
   const rawQuery = query?.trim() ?? '';

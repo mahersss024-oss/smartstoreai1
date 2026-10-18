@@ -188,6 +188,8 @@ export type MarketplaceIntentDecision = {
 };
 
 export type ComplianceDecision = {
+  modelAssessment?: import('@/lib/admin/model-review').ModelAssessment;
+  humanDecision?: 'allow' | 'block';
   checkStatus?: 'completed' | 'unavailable';
   decision: 'allow' | 'block' | 'needs_review';
   reasons: string[];

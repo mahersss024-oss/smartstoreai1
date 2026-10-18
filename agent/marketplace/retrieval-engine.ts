@@ -1,11 +1,10 @@
-import { listMarketplaceListings } from './repository';
+import { listPublicMarketplaceListings } from './repository';
 import {
   rankMarketplaceListings,
   type RankedMarketplaceListing,
 } from './ranking-engine';
-import { getMarketplaceSearchTermVariants } from './search';
+import { getMarketplaceTitleTerms } from '@/lib/marketplace/title-search';
 import type { MarketplaceSearchState } from './search-state';
-import { listingSemanticText, marketplaceTextAnalyzer, prepareListingUnderstanding } from './text-understanding';
 
 export type MarketplaceSearchEngineResult = {
   searchState: MarketplaceSearchState;
@@ -19,15 +18,7 @@ const internalCandidateLimit = 100;
 const finalResultLimit = 6;
 
 export function buildRetrievalTermGroups(state: MarketplaceSearchState) {
-  return [
-    ...(state.brand ? [getMarketplaceSearchTermVariants(state.brand, state.rawQuery, state.termAliases)] : []),
-    ...(state.model ? [getMarketplaceSearchTermVariants(state.model, state.rawQuery, state.termAliases)] : []),
-    ...(state.color ? [getMarketplaceSearchTermVariants(state.color, state.rawQuery, state.termAliases)] : []),
-    ...state.requiredFeatures.map(
-      (feature) => getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases),
-    ),
-    ...state.terms.map((term) => getMarketplaceSearchTermVariants(term, state.rawQuery, state.termAliases)),
-  ];
+  return getMarketplaceTitleTerms([...state.terms, state.brand, state.model, state.color, ...state.requiredFeatures].filter(Boolean).join(' ')).map(term => [term]);
 }
 
 function getRelaxedSuggestion(state: MarketplaceSearchState) {
@@ -49,30 +40,25 @@ function getRelaxedSuggestion(state: MarketplaceSearchState) {
 export async function retrieveAndRankMarketplaceListings(
   state: MarketplaceSearchState,
 ): Promise<MarketplaceSearchEngineResult> {
-  const candidates = await listMarketplaceListings({
-    query: state.rawQuery,
+  const candidates = await listPublicMarketplaceListings({
+    query: buildRetrievalTermGroups(state).flat().join(' '),
     category: state.category,
     city: state.city,
-    cityVariants: state.city ? getMarketplaceSearchTermVariants(state.city, state.rawQuery, state.termAliases) : undefined,
     minPrice: state.minPrice,
     maxPrice: state.maxPrice,
     condition: state.condition,
     yearMin: state.yearMin,
     yearMax: state.yearMax,
-    termGroups: buildRetrievalTermGroups(state),
+    mileageMin: state.mileageMin,
+    mileageMax: state.mileageMax,
     excludedTerms: [...state.excludedFeatures, ...state.excludedColors],
     limit: internalCandidateLimit,
+    sort: state.sortPreference,
   });
-  const queryAnalysis = marketplaceTextAnalyzer.peek(state.rawQuery ?? '');
-  if (queryAnalysis?.product && queryAnalysis.confidence >= 0.8) await prepareListingUnderstanding(candidates);
-  const relevantCandidates = candidates.filter(listing => {
-    if (!queryAnalysis?.product || queryAnalysis.confidence < 0.8) return true;
-    const analysis = marketplaceTextAnalyzer.peek(listingSemanticText(listing));
-    if (!analysis?.product || analysis.confidence < 0.8) return true;
-    return analysis.product === queryAnalysis.product && (queryAnalysis.offerKind === 'unknown'
-      || analysis.offerKind === 'unknown' || analysis.offerKind === queryAnalysis.offerKind);
-  });
-  const ranked = rankMarketplaceListings(relevantCandidates, state);
+  const scores = rankMarketplaceListings(candidates, state, { literal: true, preserveMatches: true });
+  const byId = new Map(scores.map(result => [result.listing.id, result]));
+  // Database ordering and filters are authoritative; scores explain, not hide, matches.
+  const ranked = candidates.map(listing => byId.get(listing.id)!);
 
   return {
     searchState: state,

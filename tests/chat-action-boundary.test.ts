@@ -63,6 +63,8 @@ test('draft content writes constrain status and owner atomically if the seller p
   const mode = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const delegate = prisma.listing;
   const original = { findUnique: delegate.findUnique, update: delegate.update };
+  const originalTransaction = prisma.$transaction;
+  prisma.$transaction = (async (run: (tx: unknown) => Promise<unknown>) => run({ listing: delegate })) as unknown as typeof prisma.$transaction;
   let writes = 0;
   Object.assign(delegate, {
     findUnique: async () => databaseRecord(),
@@ -78,6 +80,7 @@ test('draft content writes constrain status and owner atomically if the seller p
     assert.equal(writes, 1);
   } finally {
     Object.assign(delegate, original);
+    prisma.$transaction = originalTransaction;
     if (mode === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
     else process.env.SMARTSTORE_MARKETPLACE_STORE = mode;
   }

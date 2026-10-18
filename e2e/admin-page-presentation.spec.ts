@@ -420,6 +420,69 @@ test('report notification acknowledgement is shared across administrator session
   }
 });
 
+test('model review alerts show human-readable content without creating a customer report', async ({ page, baseURL }, testInfo) => {
+  await prepare(page, baseURL!);
+  let viewed = false;
+  await page.route('**/api/admin/moderation**', route => {
+    if (route.request().method() === 'PATCH') {
+      expect(route.request().postDataJSON().caseId).toBe('model-review-test');
+      viewed = true;
+      return route.fulfill({ json: { acknowledged: true } });
+    }
+    if (new URL(route.request().url()).searchParams.get('view') === 'notifications') return route.fulfill({ json: {
+      notifications: viewed ? [] : [{ id: 'model-review-test', sourceType: 'ModelReview', sourceId: 'model-review-test', listingId: listing.id, subjectUserId: 'model-review-owner',
+        title: 'مراجعة إعلان', reason: 'ملاحظة آلية تحتاج مراجعة الإدارة', details: 'عنوان الإعلان\nمحتوى يحتاج مراجعة بشرية', createdAt: now }], page: 1, hasMore: false,
+    } });
+    return route.fallback();
+  });
+  await page.goto('/admin/listings');
+  await page.getByRole('button', { name: 'إشعارات البلاغات', exact: true }).click();
+  await page.locator('.admin-notification-row').click();
+  const dialog = page.getByRole('dialog', { name: 'تنبيه للمراجعة', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('تم الاطلاع على التنبيه للجميع. لم يُتخذ إجراء على المحتوى.');
+  await expect(page.locator('.admin-notification-row')).toHaveCount(0);
+  await expect(dialog.getByText('عنوان الإعلان\nمحتوى يحتاج مراجعة بشرية', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'فتح الإعلان', exact: true })).toHaveAttribute('href', `/admin/listings?listingId=${listing.id}`);
+  await expect(dialog.getByRole('link', { name: 'عرض الحساب', exact: true })).toHaveAttribute('href', '/admin/users?query=model-review-owner');
+  await expect(dialog.getByRole('link', { name: 'معالجة البلاغ', exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('الأدلة المحفوظة', { exact: true })).toHaveCount(0);
+  const overflow = await dialog.evaluate(element => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath('model-review-alert.png') });
+});
+
+test('listing review queue preserves publication until an explicit human decision', async ({ page, baseURL }, testInfo) => {
+  await prepare(page, baseURL!);
+  let resolved = false;
+  await page.route('**/api/admin/moderation**', route => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'PATCH' && url.pathname.endsWith(`/listings/${listing.id}`)) {
+      expect(route.request().postDataJSON()).toEqual({ action: 'approve' });
+      resolved = true;
+      return route.fulfill({ json: { status: 'published' } });
+    }
+    if (url.pathname === '/api/admin/moderation' && !url.searchParams.has('view')) return route.fulfill({ json: {
+      listings: resolved ? [] : [{ ...listing, status: 'published', reviewSubject: 'image', reviewReasons: ['صورة تحتاج مراجعة بشرية'] }],
+      reports: [], userReports: [],
+    } });
+    return route.fallback();
+  });
+  await page.goto('/admin/moderation');
+  const section = page.locator('#pending-listings');
+  await expect(section).toContainText('إعلانات تحتاج مراجعة');
+  await expect(section).toContainText('منشور · بانتظار المراجعة');
+  await expect(section).toContainText('صورة تحتاج مراجعة بشرية');
+  await expect(section.getByRole('link', { name: 'عرض الإعلان', exact: true })).toHaveAttribute('href', `/admin/listings?listingId=${listing.id}`);
+  await expect(page.locator('.app-welcome')).toBeHidden();
+  await section.scrollIntoViewIfNeeded();
+  expect(await section.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('listing-review-queue.png'), fullPage: true });
+  await section.getByRole('button', { name: 'إبقاء الإعلان', exact: true }).click();
+  await expect(section).toContainText('لا توجد إعلانات بانتظار المراجعة.');
+  expect(resolved).toBe(true);
+});
+
 test('failed shared acknowledgement leaves the report notification available for retry', async ({
   page,
   baseURL,

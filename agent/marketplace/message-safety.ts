@@ -49,14 +49,14 @@ export function evaluateConversationMessageSafety(
   const reasons = new Set<string>();
   const forbiddenTermsDecision = evaluateSaudiMarketplaceCompliance(body);
 
-  if (forbiddenTermsDecision.decision !== 'allow') {
+  if (forbiddenTermsDecision.modelAssessment?.decision !== 'allow') {
     reasons.add('forbidden_or_regulated_marketplace_terms');
   }
 
   const resolvedReasons = [...reasons];
 
   return {
-    decision: resolvedReasons.length ? 'block' : 'allow',
+    decision: 'allow',
     reasons: resolvedReasons,
   };
 }

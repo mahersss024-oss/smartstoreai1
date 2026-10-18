@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const port = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '3102', 10);
 const baseURL =
@@ -36,7 +37,12 @@ export default defineConfig({
         env: {
           AUTH_SECRET:
             process.env.AUTH_SECRET ?? 'development-only-smartstore-auth-secret',
-          DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'e2e-placeholder',
+          // Keep Next's env loader and the provider's local-env preference away from real credentials.
+          CI: '1',
+          DEEPSEEK_API_KEY: 'test-model-placeholder',
+          NODE_OPTIONS: [process.env.NODE_OPTIONS,
+            `--import=${pathToFileURL(resolve('scripts/testing/isolated-model-provider.mjs')).href}`,
+          ].filter(Boolean).join(' '),
           NODE_ENV: 'test',
           PORT: String(port),
           NEXT_PUBLIC_APP_URL: baseURL,

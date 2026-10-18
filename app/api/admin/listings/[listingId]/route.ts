@@ -13,6 +13,7 @@ import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
+import { recordModelReview } from '@/lib/admin/model-review';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import { runOptionalTask } from '@/lib/optional-task';
 
@@ -227,10 +228,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         priceMode,
         status: parsed.data.status,
         searchText: contentChanged ? buildSearchText(nextListing) : undefined,
-        compliance: compliance ?? undefined,
+        compliance: parsed.data.status
+          ? { ...(compliance ?? existing.compliance as Record<string, unknown>), humanDecision: ['published', 'draft'].includes(parsed.data.status) ? 'allow' : 'block', decision: ['published', 'draft'].includes(parsed.data.status) ? 'allow' : (compliance?.decision ?? 'allow') }
+          : compliance ? { ...compliance, ...((existing.compliance as Record<string, unknown>).humanDecision === 'block' ? { humanDecision: 'block' } : {}) } : undefined,
       },
     });
 
+    if (compliance?.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listingId, listingId, userId: existing.sellerId, text: listingSemanticText(nextListing), assessment: compliance.modelAssessment }, tx);
     await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,

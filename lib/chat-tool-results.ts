@@ -97,3 +97,8 @@ export function extractAssistantSearchToolResults(
 
   return results;
 }
+
+export function selectAssistantSearchToolResults(original: AssistantSearchToolResult[], regenerated: AssistantSearchToolResult[]) {
+  // An explicit empty new search is authoritative; never revive older matches.
+  return regenerated.length ? regenerated : original;
+}

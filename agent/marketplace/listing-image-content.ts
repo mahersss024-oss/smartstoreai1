@@ -1,38 +1,50 @@
 import type { UploadedListingImage } from './listing-image-storage';
 import { checkImageMarketplaceCompliance } from './vision-compliance';
 import type { ListingImage, ImageContentReviewStatus } from './types';
+import { modelReviewImageFingerprint, recordModelReview } from '@/lib/admin/model-review';
+import { getDeepseekModelName } from '@/agent/deepseek-provider';
 
-export async function reviewListingImageContent(images: UploadedListingImage[], existingImages: ListingImage[] = []) {
+type ImageAssessment = Awaited<ReturnType<typeof checkImageMarketplaceCompliance>> | null;
+const cache = new Map<string, { expiresAt: number; value: ImageAssessment }>();
+const pending = new Map<string, Promise<ImageAssessment>>();
+
+export function resetImageContentReviewCacheForTests() { cache.clear(); }
+
+async function inspectImages(images: UploadedListingImage[]): Promise<ImageAssessment> {
+  const key = `content-v2:${getDeepseekModelName('vision')}:${modelReviewImageFingerprint(images.map(image => image.data))}`;
+  const existing = cache.get(key);
+  if (existing && existing.expiresAt > Date.now()) return existing.value;
+  if (pending.has(key)) return pending.get(key)!;
+  if (pending.size >= 32) return null;
+  const task = (async () => {
+    let value: ImageAssessment = null;
+    try {
+      value = await checkImageMarketplaceCompliance({
+        messages: [{ role: 'user', content: images.map(image => ({ type: 'file' as const, mediaType: image.mediaType, data: image.data })) }],
+        userRequest: 'Describe the actual product and assess content policy. Quality and category matching never restrict acceptance.',
+        language: 'ar', reviewMode: 'all_images', prohibitedOnly: false,
+      });
+    } catch (error) {
+      console.warn(`[listing_image_content] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
+    }
+    if (cache.size >= 128) cache.delete(cache.keys().next().value!);
+    cache.set(key, { value, expiresAt: Date.now() + (value && !value.inspectionUnavailable ? 600_000 : 10_000) });
+    return value;
+  })();
+  pending.set(key, task);
+  try { return await task; } finally { pending.delete(key); }
+}
+
+export async function reviewListingImageContent(images: UploadedListingImage[], existingImages: ListingImage[] = [], context?: { listingId: string; userId: string }) {
   const unchecked: ImageContentReviewStatus[] = images.map(() => 'not_checked');
-  const remaining = Math.max(0, 3 - existingImages.length);
-  if (remaining === 0 || existingImages.some(image => image.contentReviewStatus === 'clear')) {
-    return { status: 'skipped' as const, message: undefined, compliance: null, imageReviewStatuses: unchecked };
-  }
-  try {
-    const compliance = await checkImageMarketplaceCompliance({
-      messages: [{
-        role: 'user',
-        content: images.slice(0, remaining).map(image => ({ type: 'file' as const, mediaType: image.mediaType, data: image.data })),
-      }],
-      userRequest: 'Check uploaded images for prohibited content only.',
-      language: 'ar',
-      reviewMode: 'first_clear_max_three',
-      prohibitedOnly: true,
-    });
-    return {
-      status: compliance.inspectionUnavailable ? 'unavailable' as const : compliance.decision === 'block' ? 'blocked' as const : 'allowed' as const,
-      message: compliance.decision === 'block' ? 'The image contains prohibited content and was not saved.' : undefined,
-      compliance: compliance.inspectionUnavailable ? null : compliance,
-      imageReviewStatuses: unchecked.map((status, index) => compliance.imageReviewStatuses?.[index] ?? status),
-    };
-  } catch (error) {
-    console.warn(`[listing_image_content] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
-    // Keep the outage explicit without blocking otherwise valid uploads.
-    return {
-      status: 'unavailable' as const,
-      message: 'Content inspection is unavailable; the image has not been checked.',
-      compliance: null,
-      imageReviewStatuses: unchecked.map((status, index) => index === 0 ? 'unavailable' : status),
-    };
-  }
+  void existingImages;
+  const compliance = await inspectImages(images);
+  if (context) await recordModelReview({ subject: 'image', subjectId: `${context.listingId}:${modelReviewImageFingerprint(images.map(image => image.data))}`, listingId: context.listingId, userId: context.userId,
+    text: compliance?.detectedProduct ?? 'صورة مرفوعة للإعلان', assessment: { decision: compliance?.decision ?? 'needs_review', reasons: compliance?.reasons ?? ['image_inspection_unavailable'], unavailable: !compliance || Boolean(compliance.inspectionUnavailable) } });
+  return {
+    status: !compliance || compliance.inspectionUnavailable ? 'unavailable' as const : 'allowed' as const,
+    message: undefined,
+    compliance,
+    imageReviewStatuses: unchecked.map(() => !compliance || compliance.inspectionUnavailable ? 'unavailable' as const : compliance.decision === 'allow' ? 'clear' as const : 'unclear' as const),
+  };
 }

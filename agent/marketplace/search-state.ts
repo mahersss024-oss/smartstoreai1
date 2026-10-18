@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
+import { getMarketplaceTitleTerms } from '@/lib/marketplace/title-search';
 import type { Prisma } from '@prisma/client';
 
 import {
@@ -46,33 +47,6 @@ function fromStoredState(value: unknown): MarketplaceSearchState | null {
   };
 }
 
-function isDifferentPrimaryTarget(
-  current: MarketplaceSearchState | null,
-  next: StructuredSearchIntent,
-) {
-  if (!current) {
-    return false;
-  }
-
-  if (next.searchMode === 'new_search') {
-    return true;
-  }
-
-  if (next.category && current.category && next.category !== current.category) {
-    return true;
-  }
-
-  if (next.brand && current.brand && next.brand !== current.brand) {
-    return true;
-  }
-
-  if (next.model && current.model && next.model !== current.model) {
-    return true;
-  }
-
-  return false;
-}
-
 function uniqueStrings(values: Array<string | undefined>) {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
@@ -82,8 +56,14 @@ function mergeSearchState(
   next: StructuredSearchIntent,
 ): MarketplaceSearchState {
   // Retain prior filters only for an explicitly requested continuation.
-  const base = next.searchMode === 'refine' && !isDifferentPrimaryTarget(current, next)
-    ? current : null;
+  const base = next.searchMode === 'refine'
+    ? current && { ...current } : null;
+  if (base) {
+    const structuredTerms = getMarketplaceTitleTerms([base.brand, base.model, base.color, ...base.requiredFeatures].filter(Boolean).join(' '));
+    base.terms = base.terms.filter(term => !structuredTerms.includes(term));
+    for (const field of next.clearFilters ?? []) delete (base as Partial<MarketplaceSearchState>)[field];
+    if (next.locationPreference === 'anywhere' && !next.city) delete base.city;
+  }
   const updatedAt = new Date().toISOString();
   const searchMode = base ? 'refine' : 'new_search';
 

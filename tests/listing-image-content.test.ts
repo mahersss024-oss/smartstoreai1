@@ -11,11 +11,11 @@ const images = Array.from({ length: 8 }, (_, index) => ({
 for (const scenario of [
   { name: 'one image', total: 1, decisions: ['needs_review'], calls: 1, status: 'allowed' },
   { name: 'two images', total: 2, decisions: ['needs_review'], calls: 2, status: 'allowed' },
-  { name: 'first is clear', total: 8, decisions: ['allow', 'block'], calls: 1, status: 'allowed' },
-  { name: 'second is clear', total: 8, decisions: ['needs_review', 'allow', 'block'], calls: 2, status: 'allowed' },
-  { name: 'third is clear', total: 8, decisions: ['needs_review', 'needs_review', 'allow', 'block'], calls: 3, status: 'allowed' },
-  { name: 'all are unclear', total: 8, decisions: ['needs_review'], calls: 3, status: 'allowed' },
-  { name: 'second is prohibited', total: 8, decisions: ['needs_review', 'block'], calls: 2, status: 'blocked' },
+  { name: 'first is clear', total: 8, decisions: ['allow', 'block'], calls: 8, status: 'allowed' },
+  { name: 'second is clear', total: 8, decisions: ['needs_review', 'allow', 'block'], calls: 8, status: 'allowed' },
+  { name: 'third is clear', total: 8, decisions: ['needs_review', 'needs_review', 'allow', 'block'], calls: 8, status: 'allowed' },
+  { name: 'all are unclear', total: 8, decisions: ['needs_review'], calls: 8, status: 'allowed' },
+  { name: 'second is prohibited', total: 8, decisions: ['needs_review', 'block'], calls: 8, status: 'allowed' },
   { name: 'inspection is down', total: 8, decisions: ['unavailable'], calls: 1, status: 'unavailable' },
 ] as const) {
   test(`sequential content inspection: ${scenario.name}`, async (t) => {
@@ -24,19 +24,22 @@ for (const scenario of [
     assert.equal(review.status, scenario.status);
     assert.equal(calls(), scenario.calls);
     assert.equal(review.imageReviewStatuses.length, scenario.total);
-    assert.ok(review.imageReviewStatuses.slice(3).every(status => status === 'not_checked'));
+    assert.ok(review.imageReviewStatuses.every(status => status === 'clear' || status === 'unclear' || status === 'unavailable'));
   });
 }
 
-test('persisted review progress stops subsequent upload requests after clarity or three images', async (t) => {
+test('previous clear images do not bypass inspection of subsequently uploaded images', async (t) => {
   const calls = mockImageContentReview(t, 'block');
   const previous = (statuses: string[]) => statuses.map(contentReviewStatus => ({ contentReviewStatus })) as ListingImage[];
   const clear = await reviewListingImageContent(images, previous(['unclear', 'clear']));
-  assert.equal(clear.status, 'skipped');
+  assert.equal(clear.status, 'allowed');
+  assert.equal(clear.compliance?.decision, 'block');
   const three = await reviewListingImageContent(images, previous(['unclear', 'unclear', 'unavailable']));
-  assert.equal(three.status, 'skipped');
-  assert.equal(calls(), 0);
+  assert.equal(three.status, 'allowed');
+  assert.equal(calls(), 8);
   const remaining = await reviewListingImageContent(images, previous(['unclear', 'unclear']));
-  assert.equal(remaining.status, 'blocked');
-  assert.equal(calls(), 1);
+  assert.equal(remaining.status, 'allowed');
+  assert.equal(calls(), 8);
+  await reviewListingImageContent([{ data: new Uint8Array([99]), mediaType: 'image/png' }], previous(['clear']));
+  assert.equal(calls(), 9, 'changed image bytes must be inspected again');
 });

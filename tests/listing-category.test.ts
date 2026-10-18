@@ -22,12 +22,13 @@ test('storage does not reclassify a model-supplied draft or existing drafts', ()
   assert.equal(manual.category, 'furniture');
 });
 
-test('a technical policy outage remains explicit and holds photo-free publication for review', () => {
+test('a technical policy outage remains explicit without deciding photo-free publication', () => {
   const compliance = evaluateListingComplianceBestEffort('Desk', () => { throw new Error('unavailable'); });
   assert.equal(compliance.checkStatus, 'unavailable');
   const listing = createListingDraft({ sellerId: 'policy-outage', category: 'other', title: 'Desk' });
   listing.compliance = compliance;
-  assert.equal(setListingStatusForSeller(listing.id, listing.sellerId, 'published')?.status, 'pending');
+  assert.equal(setListingStatusForSeller(listing.id, listing.sellerId, 'published')?.status, 'published');
+  assert.equal(compliance.modelAssessment?.unavailable, true);
   assert.equal(listing.images.length, 0);
 });
 

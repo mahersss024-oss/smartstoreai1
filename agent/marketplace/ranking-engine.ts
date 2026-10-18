@@ -213,7 +213,11 @@ export function extractListingMileage(listing: ListingRecord) {
   return Number.isFinite(value) ? (unit === 'الف' || unit === 'k' ? value * 1000 : value) : null;
 }
 
-function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
+function rankingVariants(term: string, state: MarketplaceSearchState, literal: boolean) {
+  return literal ? [term] : getMarketplaceSearchTermVariants(term, state.rawQuery, state.termAliases);
+}
+
+function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState, literal = false) {
   const text = listingText(listing);
   const desiredTerms = [
     state.category,
@@ -221,7 +225,7 @@ function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
     state.model,
     ...state.terms,
     ...state.requiredFeatures.flatMap(
-      (feature) => getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases),
+      (feature) => rankingVariants(feature, state, literal),
     ),
   ].filter((value): value is string => Boolean(value));
 
@@ -230,7 +234,7 @@ function scoreRelevance(listing: ListingRecord, state: MarketplaceSearchState) {
   }
 
   const matched = desiredTerms.filter((term) => {
-    const variants = getMarketplaceSearchTermVariants(term, state.rawQuery, state.termAliases);
+    const variants = rankingVariants(term, state, literal);
     return textIncludesAny(text, variants);
   }).length;
 
@@ -258,13 +262,13 @@ function scorePrice(listing: ListingRecord, state: MarketplaceSearchState) {
   return 75;
 }
 
-function scoreLocation(listing: ListingRecord, state: MarketplaceSearchState) {
+function scoreLocation(listing: ListingRecord, state: MarketplaceSearchState, literal = false) {
   if (!state.city) {
     return 70;
   }
 
   const normalizedListingCity = normalizeMarketplaceSearchText(listing.city ?? '');
-  const matchesCity = getMarketplaceCitySearchVariants(state.city).some(
+  const matchesCity = (literal ? [state.city] : getMarketplaceCitySearchVariants(state.city)).some(
     (cityVariant) =>
       normalizedListingCity.includes(
         normalizeMarketplaceSearchText(cityVariant),
@@ -330,7 +334,7 @@ function scoreMileage(listing: ListingRecord, state: MarketplaceSearchState) {
   return 28;
 }
 
-function scoreSpecifications(listing: ListingRecord, state: MarketplaceSearchState) {
+function scoreSpecifications(listing: ListingRecord, state: MarketplaceSearchState, literal = false) {
   const year = extractListingYear(listing);
   let score = 68;
 
@@ -349,7 +353,7 @@ function scoreSpecifications(listing: ListingRecord, state: MarketplaceSearchSta
   if (state.requiredFeatures.length) {
     const text = listingText(listing);
     const matched = state.requiredFeatures.filter((feature) =>
-      textIncludesAny(text, getMarketplaceSearchTermVariants(feature, state.rawQuery, state.termAliases)),
+      textIncludesAny(text, rankingVariants(feature, state, literal)),
     ).length;
 
     score = Math.min(score, clampScore((matched / state.requiredFeatures.length) * 100));
@@ -451,18 +455,19 @@ function buildReasons(
 export function rankMarketplaceListings(
   listings: ListingRecord[],
   state: MarketplaceSearchState,
+  options: { literal?: boolean; preserveMatches?: boolean } = {},
 ) {
   const weights = buildRankingWeights(state);
 
   return listings
     .map((listing) => {
       const scores = {
-        relevanceScore: scoreRelevance(listing, state),
+        relevanceScore: scoreRelevance(listing, state, options.literal),
         priceScore: scorePrice(listing, state),
-        locationScore: scoreLocation(listing, state),
+        locationScore: scoreLocation(listing, state, options.literal),
         conditionScore: scoreCondition(listing, state),
         mileageScore: scoreMileage(listing, state),
-        specificationsScore: scoreSpecifications(listing, state),
+        specificationsScore: scoreSpecifications(listing, state, options.literal),
         listingQualityScore: scoreListingQuality(listing),
         freshnessScore: scoreFreshness(listing),
         engagementScore: scoreEngagement(listing),
@@ -488,9 +493,9 @@ export function rankMarketplaceListings(
         reasons: buildReasons(listing, state, scores),
       };
     })
-    .filter((result) => result.scores.priceScore > 0)
-    .filter((result) => result.scores.specificationsScore > 0)
-    .filter((result) => result.scores.mileageScore > 0)
+    .filter((result) => options.preserveMatches || result.scores.priceScore > 0)
+    .filter((result) => options.preserveMatches || result.scores.specificationsScore > 0)
+    .filter((result) => options.preserveMatches || result.scores.mileageScore > 0)
     .sort((left, right) => {
       if (state.sortPreference === 'cheapest') {
         const leftPrice =

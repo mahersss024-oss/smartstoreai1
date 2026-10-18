@@ -3,7 +3,7 @@
 import { getArabicCustomerMessage } from '@/lib/customer-language';
 /* eslint-disable @next/next/no-img-element */
 
-import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
+import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryDefinitions, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
 import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
@@ -1553,7 +1553,7 @@ function renderMessageParts(
 ): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
-      const text = assistant ? getSafeAssistantText(part.text) || 'تعذر عرض هذا الرد بالعربية. يرجى إعادة إرسال طلبك.' : part.text;
+      const text = assistant ? getSafeAssistantText(part.text) || chatServiceUnavailableMessage : part.text;
       if (text.includes(authRequiredMarker) || (assistant && part.text.includes(authRequiredMarker))) {
         return [<SignInCard key={`auth-${index}`} text={assistant ? getSafeAssistantText(part.text) || `${authRequiredMarker} يرجى تسجيل الدخول للمتابعة.` : text} />];
       }
@@ -3089,6 +3089,12 @@ export default function Page() {
     if (activeMarketCity !== 'all') {
       params.set('city', activeMarketCity);
     }
+    if (activeMarketSubcategory !== 'all') {
+      const category = marketplaceCategoryDefinitions.find(item => item.label === activeMarketSubcategory);
+      if (category) params.set('category', category.id);
+    } else if (activeMarketCategoryGroup !== 'all') {
+      params.set('categories', marketplaceCategoryDefinitions.filter(item => item.group === activeMarketCategoryGroup).map(item => item.id).join(','));
+    }
 
     params.set('page', String(page));
     params.set('limit', '24');
@@ -3180,7 +3186,7 @@ export default function Page() {
 
     listingsInFlightRequestsRef.current.set(endpoint, request);
     return request;
-  }, [activeMarketCity, marketplaceSearchQuery]);
+  }, [activeMarketCity, activeMarketCategoryGroup, activeMarketSubcategory, marketplaceSearchQuery]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -4637,9 +4643,12 @@ export default function Page() {
                           </option>
                         ))}
                       </select>
-                      {manualListingForm.autoCategory && manualCategoryStatus === 'loading' && <span role="status">جار اقتراح التصنيف...</span>}
-                      {manualListingForm.autoCategory && manualCategoryStatus === 'uncertain' && <span role="status">التصنيف غير واضح. اختره يدويًا.</span>}
-                      {manualListingForm.autoCategory && manualCategoryStatus === 'unavailable' && <span role="status">تعذر اقتراح التصنيف. يمكنك اختياره يدويًا.</span>}
+                      {manualListingForm.autoCategory &&
+                        (manualCategoryStatus === 'uncertain' || manualCategoryStatus === 'unavailable') && (
+                          <span className="text-xs font-normal text-muted-foreground" role="status">
+                            أدخل التصنيف
+                          </span>
+                        )}
                     </label>
                     <label className="grid gap-1 text-xs font-semibold">
                       حالة المنتج

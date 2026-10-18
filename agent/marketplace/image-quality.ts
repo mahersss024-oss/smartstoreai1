@@ -13,135 +13,40 @@ export type ImageQualityInput = {
 
 export type ImageQualityResult = {
   qualityScore: number;
-  resolution?: {
-    width: number;
-    height: number;
-  };
-  sharpness: 'unknown' | 'low' | 'medium' | 'high';
-  lighting: 'unknown' | 'poor' | 'acceptable' | 'good';
-  productVisibility: 'unknown' | 'poor' | 'partial' | 'clear';
-  hasSensitiveInfo: boolean;
-  hasPhoneNumber: boolean;
-  isRelevantToListing: boolean;
-  recommendedAction:
-    | 'approve'
-    | 'enhance'
-    | 'blur_sensitive_info'
-    | 'request_retake'
-    | 'reject';
+  assessmentStatus: 'not_measured';
+  resolution?: { width: number; height: number };
+  sharpness: 'unknown';
+  lighting: 'unknown';
+  productVisibility: 'unknown';
+  hasSensitiveInfo: boolean | null;
+  hasPhoneNumber: boolean | null;
+  isRelevantToListing: boolean | null;
+  recommendedAction: 'approve' | 'enhance' | 'blur_sensitive_info' | 'request_retake' | 'reject';
   listingImageStatus: ListingImageStatus;
   enhancements: ImageEnhancementAction[];
   notes: string[];
 };
 
-const supportedMimeTypes = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
-const maxImageBytes = 12 * 1024 * 1024;
-const minimumUsefulPixels = 720 * 720;
+const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export function analyzeImageQuality(input: ImageQualityInput): ImageQualityResult {
-  const notes: string[] = [];
-  const enhancements: ImageEnhancementAction[] = ['compress', 'create_thumbnail'];
-  const hasPhoneNumber = Boolean(input.hasDetectedPhoneNumber);
-  const hasSensitiveInfo =
-    hasPhoneNumber || Boolean(input.hasDetectedSensitiveInfo);
-  const isRelevantToListing = input.isRelevantToListing !== false;
-  const hasResolution =
-    typeof input.width === 'number' && typeof input.height === 'number';
-  const pixelCount = hasResolution ? input.width! * input.height! : undefined;
-  let qualityScore = 84;
-
-  if (input.mimeType && !supportedMimeTypes.has(input.mimeType)) {
-    return {
-      qualityScore: 0,
-      sharpness: 'unknown',
-      lighting: 'unknown',
-      productVisibility: 'unknown',
-      hasSensitiveInfo,
-      hasPhoneNumber,
-      isRelevantToListing,
-      recommendedAction: 'reject',
-      listingImageStatus: 'rejected',
-      enhancements: [],
-      notes: ['unsupported_image_type'],
-    };
-  }
-
-  if (typeof input.sizeBytes === 'number' && input.sizeBytes > maxImageBytes) {
-    qualityScore -= 35;
-    notes.push('image_file_too_large');
-  }
-
-  if (hasResolution && pixelCount! < minimumUsefulPixels) {
-    qualityScore -= 40;
-    notes.push('resolution_too_low');
-  }
-
-  if (!hasResolution) {
-    qualityScore -= 8;
-    notes.push('resolution_unknown');
-  }
-
-  if (!isRelevantToListing) {
-    return {
-      qualityScore: 0,
-      resolution: hasResolution
-        ? { width: input.width!, height: input.height! }
-        : undefined,
-      sharpness: 'unknown',
-      lighting: 'unknown',
-      productVisibility: 'poor',
-      hasSensitiveInfo,
-      hasPhoneNumber,
-      isRelevantToListing,
-      recommendedAction: 'reject',
-      listingImageStatus: 'rejected',
-      enhancements: [],
-      notes: ['image_not_relevant_to_listing'],
-    };
-  }
-
-  if (hasSensitiveInfo) {
-    enhancements.push('blur_sensitive_info');
-    notes.push('sensitive_info_should_be_blurred');
-  }
-
-  if (qualityScore < 75 || hasSensitiveInfo) {
-    enhancements.push('improve_lighting', 'sharpen', 'auto_crop');
-
-    return {
-      qualityScore,
-      resolution: hasResolution
-        ? { width: input.width!, height: input.height! }
-        : undefined,
-      sharpness: qualityScore < 75 ? 'medium' : 'high',
-      lighting: qualityScore < 75 ? 'acceptable' : 'good',
-      productVisibility: 'clear',
-      hasSensitiveInfo,
-      hasPhoneNumber,
-      isRelevantToListing,
-      recommendedAction: hasSensitiveInfo ? 'blur_sensitive_info' : 'enhance',
-      listingImageStatus: 'approved',
-      enhancements,
-      notes,
-    };
-  }
-
+  const unsupported = Boolean(input.mimeType && !supportedMimeTypes.has(input.mimeType));
+  const hasSensitiveInfo = Boolean(input.hasDetectedPhoneNumber || input.hasDetectedSensitiveInfo);
+  // Zero is the legacy storage sentinel, not a measured visual-quality score.
+  // Visual claims require pixels and cannot be established from file metadata.
   return {
-    qualityScore,
-    resolution: hasResolution ? { width: input.width!, height: input.height! } : undefined,
-    sharpness: 'high',
-    lighting: 'good',
-    productVisibility: 'clear',
-    hasSensitiveInfo,
-    hasPhoneNumber,
-    isRelevantToListing,
-    recommendedAction: 'approve',
-    listingImageStatus: 'approved',
-    enhancements,
-    notes,
+    qualityScore: 0,
+    assessmentStatus: 'not_measured',
+    resolution: input.width && input.height ? { width: input.width, height: input.height } : undefined,
+    sharpness: 'unknown',
+    lighting: 'unknown',
+    productVisibility: 'unknown',
+    hasSensitiveInfo: input.hasDetectedPhoneNumber === undefined && input.hasDetectedSensitiveInfo === undefined ? null : hasSensitiveInfo,
+    hasPhoneNumber: input.hasDetectedPhoneNumber ?? null,
+    isRelevantToListing: input.isRelevantToListing ?? null,
+    recommendedAction: unsupported ? 'reject' : hasSensitiveInfo ? 'blur_sensitive_info' : 'approve',
+    listingImageStatus: unsupported ? 'rejected' : 'approved',
+    enhancements: unsupported ? [] : ['compress', 'create_thumbnail', ...(hasSensitiveInfo ? ['blur_sensitive_info' as const] : [])],
+    notes: unsupported ? ['unsupported_image_type'] : ['visual_quality_not_measured'],
   };
 }

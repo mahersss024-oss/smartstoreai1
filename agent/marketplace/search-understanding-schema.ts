@@ -1,20 +1,23 @@
 import { z } from 'zod';
+import { marketplaceCategoryIds } from '@/lib/marketplace/categories';
 
 import {
   rankingPreferenceSchema,
   searchModeSchema,
   sortPreferenceSchema,
+  clearableSearchFilterSchema,
 } from './structured-search-intent';
 
 export const marketplaceSearchUnderstandingSchema = z.object({
+  clearFilters: z.array(clearableSearchFilterSchema).max(19).describe('Explicitly remove these previous constraints during refinement; omitted filters otherwise stay unchanged. Use city to search all cities, minPrice/maxPrice to remove a budget, or terms to replace old product descriptors.').optional(),
   searchMode: searchModeSchema
     .describe(
       'Use new_search for a fresh broad product/category request. Use refine only when the buyer clearly narrows existing results.',
     )
     .optional(),
-  category: z.string().trim().min(1).max(80).optional(),
-  brand: z.string().trim().min(1).max(80).optional(),
-  model: z.string().trim().min(1).max(80).optional(),
+  category: z.enum(marketplaceCategoryIds).optional(),
+  brand: z.string().trim().min(1).max(80).describe('Literal brand spelling used by the customer, not a translated or inferred canonical identity.').optional(),
+  model: z.string().trim().min(1).max(80).describe('Literal model spelling used by the customer, not a translated or inferred canonical identity.').optional(),
   city: z.string().trim().min(1).max(80).optional(),
   minPrice: z.number().nonnegative().optional(),
   maxPrice: z.number().nonnegative().optional(),

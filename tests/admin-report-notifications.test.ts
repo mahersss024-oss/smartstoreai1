@@ -204,7 +204,7 @@ test('notification reads and acknowledgements cannot bypass staff authorization'
   }
 });
 
-test('focused report navigation extends the current queue without changing its default filters', async (t) => {
+test('focused report navigation excludes the listing review queue and preserves report filters', async (t) => {
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const original = [
     prisma.listing.findMany,
@@ -212,6 +212,11 @@ test('focused report navigation extends the current queue without changing its d
     prisma.userReport.findMany,
   ];
   const calls: unknown[] = [];
+  const reviewQueries: unknown[] = [];
+  t.mock.method(prisma, '$queryRaw', async (query: unknown) => {
+    reviewQueries.push(query);
+    return [];
+  });
   prisma.listing.findMany = t.mock.fn(async (args: unknown) => {
     calls.push(args);
     return [];
@@ -230,23 +235,18 @@ test('focused report navigation extends the current queue without changing its d
       {},
       { reportId: 'conversation-report', sourceType: 'UserReport' },
     );
+    assert.equal(reviewQueries.length, 0);
     assert.deepEqual((calls[0] as { where: unknown }).where, {
-      status: { in: ['pending', 'rejected'] },
       id: { in: [] },
     });
     assert.deepEqual((calls[1] as { where: unknown }).where, {
-      id: { in: [] },
-    });
-    assert.deepEqual((calls[2] as { where: unknown }).where, {
       id: 'conversation-report',
     });
     calls.length = 0;
     await listModerationQueuePage();
-    assert.deepEqual((calls[0] as { where: unknown }).where, {
-      status: { in: ['pending', 'rejected'] },
-    });
+    assert.equal(reviewQueries.length, 1);
+    assert.equal('where' in (calls[0] as object), false);
     assert.equal('where' in (calls[1] as object), false);
-    assert.equal('where' in (calls[2] as object), false);
   } finally {
     [
       prisma.listing.findMany,

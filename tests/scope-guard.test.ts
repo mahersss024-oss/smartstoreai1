@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
 
 import {
   applyAllowedRequestToLatestUserMessage,
@@ -117,7 +119,8 @@ test('does not treat earlier image attachments as latest vision input', () => {
   assert.equal(latestUserMessageHasImageAttachment(messages), false);
 });
 
-test('allows short marketplace search follow-ups from prior context', () => {
+test('allows model-understood marketplace follow-ups without product dictionaries', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing', search: { searchMode: 'refine', requiredFeatures: [], excludedFeatures: [], excludedColors: [], descriptiveTerms: [], rankingPreferences: [] } }));
   const context = buildScopeContext([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
     { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
@@ -129,10 +132,11 @@ test('allows short marketplace search follow-ups from prior context', () => {
   const decision = getMarketplaceContinuationScopeDecision('2020', context);
 
   assert.equal(decision?.decision, 'ALLOW');
-  assert.equal(decision?.reason_code, 'marketplace_context_follow_up');
+  assert.equal(decision?.reason_code, 'model_marketplace_follow_up');
 });
 
-test('allows buyer budget follow-ups from prior marketplace context', () => {
+test('allows model-understood budget follow-ups from marketplace context', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing', search: { searchMode: 'refine', requiredFeatures: [], excludedFeatures: [], excludedColors: [], descriptiveTerms: [], rankingPreferences: [] } }));
   const context = buildScopeContext([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
     { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
@@ -145,7 +149,7 @@ test('allows buyer budget follow-ups from prior marketplace context', () => {
   );
 
   assert.equal(decision?.decision, 'ALLOW');
-  assert.equal(decision?.reason_code, 'marketplace_context_follow_up');
+  assert.equal(decision?.reason_code, 'model_marketplace_follow_up');
 });
 
 test('does not allow unrelated short follow-ups through marketplace context', () => {
@@ -160,7 +164,8 @@ test('does not allow unrelated short follow-ups through marketplace context', ()
   assert.equal(decision, null);
 });
 
-test('allows direct marketplace camera searches without model scope fallback', async () => {
+test('reuses high-confidence text understanding for marketplace scope', async t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing' }));
   const decision = await checkInputScope({
     messages: [
       {
@@ -173,10 +178,11 @@ test('allows direct marketplace camera searches without model scope fallback', a
   });
 
   assert.equal(decision.decision, 'ALLOW');
-  assert.equal(decision.reason_code, 'direct_marketplace_request');
+  assert.equal(decision.reason_code, 'model_marketplace_request');
 });
 
-test('allows generic Arabic marketplace search starters without model scope fallback', async () => {
+test('reuses understood broad buyer intent without a keyword fallback', async t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing' }));
   const decision = await checkInputScope({
     messages: [
       {
@@ -187,7 +193,7 @@ test('allows generic Arabic marketplace search starters without model scope fall
   });
 
   assert.equal(decision.decision, 'ALLOW');
-  assert.equal(decision.reason_code, 'direct_marketplace_request');
+  assert.equal(decision.reason_code, 'model_marketplace_request');
 });
 
 test('rewrites only the latest user message for partial requests', () => {

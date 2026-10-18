@@ -90,6 +90,7 @@ test('manual title uses model suggestions while typing and preserves explicit ca
     await title.fill(value);
     await expect(select).toHaveValue('heavy_equipment');
     await expect(title).toBeFocused();
+    await expect(form.getByText('أدخل التصنيف', { exact: true })).toHaveCount(0);
   }
   await title.fill('قطع غيار تريله');
   await expect(select).toHaveValue('auto_parts');
@@ -122,6 +123,8 @@ test('model suggestions debounce input and discard stale responses without overr
     await title.pressSequentially('طلب قديم', { delay: 30 });
     expect(calls).toBe(0);
     await expect.poll(() => calls).toBe(1);
+    await expect(form.getByText('جار اقتراح التصنيف...')).toHaveCount(0);
+    await expect(form.getByText('أدخل التصنيف', { exact: true })).toHaveCount(0);
     await title.fill('طلب جديد');
     await expect(select).toHaveValue('networking');
     release();
@@ -147,12 +150,20 @@ test('unavailable or uncertain model suggestions leave manual classification ava
   const title = form.locator('input[maxlength="140"]');
   const select = form.locator('select').first();
   await title.fill('iPhone');
-  await expect(form.getByText('تعذر اقتراح التصنيف. يمكنك اختياره يدويًا.')).toBeVisible();
+  await expect(form.getByText('أدخل التصنيف', { exact: true })).toBeVisible();
+  await expect(form.getByText('تعذر اقتراح التصنيف. يمكنك اختياره يدويًا.')).toHaveCount(0);
   await expect(select).toHaveValue('other');
   unavailable = false;
+  const uncertainResponse = page.waitForResponse(response =>
+    response.url().includes('/api/marketplace/listing-category') &&
+    response.request().postDataJSON()?.title === 'Toyota Camry',
+  );
   await title.fill('Toyota Camry');
-  await expect(form.getByText('التصنيف غير واضح. اختره يدويًا.')).toBeVisible();
+  await uncertainResponse;
+  await expect(form.getByText('أدخل التصنيف', { exact: true })).toBeVisible();
+  await expect(form.getByText('التصنيف غير واضح. اختره يدويًا.')).toHaveCount(0);
   await expect(select).toHaveValue('other');
   await select.selectOption('cars');
   await expect(select).toHaveValue('cars');
+  await expect(form.getByText('أدخل التصنيف', { exact: true })).toHaveCount(0);
 });

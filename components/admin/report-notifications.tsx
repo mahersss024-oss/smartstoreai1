@@ -190,14 +190,14 @@ export function AdminReportNotifications({
                   disabled={Boolean(busy)}
                   onClick={() => void openNotification(item)}
                 >
-                  {item.sourceType === 'Report' ? (
+                  {item.sourceType !== 'UserReport' ? (
                     <ShieldCheck className="size-4 shrink-0 text-primary" />
                   ) : (
                     <MessageCircle className="size-4 shrink-0 text-primary" />
                   )}
                   <span className="grid min-w-0 gap-1 text-start">
                     <strong className="text-sm">
-                      {item.sourceType === 'Report'
+                      {item.sourceType === 'ModelReview' ? 'تنبيه للمراجعة' : item.sourceType === 'Report'
                         ? 'بلاغ إعلان'
                         : 'بلاغ محادثة'}
                       {item.title ? ` · ${item.title}` : ''}
@@ -256,7 +256,7 @@ export function AdminReportNotifications({
         <AdminRecordPreview
           open
           title={
-            selected.sourceType === 'Report' ? 'بلاغ إعلان' : 'بلاغ محادثة'
+            selected.sourceType === 'ModelReview' ? 'تنبيه للمراجعة' : selected.sourceType === 'Report' ? 'بلاغ إعلان' : 'بلاغ محادثة'
           }
           dirty={false}
           busy={false}
@@ -273,13 +273,15 @@ export function AdminReportNotifications({
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              تم الاطلاع على الإشعار للجميع. حالة البلاغ لم تتغير.
+              {selected.sourceType === 'ModelReview'
+                ? 'تم الاطلاع على التنبيه للجميع. لم يُتخذ إجراء على المحتوى.'
+                : 'تم الاطلاع على الإشعار للجميع. حالة البلاغ لم تتغير.'}
             </p>
-            <EvidencePanel
+            {selected.sourceType !== 'ModelReview' && <EvidencePanel
               reportId={selected.sourceId}
               sourceType={selected.sourceType}
               canManage={canManage}
-            />
+            />}
             <div className="admin-actions">
               {selected.listingId && (
                 <Button asChild variant="outline">
@@ -293,7 +295,7 @@ export function AdminReportNotifications({
                   </Link>
                 </Button>
               )}
-              <Button asChild variant="outline">
+              {selected.sourceType !== 'ModelReview' && <Button asChild variant="outline">
                 <Link
                   href={`/admin/moderation?reportId=${encodeURIComponent(selected.sourceId)}&sourceType=${selected.sourceType}`}
                   prefetch={false}
@@ -302,7 +304,14 @@ export function AdminReportNotifications({
                   معالجة البلاغ
                   <ShieldCheck className="size-4" />
                 </Link>
-              </Button>
+              </Button>}
+              {selected.sourceType === 'ModelReview' && selected.subjectUserId && (
+                <Button asChild variant="outline">
+                  <Link href={`/admin/users?query=${encodeURIComponent(selected.subjectUserId)}`} prefetch={false} onClick={() => setSelected(null)}>
+                    عرض الحساب <ExternalLink className="size-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </AdminRecordPreview>

@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { hardMaxListingImages } from '@/agent/marketplace/listing-image-limits';
 import type { ListingImage } from '@/agent/marketplace/types';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
 
 function shouldRunDatabaseIntegration() {
   return (
@@ -11,6 +13,140 @@ function shouldRunDatabaseIntegration() {
       process.env.npm_lifecycle_event === 'test:db:integration')
   );
 }
+
+test('database public title search normalizes Arabic, filters before pagination and never invokes models', async t => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const suffix = crypto.randomUUID();
+  const sellerId = `title-seller-${suffix}`;
+  const product = '\u0622\u064a\u0640\u0641\u064f\u0648\u0646 \u0661\u0665';
+  const query = `\u0627\u064a\u0641\u0648\u0646 15 ${suffix}`;
+  const analyze = t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => { throw new Error('Search must not call a model'); });
+  const peek = t.mock.method(marketplaceTextAnalyzer, 'peek', () => { throw new Error('Search must not read model analysis'); });
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  try {
+    await prisma.user.create({ data: { id: sellerId, email: `${sellerId}@example.test` } });
+    const base = { sellerId, category: 'mobile_phones', city: 'Riyadh', status: 'published' as const,
+      condition: 'used' as const, compliance: { decision: 'allow', reasons: [] },
+      attributes: { year: '\u0662\u0660\u0662\u0665', mileage: '\u0661\u0662\u0660\u0660\u0660' } };
+    const first = await prisma.listing.create({ data: { ...base, title: `${product} ${suffix}`, price: 50 } });
+    const second = await prisma.listing.create({ data: { ...base, title: `${product} ${suffix}`, price: 70, condition: 'new' } });
+    await prisma.listing.createMany({ data: [
+      { ...base, title: `${product} ${suffix}`, price: 30, city: 'Jeddah' },
+      { ...base, title: `${product} ${suffix}`, price: 40, category: 'computers' },
+      { ...base, title: `${product} ${suffix}`, price: 20, status: 'draft' },
+      { ...base, title: `Other ${suffix}`, description: `description-only-${suffix} ${product}` },
+    ] });
+    const filtered = await repository.listPublicMarketplaceListings({ query, category: 'mobile_phones', city: 'Riyadh',
+      condition: 'used', minPrice: 40, maxPrice: 60, yearMin: 2024, yearMax: 2026, mileageMin: 10000, mileageMax: 15000 });
+    assert.deepEqual(filtered.map(item => item.id), [first.id]);
+    const filters = { query, city: 'Riyadh', category: 'mobile_phones', sort: 'cheapest' as const, limit: 1, take: 1 };
+    assert.deepEqual((await repository.listPublicMarketplaceListings(filters)).map(item => item.id), [first.id]);
+    assert.deepEqual((await repository.listPublicMarketplaceListings({ ...filters, page: 2 })).map(item => item.id), [second.id]);
+    assert.deepEqual(await repository.listPublicMarketplaceListings({ query: `description-only-${suffix}` }), []);
+    assert.deepEqual(await repository.listPublicMarketplaceListings({ query: "%' OR 1=1 --" }), []);
+    assert.equal(analyze.mock.callCount(), 0);
+    assert.equal(peek.mock.callCount(), 0);
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId } });
+    await prisma.user.deleteMany({ where: { id: sellerId } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
+test('database advisory review survives shared reads and closes only after a human listing decision', async t => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const { recordModelReview } = await import('@/lib/admin/model-review');
+  const { acknowledgeReportNotification, listReportNotifications } = await import('@/lib/admin/report-notifications');
+  const suffix = crypto.randomUUID();
+  const seller = { id: `review-seller-${suffix}`, email: `review-seller-${suffix}@example.test` };
+  const admin = { id: `review-admin-${suffix}`, email: `review-admin-${suffix}@example.test` };
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => textAnalysis());
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis());
+  try {
+    await prisma.user.createMany({ data: [seller, { ...admin, role: 'admin' }] });
+    const listing = await prisma.listing.create({ data: { sellerId: seller.id, category: 'other', title: 'Review fixture',
+      status: 'published', compliance: { decision: 'allow', reasons: [] } } });
+    const review = { subject: 'listing' as const, subjectId: listing.id, listingId: listing.id, userId: seller.id,
+      text: JSON.stringify({ title: listing.title }), assessment: { decision: 'needs_review' as const, reasons: ['fixture_review'] } };
+    await recordModelReview(review);
+    const queued = async () => (await repository.listModerationQueuePage({ limit: 80 })).listings.some(item => item.id === listing.id);
+    assert.equal(await queued(), true);
+    assert.equal((await repository.getListing(listing.id))?.status, 'published');
+    const inbox = await listReportNotifications(1, 100);
+    const notification = inbox.notifications.find(item => item.sourceType === 'ModelReview' && item.listingId === listing.id)!;
+    assert.ok(notification);
+    assert.equal(notification.details, 'Review fixture');
+    const acknowledgements = await Promise.all(Array.from({ length: 4 }, () => acknowledgeReportNotification(notification.id, admin.id)));
+    assert.ok(acknowledgements.every(Boolean));
+    assert.equal(await prisma.adminAuditLog.count({ where: { targetType: 'ModelReviewRead', targetId: notification.id } }), 1);
+    assert.ok(!(await listReportNotifications(1, 100)).notifications.some(item => item.id === notification.id));
+    assert.equal(await queued(), true, 'Reading an alert must not decide the content outcome');
+    await repository.setListingModerationStatus(listing.id, 'published', admin);
+    assert.equal(await queued(), false);
+    await recordModelReview({ ...review, subject: 'image', text: 'Later image assessment' });
+    assert.equal(await queued(), true, 'A later assessment must reopen review');
+    await repository.setListingModerationStatus(listing.id, 'rejected', admin);
+    assert.equal(await queued(), false);
+    await repository.updateListingForSeller(listing.id, seller.id, { title: 'Seller cannot bypass rejection' });
+    assert.equal((await repository.setListingStatusForSeller(listing.id, seller.id, 'published'))?.status, 'rejected');
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId: seller.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [seller.id, admin.id] } } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
+test('database concurrent chat draft replays create one draft and one advisory alert without customer reports', async t => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const suffix = crypto.randomUUID();
+  const seller = { id: `draft-replay-${suffix}`, email: `draft-replay-${suffix}@example.test` };
+  const assessed = textAnalysis({ compliance: { decision: 'block', reasons: ['review_fixture'], shariaSensitive: false } });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => assessed);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => assessed);
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  try {
+    const input = { category: 'other', title: 'Concurrent draft' };
+    const results = await Promise.all(Array.from({ length: 4 }, () => repository.createListingDraft(seller, input, { idempotencyKey: suffix })));
+    assert.equal(new Set(results.map(item => item.id)).size, 1);
+    assert.ok(results.every(item => item.status === 'draft' && item.compliance.decision === 'allow'));
+    assert.equal(await prisma.listing.count({ where: { sellerId: seller.id } }), 1);
+    const listingId = results[0].id;
+    assert.equal(await prisma.adminAuditLog.count({ where: { targetType: 'ModelReview', targetId: listingId } }), 1);
+    assert.equal(await prisma.report.count({ where: { listingId } }), 0);
+    const replay = await repository.createListingDraft(seller, { ...input, title: 'Different model wording' }, { idempotencyKey: suffix });
+    assert.equal(replay.id, listingId);
+    assert.equal(replay.title, input.title);
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId: seller.id } });
+    await prisma.user.deleteMany({ where: { id: seller.id } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
 
 test('future first-publication timestamps survive concurrent publish, edits and republication without enrolling legacy rows', async (t) => {
   if (!shouldRunDatabaseIntegration()) {

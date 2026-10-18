@@ -42,7 +42,8 @@ test('parses tolerant adaptive model enum and boolean values', () => {
   assert.equal(intent.requiresAuth, false);
 });
 
-test('uses conversation context for short marketplace follow-ups', () => {
+test('model-understood follow-ups never concatenate old requests into the search query', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing' }));
   const intent = getFallbackAdaptiveMarketplaceIntent([
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
     { role: 'assistant', parts: [{ type: 'text', text: 'أي ماركة؟' }] },
@@ -53,9 +54,7 @@ test('uses conversation context for short marketplace follow-ups', () => {
 
   assert.equal(intent.intent, 'search_listing');
   assert.equal(intent.execution, 'search_listings');
-  assert.match(intent.searchQuery ?? '', /سيارة/);
-  assert.match(intent.searchQuery ?? '', /كامري/);
-  assert.match(intent.searchQuery ?? '', /2020/);
+  assert.equal(intent.searchQuery, '2020');
   assert.equal(intent.requiresAuth, false);
 });
 
@@ -83,7 +82,8 @@ test('does not search listings when the model identifies creation intent', (t) =
   assert.equal(intent.requiresAuth, true);
 });
 
-test('routes listing approval follow-ups to draft creation', () => {
+test('routes model-understood listing preparation confirmations without publishing', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'create_listing' }));
   const intent = getFallbackAdaptiveMarketplaceIntent([
     {
       role: 'user',
@@ -108,7 +108,7 @@ test('routes listing approval follow-ups to draft creation', () => {
 
   assert.equal(intent.intent, 'create_listing');
   assert.equal(intent.execution, 'create_listing_draft');
-  assert.equal(intent.reasonCode, 'listing_publish_confirmation');
+  assert.equal(intent.reasonCode, 'model_marketplace_intent');
   assert.equal(intent.requiresAuth, true);
 });
 
@@ -184,4 +184,14 @@ test('search intent searches first instead of only asking for narrowing', () => 
   assert.equal(intent.execution, 'search_listings');
   assert.equal(intent.searchQuery, 'I want a car');
   assert.match(intent.reasonCode, /search_first/);
+});
+
+test('unavailable understanding does not turn arbitrary text or prior products into a search', t => {
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
+  const intent = getFallbackAdaptiveMarketplaceIntent([
+    { role: 'user', content: 'old chair search' },
+    { role: 'user', content: 'new refrigerator search' },
+  ]);
+  assert.equal(intent.searchQuery, undefined);
+  assert.equal(intent.intent, 'general_info');
 });

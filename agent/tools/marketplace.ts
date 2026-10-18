@@ -1,4 +1,6 @@
 import { tool } from 'ai';
+import sharp from 'sharp';
+import { createHash } from 'node:crypto';
 import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { z } from 'zod';
 
@@ -209,15 +211,18 @@ export function createMarketplaceTools(
     latestUploadedImages?: UploadedListingImage[];
     searchOwnerKey?: string;
     language?: AppLanguage;
+    requestKey?: string;
+    onDraftSaved?: (listingId: string) => void;
   } = {},
 ) {
-  return {
+  const draftOperations = new Map<string, number>();
+  const tools = {
     searchMarketplaceListings: tool({
       description:
         'Search current published سوق حمد marketplace listings for a buyer only. Do not use this for seller requests to create, publish, prepare, price, or add a listing; seller listing creation must use createListingDraft. Understand the buyer request first, pass structured understoodIntent fields when possible, set searchMode="new_search" for a fresh broad product/category request, and set searchMode="refine" only when the buyer clearly narrows existing results. Use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying buyer listings are unavailable. This is read-only and never stores raw user search text as listing data.',
       inputSchema: z.object({
-        query: z.string().trim().min(1).max(300).optional(),
-        understoodIntent: marketplaceSearchUnderstandingSchema.optional(),
+        query: z.string().trim().min(1).max(300).describe('Literal product/title words from the customer, preserving their language and spelling. Omit request wording, city and budget. This database tool does not interpret natural-language sentences or infer synonyms. For a filter-only refinement omit query.').optional(),
+        understoodIntent: marketplaceSearchUnderstandingSchema.describe('Explicit customer-requested filters only. Never infer a category, manufacturer, city, budget, condition or feature that the customer did not request. Category discovery during listing creation is separate. Use new_search for independent requests and refine only for explicit follow-ups.').optional(),
       }),
       execute: async ({ query, understoodIntent }) => {
         const searchResult = await searchMarketplaceWithState({
@@ -227,11 +232,11 @@ export function createMarketplaceTools(
           query,
           understoodIntent,
           language: options.language,
-          useModelUnderstanding: true,
         });
 
         return {
           status: searchResult.status,
+          unavailablePreferences: understoodIntent?.sortPreference === 'closest' || understoodIntent?.locationPreference === 'nearby' ? ['geographic_distance'] : [],
           count: searchResult.listings.length,
           candidateCount: searchResult.candidateCount,
           rankedCount: searchResult.rankedCount,
@@ -241,7 +246,7 @@ export function createMarketplaceTools(
           market: searchResult.market,
           relaxedSuggestion: searchResult.relaxedSuggestion,
           note:
-            'Each search replaces the prior server filters unless searchMode="refine" explicitly continues the current search. Return only the latest visible ranked matches and explain scores using the provided reasons. Do not invent unavailable listings or market averages.',
+            'Each search replaces prior server filters unless searchMode="refine" explicitly continues the current search. clearFilters removes previous constraints. Return only the latest visible matches. No geographic distance is calculated: if geographic_distance is unavailable, say so and offer the explicit city filter; never claim that the ordering is nearest by distance. Do not invent unavailable listings or market averages.',
         };
       },
     }),
@@ -357,7 +362,7 @@ export function createMarketplaceTools(
 
     createListingDraft: tool({
       description:
-        'Create a structured marketplace listing draft from a natural seller conversation. Use after the user wants to sell or publish an allowed marketplace item and gives a minimum product signal. Put every confirmed extra detail that does not fit title, description, price, city, condition, or category into attributes, including model, year, mileage, specs, accessories, warranty, defects/no-defects, color, material, brand, sale terms, usage notes, and seller notes. Do not use for prohibited Saudi or Islamic-policy items.',
+        'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
       inputSchema: listingDetailsInputSchema,
       execute: async (input) => {
         if (!session) {
@@ -371,7 +376,12 @@ export function createMarketplaceTools(
         let imageUploadUnavailable = false;
 
         try {
-          listing = await createListingDraft(session.user, listingInput);
+          const signature = JSON.stringify(listingInput, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+            ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
+          if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
+          const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
+          listing = await createListingDraft(session.user, listingInput, { idempotencyKey });
+          if (listing.status === 'draft') options.onDraftSaved?.(listing.id);
         } catch (error) {
           if (isListingLimitReachedError(error)) {
             const maxListings = getMaxListingsPerSeller();
@@ -386,20 +396,22 @@ export function createMarketplaceTools(
           throw error;
         }
 
-        if (listing.compliance.decision === 'block') {
+        if (listing.status !== 'draft' && listing.status !== 'pending') return {
+          status: 'already_saved', listing,
+          message: 'This request already saved the listing. Do not create another or modify its current state; guide the user to Account > My listings.',
+        };
+
+        if (listing.compliance.humanDecision === 'block') {
           return {
             status: 'blocked',
             message:
-              'This listing is blocked by Saudi marketplace and Islamic compliance policy.',
+              'An explicit administration decision restricts this listing. Do not bypass it.',
             listing,
           };
         }
 
         if (options.latestUploadedImages?.length) {
-          const review = await reviewListingImageContent(options.latestUploadedImages, listing.images);
-          if (review.status === 'blocked') {
-            return { status: review.status, message: review.message, listing, compliance: review.compliance };
-          }
+          const review = await reviewListingImageContent(options.latestUploadedImages, listing.images, { listingId: listing.id, userId: session.user.id });
           const listingWithImages = await saveUploadedListingImagesForSeller({
             listingId: listing.id,
             sellerId: session.user.id,
@@ -480,11 +492,13 @@ export function createMarketplaceTools(
           };
         }
 
-        if (listing.compliance.decision === 'block') {
+        options.onDraftSaved?.(listing.id);
+
+        if (listing.compliance.humanDecision === 'block') {
           return {
             status: 'blocked',
             message:
-              'This update is blocked by Saudi marketplace and Islamic compliance policy.',
+              'An explicit administration decision restricts this listing. Do not bypass it.',
             listing,
           };
         }
@@ -528,10 +542,7 @@ export function createMarketplaceTools(
           return { status: 'user_action_required', message: 'Change images for non-draft listings yourself from Account > My listings.' };
         }
 
-        const review = await reviewListingImageContent(options.latestUploadedImages, targetListing.images);
-        if (review.status === 'blocked') {
-          return { status: review.status, message: review.message, listing: targetListing, compliance: review.compliance };
-        }
+        const review = await reviewListingImageContent(options.latestUploadedImages, targetListing.images, { listingId, userId: session.user.id });
         const listing = await saveUploadedListingImagesForSeller({
           listingId,
           sellerId: session.user.id,
@@ -547,6 +558,7 @@ export function createMarketplaceTools(
           };
         }
 
+        options.onDraftSaved?.(listing.id);
         return {
           status: 'images_added',
           contentCheck: review.status,
@@ -558,7 +570,7 @@ export function createMarketplaceTools(
 
     analyzeListingImages: tool({
       description:
-        'Evaluate listing image quality and truth-preserving enhancement actions. Images are uploaded through chat; do not recommend edits that hide defects or change the item.',
+        'Read actual uploaded-image file metadata. This does not measure sharpness, lighting or product visibility, and never requires a retake or minimum resolution. The existing visual inspection supplies product understanding separately.',
       inputSchema: z.object({
         images: z
           .array(
@@ -574,15 +586,25 @@ export function createMarketplaceTools(
             }),
           )
           .min(1)
-          .max(10),
+          .max(10).optional(),
       }),
-      execute: async ({ images }) => ({
-        status: 'analyzed',
-        policy:
-          'Allowed enhancements: crop, lighting, sharpening, straighten, compression, thumbnails, and blur sensitive info. Forbidden: hide defects, change colors, add accessories, or alter product truth.',
-        results: images.map(analyzeImageQuality),
-      }),
+      execute: async () => {
+        if (!options.latestUploadedImages?.length) return { status: 'missing_images', results: [] };
+        const results = await Promise.all(options.latestUploadedImages.map(async image => {
+          try {
+            const metadata = await sharp(image.data).metadata();
+            return { ...analyzeImageQuality({ mimeType: image.mediaType, sizeBytes: image.data.byteLength, width: metadata.width, height: metadata.height }), qualityScore: null };
+          } catch { return { assessmentStatus: 'unavailable' as const, qualityScore: null }; }
+        }));
+        return { status: 'metadata_only', results, note: 'No visual-quality measurement or image enhancement was performed. Do not invent image-quality claims.' };
+      },
     }),
 
   };
+  return tools;
+}
+
+export function createReadOnlyMarketplaceTools(session: AuthSession | null, options: Parameters<typeof createMarketplaceTools>[1] = {}) {
+  const { searchMarketplaceListings, compareMarketplaceListings, estimateListingPrice, evaluateNegotiationOffer, analyzeListingImages } = createMarketplaceTools(session, options);
+  return { searchMarketplaceListings, compareMarketplaceListings, estimateListingPrice, evaluateNegotiationOffer, analyzeListingImages };
 }

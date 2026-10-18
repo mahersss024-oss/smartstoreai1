@@ -72,7 +72,7 @@ test('creates an allowed marketplace listing draft', () => {
   assert.equal(listing.sellerId, 'seller:test-1');
 });
 
-test('rejects a model-blocked listing draft before publishing', (t) => {
+test('model-blocked assessments are advisory and cannot reject listing drafts', (t) => {
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({
     compliance: { decision: 'block', reasons: ['prohibited_content'], shariaSensitive: false },
   }));
@@ -82,8 +82,9 @@ test('rejects a model-blocked listing draft before publishing', (t) => {
     title: 'مشروب كحولي للبيع',
   });
 
-  assert.equal(listing.status, 'rejected');
-  assert.equal(listing.compliance.decision, 'block');
+  assert.equal(listing.status, 'draft');
+  assert.equal(listing.compliance.decision, 'allow');
+  assert.equal(listing.compliance.modelAssessment?.decision, 'block');
 });
 
 test('publishes only compliant listings', () => {
@@ -762,7 +763,7 @@ test('listing reports stay unique per reporter even after moderation', () => {
   assert.equal(getListingReport(listing.id, 'unrelated-buyer'), null);
 });
 
-test('lists moderation queue and prevents publishing model-blocked listings', (t) => {
+test('administrators can publish listings independently of model concerns', (t) => {
   const decisions = new Map<string, 'needs_review' | 'block'>([
     ['فيب للبيع', 'needs_review'], ['مشروب كحولي للبيع', 'block'],
   ] as const);
@@ -794,8 +795,9 @@ test('lists moderation queue and prevents publishing model-blocked listings', (t
     'published',
   );
 
-  assert.equal(queue.listings.some((listing) => listing.id === sensitiveListing.id), true);
-  assert.equal(blockedPublish.status, 'blocked_by_policy');
+  assert.equal(queue.listings.some((listing) => listing.id === sensitiveListing.id), false);
+  assert.equal(blockedPublish.status, 'published');
+  assert.equal(blockedPublish.listing?.compliance.humanDecision, 'allow');
   assert.equal(approvedSensitive.status, 'published');
 });
 
@@ -995,7 +997,10 @@ test('accepts low resolution images with optional enhancement instead of requiri
     height: 240,
   });
 
-  assert.equal(result.recommendedAction, 'enhance');
+  assert.equal(result.recommendedAction, 'approve');
+  assert.equal(result.assessmentStatus, 'not_measured');
+  assert.equal(result.sharpness, 'unknown');
+  assert.equal(result.lighting, 'unknown');
   assert.equal(result.listingImageStatus, 'approved');
 });
 

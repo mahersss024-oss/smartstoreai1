@@ -50,14 +50,15 @@ test('invalid categories, errors, timeouts and oversized text do not invent anal
   assert.equal(await stalled.analyze('x'.repeat(12001)), null);
 });
 
-test('unavailable analysis routes a draft to review and does not permit publication', async t => {
+test('unavailable analysis raises an advisory review signal without deciding publication', async t => {
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => null);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
   const draft = await createListingDraft({ id: 'semantic-outage-owner', email: 'outage@example.test' },
     { category: 'other', title: 'Policy inspection unavailable', attributes: {} });
-  assert.equal(draft.status, 'pending');
+  assert.equal(draft.status, 'draft');
   assert.equal(draft.compliance.checkStatus, 'unavailable');
-  assert.equal(publishListing(draft.id)?.status, 'pending');
+  assert.equal(draft.compliance.modelAssessment?.unavailable, true);
+  assert.equal(publishListing(draft.id)?.status, 'published');
 });
 
 test('candidate preparation gives later batches the remaining deadline instead of another full timeout', async t => {
@@ -109,12 +110,12 @@ test('explicit refinement retains contextual aliases and a new search clears the
   refine.terms = [];
   refine.maxPrice = 100;
   const state = await updateMarketplaceSearchState('semantic-refinement', refine);
-  assert.ok(buildRetrievalTermGroups(state).some(group => group.includes('bureau')));
+  assert.deepEqual(buildRetrievalTermGroups(state), [['desk']]);
   const fresh = await updateMarketplaceSearchState('semantic-refinement', parseStructuredSearchIntent('new product'));
   assert.deepEqual(fresh.termAliases, []);
 });
 
-test('site and chat search retrieve contextual synonyms and exclude confirmed spare parts', async t => {
+test('chat database search returns literal title matches without semantic removal of parts', async t => {
   const query = 'integration semantic furniture request';
   const whole = { category: 'furniture', title: 'unit semantic bureau fixed', price: 100, attributes: {} };
   const part = { category: 'furniture', title: 'unit semantic bureau fixed leg', price: 5, attributes: {} };
@@ -138,9 +139,9 @@ test('site and chat search retrieve contextual synonyms and exclude confirmed sp
   const savedPart = await createListingDraft(owner, part);
   publishListing(savedWhole.id);
   publishListing(savedPart.id);
-  const result = await searchMarketplaceWithState({ ownerKey: 'semantic-integration-search', query });
+  const result = await searchMarketplaceWithState({ ownerKey: 'semantic-integration-search', query: 'bureau' });
   assert.ok(result.listings.some(item => item.listing.id === savedWhole.id));
-  assert.ok(!result.listings.some(item => item.listing.id === savedPart.id));
+  assert.ok(result.listings.some(item => item.listing.id === savedPart.id));
 });
 
 test('classification search aliases and contextual policy reuse one result', async t => {
@@ -161,7 +162,8 @@ test('classification search aliases and contextual policy reuse one result', asy
   assert.deepEqual(parseMarketplaceSearchQuery(source).terms, ['desk']);
   assert.ok(getMarketplaceSearchTermVariants('desk', source).includes('writing table'));
   assert.equal(calls, 1);
-  assert.equal(evaluateSaudiMarketplaceCompliance('not analyzed').decision, 'needs_review');
+  assert.equal(evaluateSaudiMarketplaceCompliance('not analyzed').decision, 'allow');
+  assert.equal(evaluateSaudiMarketplaceCompliance('not analyzed').modelAssessment?.unavailable, true);
 });
 
 function listing(id: string, title: string, price: number): ListingRecord {
@@ -199,7 +201,8 @@ test('contextual compliance keeps colors distinct from prohibited commerce', t =
   ]);
   t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => outputs.get(text) ?? null);
   assert.equal(evaluateSaudiMarketplaceCompliance(grey).decision, 'allow');
-  assert.equal(evaluateSaudiMarketplaceCompliance(prohibited).decision, 'block');
+  assert.equal(evaluateSaudiMarketplaceCompliance(prohibited).decision, 'allow');
+  assert.equal(evaluateSaudiMarketplaceCompliance(prohibited).modelAssessment?.decision, 'block');
 });
 
 test('low and unknown resolution are optional quality advice, not upload rejection', () => {

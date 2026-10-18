@@ -4,6 +4,10 @@ import { concretePath } from '@/scripts/testing/route-contracts';
 import { prepare, listing, customer, pagination, now } from './helpers/admin-presentation-fixture';
 import { observePageVitals, readPageVitals } from './helpers/page-vitals';
 
+// Trace screencasting adds presentation latency to the timing being measured.
+// Keep post-measurement screenshots and metric attachments without recording frames during input.
+test.use({ trace: 'off' });
+
 const pages = buildInventory().items.filter(item => item.kind === 'page');
 const layouts = [
   { width: 320, height: 568 },

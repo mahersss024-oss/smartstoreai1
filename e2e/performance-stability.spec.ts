@@ -435,6 +435,9 @@ async function auditThemeToggle(page: Page) {
   );
 }
 
+// Functional specs retain traces; timing samples must not include trace screencasting overhead.
+test.use({ trace: 'off' });
+
 test.describe('mobile and tablet production performance stability audit', () => {
   test('key pages keep stable layout, responsive images, and clean network flow', async ({
     page,

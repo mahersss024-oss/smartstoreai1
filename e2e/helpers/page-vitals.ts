@@ -7,6 +7,7 @@ type LabVitals = {
   eventEntries: number;
   trustedKeydowns: number;
   supported: string[];
+  interactions: Array<{ name: string; target: string; duration: number; inputDelay: number; processing: number; presentation: number }>;
 };
 
 declare global {
@@ -20,6 +21,7 @@ export async function observePageVitals(page: Page) {
     const state: LabVitals = {
       lcp: null, cls: 0, interactionMax: null, eventEntries: 0,
       trustedKeydowns: 0, supported: [...PerformanceObserver.supportedEntryTypes],
+      interactions: [],
     };
     window.__allPageVitals = state;
     let windowStart = 0;
@@ -46,10 +48,16 @@ export async function observePageVitals(page: Page) {
     }
     if (state.supported.includes('event')) {
       new PerformanceObserver(list => {
-        for (const entry of list.getEntries() as Array<PerformanceEntry & { interactionId: number }>) {
+        for (const entry of list.getEntries() as Array<PerformanceEventTiming & { interactionId: number }>) {
           if (!entry.interactionId) continue;
           state.eventEntries++;
           state.interactionMax = Math.max(state.interactionMax ?? 0, entry.duration);
+          if (state.interactions.length < 50) state.interactions.push({
+            name: entry.name, target: entry.target instanceof Element ? `${entry.target.tagName}.${[...entry.target.classList].slice(0, 3).join('.')}` : '',
+            duration: entry.duration, inputDelay: entry.processingStart - entry.startTime,
+            processing: entry.processingEnd - entry.processingStart,
+            presentation: entry.startTime + entry.duration - entry.processingEnd,
+          });
         }
       }).observe({ type: 'event', buffered: true, durationThreshold: 16 } as PerformanceObserverInit);
     }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { ModelMessage } from 'ai';
 
@@ -224,8 +224,10 @@ export async function saveUploadedListingImagesForSeller({
   const initialImageCount = existingListing.images.length;
   let storageFailure: unknown;
 
-  for (const [index, uploadedImage] of images.slice(0, remainingSlots).entries()) {
-    const imageId = randomUUID();
+  for (const [index, uploadedImage] of images.entries()) {
+    const imageId = draftOnly ? `chat-image-${createHash('sha256').update(listingId).update(uploadedImage.data).digest('hex')}` : randomUUID();
+    if (latestListing.images.some(image => image.id === imageId)) continue;
+    if (latestListing.images.length >= maxImages) break;
     let sanitizedOriginal: Awaited<
       ReturnType<typeof createSanitizedListingImageOriginal>
     >;

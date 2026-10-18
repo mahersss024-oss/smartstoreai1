@@ -53,9 +53,12 @@ test('a repeated product search without explicit refinement drops all prior cons
   for (const field of ['city', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'mileageMin', 'mileageMax', 'condition', 'color', 'sortPreference', 'locationPreference'] as const) {
     assert.equal(state?.[field], undefined, field);
   }
-  for (const field of ['terms', 'requiredFeatures', 'excludedFeatures', 'excludedColors', 'rankingPreferences'] as const) {
+  for (const field of ['requiredFeatures', 'excludedFeatures', 'excludedColors', 'rankingPreferences'] as const) {
     assert.deepEqual(state?.[field], [], field);
   }
+  assert.deepEqual(state?.terms, [], 'brand and model constraints must not remain duplicated as hidden product terms');
+  assert.ok(state);
+  assert.deepEqual(buildRetrievalTermGroups(state), [['toyota'], ['camry']]);
   assert.equal(fresh.listings.some(result => result.listing.id === listing.id), true);
 });
 
@@ -182,18 +185,17 @@ test('keeps one accumulated server search state across buyer followups', async (
     mileage: 18000,
   });
 
-  await searchMarketplaceWithState({ ownerKey, query: 'أريد كامري في تبوك' });
-  await searchMarketplaceWithState({ ownerKey, query: '2022 وفوق', understoodIntent: { searchMode: 'refine' } });
-  await searchMarketplaceWithState({ ownerKey, query: 'حدي 80 ألف', understoodIntent: { searchMode: 'refine' } });
+  await searchMarketplaceWithState({ ownerKey, query: 'كامري', understoodIntent: { city: 'تبوك', category: 'cars', brand: 'تويوتا', model: 'كامري' } });
+  await searchMarketplaceWithState({ ownerKey, understoodIntent: { searchMode: 'refine', yearMin: 2022 } });
+  await searchMarketplaceWithState({ ownerKey, understoodIntent: { searchMode: 'refine', maxPrice: 80000 } });
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query: 'الأهم ممشى قليل',
-    understoodIntent: { searchMode: 'refine' },
+    understoodIntent: { searchMode: 'refine', rankingPreferences: ['mileage'] },
   });
 
   assert.equal(result.searchState.category, 'cars');
-  assert.equal(result.searchState.brand, 'Toyota');
-  assert.equal(result.searchState.model, 'Camry');
+  assert.equal(result.searchState.brand, 'تويوتا');
+  assert.equal(result.searchState.model, 'كامري');
   assert.equal(result.searchState.city, 'تبوك');
   assert.equal(result.searchState.yearMin, 2022);
   assert.equal(result.searchState.maxPrice, 80000);
@@ -213,16 +215,14 @@ test('keeps one accumulated server search state across buyer followups', async (
 
   const relaxedBudget = await searchMarketplaceWithState({
     ownerKey,
-    query: 'خل الميزانية 90 ألف',
-    understoodIntent: { searchMode: 'refine' },
+    understoodIntent: { searchMode: 'refine', maxPrice: 90000 },
   });
   assert.equal(relaxedBudget.searchState.maxPrice, 90000);
-  assert.equal(relaxedBudget.searchState.model, 'Camry');
+  assert.equal(relaxedBudget.searchState.model, 'كامري');
 
   const withoutWhite = await searchMarketplaceWithState({
     ownerKey,
-    query: 'لا أريد أبيض',
-    understoodIntent: { searchMode: 'refine' },
+    understoodIntent: { searchMode: 'refine', excludedColors: ['أبيض'] },
   });
   assert.equal(withoutWhite.searchState.excludedColors.includes('أبيض'), true);
 });
@@ -264,7 +264,7 @@ test('refined chat searches replace smart cards with accumulated matching listin
 
   const broadResult = await searchMarketplaceWithState({
     ownerKey,
-    query: 'I want a Camry',
+    query: 'Camry',
     understoodIntent: {
       category: 'cars',
       brand: 'Toyota',
@@ -280,7 +280,6 @@ test('refined chat searches replace smart cards with accumulated matching listin
 
   const yearResult = await searchMarketplaceWithState({
     ownerKey,
-    query: 'model 2025',
     understoodIntent: {
       searchMode: 'refine',
       yearMin: 2025,
@@ -298,7 +297,6 @@ test('refined chat searches replace smart cards with accumulated matching listin
 
   const budgetResult = await searchMarketplaceWithState({
     ownerKey,
-    query: 'between 90000 and 100000',
     understoodIntent: {
       searchMode: 'refine',
       minPrice: 90000,
@@ -371,7 +369,7 @@ test('ranking engine returns explainable scores without LLM scoring', () => {
   assert.equal(ranked[0].reasons.length > 0, true);
 });
 
-test('retrieval treats feature synonyms as alternatives, not mandatory words', async () => {
+test('retrieval uses the product words and explicit title features supplied by chat', async () => {
   const ownerKey = 'test:search-state-hybrid-synonyms';
   await resetMarketplaceSearchState(ownerKey);
 
@@ -385,7 +383,7 @@ test('retrieval treats feature synonyms as alternatives, not mandatory words', a
 
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query: 'أريد toyota camry hybrid في تبوك تحت 80 ألف',
+    query: 'كامري', understoodIntent: { city: 'تبوك', maxPrice: 80000, requiredFeatures: ['هايبرد'] },
   });
 
   assert.equal(
@@ -394,7 +392,7 @@ test('retrieval treats feature synonyms as alternatives, not mandatory words', a
   );
 });
 
-test('retrieval matches Arabic city searches against English stored cities', async () => {
+test('retrieval uses the supplied city value without an additional model inference', async () => {
   const ownerKey = 'test:search-state-arabic-english-city';
   await resetMarketplaceSearchState(ownerKey);
 
@@ -409,7 +407,7 @@ test('retrieval matches Arabic city searches against English stored cities', asy
 
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query: 'أريد كامري في الرياض',
+    query: 'Camry', understoodIntent: { city: 'Riyadh' },
   });
 
   assert.equal(
@@ -420,7 +418,7 @@ test('retrieval matches Arabic city searches against English stored cities', asy
   );
 });
 
-test('retrieval expands structured brand and model aliases before database filtering', () => {
+test('retrieval applies literal brand and model constraints without expanding aliases', () => {
   const termGroups = buildRetrievalTermGroups({
     intent: 'search_listing',
     category: 'cars',
@@ -430,19 +428,15 @@ test('retrieval expands structured brand and model aliases before database filte
     excludedFeatures: [],
     excludedColors: [],
     rankingPreferences: [],
-    terms: [],
+    terms: ['نيسان', 'باترول'],
     revision: 1,
     updatedAt: new Date().toISOString(),
   });
 
-  assert.equal(termGroups[0].includes('nissan'), true);
-  assert.equal(termGroups[0].includes('نيسان'), true);
-  assert.equal(termGroups[1].includes('patrol'), true);
-  assert.equal(termGroups[1].includes('باترول'), true);
-  assert.equal(termGroups[1].includes('بترول'), true);
+  assert.deepEqual(termGroups, [['نيسان'], ['باترول'], ['nissan'], ['patrol']]);
 });
 
-test('chat marketplace search finds Nissan Patrol when the buyer writes petrol spelling', async () => {
+test('chat database search does not substitute a contextual synonym for literal product words', async () => {
   const ownerKey = 'test:search-state-nissan-patrol-alias';
   await resetMarketplaceSearchState(ownerKey);
 
@@ -459,22 +453,22 @@ test('chat marketplace search finds Nissan Patrol when the buyer writes petrol s
 
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query: 'ابي نيسان بترول',
+    query: 'نيسان بترول',
   });
   const intent = parseStructuredSearchIntent('ابي نيسان بترول');
 
-  assert.equal(result.searchState.brand, 'Nissan');
-  assert.equal(result.searchState.model, 'Patrol');
+  assert.equal(result.searchState.brand, undefined);
+  assert.equal(result.searchState.model, undefined);
   assert.deepEqual(intent.terms, []);
   assert.equal(
     result.listings.some(
       (ranked) => ranked.listing.id === 'listing:p0-nissan-patrol-arabic',
     ),
-    true,
+    false,
   );
 });
 
-test('chat marketplace search uses understood intent instead of raw query words', async () => {
+test('chat supplies product-only words and explicit filters to the database tool', async () => {
   const ownerKey = 'test:search-state-understood-intent-no-raw-words';
   await resetMarketplaceSearchState(ownerKey);
 
@@ -492,8 +486,7 @@ test('chat marketplace search uses understood intent instead of raw query words'
 
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query:
-      'Please check if سوق حمد has a published listing card for a Nissan Patrol and do not just search these words.',
+    query: 'Nissan Patrol',
     understoodIntent: {
       category: 'cars',
       brand: 'Nissan',
@@ -541,7 +534,7 @@ test('broad category search starts fresh instead of inheriting old filters', asy
 
   await searchMarketplaceWithState({
     ownerKey,
-    query: 'Nissan Patrol in Tabuk',
+    query: 'Nissan Patrol',
     understoodIntent: {
       category: 'cars',
       brand: 'Nissan',
@@ -551,7 +544,7 @@ test('broad category search starts fresh instead of inheriting old filters', asy
   });
   const result = await searchMarketplaceWithState({
     ownerKey,
-    query: 'I want a car',
+    understoodIntent: { category: 'cars' },
   });
   const storedState = await getMarketplaceSearchState(ownerKey);
 
@@ -595,7 +588,7 @@ test('changed buyer product intent starts a fresh search without old listing fil
 
   await searchMarketplaceWithState({
     ownerKey,
-    query: 'I want a Camry',
+    query: 'Camry',
     understoodIntent: {
       category: 'cars',
       brand: 'Toyota',
@@ -604,7 +597,6 @@ test('changed buyer product intent starts a fresh search without old listing fil
   });
   const refinedCarResult = await searchMarketplaceWithState({
     ownerKey,
-    query: 'in Riyadh',
     understoodIntent: {
       searchMode: 'refine',
       city: 'Riyadh',
@@ -618,7 +610,7 @@ test('changed buyer product intent starts a fresh search without old listing fil
 
   const houseResult = await searchMarketplaceWithState({
     ownerKey,
-    query: 'I want a house',
+    query: 'house',
     understoodIntent: {
       category: 'real_estate',
     },
@@ -662,7 +654,7 @@ test('changed car model starts a fresh search instead of mixing old ad context',
 
   await searchMarketplaceWithState({
     ownerKey,
-    query: 'Toyota Camry in Riyadh',
+    query: 'Toyota Camry',
     understoodIntent: {
       category: 'cars',
       brand: 'Toyota',

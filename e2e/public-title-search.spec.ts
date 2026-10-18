@@ -1,0 +1,34 @@
+import { expect, test } from '@playwright/test';
+
+test('market search returns actual title matches, not description matches, and clears back to the feed', async ({ page, request }) => {
+  const titleResult = await request.get('/api/marketplace/listings?q=desk');
+  expect(titleResult.ok()).toBe(true);
+  const titlePayload = await titleResult.json();
+  expect(titlePayload.listings.length).toBeGreaterThan(0);
+  expect(titlePayload.listings.every((listing: { title: string }) => listing.title.toLowerCase().includes('desk'))).toBe(true);
+  const descriptionResult = await request.get('/api/marketplace/listings?q=solid');
+  expect(descriptionResult.ok()).toBe(true);
+  expect((await descriptionResult.json()).listings).toEqual([]);
+  const categoryResult = await request.get('/api/marketplace/listings?q=desk&category=other&minPrice=100&maxPrice=100&city=' + encodeURIComponent('الرياض'));
+  expect(categoryResult.ok()).toBe(true);
+  expect((await categoryResult.json()).listings.length).toBeGreaterThan(0);
+  const wrongCategory = await request.get('/api/marketplace/listings?q=desk&category=cameras');
+  expect((await wrongCategory.json()).listings).toEqual([]);
+  const wrongPrice = await request.get('/api/marketplace/listings?q=desk&minPrice=101');
+  expect((await wrongPrice.json()).listings).toEqual([]);
+  await page.goto('/');
+  const search = page.getByPlaceholder('ابحث في كل السوق');
+  const searched = page.waitForResponse(response => response.url().includes('/api/marketplace/listings?') && new URL(response.url()).searchParams.get('q') === 'desk');
+  await search.fill('desk');
+  expect((await searched).ok()).toBe(true);
+  await expect(page.locator('.marketplace-listing-card').first()).toBeVisible();
+  const empty = page.waitForResponse(response => response.url().includes('/api/marketplace/listings?') && new URL(response.url()).searchParams.get('q') === 'solid');
+  await search.fill('solid');
+  expect((await empty).ok()).toBe(true);
+  await expect(page.locator('.marketplace-listing-card')).toHaveCount(0);
+  const cleared = page.waitForResponse(response => response.url().includes('/api/marketplace/listings?') && !new URL(response.url()).searchParams.has('q'));
+  await page.getByRole('button', { name: 'مسح البحث', exact: true }).click();
+  await cleared;
+  await expect(search).toHaveValue('');
+  await expect(page.locator('.marketplace-listing-card').first()).toBeVisible();
+});

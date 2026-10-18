@@ -1,6 +1,6 @@
 import { retrieveAndRankMarketplaceListings } from './retrieval-engine';
 import {
-  analyzeMarketForRankedListings,
+  analyzeListingMarket,
   type ListingMarketIntelligence,
 } from './market-intelligence';
 import {
@@ -12,92 +12,18 @@ import {
   type MarketplaceSearchState,
 } from './search-state';
 import {
-  structuredSearchIntentSchema,
-  parseStructuredSearchIntent,
-  type StructuredSearchIntent,
+  parseExplicitMarketplaceSearchIntent,
 } from './structured-search-intent';
 import {
   marketplaceSearchUnderstandingSchema,
   type MarketplaceSearchUnderstandingInput,
 } from './search-understanding-schema';
-import { resolveMarketplaceSearchUnderstanding } from './search-understanding';
-import { prepareListingUnderstanding } from './text-understanding';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import type { AppLanguage } from '@/app/i18n';
 
 export type StatefulMarketplaceSearchResult = Awaited<
   ReturnType<typeof searchMarketplaceWithState>
 >;
-
-function uniqueStrings(values: Array<string | undefined>) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
-}
-
-function hasUnderstoodIntent(input: MarketplaceSearchUnderstandingInput | undefined) {
-  if (!input) {
-    return false;
-  }
-
-  return Object.values(input).some((value) =>
-    Array.isArray(value) ? value.length > 0 : value !== undefined,
-  );
-}
-
-function mergeSearchUnderstanding(
-  parsed: StructuredSearchIntent,
-  understoodIntent?: MarketplaceSearchUnderstandingInput,
-): StructuredSearchIntent {
-  const parsedUnderstanding = marketplaceSearchUnderstandingSchema.safeParse(
-    understoodIntent,
-  );
-  const understood = parsedUnderstanding.success ? parsedUnderstanding.data : undefined;
-  const useUnderstoodTerms = hasUnderstoodIntent(understood);
-  const hasStructuredProductIdentity = Boolean(
-    understood?.brand ?? understood?.model ?? parsed.brand ?? parsed.model,
-  );
-  const parsedTerms =
-    useUnderstoodTerms || hasStructuredProductIdentity ? [] : parsed.terms;
-
-  return structuredSearchIntentSchema.parse({
-    ...parsed,
-    searchMode: understood?.searchMode ?? parsed.searchMode,
-    category: understood?.category ?? parsed.category,
-    brand: understood?.brand ?? parsed.brand,
-    model: understood?.model ?? parsed.model,
-    city: understood?.city ?? parsed.city,
-    minPrice: understood?.minPrice ?? parsed.minPrice,
-    maxPrice: understood?.maxPrice ?? parsed.maxPrice,
-    yearMin: understood?.yearMin ?? parsed.yearMin,
-    yearMax: understood?.yearMax ?? parsed.yearMax,
-    condition: understood?.condition ?? parsed.condition,
-    mileageMin: understood?.mileageMin ?? parsed.mileageMin,
-    mileageMax: understood?.mileageMax ?? parsed.mileageMax,
-    color: understood?.color ?? parsed.color,
-    requiredFeatures: uniqueStrings([
-      ...parsed.requiredFeatures,
-      ...(understood?.requiredFeatures ?? []),
-    ]),
-    excludedFeatures: uniqueStrings([
-      ...parsed.excludedFeatures,
-      ...(understood?.excludedFeatures ?? []),
-    ]),
-    excludedColors: uniqueStrings([
-      ...parsed.excludedColors,
-      ...(understood?.excludedColors ?? []),
-    ]),
-    rankingPreferences: uniqueStrings([
-      ...parsed.rankingPreferences,
-      ...(understood?.rankingPreferences ?? []),
-    ]),
-    sortPreference: understood?.sortPreference ?? parsed.sortPreference,
-    locationPreference:
-      understood?.locationPreference ?? parsed.locationPreference,
-    terms: uniqueStrings([
-      ...parsedTerms,
-      ...(understood?.descriptiveTerms ?? []),
-    ]),
-  });
-}
 
 function summarizeMarket(
   market: Map<string, ListingMarketIntelligence>,
@@ -146,23 +72,13 @@ export async function searchMarketplaceWithState(input: {
   query?: string;
   understoodIntent?: MarketplaceSearchUnderstandingInput;
   language?: AppLanguage;
-  useModelUnderstanding?: boolean;
 }) {
-  const understoodIntent = input.useModelUnderstanding !== false
-    ? await resolveMarketplaceSearchUnderstanding({
-        query: input.query,
-        language: input.language,
-        preliminaryUnderstanding: input.understoodIntent,
-      })
-    : input.understoodIntent;
-  const intent = mergeSearchUnderstanding(
-    parseStructuredSearchIntent(input.query),
-    understoodIntent,
-  );
+  const explicit = marketplaceSearchUnderstandingSchema.parse(input.understoodIntent ?? {});
+  const intent = parseExplicitMarketplaceSearchIntent(input.query, explicit);
   const searchState = await updateMarketplaceSearchState(input.ownerKey, intent);
   const results = await retrieveAndRankMarketplaceListings(searchState);
-  await prepareListingUnderstanding(results.shown.map(result => result.listing));
-  const market = analyzeMarketForRankedListings(results.shown.map(result => result.listing));
+  // Full semantic comparisons remain an explicit comparison/pricing service, not a search filter.
+  const market = new Map(results.shown.map(({ listing }) => [listing.id, analyzeListingMarket(listing, [])]));
   const recommendations = buildMarketplaceRecommendations(results.shown, market);
   const visibleListingIds = results.shown.map((result) => result.listing.id);
 

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import {
   createListingDraft,
-  listMarketplaceListings,
+  listPublicMarketplaceListings,
 } from '@/agent/marketplace/repository';
 import {
   getMaxListingsPerSeller,
@@ -14,10 +14,26 @@ import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
+import { marketplaceCategoryIds } from '@/lib/marketplace/categories';
+import { sortPreferenceSchema } from '@/agent/marketplace/structured-search-intent';
 
 export const dynamic = 'force-dynamic';
 
 const maxCreateListingRequestBytes = 64 * 1024;
+const publicSearchSchema = z.object({
+  query: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(80).optional(),
+  category: z.enum(marketplaceCategoryIds).optional(),
+  categories: z.array(z.enum(marketplaceCategoryIds)).max(marketplaceCategoryIds.length).optional(),
+  minPrice: z.coerce.number().nonnegative().optional(),
+  maxPrice: z.coerce.number().nonnegative().optional(),
+  yearMin: z.coerce.number().int().min(1900).max(2099).optional(),
+  yearMax: z.coerce.number().int().min(1900).max(2099).optional(),
+  mileageMin: z.coerce.number().int().nonnegative().optional(),
+  mileageMax: z.coerce.number().int().nonnegative().optional(),
+  condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
+  sort: sortPreferenceSchema.optional(),
+});
 const createListingSchema = z.object({
   autoCategory: z.boolean().optional(),
   category: z.string().min(2).max(80),
@@ -36,6 +52,13 @@ export async function GET(request: Request) {
   const query = url.searchParams.get('q') ?? undefined;
   const cityParam = url.searchParams.get('city')?.trim();
   const city = cityParam && cityParam !== 'all' ? cityParam : undefined;
+  const parsedSearch = publicSearchSchema.safeParse({
+    query, city,
+    categories: url.searchParams.has('categories') ? url.searchParams.get('categories')!.split(',') : undefined,
+    ...Object.fromEntries(['category', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'mileageMin', 'mileageMax', 'condition', 'sort']
+      .filter(key => url.searchParams.has(key)).map(key => [key, url.searchParams.get(key)])),
+  });
+  if (!parsedSearch.success) return Response.json({ error: 'invalid_search_filters' }, { status: 400, headers: noStoreHeaders });
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 24,
     maxLimit: 48,
@@ -51,9 +74,8 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const listings = await listMarketplaceListings({
-    query,
-    city,
+  const listings = await listPublicMarketplaceListings({
+    ...parsedSearch.data,
     page: pagination.page,
     limit: pagination.limit,
     take: pagination.limit + 1,

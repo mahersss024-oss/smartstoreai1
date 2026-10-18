@@ -8,12 +8,13 @@ import {
 import { evaluateConversationMessageSafety, containsDirectContactDetails } from '@/agent/marketplace/message-safety';
 import { textAnalysis } from './helpers/text-understanding';
 
-test('policy preserves contextual model decisions without reclassifying substrings', t => {
+test('policy preserves advisory model assessments without delegating content decisions', t => {
   for (const decision of ['allow', 'block', 'needs_review'] as const) {
     const output = textAnalysis({ compliance: { decision, reasons: [decision], shariaSensitive: decision !== 'allow' } });
     t.mock.method(marketplaceTextAnalyzer, 'peek', () => output);
     const actual = evaluateSaudiMarketplaceCompliance('context supplied by the customer');
-    assert.equal(actual.decision, decision);
+    assert.equal(actual.decision, 'allow');
+    assert.equal(actual.modelAssessment?.decision, decision);
     assert.deepEqual(actual.reasons, [decision]);
     assert.equal(actual.jurisdiction, 'SA');
     assert.equal(actual.checkStatus, 'completed');
@@ -21,13 +22,15 @@ test('policy preserves contextual model decisions without reclassifying substrin
   }
 });
 
-test('missing analysis or inspection errors require review rather than approval', t => {
+test('missing analysis or inspection errors remain explicit advisory review signals', t => {
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
   const unavailable = evaluateSaudiMarketplaceCompliance('not yet inspected');
-  assert.equal(unavailable.decision, 'needs_review');
+  assert.equal(unavailable.decision, 'allow');
+  assert.equal(unavailable.modelAssessment?.unavailable, true);
   assert.equal(unavailable.checkStatus, 'unavailable');
   const failed = evaluateListingComplianceBestEffort('text', () => { throw new Error('offline'); });
-  assert.equal(failed.decision, 'needs_review');
+  assert.equal(failed.decision, 'allow');
+  assert.equal(failed.modelAssessment?.unavailable, true);
   assert.equal(failed.checkStatus, 'unavailable');
 });
 
@@ -44,15 +47,16 @@ test('intent classification consumes model output and retains authentication req
   assert.equal(classifyMarketplaceIntent('unknown request').requiresAuth, false);
 });
 
-test('conversation safety rejects blocked regulated and uninspected content', t => {
+test('model concerns and inspection outages cannot block conversation messages', t => {
   for (const decision of ['block', 'needs_review'] as const) {
     t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({
       compliance: { decision, reasons: ['policy'], shariaSensitive: false },
     }));
-    assert.equal(evaluateConversationMessageSafety('message').decision, 'block');
+    assert.equal(evaluateConversationMessageSafety('message').decision, 'allow');
+    assert.ok(evaluateConversationMessageSafety('message').reasons.length > 0);
   }
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
-  assert.equal(evaluateConversationMessageSafety('message').decision, 'block');
+  assert.equal(evaluateConversationMessageSafety('message').decision, 'allow');
 });
 
 test('permitted contact coordination remains allowed after contextual inspection', t => {
