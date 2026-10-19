@@ -793,11 +793,11 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                   <span className="shrink-0 text-muted-foreground">طريقة البيع</span>
                   <strong className="min-w-0 truncate text-sm">{saleTerms}</strong>
                 </div>
-                <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/60 bg-background/45 px-3 py-2 sm:col-span-2">
+                <div className="col-span-2 flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1 rounded-md border border-border/60 bg-background/45 px-3 py-2 sm:col-span-2" data-listing-reference>
                   <span className="shrink-0 text-muted-foreground">رقم الإعلان</span>
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 basis-full items-start gap-2 sm:basis-auto sm:flex-1">
                     <strong
-                      className="min-w-0 select-all truncate text-sm"
+                      className="min-w-0 flex-1 select-all break-all text-sm"
                       dir="ltr"
                       title={listing.id}
                     >

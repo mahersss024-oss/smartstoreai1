@@ -222,10 +222,11 @@ test('prevents page-level horizontal panning on all viewports', () => {
 
   assert.match(globalCss, /html \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
   assert.match(globalCss, /body \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
-  assert.match(globalCss, /body > main \{[\s\S]*overflow-x: hidden;[\s\S]*overflow-x: clip;/);
+  assert.match(globalCss, /body > main,\s*body > \.page-transition-content > main \{[^}]*overflow-x: hidden;[^}]*overflow-x: clip;/);
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\]/);
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\][\s\S]*width:\s*100dvw;/);
   assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\] body > main/);
+  assert.match(globalCss, /html\[data-native-app="true"\]\[data-platform="android"\] body > \.page-transition-content > main/);
   assert.match(globalCss, /--native-status-bar-inset: env\(safe-area-inset-top, 0px\);/);
   assert.doesNotMatch(globalCss, /max\(env\(safe-area-inset-top, 0px\), 28px\)/);
   assert.match(globalCss, /overscroll-behavior-x: none;/);
@@ -260,17 +261,17 @@ test('keeps intentional touch controls and image strips interactive', () => {
   assert.match(listingGallery, /onClick=\{\(\) => openLightbox\(index\)\}/);
 });
 
-test('public marketplace search supports listing id and listing links safely', () => {
+test('public marketplace API wires the shared exact ID lookup into its active search path', () => {
   const repository = readProjectFile('agent', 'marketplace', 'repository.ts');
   const store = readProjectFile('agent', 'marketplace', 'store.ts');
   const route = readProjectFile('app', 'api', 'marketplace', 'listings', 'route.ts');
+  const search = readProjectFile('lib', 'marketplace', 'title-search.ts');
 
-  assert.match(repository, /function extractListingIdLookup/);
-  assert.match(repository, /listingPathMatch/);
-  assert.match(repository, /id: \{ contains: listingIdLookup, mode: 'insensitive' \}/);
-  assert.match(repository, /status: 'published'/);
-  assert.match(store, /function extractListingIdLookup/);
-  assert.match(store, /listing\.id\.toLowerCase\(\)\.includes/);
+  assert.match(repository, /publicListingFiltersSql\(filters\)/);
+  assert.match(search, /export function getMarketplaceListingIdLookup/);
+  assert.match(search, /Prisma\.sql`"id" = \$\{listingId\}`/);
+  assert.match(store, /listing\.id === listingId/);
+  assert.match(route, /await listPublicMarketplaceListings\(/);
   assert.match(route, /const query = url\.searchParams\.get\('q'\)/);
 });
 

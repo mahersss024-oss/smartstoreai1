@@ -19,6 +19,7 @@ import { SiteVisitTracker } from "@/components/site-visit-tracker";
 import { NativeAppBridge } from "@/components/native-app-bridge";
 import { OpenInAppBanner } from "@/components/open-in-app-banner";
 import { AuthSessionProvider } from "@/hooks/use-auth-session";
+import { PageTransition } from "@/components/page-transition";
 
 const themeStorageKey = "theme";
 const themeCookieName = "theme";
@@ -336,7 +337,7 @@ export default function RootLayout({
         <NativeAppBridge />
         <AuthSessionProvider>
           <OpenInAppBanner />
-          {children}
+          <PageTransition>{children}</PageTransition>
           <PullToRefresh />
           <MobileBottomNavigation />
         </AuthSessionProvider>

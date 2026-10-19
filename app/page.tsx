@@ -98,6 +98,7 @@ import { createChatImageContext, type RetainedChatImage } from '@/lib/chat/image
 import { scopeChatSearchOwnerKey } from '@/lib/chat/conversation';
 import { clearChatSessionState, readChatSessionState, writeChatSessionState } from '@/lib/chat/session-state';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
+import { getHomeBrowseKey, readHomeBrowseState, reloadHomeBrowsePages, writeHomeBrowseState } from '@/lib/marketplace/home-browse-state';
 
 const CommissionAgreementDialog = dynamic(
   () =>
@@ -1386,6 +1387,7 @@ function renderMessageParts(
 ): ReactNode[] {
   return parts.flatMap((part, index) => {
     if (part.type === 'text') {
+      if (!part.text.trim()) return [];
       const text = assistant ? getSafeAssistantText(part.text) || chatServiceUnavailableMessage : part.text;
       if (text.includes(authRequiredMarker) || (assistant && part.text.includes(authRequiredMarker))) {
         return [<SignInCard key={`auth-${index}`} text={assistant ? getSafeAssistantText(part.text) || `${authRequiredMarker} يرجى تسجيل الدخول للمتابعة.` : text} />];
@@ -1400,6 +1402,11 @@ function renderMessageParts(
 
     return [];
   });
+}
+
+function hasVisibleAssistantContent(message: UIMessage) {
+  return message.role === 'assistant' && message.parts.some(part =>
+    part.type === 'file' || (part.type === 'text' && part.text.trim().length > 0));
 }
 
 function isUserImageMessagePart(
@@ -1661,7 +1668,7 @@ function AssistantMessageFrame({
   const isHamadAvatar = avatar === 'hamad';
 
   return (
-    <div className="flex w-full items-start gap-2">
+    <div className="flex w-full items-start gap-2" data-testid="assistant-message-frame">
       <div
         className={cn(
           'mt-1 grid shrink-0 place-items-center overflow-hidden rounded-full border bg-slate-900/80 text-sky-300 shadow-sm shadow-sky-950/20 dark:bg-slate-950/70',
@@ -1798,21 +1805,28 @@ export default function Page() {
     transport: chatTransport,
   });
   useEffect(() => () => { void stop(); }, [stop]);
+  const [restoredBrowseState] = useState(() => readHomeBrowseState<ListingCard>());
+  const restoredBrowseResults = restoredBrowseState &&
+    restoredBrowseState.listingsKey === getHomeBrowseKey(restoredBrowseState) ? restoredBrowseState : null;
+  const canRestoreBrowseListings = Boolean(restoredBrowseResults);
+  const [browseListingsKey, setBrowseListingsKey] = useState(restoredBrowseState?.listingsKey ?? '');
+  const initialBrowseRefreshRef = useRef(true);
+  const pendingBrowseViewportRef = useRef(restoredBrowseResults?.viewport ?? null);
   const [marketplaceListings, setMarketplaceListings] =
-    useState<ListingCard[]>(featuredListings);
+    useState<ListingCard[]>(restoredBrowseResults?.listings ?? featuredListings);
   const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
-    useState('all');
+    useState(restoredBrowseState?.categoryGroup ?? 'all');
   const [selectedMarketSubcategory, setSelectedMarketSubcategory] =
-    useState('all');
-  const [selectedMarketCity, setSelectedMarketCity] = useState('all');
+    useState(restoredBrowseState?.subcategory ?? 'all');
+  const [selectedMarketCity, setSelectedMarketCity] = useState(restoredBrowseState?.city ?? 'all');
   const [nearbyMarketplaceCity, setNearbyMarketplaceCity] =
-    useState<string | null>(null);
+    useState<string | null>(restoredBrowseState?.nearbyCity ?? null);
   const [nearbyMarketplaceNotice, setNearbyMarketplaceNotice] = useState('');
   const [isLocatingNearbyListings, setIsLocatingNearbyListings] =
     useState(false);
-  const [marketplaceSearchInput, setMarketplaceSearchInput] = useState('');
-  const [marketplaceSearchQuery, setMarketplaceSearchQuery] = useState('');
-  const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(false);
+  const [marketplaceSearchInput, setMarketplaceSearchInput] = useState(restoredBrowseState?.searchInput ?? '');
+  const [marketplaceSearchQuery, setMarketplaceSearchQuery] = useState(restoredBrowseState?.searchInput.trim() ?? '');
+  const [isMarketFilterOpen, setIsMarketFilterOpen] = useState(restoredBrowseState?.filterOpen ?? false);
   const [isManualListingOpen, setIsManualListingOpen] = useState(false);
   const [manualListingForm, setManualListingForm] =
     useState<ManualListingForm>(defaultManualListingForm);
@@ -1873,13 +1887,13 @@ export default function Page() {
     wasHidden: false,
   });
   const suppressMarketplaceToolsClickRef = useRef(false);
-  const lastMarketplaceScrollTopRef = useRef(0);
+  const lastMarketplaceScrollTopRef = useRef(restoredBrowseResults?.viewport.scrollTop ?? 0);
   const lastMarketplaceScrollHeightRef = useRef(0);
   const marketplaceToolsManualLockUntilRef = useRef(0);
   const marketplaceToolsTopRevealTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
-  const marketplaceTopActionsHiddenRef = useRef(false);
+  const marketplaceTopActionsHiddenRef = useRef(restoredBrowseResults?.viewport.toolsHidden ?? false);
   const marketplaceScrollReversalDistanceRef = useRef(0);
   const marketplaceScrollIntentRef = useRef({
     direction: 0,
@@ -1887,7 +1901,7 @@ export default function Page() {
     lastToggleAt: 0,
   });
   const [isMarketplaceTopActionsHidden, setIsMarketplaceTopActionsHidden] =
-    useState(false);
+    useState(restoredBrowseResults?.viewport.toolsHidden ?? false);
   const [isMarketplaceToolsDragging, setIsMarketplaceToolsDragging] =
     useState(false);
   const [marketplaceToolsDragOffset, setMarketplaceToolsDragOffset] =
@@ -1896,7 +1910,7 @@ export default function Page() {
     useState(false);
   const [isManualListingFallbackDismissed, setIsManualListingFallbackDismissed] =
     useState(false);
-  const [listingPagination, setListingPagination] = useState({
+  const [listingPagination, setListingPagination] = useState(restoredBrowseResults?.pagination ?? {
     page: 1,
     hasMore: false,
   });
@@ -2056,6 +2070,9 @@ export default function Page() {
     [filteredMessages],
   );
   const isLoading = status === 'streaming' || status === 'submitted';
+  const showAssistantThinking = isLoading && !filteredMessages
+    .slice(filteredMessages.findLastIndex(message => message.role === 'user') + 1)
+    .some(hasVisibleAssistantContent);
   const chatErrorMessage = getChatErrorMessage(error);
   const scrollWatchKey = useMemo(() => {
     const lastMessage = filteredMessages.at(-1);
@@ -2928,12 +2945,15 @@ export default function Page() {
   const refreshMarketplaceListings = useCallback((
     query?: string,
     page = 1,
-    options?: { showLoading?: boolean },
+    options?: { showLoading?: boolean; restorePages?: number },
   ) => {
     const isAppendRequest = page > 1;
     const params = new URLSearchParams();
     const showLoading = options?.showLoading ?? true;
     const effectiveQuery = query ?? marketplaceSearchQuery;
+    const restoringWindow = !isAppendRequest && options?.restorePages !== undefined;
+    const listingsKey = getHomeBrowseKey({ searchInput: effectiveQuery, city: activeMarketCity,
+      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory });
 
     if (effectiveQuery.trim()) {
       params.set('q', effectiveQuery.trim());
@@ -2953,7 +2973,8 @@ export default function Page() {
     params.set('limit', '24');
 
     const endpoint = `/api/marketplace/listings?${params.toString()}`;
-    const existingRequest = listingsInFlightRequestsRef.current.get(endpoint);
+    const requestKey = restoringWindow ? `${endpoint}|pages=${options.restorePages}` : endpoint;
+    const existingRequest = listingsInFlightRequestsRef.current.get(requestKey);
 
     if (existingRequest) {
       return existingRequest;
@@ -2978,19 +2999,26 @@ export default function Page() {
       setIsLoadingListings(true);
     }
 
-    const request = fetch(endpoint, {
-      cache: 'no-store',
-      signal: requestController.signal,
-    })
-      .then((response) =>
-        response.json() as Promise<ListingsResponsePayload>,
-      )
+    const fetchPage = async (requestedPage: number) => {
+      if (!isCurrentRequest()) throw new DOMException('Superseded listing request', 'AbortError');
+      const pageParams = new URLSearchParams(params);
+      pageParams.set('page', String(requestedPage));
+      const response = await fetch(`/api/marketplace/listings?${pageParams.toString()}`, {
+        cache: 'no-store', signal: requestController.signal,
+      });
+      if (!response.ok) throw new Error('listings_unavailable');
+      return response.json() as Promise<ListingsResponsePayload>;
+    };
+    const request = (restoringWindow
+      ? reloadHomeBrowsePages(options.restorePages!, fetchPage)
+      : fetchPage(page))
       .then((payload) => {
         if (!isCurrentRequest()) {
           return;
         }
 
         if (payload.listings) {
+          setBrowseListingsKey(listingsKey);
           const nextListings = payload.listings.map(listingRecordToCard);
 
           setMarketplaceListings((currentListings) => {
@@ -3023,13 +3051,14 @@ export default function Page() {
           return;
         }
 
+        if (restoringWindow || !showLoading) return;
         if (page <= 1) {
           setMarketplaceListings(featuredListings);
         }
         setListingPagination({ page: 1, hasMore: false });
       })
       .finally(() => {
-        listingsInFlightRequestsRef.current.delete(endpoint);
+        listingsInFlightRequestsRef.current.delete(requestKey);
         listingsAbortControllersRef.current.delete(requestController);
 
         if (isCurrentRequest()) {
@@ -3037,7 +3066,7 @@ export default function Page() {
         }
       });
 
-    listingsInFlightRequestsRef.current.set(endpoint, request);
+    listingsInFlightRequestsRef.current.set(requestKey, request);
     return request;
   }, [activeMarketCity, activeMarketCategoryGroup, activeMarketSubcategory, marketplaceSearchQuery]);
 
@@ -3126,6 +3155,7 @@ export default function Page() {
     if (restoredChatState) {
       chatImages.restore(restoredChatState.retainedListingImages, restoredChatState.retainedListingImageMessageId, restoredChatState.conversationId);
       lastActivatedSearchMessageIdRef.current = restoredChatState.messages.findLast(message => message.role === 'assistant')?.id ?? null;
+      lastSyncedAssistantMessageIdRef.current = lastActivatedSearchMessageIdRef.current;
       shouldResetSearchStateRef.current = restoredChatState.shouldResetSearchState;
 
       queueMicrotask(() => {
@@ -3209,13 +3239,20 @@ export default function Page() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void refreshMarketplaceListings();
+      const restoreWindow = initialBrowseRefreshRef.current && canRestoreBrowseListings &&
+        restoredBrowseState?.listingsKey === getHomeBrowseKey({ searchInput: marketplaceSearchQuery,
+          city: activeMarketCity, categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory });
+      initialBrowseRefreshRef.current = false;
+      void refreshMarketplaceListings(undefined, 1, restoreWindow ? {
+        showLoading: false, restorePages: restoredBrowseState!.pagination.page,
+      } : undefined);
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [refreshMarketplaceListings]);
+  }, [refreshMarketplaceListings, activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory,
+    canRestoreBrowseListings, marketplaceSearchQuery, restoredBrowseState]);
 
   useEffect(() => {
     if (status !== 'ready') {
@@ -3840,6 +3877,36 @@ export default function Page() {
       (list.firstElementChild as HTMLElement | null)?.style.setProperty('--marketplace-content-offset', target);
     }
   }, [isManualListingVisible, isMarketplaceToolsDragging, marketplaceToolsDragOffset, isMarketplaceTopActionsHidden]);
+
+  useLayoutEffect(() => {
+    const viewport = pendingBrowseViewportRef.current;
+    const list = marketplaceListingsScrollRef.current;
+    if (!viewport || !list?.clientHeight || !hasRestoredChat || isCompactChatView || isManualListingVisible) return;
+    const content = list.firstElementChild as HTMLElement | null;
+    if (viewport.contentOffset) content?.style.setProperty('--marketplace-content-offset', viewport.contentOffset);
+    list.scrollTop = viewport.scrollTop;
+    lastMarketplaceScrollTopRef.current = list.scrollTop;
+    lastMarketplaceScrollHeightRef.current = list.scrollHeight;
+    pendingBrowseViewportRef.current = null;
+  }, [hasRestoredChat, isCompactChatView, isManualListingVisible, marketplaceListings]);
+
+  // Capture before React removes the route DOM, including scrolls that did not render state.
+  useLayoutEffect(() => () => {
+    const list = marketplaceListingsScrollRef.current;
+    writeHomeBrowseState({
+      searchInput: marketplaceSearchInput, city: activeMarketCity,
+      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory,
+      listings: marketplaceListings, listingsKey: browseListingsKey,
+      pagination: listingPagination, nearbyCity: nearbyMarketplaceCity, filterOpen: isMarketFilterOpen,
+      viewport: pendingBrowseViewportRef.current ?? {
+        scrollTop: list?.scrollTop ?? lastMarketplaceScrollTopRef.current,
+        contentOffset: (list?.firstElementChild as HTMLElement | null)?.style
+          .getPropertyValue('--marketplace-content-offset') ?? '',
+        toolsHidden: isMarketplaceTopActionsHidden,
+      },
+    });
+  }, [activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory, browseListingsKey, isMarketFilterOpen,
+    isMarketplaceTopActionsHidden, listingPagination, marketplaceListings, marketplaceSearchInput, nearbyMarketplaceCity]);
 
   const cancelMarketplaceTopReveal = useCallback(() => {
     if (marketplaceToolsTopRevealTimerRef.current !== null) {
@@ -5142,6 +5209,7 @@ export default function Page() {
                     ) : (
                       <>
                         {filteredMessages.map((message, messageIndex) => {
+                          if (message.role === 'assistant' && !hasVisibleAssistantContent(message)) return null;
                           const userImageParts =
                             message.role === 'user'
                               ? message.parts.filter(isUserImageMessagePart)
@@ -5182,8 +5250,8 @@ export default function Page() {
                             </Message>
                           );
                         })}
-                        {isLoading && (
-                          <Message from="assistant">
+                        {showAssistantThinking && (
+                          <Message from="assistant" data-testid="assistant-thinking">
                             <AssistantMessageFrame>
                               <MessageContent>
                                 <SearchStatusIndicator language="ar" mode="thinking" />

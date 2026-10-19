@@ -31,6 +31,28 @@ export function normalizeMarketplaceTitle(value: string) {
     .replace(new RegExp(ignoredCharacters, 'g'), '').replace(/\s+/g, ' ').trim();
 }
 
+export function getMarketplaceListingIdLookup(query = ''): string | null {
+  let candidate = query.normalize('NFKC').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim();
+  let explicit = false;
+  if (/^(?:https?:\/\/|\/listings\/)/i.test(candidate)) {
+    try {
+      const url = new URL(candidate, 'https://marketplace.invalid');
+      const match = url.pathname.match(/^\/listings\/([^/]+)\/?$/i);
+      if (!match) return null;
+      candidate = decodeURIComponent(match[1]);
+      explicit = true;
+    } catch {
+      return null;
+    }
+  } else {
+    const labeled = candidate.match(/^(?:listing(?:\s+id)?|ad(?:\s+id)?|advertisement|\u0631\u0642\u0645\s+(?:\u0627\u0644\u0625\u0639\u0644\u0627\u0646|\u0627\u0644\u0627\u0639\u0644\u0627\u0646))(?:\s*[:#]\s*|\s+)([a-z0-9_-]+)$/i);
+    if (labeled) { candidate = labeled[1]; explicit = true; }
+  }
+  if (!/^[a-z0-9_-]{1,300}$/i.test(candidate)) return null;
+  const canonical = /^(?:c[a-z0-9]{24}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|chat-draft-[a-z0-9_-]+)$/i.test(candidate);
+  return canonical ? candidate.toLowerCase() : explicit ? candidate : null;
+}
+
 const numericAttributeKeys = {
   year: ['year', 'modelYear', '\u0633\u0646\u0629', '\u0645\u0648\u062f\u064a\u0644'],
   mileage: ['mileage', 'odometer', '\u0645\u0645\u0634\u0649', '\u0645\u0645\u0634\u0627\u0647\u0627', '\u0645\u0627\u0634\u064a\u0647'],
@@ -84,7 +106,11 @@ export function titleSearchConditionSql() {
 }
 
 export function publicListingFiltersSql(filters: PublicMarketplaceListingFilters) {
-  const predicates: Prisma.Sql[] = [Prisma.sql`${marketplaceTitleSearchPredicate(getMarketplaceTitleTerms(filters.query))}`];
+  const titlePredicate = marketplaceTitleSearchPredicate(getMarketplaceTitleTerms(filters.query));
+  const listingId = getMarketplaceListingIdLookup(filters.query);
+  const predicates: Prisma.Sql[] = [listingId
+    ? Prisma.sql`"id" = ${listingId}`
+    : Prisma.sql`${titlePredicate}`];
   if (filters.city) predicates.push(Prisma.sql`"city" = ${filters.city}`);
   if (filters.category) predicates.push(Prisma.sql`"category" = ${filters.category}`);
   if (filters.categories?.length) predicates.push(Prisma.sql`"category" IN (${Prisma.join(filters.categories)})`);

@@ -4,8 +4,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { normalizePagination } from '@/lib/pagination';
+import { createListingId } from '@/lib/marketplace/listing-id';
 import { hasPendingLocalListingReview, resolveLocalListingReviews } from '@/lib/admin/model-review';
-import { getMarketplaceTitleTerms, matchesMarketplaceTitle, matchesPublicListingFilters, getTitleSearchNumber, titleSearchConditionScore, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
+import { getMarketplaceListingIdLookup, getMarketplaceTitleTerms, matchesMarketplaceTitle, matchesPublicListingFilters, getTitleSearchNumber, titleSearchConditionScore, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { comparePublicationFeed, recordFirstPublication } from './listing-publication';
 
 import { evaluateConversationMessageSafety } from './message-safety';
@@ -419,7 +420,7 @@ export function createListingDraft(input: CreateListingDraftInput): ListingRecor
   const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   const timestamp = nowIso();
   const listing: ListingRecord = {
-    id: input.id ?? randomUUID(),
+    id: input.id ?? createListingId(input.sellerId),
     sellerId: input.sellerId,
     category: input.category,
     title: input.title,
@@ -668,10 +669,11 @@ export function setPrimaryListingImageForSeller(
 export function listPublicMarketplaceListings(filters: PublicMarketplaceListingFilters = {}) {
   seedListings();
   const terms = getMarketplaceTitleTerms(filters.query);
+  const listingId = getMarketplaceListingIdLookup(filters.query);
   const results = [...listings.values()].filter(listing =>
     listing.status === 'published' &&
     matchesPublicListingFilters(listing, filters) &&
-    matchesMarketplaceTitle(listing.title, terms),
+    (listingId !== null ? listing.id === listingId : matchesMarketplaceTitle(listing.title, terms)),
   );
   const ordered = terms.length ? (left: ListingRecord, right: ListingRecord) =>
     right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id) : comparePublicationFeed;

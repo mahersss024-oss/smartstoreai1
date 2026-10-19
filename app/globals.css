@@ -3,6 +3,81 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+.page-transition-content {
+  view-transition-name: page-content;
+}
+
+.marketplace-bottom-nav {
+  view-transition-name: bottom-navigation;
+}
+
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(bottom-navigation),
+::view-transition-old(bottom-navigation),
+::view-transition-new(bottom-navigation) {
+  animation: none;
+}
+
+::view-transition-group(page-content) {
+  animation: none;
+  z-index: 1;
+}
+
+::view-transition-group(bottom-navigation) {
+  z-index: 2;
+}
+
+::view-transition-old(bottom-navigation) {
+  display: none;
+}
+
+::view-transition-old(page-content),
+::view-transition-new(page-content) {
+  height: 100%;
+  mix-blend-mode: normal;
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+html[data-page-transition="forward"]::view-transition-old(page-content) {
+  animation-name: page-slide-out-right;
+}
+
+html[data-page-transition="forward"]::view-transition-new(page-content) {
+  animation-name: page-slide-in-left;
+}
+
+html[data-page-transition="back"]::view-transition-old(page-content) {
+  animation-name: page-slide-out-left;
+}
+
+html[data-page-transition="back"]::view-transition-new(page-content) {
+  animation-name: page-slide-in-right;
+}
+
+@keyframes page-slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes page-slide-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes page-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes page-slide-out-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
 /* Theme colors commit together; movement remains available during that commit. */
 html[data-theme-switching],
 html[data-theme-switching]::before,
@@ -222,7 +297,8 @@ html[data-theme-switching] *::after {
     width: 100%;
   }
 
-  body > main {
+  body > main,
+  body > .page-transition-content > main {
     max-width: 100%;
     overflow-x: hidden;
     overflow-x: clip;
@@ -273,6 +349,7 @@ html[data-theme-switching] *::after {
   }
 
   html[data-native-app="true"][data-platform="android"] body > main,
+  html[data-native-app="true"][data-platform="android"] body > .page-transition-content > main,
   html[data-native-app="true"][data-platform="android"] .marketplace-shell {
     box-sizing: border-box;
     height: calc(100dvh - var(--native-status-bar-inset));

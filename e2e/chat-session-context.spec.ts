@@ -269,27 +269,32 @@ test('a long visible chat continues beyond twenty exchanges with bounded outgoin
   await page.screenshot({ path: info.outputPath('long-chat.png'), fullPage: true });
 });
 
-test('clearing early verified cards stays cleared when the delayed final answer arrives', async ({ page }) => {
+test('clearing early verified cards stays cleared when the delayed final answer arrives without duplicate assistant frames', async ({ page }, info) => {
   await prepare(page);
   await page.route('**/api/auth/session', route => route.fulfill({ json: {
     authenticated: true, user: { id: 'delayed-chat-owner', email: 'delayed@example.test', name: 'عميل' },
   } }));
   await page.addInitScript(() => {
     const originalFetch = window.fetch.bind(window);
+    let turn = 0;
     window.fetch = async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input), location.href);
       if (url.pathname !== '/api/chat') return originalFetch(input, init);
+      turn++;
       const encoder = new TextEncoder();
       const stream = new ReadableStream({ start(controller) {
         const emit = (chunk: object) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-        emit({ type: 'start', messageId: 'delayed-answer', messageMetadata: { marketplaceIntent: 'search_listing' } });
+        emit({ type: 'start', messageId: `delayed-answer-${turn}`, messageMetadata: { marketplaceIntent: 'search_listing' } });
         emit({ type: 'tool-input-available', toolCallId: 'early-search', toolName: 'searchMarketplaceListings', input: { query: 'هاتف' } });
         emit({ type: 'tool-output-available', toolCallId: 'early-search', output: { status: 'searched', listings: [
           { id: 'early-listing', title: 'هاتف', category: 'other', price: 100, image: '/hamad-market-logo.webp', status: 'published' },
         ] } });
+        emit({ type: 'text-start', id: 'final' });
+        (window as Window & { appendDelayedText?: (text: string) => void }).appendDelayedText = text => {
+          emit({ type: 'text-delta', id: 'final', delta: text });
+        };
         (window as Window & { finishDelayedAnswer?: () => void }).finishDelayedAnswer = () => {
-          emit({ type: 'text-start', id: 'final' });
-          emit({ type: 'text-delta', id: 'final', delta: 'هذه نتائج البحث المتاحة.' });
+          emit({ type: 'text-delta', id: 'final', delta: ' البحث المتاحة.' });
           emit({ type: 'text-end', id: 'final' });
           emit({ type: 'finish', finishReason: 'stop' });
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -303,12 +308,38 @@ test('clearing early verified cards stays cleared when the delayed final answer 
   await (await openChat(page)).fill('هاتف');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(1);
+  await expect(page.getByTestId('assistant-thinking')).toHaveCount(1);
+  await expect(page.locator('body')).not.toContainText('تعذر إكمال رد المساعد الآن');
+  await page.evaluate(() => (window as Window & { appendDelayedText?: (text: string) => void }).appendDelayedText!('   '));
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(1);
+  await expect(page.getByTestId('assistant-thinking')).toHaveCount(1);
+  await expect(page.locator('body')).not.toContainText('تعذر إكمال رد المساعد الآن');
+  await page.screenshot({ path: info.outputPath('single-pending-assistant.png'), fullPage: true });
   const back = page.getByRole('button', { name: 'العودة للإعلانات', exact: true });
   if (await back.isVisible()) await back.click();
   await page.getByRole('button', { name: 'مسح بحث المساعد', exact: true }).click();
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
-  await page.evaluate(() => (window as Window & { finishDelayedAnswer?: () => void }).finishDelayedAnswer!());
   await openChat(page);
+  await page.evaluate(() => (window as Window & { appendDelayedText?: (text: string) => void }).appendDelayedText!('هذه نتائج'));
+  await expect(page.getByText('هذه نتائج', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(1);
+  await expect(page.getByTestId('assistant-thinking')).toHaveCount(0);
+  await page.evaluate(() => (window as Window & { finishDelayedAnswer?: () => void }).finishDelayedAnswer!());
   await expect(page.locator('body')).toContainText('هذه نتائج البحث المتاحة.');
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(1);
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
+  const input = await openChat(page);
+  await input.fill('هاتف آخر');
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
+  await expect(page.getByTestId('assistant-thinking')).toHaveCount(1);
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(2);
+  await page.evaluate(() => (window as Window & { appendDelayedText?: (text: string) => void }).appendDelayedText!('هذه نتائج'));
+  await expect(page.getByTestId('assistant-thinking')).toHaveCount(0);
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(2);
+  await page.evaluate(() => (window as Window & { finishDelayedAnswer?: () => void }).finishDelayedAnswer!());
+  await expect(page.getByText('هذه نتائج البحث المتاحة.', { exact: true })).toHaveCount(2);
+  await expect(page.getByTestId('assistant-message-frame')).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath('completed-assistant-replies.png'), fullPage: true });
 });

@@ -1,4 +1,5 @@
 import { createListingDraft, publishListing } from '@/agent/marketplace/store';
+import { createListingId } from '@/lib/marketplace/listing-id';
 
 if (!process.env.SMARTSTORE_DATA_DIR || process.env.SMARTSTORE_MARKETPLACE_STORE !== 'file') {
   throw new Error('E2E fixtures require an explicitly isolated file store.');
@@ -20,4 +21,13 @@ for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
     checkStatus: 'completed',
   };
   publishListing(listing.id);
+
+  for (const id of [createListingId('e2e-reference-seller', project), `chat-draft-e2e-reference-${project}`]) {
+    const reference = createListingDraft({
+      id, sellerId: 'e2e-reference-seller', category: 'furniture', title: 'Reference desk',
+      description: 'Search fixture without the ID in its title', city: 'الرياض', price: 150,
+    });
+    reference.compliance = { ...listing.compliance };
+    publishListing(reference.id);
+  }
 }

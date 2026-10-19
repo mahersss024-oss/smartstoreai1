@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { createListingId } from '@/lib/marketplace/listing-id';
 import { getMarketplaceTitleTerms, publicListingFiltersSql, titleSearchNumberSql, titleSearchConditionSql, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { createAdminAuditLog } from '@/lib/admin/audit';
 import { recordModelReview } from '@/lib/admin/model-review';
@@ -2335,9 +2336,10 @@ export async function createListingDraft(
   input: CreateListingInput,
   options: { idempotencyKey?: string } = {},
 ) {
-  const id = options.idempotencyKey ? `chat-draft-${options.idempotencyKey}` : undefined;
-  if (id) {
-    const saved = await getListing(id);
+  const id = createListingId(user.id, options.idempotencyKey);
+  const replayIds = options.idempotencyKey ? [`chat-draft-${options.idempotencyKey}`, id] : [];
+  for (const replayId of replayIds) {
+    const saved = await getListing(replayId);
     if (saved) {
       if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
       return saved;
@@ -2346,17 +2348,17 @@ export async function createListingDraft(
   await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   input = { ...input, category: await resolveListingCategoryWithModel(input) };
   if (!shouldUseDatabaseStore()) {
-    if (id) {
-      const saved = memoryStore.getListing(id);
+    for (const replayId of replayIds) {
+      const saved = memoryStore.getListing(replayId);
       if (saved) {
         if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
         return saved;
       }
     }
     const listing = memoryStore.createListingDraft({
+      ...input,
       id,
       sellerId: user.id,
-      ...input,
     });
     if (listing.compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listing.id, listingId: listing.id, userId: user.id, text: listingSemanticText(listing), assessment: listing.compliance.modelAssessment });
 
@@ -2382,8 +2384,8 @@ export async function createListingDraft(
     try {
       listing = await prisma.$transaction(
         async (tx) => {
-          if (id) {
-            const saved = await tx.listing.findUnique({ where: { id }, include: { images: true } });
+          for (const replayId of replayIds) {
+            const saved = await tx.listing.findUnique({ where: { id: replayId }, include: { images: true } });
             if (saved) {
               if (saved.sellerId !== user.id) throw new Error('Draft operation ownership mismatch.');
               return saved;
@@ -2429,7 +2431,7 @@ export async function createListingDraft(
       break;
     } catch (error) {
       if (
-        !(isPrismaKnownRequestError(error, 'P2034') || (id && isPrismaKnownRequestError(error, 'P2002'))) ||
+        !(isPrismaKnownRequestError(error, 'P2034') || (options.idempotencyKey && isPrismaKnownRequestError(error, 'P2002'))) ||
         attempt === maxSerializableWriteAttempts - 1
       ) {
         throw error;
