@@ -94,14 +94,12 @@ test('human moderation survives seller edits and publication attempts until an a
 test('regeneration exposes no draft write tools and unavailable output review never releases generated text', () => {
   const full = createMarketplaceTools(null);
   assert.ok('createListingDraft' in full);
-  const safe = createReadOnlyMarketplaceTools(null);
+  const safe = createReadOnlyMarketplaceTools();
   for (const name of ['createListingDraft', 'updateListing', 'addUploadedImagesToListing', 'setListingStatus', 'sendMessage', 'openConversation']) assert.ok(!(name in safe), name);
-  assert.ok('searchMarketplaceListings' in safe);
-  assert.ok('compareMarketplaceListings' in safe);
+  assert.deepEqual(Object.keys(safe), ['getPlatformHelp']);
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
-  assert.match(route, /const retryAgent = createChatAgent\(session, \{[\s\S]*?readOnly: true/);
-  assert.match(route, /isOutputCheckerProviderFailure\(firstOutputDecision\)\) \{\s*return reply\(getModelProviderFailureResponse/);
-  assert.match(route, /isOutputCheckerProviderFailure\(retryOutputDecision\)\) \{\s*return reply\(getModelProviderFailureResponse/);
+  assert.match(route, /const retryAgent = createChatAgent\(session, \{[\s\S]*?answerOnly: true/);
+  assert.match(route, /isOutputCheckerProviderFailure\(decision\)\) return getModelProviderFailureResponse/);
 });
 
 test('a concurrent human moderation decision cannot be overwritten by a seller content or publication write', async t => {

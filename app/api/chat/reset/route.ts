@@ -1,8 +1,6 @@
-import { resetMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import { resetIncompleteSellerDrafts } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
-import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
 import { parseChatConversationId } from '@/lib/chat/conversation';
 
 export async function POST(request: Request) {
@@ -26,10 +24,6 @@ export async function POST(request: Request) {
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
-
-  const ownerKey = getChatSearchOwnerKey(session, request, conversationId ?? undefined);
-
-  await resetMarketplaceSearchState(ownerKey);
 
   if (session) {
     await resetIncompleteSellerDrafts(session.user.id);

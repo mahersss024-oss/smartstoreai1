@@ -1,45 +1,84 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('customer chat displays verified cards, replaces them with an empty new search and fits the viewport', async ({ page }, info) => {
+async function prepare(page: Page) {
   await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
   await page.route('**/api/auth/session', route => route.fulfill({ json: {
-    authenticated: true, user: { id: 'chat-flow-customer', email: 'chat-flow@example.test', name: '\u0639\u0645\u064a\u0644' },
+    authenticated: true, user: { id: 'hamad-draft-customer', email: 'hamad@example.test', name: 'عميل' },
   } }));
-  await page.route('**/api/marketplace/listings**', route => route.fulfill({ json: {
-    listings: [], pagination: { page: 1, limit: 24, hasMore: false, nextPage: null },
-  } }));
-  let searches = 0;
+  let writes = 0;
+  await page.route('**/api/marketplace/listings**', route => {
+    if (route.request().method() !== 'GET') writes++;
+    return route.fulfill({ json: { listings: [{ id: 'public-market-ad', title: 'إعلان السوق', category: 'other', price: 100, city: 'الرياض' }],
+      pagination: { page: 1, limit: 24, hasMore: false, nextPage: null } } });
+  });
+  return () => writes;
+}
+
+function reply(id: string, text: string, metadata: object = {}, legacyTool = false) {
+  return [
+    { type: 'start', messageId: id, messageMetadata: metadata },
+    ...(legacyTool ? [
+      { type: 'tool-input-available', toolCallId: 'old-search', toolName: 'searchMarketplaceListings', input: { query: 'old' } },
+      { type: 'tool-output-available', toolCallId: 'old-search', output: { status: 'searched', listings: [{ id: 'legacy-card', title: 'نتيجة قديمة', price: 1 }] } },
+    ] : []),
+    { type: 'text-start', id: 'text' }, { type: 'text-delta', id: 'text', delta: text },
+    { type: 'text-end', id: 'text' }, { type: 'finish', finishReason: 'stop' },
+  ].map(chunk => 'data: '+JSON.stringify(chunk)+'\n\n').join('')+'data: [DONE]\n\n';
+}
+
+test('generic ad creation offers both real methods and manual choice opens the unchanged form without writes', async ({ page }, info) => {
+  const writes = await prepare(page);
+  const requests: Record<string, unknown>[] = [];
   await page.route('**/api/chat', async route => {
-    searches++;
     const body = route.request().postDataJSON();
-    expect(body.messages.at(-1).id).toBeTruthy();
-    const listings = searches === 1 ? [{ id: 'verified-chat-ad', sellerId: 'verified-seller',
-      title: '\u0647\u0627\u062a\u0641 \u0644\u0644\u0628\u064a\u0639', category: 'other', price: 123, city: '\u0627\u0644\u0631\u064a\u0627\u0636',
-      image: '/hamad-market-logo.webp', status: 'published' }] : [];
-    const chunks = [
-      { type: 'start', messageId: `verified-response-${searches}` },
-      { type: 'tool-input-available', toolCallId: `search-${searches}`, toolName: 'searchMarketplaceListings', input: { query: 'customer product', understoodIntent: { searchMode: 'new_search' } } },
-      { type: 'tool-output-available', toolCallId: `search-${searches}`, output: { status: 'searched', listings } },
-      { type: 'text-start', id: 'answer' },
-      { type: 'text-delta', id: 'answer', delta: searches === 1 ? '\u0647\u0630\u0647 \u0646\u062a\u0627\u0626\u062c \u0627\u0644\u0628\u062d\u062b.' : '\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c \u0645\u0637\u0627\u0628\u0642\u0629.' },
-      { type: 'text-end', id: 'answer' }, { type: 'finish', finishReason: 'stop' },
-    ];
-    await route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
-      body: chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n' });
+    requests.push(body);
+    expect(body.creationMethod).toBeUndefined();
+    await route.fulfill({ headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+      body: reply('choose-method', 'كيف تفضّل إنشاء إعلانك؟', { creationChoice: true }) });
   });
   await page.goto('/?chat=1');
-  await expect(page.locator('.app-welcome')).toBeHidden();
-  const input = page.getByPlaceholder('\u0627\u0643\u062a\u0628 \u0637\u0644\u0628\u0643 \u0623\u0648 \u0623\u0631\u0641\u0642 \u0635\u0648\u0631 \u0627\u0644\u0645\u0646\u062a\u062c...');
-  await input.fill('\u0627\u0628\u062d\u062b \u0639\u0646 \u0647\u0627\u062a\u0641');
-  await page.getByRole('button', { name: '\u0625\u0631\u0633\u0627\u0644', exact: true }).click();
-  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
-  if (info.project.name.includes('mobile')) await page.getByRole('button', { name: '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a', exact: true }).click();
-  await expect(page.locator('.smart-assistant-result-card')).toBeVisible();
+  const input = page.getByPlaceholder('اكتب طلبك أو أرفق صور المنتج...');
+  await expect(page.getByTestId('assistant-creation-options')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'الإنشاء مع حمد', exact: true })).toBeVisible();
+  await input.fill('أريد إنشاء إعلان');
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
+  await expect(page.getByText('كيف تفضّل إنشاء إعلانك؟', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'الإنشاء اليدوي', exact: true }).click();
+  await expect(page.getByLabel('عنوان الإعلان', { exact: true })).toBeVisible();
+  expect(requests.length).toBe(1);
+  expect(writes()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: info.outputPath('verified-chat-results.png'), fullPage: true });
-  if (info.project.name.includes('mobile')) await page.getByRole('button', { name: '\u0641\u062a\u062d \u062d\u0645\u062f', exact: true }).click();
-  await input.fill('\u0627\u0628\u062d\u062b \u0639\u0646 \u062b\u0644\u0627\u062c\u0629');
-  await page.getByRole('button', { name: '\u0625\u0631\u0633\u0627\u0644', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('manual-creation-choice.png'), fullPage: true });
+});
+
+test('choosing Hamad sends explicit draft mode, ignores legacy search cards and resets mode on new chat', async ({ page }, info) => {
+  const writes = await prepare(page);
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/chat', async route => {
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    expect(body.selectedListing).toBeUndefined();
+    expect(body.resetSearchState).toBeUndefined();
+    await route.fulfill({ headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+      body: reply('draft-reply-'+requests.length, 'ما المنتج الذي تريد تجهيز مسودته؟', { marketplaceIntent: 'create_listing' }, true) });
+  });
+  await page.goto('/?chat=1');
+  await page.getByRole('button', { name: 'الإنشاء مع حمد', exact: true }).click();
+  await expect(page.getByText('ما المنتج الذي تريد تجهيز مسودته؟', { exact: true })).toBeVisible();
+  expect(requests[0].creationMethod).toBe('chat');
+  expect(requests[0].beginDraftWithHamad).toBe(true);
+  await expect(page.getByTestId('assistant-creation-options')).toHaveCount(0);
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
-  expect(searches).toBe(2);
+  await expect(page.getByRole('button', { name: 'مقارنة الإعلان', exact: true })).toHaveCount(0);
+  expect(writes()).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath('hamad-draft-choice.png'), fullPage: true });
+  await page.getByRole('button', { name: 'مسح المحادثة وبدء محادثة جديدة', exact: true }).click();
+  await expect(page.getByTestId('assistant-creation-options')).toBeVisible();
+  const input = page.getByPlaceholder('اكتب طلبك أو أرفق صور المنتج...');
+  await input.fill('كيف أستخدم المنصة؟');
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].creationMethod).toBeUndefined();
+  expect(requests[1].beginDraftWithHamad).toBeUndefined();
 });

@@ -59,39 +59,26 @@ test('allows load-more for marketplace exploration with remaining pages', () => 
   assert.equal(canLoadMore, true);
 });
 
-test('home marketplace renders assistant search as a separate active layer', () => {
+test('home marketplace stays independent of Hamad while retaining search, cards and manual creation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
   const listingCardImage = readProjectFile('components', 'listing-card-image.tsx');
   const globalCss = readProjectFile('app', 'globals.css');
 
-  assert.match(homePage, /hasActiveAssistantSearch/);
-  assert.match(homePage, /retainedSearchToolOutput/);
-  assert.match(homePage, /visibleSearchToolOutput/);
-  assert.match(homePage, /afterLatestUserOnly: false/);
-  assert.doesNotMatch(homePage, /setRetainedSearchToolOutput/);
-  assert.match(homePage, /assistantResultListings\.map/);
+  assert.doesNotMatch(homePage, /hasActiveAssistantSearch|retainedSearchToolOutput|visibleSearchToolOutput|assistantResultListings/);
   assert.match(homePage, /exploreMarketplaceListings\.map/);
-  assert.match(homePage, /نتائج حمد حسب طلبك/);
+  assert.doesNotMatch(homePage, /نتائج حمد حسب طلبك/);
   assert.doesNotMatch(homePage, /activeListingQuery \|\|/);
   assert.doesNotMatch(homePage, /الأقرب لطلبك/);
   assert.doesNotMatch(homePage, /مختارة حسب طلبك/);
-  assert.match(
-    homePage,
-    /searchToolListings: assistantResultListings/,
-  );
-  assert.match(homePage, /clearAssistantSearch/);
+  assert.doesNotMatch(homePage, /clearAssistantSearch/);
   assert.doesNotMatch(homePage, /displayedMarketplaceListings/);
   assert.doesNotMatch(homePage, /refreshMarketplaceListings\(activeListingQuery/);
   assert.doesNotMatch(homePage, /searchResultCount/);
   assert.doesNotMatch(homePage, /نتيجة مطابقة/);
-  assert.match(homePage, /smart-assistant-results-panel/);
-  assert.match(homePage, /smart-assistant-result-card/);
-  assert.match(homePage, /isSmartResult\?: boolean/);
-  assert.match(homePage, /isSmartResult &&/);
+  assert.doesNotMatch(homePage, /smart-assistant-results-panel|smart-assistant-result-card|isSmartResult/);
   assert.match(homePage, /maxChatListingCardsPerMessage = 3/);
   assert.match(homePage, /omittedListingCardCount > 0/);
   assert.match(homePage, /moreChatListingsGuidance/);
-  assert.match(homePage, /smart-assistant-results-grid grid max-w-4xl gap-1\.5 sm:gap-2/);
   assert.match(homePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(homePage, /marketplace-home-controls shrink-0/);
   assert.match(homePage, /isManualListingVisible[\s\S]*max-h-\[min\(58dvh,34rem\)\]/);
@@ -150,18 +137,10 @@ test('home marketplace renders assistant search as a separate active layer', () 
     assert.doesNotMatch(homePage, /formData\.append\('displayImage'/);
   assert.match(homePage, /variant\?: 'grid' \| 'horizontal'/);
   assert.match(homePage, /variant="horizontal"/);
-  assert.match(
-    homePage,
-    /assistantResultListings\.map[\s\S]*className="smart-assistant-result-card"[\s\S]*isSmartResult[\s\S]*variant="horizontal"/,
-  );
-  assert.match(homePage, /const askToCompareListing = \(\) => \{/);
-  assert.match(homePage, /absolute left-1\.5 top-1\.5 z-10 size-7/);
-  assert.match(homePage, /shadow-cyan-400\/35/);
-  assert.match(homePage, /drop-shadow-\[0_0_6px_rgba\(34,211,238,0\.85\)\]/);
+  assert.doesNotMatch(homePage, /askToCompareListing|مقارنة الإعلان/);
   assert.doesNotMatch(homePage, /absolute left-9 top-1\.5/);
   assert.doesNotMatch(homePage, /absolute right-1\.5 top-1\.5 size-7/);
   assert.doesNotMatch(homePage, /aria-label="حفظ الإعلان"/);
-  assert.match(homePage, /askToCompareListing\(\);/);
   assert.match(homePage, /relative aspect-square min-h-\[6\.25rem\] bg-slate-100/);
   assert.match(homePage, /grid-cols-\[6\.25rem_minmax\(0,1fr\)\]/);
   assert.match(homePage, /object-cover/);

@@ -4,6 +4,9 @@ import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { parsePaginationFromRequest } from '@/lib/pagination';
+import { isMarketplaceCategory } from '@/lib/marketplace/categories';
+import { getMarketplaceCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
+import { getMarketplaceCarModel, marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +26,7 @@ function mapListing(listing: {
   id: string;
   sellerId: string;
   category: string;
+  attributes?: unknown;
   title: string | null;
   description: string | null;
   price: unknown;
@@ -43,6 +47,7 @@ function mapListing(listing: {
     sellerId: listing.sellerId,
     seller: listing.seller,
     category: listing.category,
+    attributes: listing.attributes,
     title: listing.title,
     description: listing.description,
     price: decimalToListingPrice(listing.price, listing.priceMode),
@@ -79,11 +84,23 @@ export async function GET(request: Request) {
   const status = url.searchParams.get('status')?.trim();
   const listingId = url.searchParams.get('listingId')?.trim();
   const sellerId = url.searchParams.get('sellerId')?.trim();
+  const category = url.searchParams.get('category')?.trim();
+  const categoryOption = url.searchParams.get('categoryOption')?.trim();
+  const carModel = url.searchParams.get('carModel')?.trim();
+  if ((category && !isMarketplaceCategory(category)) || (categoryOption && (!category || !getMarketplaceCategoryOption(category, categoryOption)))) {
+    return Response.json({ error: 'invalid_search_filters' }, { status: 400, headers: noStoreHeaders });
+  }
+  if (carModel && (category !== 'cars' || !categoryOption || !getMarketplaceCarModel(categoryOption, carModel))) {
+    return Response.json({ error: 'invalid_search_filters' }, { status: 400, headers: noStoreHeaders });
+  }
   const pagination = parsePaginationFromRequest(request, {
     defaultLimit: 24,
     maxLimit: 48,
   });
   const where = {
+    ...(category ? { category } : {}),
+    ...(categoryOption ? { attributes: { path: [marketplaceCategoryOptionAttribute], equals: categoryOption } } : {}),
+    ...(carModel ? { AND: [{ attributes: { path: [marketplaceCarModelAttribute], equals: carModel } }] } : {}),
     ...(sellerId ? { sellerId } : {}),
     ...(listingId ? { id: listingId } : {}),
     ...(status && status !== 'all' ? { status: status as never } : {}),

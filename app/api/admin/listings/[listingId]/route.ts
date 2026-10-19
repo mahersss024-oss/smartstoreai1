@@ -1,5 +1,8 @@
 import { listingSemanticText, marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { z } from 'zod';
+import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
+import { isMarketplaceCategory } from '@/lib/marketplace/categories';
+import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
@@ -21,6 +24,8 @@ const maxAdminListingUpdateRequestBytes = 64 * 1024;
 
 const adminListingUpdateSchema = z.object({
   category: z.string().min(2).max(80).optional(),
+  categoryOption: z.string().max(80).nullable().optional(),
+  carModel: z.string().max(80).nullable().optional(),
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),
   price: z.number().nonnegative().nullable().optional(),
@@ -186,6 +191,22 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
+  if (parsed.data.category && parsed.data.category !== existing.category && !isMarketplaceCategory(parsed.data.category)) {
+    return Response.json({ error: 'invalid_category', message: 'اختر تصنيفًا من القائمة.' }, { status: 400 });
+  }
+
+  let attributes: Record<string, unknown>;
+  try {
+    attributes = mergeMarketplaceCategoryAttributes(parsed.data.category ?? existing.category,
+      {
+        ...(parsed.data.categoryOption !== undefined ? { [marketplaceCategoryOptionAttribute]: parsed.data.categoryOption } : {}),
+        ...(parsed.data.carModel !== undefined ? { [marketplaceCarModelAttribute]: parsed.data.carModel } : {}),
+      },
+      { category: existing.category, attributes: existing.attributes && typeof existing.attributes === 'object' && !Array.isArray(existing.attributes) ? existing.attributes as Record<string, unknown> : {} });
+  } catch (error) {
+    if (error instanceof InvalidMarketplaceCategoryOptionError) return Response.json({ error: 'invalid_category_option', message: error.message }, { status: 400 });
+    throw error;
+  }
   const nextListing = {
     category: parsed.data.category ?? existing.category,
     title: parsed.data.title ?? existing.title,
@@ -193,9 +214,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     city: 'city' in parsed.data ? parsed.data.city : existing.city,
     condition:
       'condition' in parsed.data ? parsed.data.condition : existing.condition,
-    attributes: existing.attributes,
+    attributes,
   };
-  const contentChanged = ['category', 'title', 'description', 'city', 'condition'].some(
+  const contentChanged = ['category', 'categoryOption', 'carModel', 'title', 'description', 'city', 'condition'].some(
     (key) => key in parsed.data,
   );
   if (contentChanged) await marketplaceTextAnalyzer.analyze(listingSemanticText(nextListing));
@@ -219,6 +240,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       where: { id: listingId },
       data: {
         category: parsed.data.category,
+        attributes: attributes as import('@prisma/client').Prisma.InputJsonObject,
         title: parsed.data.title,
         description: parsed.data.description,
         city: 'city' in parsed.data ? parsed.data.city : undefined,

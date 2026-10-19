@@ -415,7 +415,7 @@ test('account conversations shortcut stays neutral while alert logic lives in na
   assert.doesNotMatch(page, /shadow-\[0_0_18px_rgba\(244,63,94,0\.28\)\]/);
   assert.doesNotMatch(page, /from-rose-300 to-red-600/);
   assert.match(mobileNavigation, /useConversationMessageAlert/);
-  assert.match(mobileNavigation, /alert: hasConversationAlert/);
+  assert.match(mobileNavigation, /alert: destination\.href === '\/conversations' && hasConversationAlert/);
   assert.doesNotMatch(alertHook, /useSmartstoreRealtime/);
   assert.match(alertHook, /visibilitychange/);
   assert.match(alertHook, /window\.addEventListener\('focus'/);

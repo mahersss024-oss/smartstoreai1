@@ -21,6 +21,7 @@ import {
 import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
 import { resolveListingCategory } from './listing-category';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
+import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -407,6 +408,7 @@ function getUserReportPriority(report: UserReportRecord) {
 export function createListingDraft(input: CreateListingDraftInput): ListingRecord {
   loadStore();
   input = { ...input, category: resolveListingCategory(input) };
+  input = { ...input, attributes: mergeMarketplaceCategoryAttributes(input.category, input.attributes) };
 
   const sellerListingCount = [...listings.values()].filter(
     (listing) =>
@@ -499,8 +501,9 @@ export function updateListingForSeller(
     return null;
   }
 
+  const attributes = mergeMarketplaceCategoryAttributes(updates.category ?? listing.category, updates.attributes, listing);
   const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({
-    ...listing, ...updates, attributes: { ...listing.attributes, ...updates.attributes },
+    ...listing, ...updates, attributes,
   }));
   const compliance = listing.compliance.humanDecision === 'block'
     ? { ...assessedCompliance, humanDecision: 'block' as const, decision: listing.compliance.decision }
@@ -509,10 +512,7 @@ export function updateListingForSeller(
   const nextListing: ListingRecord = {
     ...listing,
     ...updates,
-    attributes: {
-      ...listing.attributes,
-      ...(updates.attributes ?? {}),
-    },
+    attributes,
     compliance,
     status:
       compliance.decision === 'block'

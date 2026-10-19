@@ -30,6 +30,15 @@ export const marketplaceCategoryDefinitions = [
   { id: 'camping', label: 'الرحلات والتخييم', group: 'الرحلات والتخييم' },
   { id: 'food', label: 'الأطعمة والمشروبات', group: 'الأطعمة والمشروبات' },
   { id: 'antiques', label: 'النوادر والتراثيات', group: 'النوادر والتراثيات' },
+  { id: 'boats', label: 'القوارب والمستلزمات البحرية', group: 'سيارات ومركبات' },
+  { id: 'services', label: 'الخدمات ومقدمو الخدمات', group: 'الخدمات والأعمال' },
+  { id: 'business_equipment', label: 'التجهيزات التجارية والمكتبية', group: 'الخدمات والأعمال' },
+  { id: 'businesses', label: 'المشاريع والمحلات للتنازل', group: 'الخدمات والأعمال' },
+  { id: 'jobs', label: 'الوظائف', group: 'الوظائف والتدريب' },
+  { id: 'training', label: 'التدريب والدورات', group: 'الوظائف والتدريب' },
+  { id: 'events', label: 'المناسبات وتجهيزاتها', group: 'المناسبات والسفر' },
+  { id: 'travel', label: 'السياحة والسفر', group: 'المناسبات والسفر' },
+  { id: 'building_materials', label: 'مواد البناء والتشطيب', group: 'معدات وأدوات' },
   { id: 'other', label: 'أخرى', group: 'أخرى' },
 ] as const;
 

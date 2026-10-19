@@ -1,7 +1,9 @@
 import { tool } from 'ai';
 import sharp from 'sharp';
 import { createHash } from 'node:crypto';
-import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
+import { marketplaceCategoryIds, marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
+import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, marketplaceCategoryOptionsPrompt } from '@/lib/marketplace/category-options';
+import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import { z } from 'zod';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
@@ -17,25 +19,13 @@ import {
 import {
   createListingDraft,
   getListing,
-  listMarketplaceListings,
   listSellerListings,
   updateListingForSeller,
   type CreateListingInput,
 } from '@/agent/marketplace/repository';
-import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
-import { prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
-import { marketplaceSearchUnderstandingSchema } from '@/agent/marketplace/search-understanding-schema';
-import { compareMarketplaceListings as compareListingsWithEngine } from '@/agent/marketplace/comparison-engine';
-import { recommendListingPrice } from '@/agent/marketplace/pricing-engine';
-import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine';
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
-import { getPublicListingUrl } from '@/lib/listing-url';
-import type { AssistantSearchToolResult } from '@/lib/chat-tool-results';
-
-type MarketplaceListingResult = Awaited<
-  ReturnType<typeof listMarketplaceListings>
->[number];
+import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 
 function authRequired() {
   return {
@@ -45,66 +35,11 @@ function authRequired() {
   };
 }
 
-function getListingSearchSummary(listing: MarketplaceListingResult) {
-  const primaryImage = listing.images.find((image) => image.status === 'approved');
-
-  return {
-    id: listing.id,
-    listingUrl: getPublicListingUrl(listing.id),
-    title: listing.title,
-    category: listing.category,
-    price: listing.price,
-    city: listing.city,
-    condition: listing.condition,
-    description: listing.description,
-    attributes: listing.attributes,
-    image:
-      primaryImage?.thumbnailUrl ??
-      primaryImage?.displayUrl ??
-      primaryImage?.originalUrl,
-    imageUrls: [
-      primaryImage?.thumbnailUrl,
-      primaryImage?.displayUrl,
-      primaryImage?.originalUrl,
-    ].filter(Boolean),
-    views: listing.views,
-    messageCount: listing.messageCount,
-    favoriteCount: listing.favoriteCount,
-  };
-}
-
-function getRankedListingSearchSummary(
-  result: Awaited<ReturnType<typeof searchMarketplaceWithState>>['listings'][number],
-) {
-  return {
-    ...getListingSearchSummary(result.listing),
-    matchScore: result.scores.finalScore,
-    scores: result.scores,
-    reasons: result.reasons,
-  };
-}
-
-function getComparisonListingSummary(
-  item: ReturnType<typeof compareListingsWithEngine>['target'],
-) {
-  return {
-    ...getListingSearchSummary(item.listing),
-    overallScore: item.overallScore,
-    priceScore: item.priceScore,
-    conditionScore: item.conditionScore,
-    mileageScore: item.mileageScore,
-    specsScore: item.specsScore,
-    locationScore: item.locationScore,
-    listingQualityScore: item.listingQualityScore,
-    marketValueScore: item.marketValueScore,
-    labels: item.labels,
-    reasons: item.reasons,
-  };
-}
-
 const listingDetailsSchema = {
   autoCategory: z.boolean().optional().describe('Use true only when the seller has not explicitly selected a category; infer from title and description if possible. Preserve an explicit seller category.'),
-  category: z.string().min(2).describe(`Marketplace category ID: ${marketplaceCategoryPrompt}. Preserve an explicit seller category.`),
+  category: z.enum(marketplaceCategoryIds).describe(`Marketplace category ID: ${marketplaceCategoryPrompt}. Preserve an explicit seller category.`),
+  categoryOption: z.string().max(80).nullable().optional().describe(`One optional brand/type ID belonging to the selected category, never a model or detailed variant. Use only a seller-confirmed or unambiguous value, omit when unknown; null clears it. Catalog:\n${marketplaceCategoryOptionsPrompt}`),
+  carModel: z.string().max(80).nullable().optional().describe('Cars only: exact model-family ID under the selected categoryOption brand from the system catalog. Omit when unknown; null clears it. Never years or trim levels.'),
   title: z.string().min(2).optional(),
   description: z.string().min(2).optional(),
   price: z
@@ -166,6 +101,8 @@ function normalizeListingDetailsInput(
     color,
     material,
     brand,
+    categoryOption,
+    carModel,
     attributes,
     ...listingInput
   } = input;
@@ -180,6 +117,8 @@ function normalizeListingDetailsInput(
       ...(color ? { color } : {}),
       ...(material ? { material } : {}),
       ...(brand ? { brand } : {}),
+      ...(categoryOption !== undefined ? { [marketplaceCategoryOptionAttribute]: categoryOption } : {}),
+      ...(carModel !== undefined ? { [marketplaceCarModelAttribute]: carModel } : {}),
     },
   };
 }
@@ -218,11 +157,9 @@ export function createMarketplaceTools(
   options: {
     latestUploadedImages?: UploadedListingImage[];
     imageSourceMessageId?: string;
-    searchOwnerKey?: string;
     language?: AppLanguage;
     requestKey?: string;
     onDraftSaved?: (listingId: string) => void;
-    onSearchCompleted?: (result: AssistantSearchToolResult) => void;
   } = {},
 ) {
   const draftOperations = new Map<string, number>();
@@ -234,154 +171,7 @@ export function createMarketplaceTools(
     return indexes.map(index => ({ index, image: options.latestUploadedImages![index] }));
   }
   const tools = {
-    searchMarketplaceListings: tool({
-      description:
-        'Search current published سوق حمد marketplace listings for a buyer only. Do not use this for seller requests to create, publish, prepare, price, or add a listing; seller listing creation must use createListingDraft. Understand the buyer request first, pass structured understoodIntent fields when possible, set searchMode="new_search" for a fresh broad product/category request, and set searchMode="refine" only when the buyer clearly narrows existing results. Use descriptiveTerms only for concrete product descriptors that do not fit structured fields. Do not pass search intent words or the whole user sentence as search terms. Use this before saying buyer listings are unavailable. This is read-only and never stores raw user search text as listing data.',
-      inputSchema: z.object({
-        query: z.string().trim().min(1).max(300).describe('Literal product/title words from the customer, preserving their language and spelling. Omit request wording, city and budget. This database tool does not interpret natural-language sentences or infer synonyms. For a filter-only refinement omit query.').optional(),
-        understoodIntent: marketplaceSearchUnderstandingSchema.describe('Explicit customer-requested filters only. Never infer a category, manufacturer, city, budget, condition or feature that the customer did not request. Category discovery during listing creation is separate. Use new_search for independent requests and refine only for explicit follow-ups.').optional(),
-      }),
-      execute: async ({ query, understoodIntent }, execution) => {
-        const searchResult = await searchMarketplaceWithState({
-          ownerKey:
-            options.searchOwnerKey ??
-            (session ? `user:${session.user.id}` : 'anonymous'),
-          userId: session?.user.id,
-          query,
-          understoodIntent,
-          language: options.language,
-        });
-
-        const output = {
-          status: searchResult.status,
-          unavailablePreferences: understoodIntent?.sortPreference === 'closest' || understoodIntent?.locationPreference === 'nearby' ? ['geographic_distance'] : [],
-          count: searchResult.listings.length,
-          candidateCount: searchResult.candidateCount,
-          rankedCount: searchResult.rankedCount,
-          searchState: searchResult.searchState,
-          listings: searchResult.listings.map(getRankedListingSearchSummary),
-          recommendations: searchResult.recommendations,
-          market: searchResult.market,
-          relaxedSuggestion: searchResult.relaxedSuggestion,
-          note:
-            'Each search replaces prior server filters unless searchMode="refine" explicitly continues the current search. clearFilters removes previous constraints. Return only the latest visible matches. No geographic distance is calculated: if geographic_distance is unavailable, say so and offer the explicit city filter; never claim that the ordering is nearest by distance. Do not invent unavailable listings or market averages.',
-        };
-        options.onSearchCompleted?.({ toolCallId: execution.toolCallId, toolName: 'searchMarketplaceListings', input: { query, understoodIntent }, output });
-        return output;
-      },
-    }),
-
-    compareMarketplaceListings: tool({
-      description:
-        'Compare one specific published listing against similar سوق حمد marketplace listings. Use this when the user asks to compare a selected listing, especially if a listingId is provided. Return the target listing and comparable alternatives from real marketplace data only.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        query: z.string().trim().min(1).max(300).optional(),
-        limit: z.number().int().min(2).max(12).optional(),
-      }),
-      execute: async ({ listingId, query, limit = 8 }, execution) => {
-        const targetListing = await getListing(listingId);
-
-        if (!targetListing || targetListing.status !== 'published') {
-          return {
-            status: 'not_found',
-            message:
-              'The listing was not found, deleted, or is not currently published.',
-            listings: [],
-          };
-        }
-
-        const comparisonQuery = query?.trim();
-        const listings = await listMarketplaceListings(
-          comparisonQuery
-            ? {
-                query: comparisonQuery,
-                limit: Math.max(limit + 24, 30),
-              }
-            : {
-                category: targetListing.category,
-                city: targetListing.city,
-                limit: Math.max(limit + 24, 30),
-              },
-        );
-        await prepareListingUnderstanding([targetListing, ...listings]);
-        const comparison = compareListingsWithEngine(
-          targetListing,
-          listings,
-          limit,
-        );
-
-        const output = {
-          status: 'compared' as const,
-          target: getComparisonListingSummary(comparison.target),
-          count: comparison.alternatives.length,
-          listings: comparison.alternatives.map(getComparisonListingSummary),
-          marketSummary: comparison.marketSummary,
-          comparisonBasis:
-            'Comparison scores and labels are computed from real سوق حمد listing data. Explain these values; do not invent market averages or unavailable alternatives.',
-        };
-        options.onSearchCompleted?.({ toolCallId: execution.toolCallId, toolName: 'compareMarketplaceListings', input: { listingId, query, limit }, output });
-        return output;
-      },
-    }),
-
-    estimateListingPrice: tool({
-      description:
-        'Estimate an honest seller price range using real comparable سوق حمد listings. Return a range, comparable count, confidence, and adjustments. Never present this as a guaranteed market price.',
-      inputSchema: listingDetailsInputSchema,
-      execute: async (input) => {
-        const listingInput = normalizeListingDetailsInput(
-          listingDetailsInputSchema.parse(input),
-        ) as CreateListingInput;
-        const comparableListings = await listMarketplaceListings({
-          category: listingInput.category,
-          city: listingInput.city,
-          limit: 80,
-        });
-
-        await prepareListingUnderstanding([{ ...listingInput, attributes: listingInput.attributes ?? {} }, ...comparableListings]);
-        return recommendListingPrice(listingInput, comparableListings);
-      },
-    }),
-
-    evaluateNegotiationOffer: tool({
-      description:
-        'Evaluate a buyer offer for a specific published listing using asking price and comparable سوق حمد listings. This gives private advisory guidance only and never sends messages, accepts, rejects, changes prices, or commits to a deal.',
-      inputSchema: z.object({
-        listingId: z.string().min(1),
-        buyerOffer: z.number().nonnegative(),
-      }),
-      execute: async ({ listingId, buyerOffer }) => {
-        const listing = await getListing(listingId);
-
-        if (!listing || listing.status !== 'published') {
-          return {
-            status: 'not_found',
-            message:
-              'The listing was not found, deleted, or is not currently published.',
-          };
-        }
-
-        const comparableListings = await listMarketplaceListings({
-          category: listing.category,
-          city: listing.city,
-          limit: 80,
-        });
-
-        await prepareListingUnderstanding([listing, ...comparableListings]);
-        return {
-          status: 'evaluated',
-          advice: evaluateNegotiationOffer(
-            listing,
-            buyerOffer,
-            comparableListings,
-          ),
-          note:
-            'This is private guidance only. Do not send a message, accept, reject, change price, or commit to a deal.',
-        };
-      },
-    }),
-
+    ...createReadOnlyMarketplaceTools(),
     createListingDraft: tool({
       description:
         'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
@@ -407,6 +197,7 @@ export function createMarketplaceTools(
           listing = await createListingDraft(session.user, listingInput, { idempotencyKey });
           if (listing.status === 'draft') options.onDraftSaved?.(listing.id);
         } catch (error) {
+          if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
           if (isListingLimitReachedError(error)) {
             const maxListings = getMaxListingsPerSeller();
 
@@ -513,7 +304,11 @@ export function createMarketplaceTools(
           session.user.id,
           normalizeListingDetailsInput(updates),
           { draftOnly: true },
-        );
+        ).catch((error: unknown) => {
+          if (error instanceof InvalidMarketplaceCategoryOptionError) return error;
+          throw error;
+        });
+        if (listing instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: listing.message };
 
         if (!listing) {
           return {
@@ -642,7 +437,12 @@ export function createMarketplaceTools(
   return tools;
 }
 
-export function createReadOnlyMarketplaceTools(session: AuthSession | null, options: Parameters<typeof createMarketplaceTools>[1] = {}) {
-  const { searchMarketplaceListings, compareMarketplaceListings, estimateListingPrice, evaluateNegotiationOffer, analyzeListingImages } = createMarketplaceTools(session, options);
-  return { searchMarketplaceListings, compareMarketplaceListings, estimateListingPrice, evaluateNegotiationOffer, analyzeListingImages };
+export function createReadOnlyMarketplaceTools() {
+  return {
+    getPlatformHelp: tool({
+      description: 'Read the documented public platform workflow or published policy. Use this before answering questions about platform usage, policies, fees, account deletion or terms. This does not retrieve products, account data, payments or private records and performs no actions.',
+      inputSchema: z.object({ topic: z.enum(platformHelpTopics) }),
+      execute: async ({ topic }) => getPlatformHelp(topic),
+    }),
+  };
 }

@@ -5,7 +5,10 @@ import { AdminRecordPreview } from '@/components/admin/record-preview';
 import { AdminResultsTable } from '@/components/admin/results-table';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
+import { formatMarketplaceCategory, marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
+import { CategoryOptionSelect } from '@/components/category-option-select';
+import { CarModelSelect } from '@/components/car-model-select';
+import { getListingCarModel, getListingCategoryOption } from '@/lib/marketplace/category-options';
 import { getListingDisplayUrl } from '@/agent/marketplace/listing-image-delivery';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -33,6 +36,7 @@ import { Input } from '@ui/input';
 import { useAdminAccess } from '../use-admin-access';
 
 type AdminListing = {
+  attributes?: Record<string, unknown>;
   id: string;
   sellerId: string;
   seller?: { email: string; name: string | null } | null;
@@ -66,6 +70,8 @@ type PaginationMeta = {
 };
 
 type ListingDraft = {
+  carModel: string;
+  categoryOption: string;
   title: string;
   description: string;
   category: string;
@@ -128,6 +134,8 @@ function createDraft(listing: AdminListing): ListingDraft {
     title: listing.title ?? '',
     description: listing.description ?? '',
     category: listing.category,
+    categoryOption: getListingCategoryOption(listing)?.id ?? '',
+    carModel: getListingCarModel(listing)?.id ?? '',
     city: listing.city ?? '',
     condition: listing.condition ?? '',
     price: typeof listing.price === 'number' ? String(listing.price) : '',
@@ -221,7 +229,14 @@ function AdminListingCard({
 
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="admin-field">العنوان<Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" /></label>
-        <label className="admin-field">التصنيف<Input disabled={!canManageListings} list="marketplace-admin-category-options" name={`listing-${listing.id}-category`} value={draft.category} onChange={(event) => onUpdateDraft(listing.id, { category: event.target.value })} placeholder="التصنيف" /></label>
+        <label className="admin-field">التصنيف<select className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm" disabled={!canManageListings} name={`listing-${listing.id}-category`} value={draft.category} onChange={event => onUpdateDraft(listing.id, { category: event.target.value, categoryOption: '', carModel: '' })}>
+          {!marketplaceCategoryDefinitions.some(category => category.id === draft.category) && <option value={draft.category}>{formatMarketplaceCategory(draft.category)}</option>}
+          {marketplaceCategoryDefinitions.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
+        </select></label>
+        <CategoryOptionSelect id={`listing-${listing.id}-category-option`} disabled={!canManageListings} category={draft.category} value={draft.categoryOption}
+          onChange={categoryOption => onUpdateDraft(listing.id, { categoryOption, carModel: '' })} className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
+        <CarModelSelect id={`listing-${listing.id}-car-model`} disabled={!canManageListings} category={draft.category} brand={draft.categoryOption} value={draft.carModel}
+          onChange={carModel => onUpdateDraft(listing.id, { carModel })} className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
         <div className="admin-field"><span>المدينة</span><CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} /></div>
         <label className="admin-field">السعر<Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" /></label>
       </div>
@@ -371,6 +386,9 @@ function AdminListingsPageContent() {
   const [drafts, setDrafts] = useState<Record<string, ListingDraft>>({});
   const [query, setQuery] = useState(searchParams.get('query')?.trim() ?? '');
   const [status, setStatus] = useState<AdminListing['status'] | 'all'>(() => statusOptions.find(option => option.value === searchParams.get('status'))?.value ?? 'all');
+  const [category, setCategory] = useState('');
+  const [categoryOption, setCategoryOption] = useState('');
+  const [carModel, setCarModel] = useState('');
   const [notice, setNotice] = useState('');
   const [actionNotice, setActionNotice] =
     useState<AdminListingActionNotice | null>(null);
@@ -383,6 +401,8 @@ function AdminListingsPageContent() {
   } | null>(null);
   const queryRef = useRef(query);
   const statusRef = useRef(status);
+  const categoryRef = useRef({ category, categoryOption, carModel });
+  useEffect(() => { categoryRef.current = { category, categoryOption, carModel }; }, [category, categoryOption, carModel]);
   const focusedListingIdRef = useRef(focusedListingId);
 
   useEffect(() => {
@@ -419,6 +439,9 @@ function AdminListingsPageContent() {
           status: statusRef.current,
         });
         if (sellerId) params.set('sellerId', sellerId);
+        if (categoryRef.current.category) params.set('category', categoryRef.current.category);
+        if (categoryRef.current.categoryOption) params.set('categoryOption', categoryRef.current.categoryOption);
+        if (categoryRef.current.carModel) params.set('carModel', categoryRef.current.carModel);
 
         if (focusedListingIdRef.current) {
           params.set('listingId', focusedListingIdRef.current);
@@ -548,6 +571,8 @@ function AdminListingsPageContent() {
         title: draft.title,
         description: draft.description,
         category: draft.category,
+        categoryOption: draft.categoryOption || null,
+        carModel: draft.carModel || null,
         city: draft.city || null,
         condition: draft.condition || null,
         price: draft.priceMode === 'fixed' ? Number(draft.price || 0) : null,
@@ -719,11 +744,6 @@ function AdminListingsPageContent() {
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <datalist id="marketplace-admin-category-options">
-        {marketplaceCategoryDefinitions.map(category => (
-          <option key={category.id} value={category.id}>{category.label}</option>
-        ))}
-      </datalist>
       <ActionConfirmDialog
         confirmLabel={
           pendingDeleteAction?.permanent ? 'حذف نهائي' : 'حذف الإعلان'
@@ -780,7 +800,7 @@ function AdminListingsPageContent() {
             </Button>
           </section>
         ) : (
-          <section className="admin-filterbar grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <section className="admin-filterbar grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Input
               name="listingSearch"
               value={query}
@@ -801,6 +821,17 @@ function AdminListingsPageContent() {
                 </option>
               ))}
             </select>
+            <label className="grid min-w-0 gap-2 text-sm">التصنيف
+              <select className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm" name="listingCategoryFilter" value={category}
+                onChange={event => { setCategory(event.target.value); setCategoryOption(''); setCarModel(''); }}>
+                <option value="">كل التصنيفات</option>
+                {marketplaceCategoryDefinitions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </label>
+            <CategoryOptionSelect id="admin-listing-category-option-filter" category={category} value={categoryOption} onChange={value => { setCategoryOption(value); setCarModel(''); }} all
+              className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
+            <CarModelSelect id="admin-listing-car-model-filter" category={category} brand={categoryOption} value={carModel} onChange={setCarModel} all
+              className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
             <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => void loadListings(1)}>
               <Search className="size-4" />
               بحث

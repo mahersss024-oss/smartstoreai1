@@ -1,5 +1,8 @@
 # Independent Chat Searches
 
+> Historical implementation notes. Hamad no longer searches for products or
+> changes search state. See [the current role contract](hamad-role.md).
+
 New searches replace the stored search constraints by default, including when
 the user requests the same product again. Previously, an omitted search mode
 implicitly merged old city, price, year, mileage, condition, color, descriptive

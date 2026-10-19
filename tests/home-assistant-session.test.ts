@@ -14,12 +14,12 @@ test('home assistant starts clean without durable chat history', () => {
     /clearStaleStoredChatState\(\);[\s\S]*?setRestoredChatOwnerId\(chatOwnerId\);[\s\S]*?return \(\) => \{/,
   )?.[0] ?? '';
 
-  assert.match(homePage, /resetAssistantSearchState/);
-  assert.match(homePage, /resetSearchState/);
-  assert.match(homePage, /shouldResetSearchStateRef\.current = true/);
+  assert.match(homePage, /resetAssistantDraftContext/);
+  assert.match(homePage, /resetDraftContext/);
+  assert.match(homePage, /shouldResetDraftContextRef\.current = true/);
   assert.match(mountRestoreEffect, /clearStaleStoredChatState\(\)/);
   assert.match(mountRestoreEffect, /setRestoredChatOwnerId\(chatOwnerId\)/);
-  assert.doesNotMatch(mountRestoreEffect, /resetAssistantSearchState/);
+  assert.doesNotMatch(mountRestoreEffect, /resetAssistantDraftContext/);
   assert.doesNotMatch(
     homePage,
     /localStorage\.setItem\(\s*currentChatStorageKey/,
@@ -34,7 +34,7 @@ test('home assistant keeps chat only across in-app navigation', () => {
   assert.match(homePage, /writeHomeAssistantRuntimeState/);
   assert.match(homePage, /clearHomeAssistantRuntimeState/);
   assert.match(homePage, /setMessages\(restoredChatState\.messages\)/);
-  assert.match(homePage, /setActiveListingQuery\(restoredChatState\.activeListingQuery\)/);
+  assert.match(homePage, /setCreationMethod\(restoredChatState\.creationMethod \?\? null\)/);
   assert.match(homePage, /clearHomeAssistantRuntimeState\(\)/);
   assert.doesNotMatch(homePage, /sessionStorage\.setItem\(\s*currentChatStorageKey/);
 });
@@ -60,7 +60,7 @@ test('primary mobile navigation closes the visible assistant chat view only', ()
   assert.match(mobileNavigation, /smartstore:close-assistant-view/);
 });
 
-test('listing details does not show Hamad comparison while home can still return to the listing', () => {
+test('home and listing details expose no old comparison role or automatic comparison entry point', () => {
   const homePage = readProjectFile('app', 'page.tsx');
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
 
@@ -68,13 +68,12 @@ test('listing details does not show Hamad comparison while home can still return
   assert.doesNotMatch(listingPage, /assistant=listing&listingId=/);
   assert.doesNotMatch(listingPage, /listingAssistantHref/);
   assert.doesNotMatch(listingPage, /hamad-assistant-bubble\.webp/);
-  assert.match(homePage, /isSafeListingId/);
+  assert.doesNotMatch(homePage, /isSafeListingId/);
   assert.doesNotMatch(homePage, /const \[assistantReturnListingId, setAssistantReturnListingId\]/);
-  assert.match(homePage, /handledListingAssistantRef/);
-  assert.match(homePage, /url\.searchParams\.get\('assistant'\)/);
-  assert.match(homePage, /url\.searchParams\.get\('listingId'\)/);
-  assert.match(homePage, /assistantMode !== 'listing'/);
-  assert.match(homePage, /sendStarter\(`قارن لي الإعلان رقم \$\{listingId\} مع السوق`\)/);
+  assert.doesNotMatch(homePage, /handledListingAssistantRef|askToCompareListing|tool-searchMarketplaceListings|tool-compareMarketplaceListings/);
+  assert.doesNotMatch(homePage, /url\.searchParams\.get\('assistant'\)/);
+  assert.doesNotMatch(homePage, /url\.searchParams\.get\('listingId'\)/);
+  assert.doesNotMatch(homePage, /aria-label="مقارنة الإعلان"/);
   assert.doesNotMatch(homePage, /assistantReturnListingHref/);
   assert.doesNotMatch(homePage, /href=\{assistantReturnListingHref\}/);
   assert.doesNotMatch(homePage, /aria-label="العودة للإعلان"/);
@@ -231,9 +230,11 @@ test('home header keeps account access available on mobile and wider screens', (
   assert.doesNotMatch(homePage, /className="hidden rounded-md lg:inline-flex"/);
 });
 
-test('home assistant starter search is generic instead of a fixed car city example', () => {
+test('home assistant starters offer documented platform help instead of buyer services', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 
-  assert.match(homePage, /'أبحث عن منتج'/);
-  assert.doesNotMatch(homePage, /'أبحث عن سيارة في الرياض'/);
+  assert.match(homePage, /'كيف أستخدم سوق حمد؟'/);
+  assert.match(homePage, /'ما سياسة الإعلانات؟'/);
+  assert.match(homePage, /assistant-creation-options/);
+  assert.doesNotMatch(homePage, /'أبحث عن منتج'|'افحص صور الإعلان'/);
 });

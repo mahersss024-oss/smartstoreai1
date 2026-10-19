@@ -28,7 +28,7 @@ test('a changed search or filter cannot label old cached results as current', ()
   const saved = state();
   assert.equal(getHomeBrowseKey({ ...saved, searchInput: ' desk ' }), saved.listingsKey);
   for (const change of [{ searchInput: 'phone' }, { city: 'Jeddah' },
-    { categoryGroup: 'all' }, { subcategory: 'all' }, { searchInput: '' }]) {
+    { categoryGroup: 'all' }, { subcategory: 'all' }, { searchInput: '' }, { categoryOption: 'apple' }]) {
     assert.notEqual(getHomeBrowseKey({ ...saved, ...change }), saved.listingsKey);
   }
 });

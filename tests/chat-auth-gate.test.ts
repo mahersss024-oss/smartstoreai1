@@ -48,7 +48,7 @@ test('requires sign-in before any chat model interaction', async () => {
   assert.match(text, /\[\[SMARTSTORE_GOOGLE_AUTH_REQUIRED\]\]/);
 });
 
-test('chat reset endpoint clears retained assistant search state', async () => {
+test('chat reset clears incomplete drafts without touching the independent search state', async () => {
   const userId = 'google:chat-reset-user';
   const ownerKey = `user:${userId}`;
 
@@ -80,7 +80,8 @@ test('chat reset endpoint clears retained assistant search state', async () => {
     },
   );
 
-  assert.ok(await getMarketplaceSearchState(ownerKey));
+  const beforeSearch = await getMarketplaceSearchState(ownerKey);
+  assert.ok(beforeSearch);
   assert.equal(incompleteDraft.status, 'draft');
   assert.equal(completeDraft.status, 'draft');
   assert.equal(
@@ -109,7 +110,7 @@ test('chat reset endpoint clears retained assistant search state', async () => {
   );
 
   assert.equal(response.status, 200);
-  assert.equal(await getMarketplaceSearchState(ownerKey), null);
+  assert.deepEqual(await getMarketplaceSearchState(ownerKey), beforeSearch);
   assert.equal(
     (await listSellerListings(userId)).some(
       (listing) => listing.id === incompleteDraft.id,
@@ -124,7 +125,7 @@ test('chat reset endpoint clears retained assistant search state', async () => {
   );
 });
 
-test('chat reset endpoint is rate limited because it mutates search and draft state', () => {
+test('chat reset endpoint remains rate limited because it cleans up draft context', () => {
   const resetRoute = readProjectFile('app', 'api', 'chat', 'reset', 'route.ts');
 
   assert.match(resetRoute, /enforceApiRateLimit/);

@@ -185,18 +185,16 @@ test('listing contact passes the selected listing into the conversation page', (
   assert.match(repository, /phoneNumber: true/);
 });
 
-test('assistant marketplace context can share real listing links without opening conversations', () => {
+test('assistant context contains owned drafts only and directs manual review without retrieving other sellers', () => {
   const marketplaceTools = readProjectFile('agent', 'tools', 'marketplace.ts');
   const chatRoute = readProjectFile('app', 'api', 'chat', 'route.ts');
   const marketplaceInstructions = readProjectFile('agent', 'marketplace', 'agents.ts');
 
-  assert.match(marketplaceTools, /listingUrl: getPublicListingUrl\(listing\.id\)/);
-  assert.match(chatRoute, /listingUrl:/);
-  assert.match(chatRoute, /getPublicListingUrl\(listing\.id/);
-  assert.match(chatRoute, /\[فتح الإعلان\]\(\$\{listingUrl\}\)/);
-  assert.match(marketplaceInstructions, /\[فتح الإعلان\]\(listingUrl\)/);
-  assert.match(chatRoute, /links only/);
-  assert.match(chatRoute, /do not create or open conversations from assistant chat/);
+  assert.doesNotMatch(marketplaceTools, /searchMarketplaceListings|compareMarketplaceListings|listMarketplaceListings/);
+  assert.match(chatRoute, /drafts\.filter\(listing => listing\.status === 'draft'\)/);
+  assert.match(chatRoute, /reviewUrl: '\/account\/listings'/);
+  assert.doesNotMatch(chatRoute, /getVerifiedSelectedListingContext|getListing\(parsed\.id\)/);
+  assert.match(marketplaceInstructions, /customer reviews and publishes from \/account\/listings themselves/);
 });
 
 test('assistant message renderer turns listing links into a listing card inside chat', () => {

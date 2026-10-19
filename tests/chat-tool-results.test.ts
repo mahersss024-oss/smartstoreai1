@@ -99,19 +99,18 @@ test('retry preserves verified matches and respects an explicitly empty newer re
   assert.deepEqual(selectAssistantSearchToolResults(first, empty), empty);
 });
 
-test('chat route streams marketplace tool outputs with guarded text responses', () => {
+test('chat route reviews all draft and help tool steps but never streams old search outputs', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
     'utf8',
   );
 
-  assert.match(route, /extractAssistantSearchToolResults\(firstResult\)/);
-  assert.match(route, /extractAssistantSearchToolResults\(retryResult\)/);
-  assert.match(route, /type: 'tool-input-available'/);
-  assert.match(route, /type: 'tool-output-available'/);
+  assert.match(route, /firstResult\.steps\.flatMap\(step => step\.toolResults\)/);
+  assert.match(route, /assistantResponse: firstText, verifiedToolResults/);
+  assert.doesNotMatch(route, /extractAssistantSearchToolResults|type: 'tool-input-available'|type: 'tool-output-available'/);
 });
 
-test('chat route keeps buyer search responses on the real agent path', () => {
+test('chat route has no buyer search fast path and keeps bounded model generation', () => {
   const route = readFileSync(
     join(process.cwd(), 'app', 'api', 'chat', 'route.ts'),
     'utf8',
@@ -133,7 +132,7 @@ test('chat image assessments are advisory and do not block uploads or publicatio
   );
   const chatVisionReview = route.slice(
     route.indexOf('imageComplianceDecision = (await reviewListingImageContent('),
-    route.indexOf('if ((marketplaceIntent.requiresAuth'),
+    route.indexOf('  const authSystemMessage =', route.indexOf('imageComplianceDecision = (await reviewListingImageContent(')),
   );
 
   assert.match(chatVisionReview, /reviewListingImageContent\(latestUploadedImages\)/);

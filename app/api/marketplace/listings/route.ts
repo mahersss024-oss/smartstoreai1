@@ -15,6 +15,8 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { parsePaginationFromRequest } from '@/lib/pagination';
 import { marketplaceCategoryIds } from '@/lib/marketplace/categories';
+import { getMarketplaceCategoryOption, InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
+import { getMarketplaceCarModel } from '@/lib/marketplace/car-models';
 import { sortPreferenceSchema } from '@/agent/marketplace/structured-search-intent';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +26,8 @@ const publicSearchSchema = z.object({
   query: z.string().trim().max(300).optional(),
   city: z.string().trim().max(80).optional(),
   category: z.enum(marketplaceCategoryIds).optional(),
+  categoryOption: z.string().trim().min(1).max(80).optional(),
+  carModel: z.string().trim().min(1).max(80).optional(),
   categories: z.array(z.enum(marketplaceCategoryIds)).max(marketplaceCategoryIds.length).optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
@@ -33,10 +37,11 @@ const publicSearchSchema = z.object({
   mileageMax: z.coerce.number().int().nonnegative().optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
   sort: sortPreferenceSchema.optional(),
-});
+}).refine(value => !value.categoryOption || Boolean(value.category && getMarketplaceCategoryOption(value.category, value.categoryOption)), { message: 'invalid_category_option' })
+  .refine(value => !value.carModel || Boolean(value.category === 'cars' && value.categoryOption && getMarketplaceCarModel(value.categoryOption, value.carModel)), { message: 'invalid_car_model' });
 const createListingSchema = z.object({
   autoCategory: z.boolean().optional(),
-  category: z.string().min(2).max(80),
+  category: z.enum(marketplaceCategoryIds),
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),
   price: z
@@ -55,7 +60,7 @@ export async function GET(request: Request) {
   const parsedSearch = publicSearchSchema.safeParse({
     query, city,
     categories: url.searchParams.has('categories') ? url.searchParams.get('categories')!.split(',') : undefined,
-    ...Object.fromEntries(['category', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'mileageMin', 'mileageMax', 'condition', 'sort']
+    ...Object.fromEntries(['category', 'categoryOption', 'carModel', 'minPrice', 'maxPrice', 'yearMin', 'yearMax', 'mileageMin', 'mileageMax', 'condition', 'sort']
       .filter(key => url.searchParams.has(key)).map(key => [key, url.searchParams.get(key)])),
   });
   if (!parsedSearch.success) return Response.json({ error: 'invalid_search_filters' }, { status: 400, headers: noStoreHeaders });
@@ -160,6 +165,10 @@ export async function POST(request: Request) {
   try {
     listing = await createListingDraft(session.user, parsed.data);
   } catch (error) {
+    if (error instanceof InvalidMarketplaceCategoryOptionError) {
+      await idempotency?.abandon();
+      return Response.json({ error: 'invalid_category_option', message: error.message }, { status: 400 });
+    }
     if (isListingLimitReachedError(error)) {
       const maxListings = getMaxListingsPerSeller();
       const responseBody = {

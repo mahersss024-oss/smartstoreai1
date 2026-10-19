@@ -15,6 +15,18 @@ Model responses must match an existing category ID or null and confidence in
 the range 0..1. Scores below 0.8 yield an uncertain result, not a guessed
 category. Model confidence is self-reported, not a calibrated accuracy metric.
 
+The manual form places description immediately after title and sends both to
+the same existing classifier. Title identifies the offer and description adds
+context. Changes to either field refresh automatic suggestions; manual choices
+remain authoritative. Cached results are keyed by both fields.
+
+Optional `categoryOption` must belong to the suggested category. For cars only,
+optional `carModel` must belong to that selected brand in the shared car-family
+catalog. Invalid dependent choices are omitted without inventing substitutes.
+Both analysis and classifier cache keys include the catalog, so catalog updates
+cannot reuse an obsolete selection. This uses the same existing model task, not
+another inference step. Customer selection always takes precedence.
+
 Client suggestions wait 900ms after typing stops. Editing the text clears the
 previous automatic suggestion; aborted or stale replies cannot overwrite new
 text or a manual selection. Blur does not trigger duplicate calls. The UI

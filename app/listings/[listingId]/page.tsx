@@ -1,5 +1,7 @@
 
 import { formatMarketplaceCategory as formatCategory } from '@/lib/marketplace/categories';
+import { getListingCarModel, getListingCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
+import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -684,6 +686,8 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
         },
       ];
   const summaryAttributeKeys = new Set([
+    marketplaceCategoryOptionAttribute,
+    marketplaceCarModelAttribute,
     'askingPrice',
     'city',
     'condition',
@@ -761,7 +765,7 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
-                      {formatCategory(listing.category)}
+                      {formatCategory(listing.category)}{getListingCategoryOption(listing) ? ` · ${getListingCategoryOption(listing)!.label}` : ''}{getListingCarModel(listing) ? ` · ${getListingCarModel(listing)!.label}` : ''}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                       <BadgeCheck className="size-3.5" />

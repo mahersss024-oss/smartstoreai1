@@ -36,7 +36,7 @@ test('conversation search keys stay stable per conversation and are always scope
 });
 
 for (const store of ['file', 'database'] as const) {
-  test(`search refinements and resets cannot overwrite another conversation in ${store} storage`, async t => {
+  test(`chat resets cannot change independent search state in ${store} storage`, async t => {
     const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
     process.env.SMARTSTORE_MARKETPLACE_STORE = store;
     t.after(() => {
@@ -68,7 +68,7 @@ for (const store of ['file', 'database'] as const) {
     assert.equal((await getMarketplaceSearchState(secondKey))?.city, 'Jeddah');
     const beforeReset = await getMarketplaceSearchState(secondKey);
     assert.equal((await resetChat(request(firstConversation, true))).status, 200);
-    assert.equal(await getMarketplaceSearchState(firstKey), null);
+    assert.deepEqual(await getMarketplaceSearchState(firstKey), refined);
     assert.deepEqual(await getMarketplaceSearchState(secondKey), beforeReset);
   });
 }
@@ -92,39 +92,29 @@ test('a stale tab cannot reset the newly authenticated account search state', as
   assert.deepEqual(await getMarketplaceSearchState(key), before);
 });
 
-test('the real chat route scopes searches, refinements and realtime notifications to the current conversation', async t => {
+test('the real chat route cannot execute old product searches or emit search notifications', async t => {
   const analysis = textAnalysis({ intent: 'search_listing' });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
-  let toolInput: object = {};
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     const checker = body.messages.some((message: { content: unknown }) => typeof message.content === 'string' && message.content.includes('output Scope Checker'));
-    const tool = !checker && !body.messages.some((message: { role: string }) => message.role === 'tool');
-    return Response.json({ id: 'isolated-search', object: 'chat.completion', created: 1, model: 'test-model',
-      choices: [{ index: 0, finish_reason: tool ? 'tool_calls' : 'stop', message: { role: 'assistant',
-        content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : tool ? null : 'هذه نتائج البحث المتاحة.',
-        ...(tool ? { tool_calls: [{ id: 'isolated-search-call', type: 'function', function: { name: 'searchMarketplaceListings', arguments: JSON.stringify(toolInput) } }] } : {}),
-      } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-    });
+    if (!checker) assert.deepEqual(body.tools.map((tool: { function: { name: string } }) => tool.function.name), ['getPlatformHelp']);
+    return Response.json({ id: 'scoped-help', object: 'chat.completion', created: 1, model: 'test-model',
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
+        content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'البحث عن المنتجات ليس من دوري. يمكنك استخدام بحث السوق بنفسك.',
+      } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });
-  for (const [conversation, input] of [
-    [firstConversation, { query: 'هاتف', understoodIntent: { city: 'Riyadh' } }],
-    [secondConversation, { query: 'سيارة', understoodIntent: { city: 'Jeddah' } }],
-    [firstConversation, { understoodIntent: { searchMode: 'refine', maxPrice: 200 } }],
-  ] as const) {
-    toolInput = input;
-    const response = await POST(request(conversation));
+  const keys = [firstConversation, secondConversation].map(id => getChatSearchOwnerKey(session, request(id), id));
+  const before = await Promise.all(keys.map(key => getMarketplaceSearchState(key)));
+  const beforeEvents = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }).filter(event => event.type === 'ai_results_updated').length;
+  for (const id of [firstConversation, secondConversation]) {
+    const response = await POST(request(id));
     assert.equal(response.status, 200);
-    assert.match(await response.text(), /tool-output-available/);
+    const stream = await response.text();
+    assert.match(stream, /ليس من دوري/);
+    assert.doesNotMatch(stream, /tool-output-available/);
   }
-  const firstKey = getChatSearchOwnerKey(session, request(firstConversation), firstConversation);
-  const secondKey = getChatSearchOwnerKey(session, request(secondConversation), secondConversation);
-  assert.equal((await getMarketplaceSearchState(firstKey))?.city, 'Riyadh');
-  assert.equal((await getMarketplaceSearchState(firstKey))?.maxPrice, 200);
-  assert.equal((await getMarketplaceSearchState(secondKey))?.city, 'Jeddah');
-  const events = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }).filter(event => event.type === 'ai_results_updated');
-  assert.ok(events.some(event => 'ownerKey' in event.payload && event.payload.ownerKey === firstKey));
-  assert.ok(events.some(event => 'ownerKey' in event.payload && event.payload.ownerKey === secondKey));
-  assert.equal(getRealtimeEventsSince(null, { userId: 'another-account', isAdmin: false }).filter(event => event.type === 'ai_results_updated').length, 0);
+  assert.deepEqual(await Promise.all(keys.map(key => getMarketplaceSearchState(key))), before);
+  assert.equal(getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }).filter(event => event.type === 'ai_results_updated').length, beforeEvents);
 });

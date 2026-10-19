@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { platformPolicies } from '@/lib/platform/policies';
 
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
@@ -26,8 +27,10 @@ test('registration agreement explicitly accepts platform policies', () => {
 test('privacy policy describes service providers without naming vendors', () => {
   const privacyPage = readProjectFile('app', 'privacy', 'page.tsx');
 
-  assert.match(privacyPage, /مزودي خدمة موثوقين/);
-  assert.doesNotMatch(privacyPage, /DeepSeek|Cloudinary|Render|Google|Apple/);
+  assert.match(privacyPage, /platformPolicies\.privacy/);
+  const policy = JSON.stringify(platformPolicies.privacy);
+  assert.match(policy, /مزودي خدمة موثوقين/);
+  assert.doesNotMatch(policy, /DeepSeek|Cloudinary|Render|Google|Apple/);
 });
 
 test('home and policy navigation keep legal links concise and discoverable', () => {

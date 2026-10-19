@@ -1,5 +1,9 @@
 # Chat Customer Experience Contract
 
+> Current role: [Hamad: Drafts And Platform Help](hamad-role.md). The search,
+> comparison and pricing chat flows below describe previous implementations and
+> historical verification, not the capabilities currently exposed to Hamad.
+
 ## Responsibilities
 
 The existing chat, scope, search/text-analysis, moderation and vision model

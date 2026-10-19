@@ -13,6 +13,8 @@ import {
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
+import { InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
+import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -185,6 +187,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  if (updates.data.category && !isMarketplaceCategory(updates.data.category)) {
+    const existing = await getListing(listingId);
+    if (!existing || existing.sellerId !== session.user.id) return Response.json({ error: 'listing_not_found' }, { status: 404 });
+    if (updates.data.category !== existing.category) return Response.json({ error: 'invalid_category', message: 'اختر تصنيفًا من القائمة.' }, { status: 400 });
+  }
+
   const idempotency = await reserveIdempotencyKey(request, {
     namespace: 'listing_update',
     actorKey: `${session.user.id}:${listingId}`,
@@ -198,7 +206,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     listingId,
     session.user.id,
     updates.data,
-  );
+  ).catch(async (error: unknown) => {
+    await idempotency?.abandon();
+    if (error instanceof InvalidMarketplaceCategoryOptionError) return error;
+    throw error;
+  });
+
+  if (listing instanceof InvalidMarketplaceCategoryOptionError) {
+    return Response.json({ error: 'invalid_category_option', message: listing.message }, { status: 400 });
+  }
 
   if (!listing) {
     const responseBody = { error: 'listing_not_found' };

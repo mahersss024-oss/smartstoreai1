@@ -48,6 +48,34 @@ test('timeout and provider failures never fall back to keyword categories', asyn
   assert.equal((await failed.suggest({ title: 'Toyota Camry', description: '' })).category, null);
 });
 
+test('classification caches the complete title and description pair without reusing an older description', async () => {
+  const seen: Array<{ title: string; description: string }> = [];
+  const classifier = createListingCategoryClassifier(async input => {
+    seen.push(input);
+    return { category: input.description === 'First description' ? 'cars' : 'furniture', status: 'suggested' };
+  });
+  const first = { title: 'An ambiguous title', description: 'First description' };
+  const second = { ...first, description: 'Updated description' };
+  assert.equal((await classifier.suggest(first)).category, 'cars');
+  assert.equal((await classifier.suggest(first)).category, 'cars');
+  assert.equal((await classifier.suggest(second)).category, 'furniture');
+  assert.equal((await classifier.suggest(second)).category, 'furniture');
+  assert.deepEqual(seen, [first, second]);
+});
+
+test('category API forwards both customer text fields unchanged', async t => {
+  const input = { title: 'جهاز للبيع', description: 'حاسب محمول مع الشاحن' };
+  let received: unknown;
+  t.mock.method(listingCategoryClassifier, 'suggest', async (value: { title: string; description: string }) => {
+    received = value;
+    return { category: 'computers', status: 'suggested' };
+  });
+  const response = await POST(request(JSON.stringify(input), 'title-description-pair'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(received, input);
+  assert.equal((await response.json()).category, 'computers');
+});
+
 test('manual categories bypass model inference; automatic drafts use only model output', async t => {
   let calls = 0;
   t.mock.method(listingCategoryClassifier, 'suggest', async () => {

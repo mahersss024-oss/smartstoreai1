@@ -28,7 +28,8 @@ test('category catalog preserves legacy IDs, has unique labels and groups every 
   assert.equal(new Set(labels).size, labels.length);
   assert.deepEqual(marketplaceCategoryGroups.flatMap(group => group.categories).sort(), [...labels].sort());
   for (const id of legacyIds) assert.ok(isMarketplaceCategory(id), id);
-  for (const id of ['jobs', 'services', 'travel', 'lost_found', 'training', 'investments']) assert.equal(isMarketplaceCategory(id), false);
+  for (const id of ['jobs', 'services', 'travel', 'training', 'businesses', 'events', 'boats', 'building_materials', 'business_equipment']) assert.equal(isMarketplaceCategory(id), true);
+  for (const id of ['lost_found', 'investments']) assert.equal(isMarketplaceCategory(id), false);
   assert.equal(formatMarketplaceCategory('computers'), 'الحواسيب وملحقاتها');
   assert.equal(formatMarketplaceCategory('legacy-custom-category'), 'legacy-custom-category');
   assert.equal(resolveListingCategory({ category: 'legacy-custom-category', title: 'iPhone' }), 'legacy-custom-category');

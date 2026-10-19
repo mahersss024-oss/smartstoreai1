@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { getListingCarModel, getListingCategoryOption, marketplaceCategoryOptionAttribute } from './category-options';
+import { marketplaceCarModelAttribute } from './car-models';
 
 // Orthographic normalization only, not product synonyms or category inference.
 const sourceCharacters = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669\u06f0\u06f1\u06f2\u06f3\u06f4\u06f5\u06f6\u06f7\u06f8\u06f9\u0625\u0623\u0622\u0671\u0624\u0626\u0629\u0649\u06a9\u06cc\u200c\u200e\u200f';
@@ -10,6 +12,8 @@ export type PublicMarketplaceListingFilters = {
   query?: string;
   city?: string;
   category?: string;
+  categoryOption?: string;
+  carModel?: string;
   categories?: string[];
   minPrice?: number;
   maxPrice?: number;
@@ -80,6 +84,8 @@ export function titleSearchNumberSql(field: 'year' | 'mileage') {
 export function matchesPublicListingFilters(listing: { title?: string; category: string; city?: string; price?: number | 'bid' | 'negotiable'; condition?: string; attributes: Record<string, unknown> }, filters: PublicMarketplaceListingFilters) {
   if (filters.city && listing.city !== filters.city) return false;
   if (filters.category && listing.category !== filters.category) return false;
+  if (filters.categoryOption && getListingCategoryOption(listing)?.id !== filters.categoryOption) return false;
+  if (filters.carModel && getListingCarModel(listing)?.id !== filters.carModel) return false;
   if (filters.categories?.length && !filters.categories.includes(listing.category)) return false;
   if (filters.condition && listing.condition !== filters.condition) return false;
   if (filters.minPrice !== undefined && (typeof listing.price !== 'number' || listing.price < filters.minPrice)) return false;
@@ -113,6 +119,8 @@ export function publicListingFiltersSql(filters: PublicMarketplaceListingFilters
     : Prisma.sql`${titlePredicate}`];
   if (filters.city) predicates.push(Prisma.sql`"city" = ${filters.city}`);
   if (filters.category) predicates.push(Prisma.sql`"category" = ${filters.category}`);
+  if (filters.categoryOption) predicates.push(Prisma.sql`"attributes" ->> ${marketplaceCategoryOptionAttribute} = ${filters.categoryOption}`);
+  if (filters.carModel) predicates.push(Prisma.sql`"attributes" ->> ${marketplaceCarModelAttribute} = ${filters.carModel}`);
   if (filters.categories?.length) predicates.push(Prisma.sql`"category" IN (${Prisma.join(filters.categories)})`);
   if (filters.condition) predicates.push(Prisma.sql`"condition" = ${filters.condition}::"ListingCondition"`);
   if (filters.minPrice !== undefined) predicates.push(Prisma.sql`"price" >= ${filters.minPrice}`);

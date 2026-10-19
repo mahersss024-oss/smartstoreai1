@@ -32,8 +32,7 @@ test('chat exposes no sensitive action tools even for signed-in users', () => {
   for (const session of [null, createTestSession('buyer'), { ...createTestSession('owner'), user: { ...createTestSession('owner').user, role: 'owner' as const } }]) {
     const tools = createMarketplaceTools(session);
     assert.deepEqual(Object.keys(tools).sort(), [
-      'searchMarketplaceListings', 'compareMarketplaceListings', 'estimateListingPrice',
-      'evaluateNegotiationOffer', 'createListingDraft', 'updateListing',
+      'getPlatformHelp', 'createListingDraft', 'updateListing',
       'addUploadedImagesToListing', 'analyzeListingImages',
     ].sort());
     for (const name of ['setListingStatus', 'deleteListingImage', 'setPrimaryListingImage',

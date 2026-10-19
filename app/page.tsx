@@ -4,6 +4,10 @@ import { getArabicCustomerMessage } from '@/lib/customer-language';
 /* eslint-disable @next/next/no-img-element */
 
 import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryDefinitions, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
+import { CategoryOptionSelect } from '@/components/category-option-select';
+import { CarModelSelect } from '@/components/car-model-select';
+import { getListingCarModel, getListingCategoryOption, getMarketplaceCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
+import { getMarketplaceCarModel, marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import {
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
@@ -81,11 +85,6 @@ import {
   getSafeAssistantText,
   isRawServiceErrorResponse,
 } from '@/lib/chat-response-safety';
-import {
-  getAssistantResultListings,
-  getCanLoadMoreExploreListings,
-  getExploreListings,
-} from '@/lib/chat-listing-display';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { useAuthSession } from '@/hooks/use-auth-session';
 import { useAppBridge } from '@/hooks/use-app-bridge';
@@ -93,9 +92,7 @@ import { useAuthProviderVisibility } from '@/hooks/use-auth-provider-visibility'
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { cn } from '@/lib/utils';
-import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
 import { createChatImageContext, type RetainedChatImage } from '@/lib/chat/image-context';
-import { scopeChatSearchOwnerKey } from '@/lib/chat/conversation';
 import { clearChatSessionState, readChatSessionState, writeChatSessionState } from '@/lib/chat/session-state';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
 import { getHomeBrowseKey, readHomeBrowseState, reloadHomeBrowsePages, writeHomeBrowseState } from '@/lib/marketplace/home-browse-state';
@@ -121,6 +118,10 @@ type MarketplaceCityCoordinate = {
 };
 
 type ListingCard = {
+  carModel?: string;
+  carModelLabel?: string;
+  categoryOption?: string;
+  categoryOptionLabel?: string;
   id?: string;
   sellerId?: string;
   title: string;
@@ -135,12 +136,9 @@ type ListingCard = {
   timeLabel?: string;
 };
 
-type SelectedListingContext = Pick<
-  ListingCard,
-  'id' | 'title' | 'price' | 'city' | 'category' | 'status' | 'description'
->;
 
 type ApiListingRecord = {
+  attributes?: Record<string, unknown>;
   id: string;
   sellerId?: string;
   category: string;
@@ -179,11 +177,10 @@ type AssistantState = 'expanded' | 'collapsed';
 type HomeAssistantRuntimeState = {
   conversationId: string;
   messages: UIMessage[];
-  activeListingQuery: string;
-  selectedListingContext: SelectedListingContext | null;
+  creationMethod: 'chat' | null;
   retainedListingImages: RetainedChatImage[];
   retainedListingImageMessageId: string | null;
-  shouldResetSearchState: boolean;
+  shouldResetDraftContext: boolean;
 };
 
 function readHomeAssistantRuntimeState(ownerId: string | null) {
@@ -206,9 +203,6 @@ async function prepareUploadableImageFilesOnDemand(files: File[]) {
   return prepareUploadableImageFiles(files);
 }
 
-function isSafeListingId(value: string | null): value is string {
-  return Boolean(value && /^[a-zA-Z0-9_-]+$/.test(value));
-}
 
 const authRequiredMarker = '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]]';
 const chatRateLimitMessage =
@@ -608,9 +602,9 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
 const featuredListings: ListingCard[] = [];
 
 const starters = [
-  'أريد بيع منتج',
-  'أبحث عن منتج',
-  'افحص صور الإعلان',
+  'كيف أستخدم سوق حمد؟',
+  'ما سياسة الإعلانات؟',
+  'كيف تعمل رسوم المنصة؟',
 ];
 
 function getDurableImageUrls(...urls: Array<string | undefined>) {
@@ -657,14 +651,9 @@ function formatListingStatus(status: string | undefined) {
 
 
 
-const manualListingConditionOptions = [
-  { value: 'new', label: 'جديد' },
-  { value: 'like_new', label: 'شبه جديد' },
-  { value: 'used', label: 'مستعمل' },
-  { value: 'damaged', label: 'يحتاج إصلاح' },
-] as const;
-
 type ManualListingForm = {
+  carModel: string;
+  categoryOption: string;
   autoCategory: boolean;
   title: string;
   description: string;
@@ -672,7 +661,6 @@ type ManualListingForm = {
   price: string;
   city: string;
   category: string;
-  condition: 'new' | 'used' | 'like_new' | 'damaged';
 };
 
 type ManualListingNotice = {
@@ -687,6 +675,8 @@ type ManualListingNotice = {
 type ManualListingSubmission = 'saving' | 'saving_and_publishing';
 
 const defaultManualListingForm: ManualListingForm = {
+  carModel: '',
+  categoryOption: '',
   autoCategory: true,
   title: '',
   description: '',
@@ -694,7 +684,6 @@ const defaultManualListingForm: ManualListingForm = {
   price: '',
   city: '',
   category: 'other',
-  condition: 'used',
 };
 
 // Shared with every city selector so listing creation, editing, and search stay aligned.
@@ -831,7 +820,7 @@ function clearStoredChatState() {
   }
 }
 
-async function resetAssistantSearchState(conversationId: string, ownerId: string | null) {
+async function resetAssistantDraftContext(conversationId: string, ownerId: string | null) {
   await fetch('/api/chat/reset', {
     cache: 'no-store',
     credentials: 'include',
@@ -882,76 +871,7 @@ async function clearRetainedListingImages() {
   });
 }
 
-function toSelectedListingContext(
-  listing: ListingCard,
-): SelectedListingContext | null {
-  if (!listing.id) {
-    return null;
-  }
 
-  return {
-    id: listing.id,
-    title: listing.title,
-    price: listing.price,
-    city: listing.city,
-    category: listing.category,
-    status: listing.status,
-    description: listing.description,
-  };
-}
-
-function getLatestSearchToolOutput(
-  messages: UIMessage[],
-  options: { afterLatestUserOnly?: boolean } = {},
-) {
-  const latestUserMessageIndex = messages.findLastIndex(
-    (message) => message.role === 'user',
-  );
-  const firstEligibleAssistantIndex =
-    options.afterLatestUserOnly === false
-      ? 0
-      : latestUserMessageIndex === -1
-        ? 0
-        : latestUserMessageIndex + 1;
-
-  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
-    if (messageIndex < firstEligibleAssistantIndex) {
-      break;
-    }
-
-    const message = messages[messageIndex];
-
-    if (message.role !== 'assistant') {
-      continue;
-    }
-
-    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
-      const part = message.parts[partIndex];
-
-      if (
-        part.type === 'tool-searchMarketplaceListings' &&
-        'state' in part &&
-        part.state === 'output-available' &&
-        'output' in part &&
-        isAssistantSearchToolOutput(part.output)
-      ) {
-        return part.output;
-      }
-
-      if (
-        part.type === 'tool-compareMarketplaceListings' &&
-        'state' in part &&
-        part.state === 'output-available' &&
-        'output' in part &&
-        isAssistantSearchToolOutput(part.output)
-      ) {
-        return part.output;
-      }
-    }
-  }
-
-  return null;
-}
 
 function listingRecordToCard(listing: ApiListingRecord): ListingCard {
   const primaryImage = listing.images?.find(
@@ -972,6 +892,10 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
     price: formatListingPrice(listing.price),
     city: listing.city ?? 'السعودية',
     category: formatCategory(listing.category),
+    categoryOption: getListingCategoryOption(listing)?.id,
+    categoryOptionLabel: getListingCategoryOption(listing)?.label,
+    carModel: getListingCarModel(listing)?.id,
+    carModelLabel: getListingCarModel(listing)?.label,
     description: listing.description,
     image: imageUrls[0] ?? null,
     imageFallbacks: imageUrls.slice(1),
@@ -1452,33 +1376,20 @@ function ListingImageFallback() {
 function ListingCardView({
   listing,
   className,
-  onAsk,
   onOpen,
   eagerImage = false,
   prioritizeImage = false,
-  isSmartResult = false,
   style,
   variant = 'grid',
 }: {
   listing: ListingCard;
   className?: string;
-  isSmartResult?: boolean;
-  onAsk: (prompt: string, listing?: ListingCard) => void;
   onOpen: (listing: ListingCard) => void;
   eagerImage?: boolean;
   prioritizeImage?: boolean;
   style?: CSSProperties;
   variant?: 'grid' | 'horizontal';
 }) {
-  const askToCompareListing = () => {
-    onAsk(
-      listing.id
-        ? `قارن لي الإعلان رقم ${listing.id} (${listing.title}) بالسوق`
-        : `قارن لي إعلان ${listing.title} بالسوق`,
-      listing,
-    );
-  };
-
   if (variant === 'horizontal') {
     return (
       <article
@@ -1497,29 +1408,6 @@ function ListingCardView({
         style={style}
         tabIndex={0}
       >
-        <Button
-          size="icon-sm"
-          variant="outline"
-          className={cn(
-            'absolute left-1.5 top-1.5 z-10 size-7 rounded-md p-0 shadow-sm ring-1 sm:left-2 sm:top-2 sm:size-8',
-            isSmartResult
-              ? 'border-cyan-300 bg-cyan-50/95 text-cyan-700 shadow-cyan-400/35 ring-2 ring-cyan-200/70 hover:bg-cyan-100 hover:text-cyan-800 dark:border-cyan-300/40 dark:bg-cyan-400/15 dark:text-cyan-100 dark:ring-cyan-300/25 dark:hover:bg-cyan-400/20'
-              : 'border-sky-200 bg-white/95 text-blue-600 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900',
-          )}
-          aria-label="مقارنة الإعلان"
-          onClick={(event) => {
-            event.stopPropagation();
-            askToCompareListing();
-          }}
-        >
-          <Sparkles
-            className={cn(
-              'size-3.5 sm:size-4',
-              isSmartResult &&
-                'fill-current drop-shadow-[0_0_6px_rgba(34,211,238,0.85)]',
-            )}
-          />
-        </Button>
         <div className="relative aspect-square min-h-[6.25rem] bg-slate-100 dark:bg-slate-900 sm:min-h-[7.25rem]">
           {listing.image ? (
             <>
@@ -1562,7 +1450,7 @@ function ListingCardView({
             </span>
           </div>
           <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-5 text-muted-foreground">
-            <span className="truncate">{listing.category ?? listing.status ?? 'إعلان'}</span>
+            <span className="truncate">{listing.category ?? listing.status ?? 'إعلان'}{listing.categoryOptionLabel ? ` · ${listing.categoryOptionLabel}` : ''}{listing.carModelLabel ? ` · ${listing.carModelLabel}` : ''}</span>
             {listing.stats && (
               <span className="truncate text-[10px]">{listing.stats}</span>
             )}
@@ -1614,18 +1502,6 @@ function ListingCardView({
             </div>
           </div>
         )}
-        <Button
-          size="icon-sm"
-          variant="outline"
-          className="absolute left-1.5 top-1.5 size-7 rounded-md border-sky-200 bg-white/95 p-0 text-blue-600 shadow-sm ring-1 ring-slate-950/5 hover:bg-sky-50 hover:text-blue-700 dark:border-sky-400/20 dark:bg-slate-950/85 dark:text-blue-200 dark:ring-white/10 dark:hover:bg-slate-900 sm:left-2 sm:top-2 sm:size-8"
-          aria-label="مقارنة الإعلان"
-          onClick={(event) => {
-            event.stopPropagation();
-            askToCompareListing();
-          }}
-        >
-          <Sparkles className="size-3.5 sm:size-4" />
-        </Button>
       </div>
       <div className="grid gap-1 p-2 text-right">
         <h3 className="line-clamp-1 text-xs font-bold leading-5">{listing.title}</h3>
@@ -1824,6 +1700,8 @@ export default function Page() {
     useState(restoredBrowseState?.categoryGroup ?? 'all');
   const [selectedMarketSubcategory, setSelectedMarketSubcategory] =
     useState(restoredBrowseState?.subcategory ?? 'all');
+  const [selectedMarketCategoryOption, setSelectedMarketCategoryOption] = useState(restoredBrowseState?.categoryOption ?? '');
+  const [selectedMarketCarModel, setSelectedMarketCarModel] = useState(restoredBrowseState?.carModel ?? '');
   const [selectedMarketCity, setSelectedMarketCity] = useState(restoredBrowseState?.city ?? 'all');
   const [nearbyMarketplaceCity, setNearbyMarketplaceCity] =
     useState<string | null>(restoredBrowseState?.nearbyCity ?? null);
@@ -1841,7 +1719,7 @@ export default function Page() {
     if (!isManualListingOpen || !manualListingForm.autoCategory) return;
     const title = manualListingForm.title;
     const description = manualListingForm.description;
-    setManualListingForm(form => form.autoCategory ? { ...form, category: 'other' } : form);
+    setManualListingForm(form => form.autoCategory ? { ...form, category: 'other', categoryOption: '', carModel: '' } : form);
     setManualCategoryStatus('idle');
     if (!session.authenticated || (title.trim().length < 2 && description.trim().length < 2)) return;
     let active = true;
@@ -1854,12 +1732,14 @@ export default function Page() {
           body: JSON.stringify({ title, description }), signal: controller.signal,
         });
         if (!response.ok) throw new Error('category_unavailable');
-        const result = await response.json() as { category?: unknown; status?: string };
+        const result = await response.json() as { category?: unknown; categoryOption?: unknown; carModel?: unknown; status?: string };
         if (!active) return;
         const category = typeof result.category === 'string' && isMarketplaceCategory(result.category)
           && result.status === 'suggested' ? result.category : null;
+        const categoryOption = category ? getMarketplaceCategoryOption(category, result.categoryOption)?.id ?? '' : '';
+        const carModel = category === 'cars' ? getMarketplaceCarModel(categoryOption, result.carModel)?.id ?? '' : '';
         setManualListingForm(form => form.autoCategory && form.title === title && form.description === description
-          ? { ...form, category: category ?? 'other' } : form);
+          ? { ...form, category: category ?? 'other', categoryOption, carModel } : form);
         setManualCategoryStatus(category ? 'suggested' : 'uncertain');
       } catch {
         if (active) setManualCategoryStatus('unavailable');
@@ -1921,9 +1801,7 @@ export default function Page() {
     hasMore: false,
   });
   const [isLoadingListings, setIsLoadingListings] = useState(false);
-  const [activeListingQuery, setActiveListingQuery] = useState('');
-  const [selectedListingContext, setSelectedListingContext] =
-    useState<SelectedListingContext | null>(null);
+  const [creationMethod, setCreationMethod] = useState<'chat' | null>(null);
   const [restoredChatOwnerId, setRestoredChatOwnerId] = useState<string | null>();
   const hasRestoredChat = !isSessionLoading && restoredChatOwnerId === chatOwnerId;
   const [assistantState, setAssistantState] =
@@ -1938,13 +1816,10 @@ export default function Page() {
     useState<AssistantBubblePosition | null>(null);
   const [hasAssistantBubbleAttention, setHasAssistantBubbleAttention] =
     useState(false);
-  const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
-  const lastActivatedSearchMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
   const assistantBubbleDragRef = useRef<AssistantBubbleDragState | null>(null);
   const assistantBubbleRef = useRef<HTMLButtonElement | null>(null);
   const lastAssistantBubbleMessageIdRef = useRef<string | null>(null);
-  const handledListingAssistantRef = useRef<string | null>(null);
   const compactViewportRef = useRef<boolean | null>(null);
   const keyboardBaselineViewportHeightRef = useRef<number | null>(null);
   const chatInputContainerRef = useRef<HTMLDivElement | null>(null);
@@ -2064,7 +1939,7 @@ export default function Page() {
     manualListingImagePreviewIndex === null
       ? null
       : manualListingImagePreviewUrls[manualListingImagePreviewIndex] ?? null;
-  const shouldResetSearchStateRef = useRef(true);
+  const shouldResetDraftContextRef = useRef(true);
   const filteredMessages = useMemo(
     () => hasRestoredChat ? messages.filter((message) => message.role !== 'system') : [],
     [hasRestoredChat, messages],
@@ -2104,49 +1979,10 @@ export default function Page() {
     visualViewportFrame?.height,
     visualViewportFrame?.offsetTop,
   ]);
-  const latestSearchToolOutput = useMemo(
-    () => getLatestSearchToolOutput(filteredMessages),
-    [filteredMessages],
-  );
   const latestAssistantIndex = filteredMessages.findLastIndex(message => message.role === 'assistant');
   const latestAssistantMetadata = latestAssistantIndex > filteredMessages.findLastIndex(message => message.role === 'user')
     ? filteredMessages[latestAssistantIndex]?.metadata : undefined;
   const assistantIntent = isRecord(latestAssistantMetadata) ? latestAssistantMetadata.marketplaceIntent : undefined;
-  useEffect(() => {
-    if (latestSearchToolOutput) {
-      if (lastActivatedSearchMessageIdRef.current === latestAssistantMessageId) return;
-      lastActivatedSearchMessageIdRef.current = latestAssistantMessageId;
-      const latestUser = filteredMessages.findLast(message => message.role === 'user');
-      const label = latestUser?.parts.filter(part => part.type === 'text').map(part => part.text).join(' ') || 'نتائج البحث';
-      queueMicrotask(() => setActiveListingQuery(label));
-    } else if (assistantIntent === 'create_listing' || assistantIntent === 'update_listing') {
-      queueMicrotask(() => setActiveListingQuery(''));
-    }
-  }, [latestSearchToolOutput, latestAssistantMessageId, assistantIntent, filteredMessages]);
-  const retainedSearchToolOutput = useMemo(
-    () =>
-      getLatestSearchToolOutput(filteredMessages, {
-        afterLatestUserOnly: false,
-      }),
-    [filteredMessages],
-  );
-  const hasActiveAssistantSearch = Boolean(activeListingQuery);
-  const visibleSearchToolOutput = hasRestoredChat && hasActiveAssistantSearch
-    ? latestSearchToolOutput ?? retainedSearchToolOutput : null;
-  const searchToolListings = useMemo(() => {
-    if (!visibleSearchToolOutput) {
-      return [];
-    }
-
-    return (visibleSearchToolOutput.listings as ApiListingRecord[]).map(
-      listingRecordToCard,
-    );
-  }, [visibleSearchToolOutput]);
-  const assistantResultListings = useMemo(() => {
-    return getAssistantResultListings({
-      searchToolListings,
-    });
-  }, [searchToolListings]);
   const activeMarketCategoryGroup =
     selectedMarketCategoryGroup !== 'all' &&
     marketplaceCategoryGroups.some(
@@ -2169,6 +2005,9 @@ export default function Page() {
     selectedMarketCity !== 'all' && saudiMarketplaceCities.includes(selectedMarketCity)
       ? selectedMarketCity
       : 'all';
+  const activeMarketCategoryId = marketplaceCategoryDefinitions.find(category => category.label === activeMarketSubcategory)?.id ?? '';
+  const activeMarketCategoryOption = getMarketplaceCategoryOption(activeMarketCategoryId, selectedMarketCategoryOption)?.id ?? '';
+  const activeMarketCarModel = activeMarketCategoryId === 'cars' ? getMarketplaceCarModel(activeMarketCategoryOption, selectedMarketCarModel)?.id ?? '' : '';
   const hasMarketplaceSearchQuery = marketplaceSearchQuery.trim().length > 0;
   const manuallyFilteredMarketplaceListings = useMemo(() => {
     return marketplaceListings.filter((listing) => {
@@ -2185,57 +2024,34 @@ export default function Page() {
       const matchesCity =
         activeMarketCity === 'all' || listing.city === activeMarketCity;
 
-      return matchesCategory && matchesCity;
+      return matchesCategory && matchesCity && (!activeMarketCategoryOption || listing.categoryOption === activeMarketCategoryOption)
+        && (!activeMarketCarModel || listing.carModel === activeMarketCarModel);
     });
   }, [
     activeMarketCategoryGroup,
     activeMarketCategoryGroupConfig,
     activeMarketCity,
     activeMarketSubcategory,
+    activeMarketCategoryOption,
+    activeMarketCarModel,
     marketplaceListings,
   ]);
   const hasManualMarketFilters =
+    Boolean(activeMarketCategoryOption) ||
     activeMarketCategoryGroup !== 'all' ||
     activeMarketSubcategory !== 'all' ||
     activeMarketCity !== 'all';
   const activeMarketFilterCount =
+    Number(Boolean(activeMarketCarModel)) +
+    Number(Boolean(activeMarketCategoryOption)) +
     Number(activeMarketCategoryGroup !== 'all') +
     Number(activeMarketSubcategory !== 'all') +
     Number(activeMarketCity !== 'all');
-  const exploreMarketplaceListings = useMemo(() => {
-    return getExploreListings({
-      marketplaceListings: manuallyFilteredMarketplaceListings,
-      searchToolListings: assistantResultListings,
-    });
-  }, [
-    assistantResultListings,
-    manuallyFilteredMarketplaceListings,
-  ]);
-  const chatListingCardsById = useMemo(() => {
-    const cardsById = new Map<string, ListingCard>();
-
-    [
-      ...marketplaceListings,
-      ...searchToolListings,
-      ...assistantResultListings,
-      ...exploreMarketplaceListings,
-    ].forEach((listing) => {
-      if (listing.id) {
-        cardsById.set(listing.id, listing);
-      }
-    });
-
-    return cardsById;
-  }, [
-    assistantResultListings,
-    exploreMarketplaceListings,
-    marketplaceListings,
-    searchToolListings,
-  ]);
-  const canLoadMoreListings = getCanLoadMoreExploreListings({
-    hasMore: listingPagination.hasMore,
-    displayedCount: marketplaceListings.length,
-  });
+  const exploreMarketplaceListings = manuallyFilteredMarketplaceListings;
+  const chatListingCardsById = useMemo(() => new Map(
+    marketplaceListings.filter(listing => listing.id).map(listing => [listing.id!, listing]),
+  ), [marketplaceListings]);
+  const canLoadMoreListings = listingPagination.hasMore && marketplaceListings.length > 0;
 
   const isAssistantExpanded = assistantState === 'expanded';
   const assistantPanelStyle = useMemo<CSSProperties | undefined>(() => {
@@ -2651,7 +2467,6 @@ export default function Page() {
 
   const closeMobileChatView = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    handledListingAssistantRef.current = null;
     resetChatKeyboardState();
 
     const url = new URL(window.location.href);
@@ -2665,7 +2480,6 @@ export default function Page() {
 
   const closeAssistantForNavigation = useCallback(() => {
     setIsMobileChatViewOpen(false);
-    handledListingAssistantRef.current = null;
     resetChatKeyboardState();
     collapseAssistant();
 
@@ -2971,7 +2785,7 @@ export default function Page() {
     const effectiveQuery = query ?? marketplaceSearchQuery;
     const restoringWindow = !isAppendRequest && options?.restorePages !== undefined;
     const listingsKey = getHomeBrowseKey({ searchInput: effectiveQuery, city: activeMarketCity,
-      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory });
+      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory, categoryOption: activeMarketCategoryOption, carModel: activeMarketCarModel });
 
     if (effectiveQuery.trim()) {
       params.set('q', effectiveQuery.trim());
@@ -2987,6 +2801,8 @@ export default function Page() {
       params.set('categories', marketplaceCategoryDefinitions.filter(item => item.group === activeMarketCategoryGroup).map(item => item.id).join(','));
     }
 
+    if (activeMarketCategoryOption) params.set('categoryOption', activeMarketCategoryOption);
+    if (activeMarketCarModel) params.set('carModel', activeMarketCarModel);
     params.set('page', String(page));
     params.set('limit', '24');
 
@@ -3086,7 +2902,7 @@ export default function Page() {
 
     listingsInFlightRequestsRef.current.set(requestKey, request);
     return request;
-  }, [activeMarketCity, activeMarketCategoryGroup, activeMarketSubcategory, marketplaceSearchQuery]);
+  }, [activeMarketCity, activeMarketCategoryGroup, activeMarketSubcategory, activeMarketCategoryOption, activeMarketCarModel, marketplaceSearchQuery]);
 
   useEffect(() => {
     const onPullRefresh = () => {
@@ -3172,9 +2988,7 @@ export default function Page() {
 
     if (restoredChatState) {
       chatImages.restore(restoredChatState.retainedListingImages, restoredChatState.retainedListingImageMessageId, restoredChatState.conversationId);
-      lastActivatedSearchMessageIdRef.current = restoredChatState.messages.findLast(message => message.role === 'assistant')?.id ?? null;
-      lastSyncedAssistantMessageIdRef.current = lastActivatedSearchMessageIdRef.current;
-      shouldResetSearchStateRef.current = restoredChatState.shouldResetSearchState;
+      shouldResetDraftContextRef.current = restoredChatState.shouldResetDraftContext;
 
       queueMicrotask(() => {
         if (cancelled) {
@@ -3182,8 +2996,7 @@ export default function Page() {
         }
 
         setMessages(restoredChatState.messages);
-        setActiveListingQuery(restoredChatState.activeListingQuery);
-        setSelectedListingContext(restoredChatState.selectedListingContext);
+        setCreationMethod(restoredChatState.creationMethod ?? null);
         setRestoredChatOwnerId(chatOwnerId);
       });
 
@@ -3194,9 +3007,7 @@ export default function Page() {
 
     clearStaleStoredChatState();
     chatImages.clear();
-    lastActivatedSearchMessageIdRef.current = null;
-    handledListingAssistantRef.current = null;
-    shouldResetSearchStateRef.current = true;
+    shouldResetDraftContextRef.current = true;
     void clearRetainedListingImages().catch(() => {});
 
     queueMicrotask(() => {
@@ -3205,8 +3016,7 @@ export default function Page() {
       }
 
       setMessages([]);
-      setActiveListingQuery('');
-      setSelectedListingContext(null);
+      setCreationMethod(null);
     });
 
     queueMicrotask(() => {
@@ -3230,19 +3040,17 @@ export default function Page() {
     writeHomeAssistantRuntimeState(chatOwnerId, {
       conversationId: chatImages.snapshot().conversationId,
       messages,
-      activeListingQuery,
-      selectedListingContext,
+      creationMethod,
       retainedListingImages: chatImages.snapshot().images,
       retainedListingImageMessageId: chatImages.snapshot().sourceMessageId,
-      shouldResetSearchState: shouldResetSearchStateRef.current,
+      shouldResetDraftContext: shouldResetDraftContextRef.current,
     });
   }, [
-    activeListingQuery,
+    creationMethod,
     chatImages,
     chatOwnerId,
     hasRestoredChat,
     messages,
-    selectedListingContext,
   ]);
 
   useEffect(() => {
@@ -3259,7 +3067,7 @@ export default function Page() {
     const timeoutId = window.setTimeout(() => {
       const restoreWindow = initialBrowseRefreshRef.current && canRestoreBrowseListings &&
         restoredBrowseState?.listingsKey === getHomeBrowseKey({ searchInput: marketplaceSearchQuery,
-          city: activeMarketCity, categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory });
+          city: activeMarketCity, categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory, categoryOption: activeMarketCategoryOption, carModel: activeMarketCarModel });
       initialBrowseRefreshRef.current = false;
       void refreshMarketplaceListings(undefined, 1, restoreWindow ? {
         showLoading: false, restorePages: restoredBrowseState!.pagination.page,
@@ -3269,43 +3077,9 @@ export default function Page() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [refreshMarketplaceListings, activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory,
+  }, [refreshMarketplaceListings, activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory, activeMarketCategoryOption, activeMarketCarModel,
     canRestoreBrowseListings, marketplaceSearchQuery, restoredBrowseState]);
 
-  useEffect(() => {
-    if (status !== 'ready') {
-      return;
-    }
-
-    if (latestSearchToolOutput) {
-      return;
-    }
-
-    const lastAssistantMessage = [...filteredMessages]
-      .reverse()
-      .find((message) => message.role === 'assistant');
-
-    if (
-      !lastAssistantMessage ||
-      lastAssistantMessage.id === lastSyncedAssistantMessageIdRef.current
-    ) {
-      return;
-    }
-
-    lastSyncedAssistantMessageIdRef.current = lastAssistantMessage.id;
-    const timeoutId = window.setTimeout(() => {
-      void refreshMarketplaceListings();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [
-    filteredMessages,
-    latestSearchToolOutput,
-    refreshMarketplaceListings,
-    status,
-  ]);
 
   useSmartstoreRealtime({
     connectDelayMs: 2500,
@@ -3316,25 +3090,9 @@ export default function Page() {
       'ad_updated',
       'ad_deleted',
       'ad_status_changed',
-      'ai_results_updated',
       'maintenance_cleanup',
     ],
-    onEvent: (event) => {
-      if (event.type === 'ai_results_updated') {
-        if (!('ownerKey' in event.payload)) {
-          return;
-        }
-
-        const userId = session.user?.id;
-
-        if (!userId || event.payload.ownerKey !== scopeChatSearchOwnerKey(`user:${userId}`, chatImages.snapshot().conversationId)) {
-          return;
-        }
-
-        scheduleRealtimeListingsRefresh();
-        return;
-      }
-
+    onEvent: () => {
       scheduleRealtimeListingsRefresh();
     },
     onResync: ({ reason }) => {
@@ -3374,24 +3132,24 @@ export default function Page() {
       const files = hasFiles && 'files' in message ? message.files : undefined;
       setIsManualListingFallbackDismissed(false);
 
-      const resetSearchState =
-        shouldResetSearchStateRef.current || filteredMessages.length === 0;
-      shouldResetSearchStateRef.current = false;
+      const resetDraftContext =
+        shouldResetDraftContextRef.current || filteredMessages.length === 0;
+      shouldResetDraftContextRef.current = false;
 
       void sendMessage(
         { text, files },
         {
           body: {
             locationSettings,
-            resetSearchState,
-            selectedListing: selectedListingContext,
+            resetDraftContext,
+            ...(creationMethod ? { creationMethod } : {}),
           },
         },
       );
     },
     [
       hasRestoredChat,
-      selectedListingContext,
+      creationMethod,
       sendMessage,
       expandAssistant,
       filteredMessages.length,
@@ -3399,18 +3157,12 @@ export default function Page() {
   );
 
   const sendStarter = useCallback(
-    (prompt: string, listing?: ListingCard) => {
+    (prompt: string, method?: 'chat') => {
       if (isLoading || !hasRestoredChat) {
         return;
       }
 
-      const nextSelectedListingContext = listing
-        ? toSelectedListingContext(listing)
-        : selectedListingContext;
-
-      if (listing) {
-        setSelectedListingContext(nextSelectedListingContext);
-      }
+      if (method) setCreationMethod(method);
 
       setIsManualListingFallbackDismissed(false);
 
@@ -3420,17 +3172,18 @@ export default function Page() {
         expandAssistant();
       }
 
-      const resetSearchState =
-        shouldResetSearchStateRef.current || filteredMessages.length === 0;
-      shouldResetSearchStateRef.current = false;
+      const resetDraftContext =
+        shouldResetDraftContextRef.current || filteredMessages.length === 0;
+      shouldResetDraftContextRef.current = false;
 
       void sendMessage(
         { text: prompt },
         {
           body: {
             locationSettings,
-            resetSearchState,
-            selectedListing: nextSelectedListingContext,
+            resetDraftContext,
+            ...((method ?? creationMethod) ? { creationMethod: method ?? creationMethod } : {}),
+            ...(method === 'chat' ? { beginDraftWithHamad: true } : {}),
           },
         },
       );
@@ -3438,7 +3191,7 @@ export default function Page() {
     [
       hasRestoredChat,
       isLoading,
-      selectedListingContext,
+      creationMethod,
       sendMessage,
       expandAssistant,
       isCompactViewport,
@@ -3448,27 +3201,6 @@ export default function Page() {
     ],
   );
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const assistantMode = url.searchParams.get('assistant');
-    const listingId = url.searchParams.get('listingId');
-
-    if (assistantMode !== 'listing' || !isSafeListingId(listingId)) {
-      handledListingAssistantRef.current = null;
-      return;
-    }
-
-    if (
-      handledListingAssistantRef.current === listingId ||
-      isLoading ||
-      !hasRestoredChat
-    ) {
-      return;
-    }
-
-    handledListingAssistantRef.current = listingId;
-    sendStarter(`قارن لي الإعلان رقم ${listingId} مع السوق`);
-  }, [hasRestoredChat, isLoading, sendStarter]);
 
   const submitManualListing = useCallback(async (options?: { publishAfterSave?: boolean }) => {
     if (manualListingSubmissionRef.current) {
@@ -3499,7 +3231,6 @@ export default function Page() {
       price?: number | 'bid' | 'negotiable';
       city: string;
       category: string;
-      condition: ManualListingForm['condition'];
       attributes?: Record<string, unknown>;
     } = {
       autoCategory: manualListingForm.autoCategory,
@@ -3507,7 +3238,7 @@ export default function Page() {
       description,
       city,
       category: manualListingForm.category,
-      condition: manualListingForm.condition,
+      attributes: { [marketplaceCategoryOptionAttribute]: manualListingForm.categoryOption || null, [marketplaceCarModelAttribute]: manualListingForm.carModel || null },
     };
 
     if (manualListingForm.priceMode === 'number') {
@@ -3538,6 +3269,7 @@ export default function Page() {
 
         payload.price = numericPrice;
         payload.attributes = {
+          ...payload.attributes,
           saleTerms: 'negotiable',
         };
       } else {
@@ -3717,12 +3449,6 @@ export default function Page() {
 
   const openListing = useCallback(
     (listing: ListingCard) => {
-      const nextSelectedListingContext = toSelectedListingContext(listing);
-
-      if (nextSelectedListingContext) {
-        setSelectedListingContext(nextSelectedListingContext);
-      }
-
       if (!listing.id) {
         return;
       }
@@ -3805,12 +3531,9 @@ export default function Page() {
     const previousConversationId = chatImages.snapshot().conversationId;
     void stop();
     setMessages([]);
-    setActiveListingQuery('');
-    setSelectedListingContext(null);
-    handledListingAssistantRef.current = null;
+    setCreationMethod(null);
     chatImages.clear();
-    lastActivatedSearchMessageIdRef.current = null;
-    shouldResetSearchStateRef.current = true;
+    shouldResetDraftContextRef.current = true;
     clearHomeAssistantRuntimeState();
     clearStoredChatState();
     const url = new URL(window.location.href);
@@ -3818,12 +3541,8 @@ export default function Page() {
     url.searchParams.delete('listingId');
     window.history.replaceState(null, '', url);
     void clearRetainedListingImages().catch(() => {});
-    void resetAssistantSearchState(previousConversationId, chatOwnerId).catch(() => {});
+    void resetAssistantDraftContext(previousConversationId, chatOwnerId).catch(() => {});
   }, [chatImages, chatOwnerId, setMessages, stop]);
-
-  const clearAssistantSearch = useCallback(() => {
-    setActiveListingQuery('');
-  }, []);
 
   const shouldRenderAssistantPanel = !isCompactViewport || isCompactChatView;
   const isAssistantContentVisible =
@@ -3914,7 +3633,7 @@ export default function Page() {
     const list = marketplaceListingsScrollRef.current;
     writeHomeBrowseState({
       searchInput: marketplaceSearchInput, city: activeMarketCity,
-      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory,
+      categoryGroup: activeMarketCategoryGroup, subcategory: activeMarketSubcategory, categoryOption: activeMarketCategoryOption, carModel: activeMarketCarModel,
       listings: marketplaceListings, listingsKey: browseListingsKey,
       pagination: listingPagination, nearbyCity: nearbyMarketplaceCity, filterOpen: isMarketFilterOpen,
       viewport: pendingBrowseViewportRef.current ?? {
@@ -3924,7 +3643,7 @@ export default function Page() {
         toolsHidden: isMarketplaceTopActionsHidden,
       },
     });
-  }, [activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory, browseListingsKey, isMarketFilterOpen,
+  }, [activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory, activeMarketCategoryOption, activeMarketCarModel, browseListingsKey, isMarketFilterOpen,
     isMarketplaceTopActionsHidden, listingPagination, marketplaceListings, marketplaceSearchInput, nearbyMarketplaceCity]);
 
   const cancelMarketplaceTopReveal = useCallback(() => {
@@ -4245,6 +3964,23 @@ export default function Page() {
         ? 'translate3d(0, calc(-100% + var(--marketplace-categories-height, 40px)), 0)'
         : 'translate3d(0, 0, 0)';
 
+  const creationOptions = !creationMethod && !isLoading && (filteredMessages.length === 0 || (isRecord(latestAssistantMetadata) && latestAssistantMetadata.creationChoice === true)) ? (
+    <div data-testid="assistant-creation-options" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <Button variant="outline" className="h-auto min-h-10 whitespace-normal rounded-md py-2" disabled={!hasRestoredChat} onClick={() => sendStarter('أختار الإنشاء مع حمد.', 'chat')}>
+        <MessageCircle className="size-4 shrink-0" />
+        الإنشاء مع حمد
+      </Button>
+      <Button variant="outline" className="h-auto min-h-10 whitespace-normal rounded-md py-2" onClick={() => {
+        setIsManualListingOpen(true);
+        setIsManualListingFallbackDismissed(false);
+        closeMobileChatView();
+      }}>
+        <Megaphone className="size-4 shrink-0" />
+        الإنشاء اليدوي
+      </Button>
+    </div>
+  ) : null;
+
   return (
     <main
       className={cn(
@@ -4293,8 +4029,8 @@ export default function Page() {
 
             <div className="hidden h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-blue-200 bg-white px-3 text-muted-foreground shadow-sm md:mx-6 md:flex dark:border-blue-400/20 dark:bg-card">
               <Sparkles className="size-4 text-blue-600" />
-              <button className="flex h-full min-w-0 flex-1 items-center truncate text-start text-xs" type="button" onClick={() => sendStarter('أبحث عن منتج بمساعدة الذكاء الاصطناعي')}>
-                اسأل حمد عن المنتج الذي تبحث عنه
+              <button className="flex h-full min-w-0 flex-1 items-center truncate text-start text-xs" type="button" onClick={() => sendStarter('كيف أستخدم سوق حمد؟')}>
+                اسأل حمد عن المنصة
               </button>
             </div>
 
@@ -4398,7 +4134,7 @@ export default function Page() {
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 sm:flex sm:justify-end">
-                  <Button className="marketplace-primary-cta h-auto min-h-9 min-w-0 gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد بيع منتج')}>
+                  <Button className="marketplace-primary-cta h-auto min-h-9 min-w-0 gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm hover:bg-blue-700 sm:px-3" onClick={() => sendStarter('أريد إنشاء مسودة إعلان مع حمد', 'chat')}>
                   <Megaphone className="size-4" />
                   <span className="min-w-0 whitespace-normal leading-5">أنشئ إعلانك مع حمد</span>
                   </Button>
@@ -4469,21 +4205,35 @@ export default function Page() {
                     </Button>
                   </div>
 
+                  <label className="grid gap-1 text-xs font-semibold">
+                    عنوان الإعلان
+                    <input
+                      className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
+                      maxLength={140}
+                      value={manualListingForm.title}
+                      onChange={(event) =>
+                        setManualListingForm((form) => ({
+                          ...form,
+                          title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold">
+                    الوصف
+                    <textarea
+                      className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
+                      maxLength={4000}
+                      value={manualListingForm.description}
+                      onChange={(event) =>
+                        setManualListingForm((form) => ({
+                          ...form,
+                          description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-semibold">
-                      عنوان الإعلان
-                      <input
-                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
-                        maxLength={140}
-                        value={manualListingForm.title}
-                        onChange={(event) =>
-                          setManualListingForm((form) => ({
-                            ...form,
-                            title: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
                     <div className="grid gap-1 text-xs font-semibold">
                       المدينة
                       <CitySelector
@@ -4507,6 +4257,8 @@ export default function Page() {
                           setManualListingForm((form) => ({
                             ...form,
                             category: event.target.value,
+                            categoryOption: '',
+                            carModel: '',
                             autoCategory: false,
                           }))
                         }
@@ -4524,25 +4276,12 @@ export default function Page() {
                           </span>
                         )}
                     </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      حالة المنتج
-                      <select
-                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500"
-                        value={manualListingForm.condition}
-                        onChange={(event) =>
-                          setManualListingForm((form) => ({
-                            ...form,
-                            condition: event.target.value as ManualListingForm['condition'],
-                          }))
-                        }
-                      >
-                        {manualListingConditionOptions.map((condition) => (
-                          <option key={condition.value} value={condition.value}>
-                            {condition.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <CategoryOptionSelect id="manual-listing-category-option" category={manualListingForm.category} value={manualListingForm.categoryOption}
+                      onChange={categoryOption => setManualListingForm(form => ({ ...form, categoryOption, carModel: '', autoCategory: false }))}
+                      className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500" />
+                    <CarModelSelect id="manual-listing-car-model" category={manualListingForm.category} brand={manualListingForm.categoryOption} value={manualListingForm.carModel}
+                      onChange={carModel => setManualListingForm(form => ({ ...form, carModel, autoCategory: false }))}
+                      className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500" />
                     <label className="grid gap-1 text-xs font-semibold">
                       طريقة السعر
                       <select
@@ -4581,21 +4320,6 @@ export default function Page() {
                       />
                     </label>
                   </div>
-
-                  <label className="grid gap-1 text-xs font-semibold">
-                    الوصف
-                    <textarea
-                      className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
-                      maxLength={4000}
-                      value={manualListingForm.description}
-                      onChange={(event) =>
-                        setManualListingForm((form) => ({
-                          ...form,
-                          description: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
 
                   <div className="grid gap-2 text-xs font-semibold">
                     <span>الصور</span>
@@ -4905,6 +4629,8 @@ export default function Page() {
                         onClick={() => {
                           setSelectedMarketCategoryGroup('all');
                           setSelectedMarketSubcategory('all');
+                          setSelectedMarketCategoryOption('');
+                          setSelectedMarketCarModel('');
                           setSelectedMarketCity('all');
                           setNearbyMarketplaceCity(null);
                           setNearbyMarketplaceNotice('');
@@ -4927,6 +4653,8 @@ export default function Page() {
                     onClick={() => {
                       setSelectedMarketCategoryGroup('all');
                       setSelectedMarketSubcategory('all');
+                      setSelectedMarketCategoryOption('');
+                      setSelectedMarketCarModel('');
                     }}
                   >
                     الكل
@@ -4941,6 +4669,8 @@ export default function Page() {
                       onClick={() => {
                         setSelectedMarketCategoryGroup(group.label);
                         setSelectedMarketSubcategory('all');
+                        setSelectedMarketCategoryOption('');
+                        setSelectedMarketCarModel('');
                       }}
                     >
                       {group.label}
@@ -4954,7 +4684,7 @@ export default function Page() {
                       size="sm"
                       variant={activeMarketSubcategory === 'all' ? 'default' : 'outline'}
                       className="h-8 shrink-0 rounded-full px-2.5 text-xs"
-                      onClick={() => setSelectedMarketSubcategory('all')}
+                      onClick={() => { setSelectedMarketSubcategory('all'); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }}
                     >
                       كل {activeMarketCategoryGroup}
                     </Button>
@@ -4965,17 +4695,21 @@ export default function Page() {
                         size="sm"
                         variant={activeMarketSubcategory === category ? 'default' : 'outline'}
                         className="h-8 shrink-0 rounded-full px-2.5 text-xs"
-                        onClick={() => setSelectedMarketSubcategory(category)}
+                        onClick={() => { setSelectedMarketSubcategory(category); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }}
                       >
                         {category}
                       </Button>
                     ))}
                   </div>
                 )}
+                <CategoryOptionSelect id="marketplace-category-option" category={activeMarketCategoryId} value={activeMarketCategoryOption}
+                  onChange={value => { setSelectedMarketCategoryOption(value); setSelectedMarketCarModel(''); }} all
+                  className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
+                <CarModelSelect id="marketplace-car-model" category={activeMarketCategoryId} brand={activeMarketCategoryOption} value={activeMarketCarModel}
+                  onChange={setSelectedMarketCarModel} all className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
               </div>
               </div>
               </div>
-
               <div
                 ref={marketplaceListingsScrollRef}
                 onScroll={handleMarketplaceListingsScroll}
@@ -4986,49 +4720,6 @@ export default function Page() {
                 )}
               >
               <div className="marketplace-listings-content pb-[var(--marketplace-bottom-nav-space)] lg:pb-1">
-
-              {hasActiveAssistantSearch && (
-                <div className="smart-assistant-results-panel mb-3 grid gap-1.5">
-                  <div className="flex items-center justify-between gap-2 border-b border-blue-100/80 pb-1.5 text-right dark:border-blue-400/10">
-                    <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-200">
-                      <Sparkles className="size-3.5 shrink-0" />
-                      <span className="truncate">نتائج حمد حسب طلبك</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-7 shrink-0 rounded-full"
-                      aria-label="مسح بحث المساعد"
-                      onClick={clearAssistantSearch}
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </div>
-
-                  {assistantResultListings.length > 0 ? (
-                    <div className="smart-assistant-results-grid grid max-w-4xl gap-1.5 sm:gap-2">
-                      {assistantResultListings.map((listing, index) => (
-                        <ListingCardView
-                          key={listing.id ?? listing.title}
-                          className="smart-assistant-result-card"
-                          listing={listing}
-                          onAsk={sendStarter}
-                          onOpen={openListing}
-                          isSmartResult
-                          variant="horizontal"
-                          style={{
-                            animationDelay: `${Math.min(index, 8) * 45}ms`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-dashed bg-white p-4 text-center text-sm text-muted-foreground dark:bg-card">
-                      لم أجد إعلانًا مناسبًا لهذا الطلب حاليًا.
-                    </div>
-                  )}
-                </div>
-              )}
 
               {hasMarketplaceSearchQuery && (
                 <div className="marketplace-section-title mb-3 flex items-center justify-end gap-3">
@@ -5048,7 +4739,6 @@ export default function Page() {
                       index < 4 && 'marketplace-listing-card-critical',
                     )}
                     listing={listing}
-                    onAsk={sendStarter}
                     onOpen={openListing}
                     eagerImage={index < 4}
                     prioritizeImage={index === 0}
@@ -5176,10 +4866,8 @@ export default function Page() {
                           </div>
                           <div>
                             <h3 className="text-lg font-bold">كيف أساعدك؟</h3>
-                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                              بيع، بحث، مقارنة، صور، أو فتح شات بخصوص إعلان.
-                            </p>
                           </div>
+                          {creationOptions}
                           <div className="grid gap-2">
                             {starters.map((prompt) => (
                               <Button
@@ -5191,36 +4879,6 @@ export default function Page() {
                               >
                                 {prompt}
                               </Button>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 rounded-md border bg-[#f7f9fc] p-2 dark:bg-background">
-                            {featuredListings.slice(0, 3).map((listing) => (
-                              <button
-                                key={listing.title}
-                                type="button"
-                                className="grid gap-1 text-right"
-                                onClick={() => sendStarter(`اعرض لي تفاصيل ${listing.title}`)}
-                              >
-                                {listing.image ? (
-                                  <span className="relative block aspect-square overflow-hidden rounded-md bg-slate-100 dark:bg-slate-900">
-                                    <ListingCardImage
-                                      alt={listing.title}
-                                      className="h-full w-full object-contain"
-                                      fallbackSrcs={listing.imageFallbacks}
-                                      fallback={<span className="grid h-full w-full place-items-center text-slate-500 dark:text-slate-400"><ImageIcon className="size-4" /></span>}
-                                      height={96}
-                                      sizes="96px"
-                                      src={listing.image}
-                                      width={96}
-                                    />
-                                  </span>
-                                ) : (
-                                  <div className="grid aspect-square place-items-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                                    <ImageIcon className="size-4" />
-                                  </div>
-                                )}
-                                <span className="truncate text-[10px] font-semibold">{listing.price}</span>
-                              </button>
                             ))}
                           </div>
                         </div>
@@ -5269,6 +4927,7 @@ export default function Page() {
                             </Message>
                           );
                         })}
+                        {creationOptions}
                         {showAssistantThinking && (
                           <Message from="assistant" data-testid="assistant-thinking">
                             <AssistantMessageFrame>

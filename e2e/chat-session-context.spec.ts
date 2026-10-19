@@ -189,7 +189,7 @@ test('a delayed session response cannot restore private history after another ta
   }
 });
 
-test('two tabs keep distinct conversation IDs and a new chat resets only its previous search namespace', async ({ page, context }) => {
+test('two tabs keep distinct conversation IDs and a new chat resets only its previous draft context', async ({ page, context }) => {
   await context.route('**/api/auth/session', route => route.fulfill({ json: {
     authenticated: true, user: { id: 'tab-search-owner', email: 'search-tabs@example.test', name: 'عميل' },
   } }));
@@ -269,7 +269,7 @@ test('a long visible chat continues beyond twenty exchanges with bounded outgoin
   await page.screenshot({ path: info.outputPath('long-chat.png'), fullPage: true });
 });
 
-test('clearing early verified cards stays cleared when the delayed final answer arrives without duplicate assistant frames', async ({ page }, info) => {
+test('legacy tool parts stay invisible while a delayed answer arrives without duplicate assistant frames', async ({ page }, info) => {
   await prepare(page);
   await page.route('**/api/auth/session', route => route.fulfill({ json: {
     authenticated: true, user: { id: 'delayed-chat-owner', email: 'delayed@example.test', name: 'عميل' },
@@ -307,7 +307,7 @@ test('clearing early verified cards stays cleared when the delayed final answer 
   await page.goto('/?chat=1');
   await (await openChat(page)).fill('هاتف');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
-  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
   await expect(page.getByTestId('assistant-message-frame')).toHaveCount(1);
   await expect(page.getByTestId('assistant-thinking')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('تعذر إكمال رد المساعد الآن');
@@ -318,7 +318,7 @@ test('clearing early verified cards stays cleared when the delayed final answer 
   await page.screenshot({ path: info.outputPath('single-pending-assistant.png'), fullPage: true });
   const back = page.getByRole('button', { name: 'العودة للإعلانات', exact: true });
   if (await back.isVisible()) await back.click();
-  await page.getByRole('button', { name: 'مسح بحث المساعد', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'مسح بحث المساعد', exact: true })).toHaveCount(0);
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
   await openChat(page);
   await page.evaluate(() => (window as Window & { appendDelayedText?: (text: string) => void }).appendDelayedText!('هذه نتائج'));

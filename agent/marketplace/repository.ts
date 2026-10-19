@@ -25,6 +25,7 @@ import { Prisma, type AdminAuditAction } from '@prisma/client';
 import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
 import { resolveListingCategoryWithModel } from './listing-category-model';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
+import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { getComparableListings } from './market-intelligence';
 import { listingSemanticText, marketplaceTextAnalyzer, prepareListingUnderstanding } from './text-understanding';
 import {
@@ -2347,6 +2348,7 @@ export async function createListingDraft(
   }
   await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   input = { ...input, category: await resolveListingCategoryWithModel(input) };
+  input = { ...input, attributes: mergeMarketplaceCategoryAttributes(input.category, input.attributes) };
   if (!shouldUseDatabaseStore()) {
     for (const replayId of replayIds) {
       const saved = memoryStore.getListing(replayId);
@@ -2471,6 +2473,7 @@ export async function updateListingForSeller(
 ) {
   const current = await getListing(listingId);
   if (!current || current.sellerId !== sellerId || (options.draftOnly && current.status !== 'draft')) return null;
+  mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current);
   await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } }));
   if (!shouldUseDatabaseStore()) {
     if (options.draftOnly && memoryStore.getListing(listingId)?.status !== 'draft') return null;
@@ -2510,10 +2513,7 @@ export async function updateListingForSeller(
     price: updates.price ?? existing.price,
     city: updates.city ?? existing.city,
     condition: updates.condition ?? existing.condition,
-    attributes: {
-      ...existing.attributes,
-      ...(updates.attributes ?? {}),
-    },
+    attributes: mergeMarketplaceCategoryAttributes(updates.category ?? existing.category, updates.attributes, existing),
   };
   const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }));
   const compliance = existing.compliance.humanDecision === 'block'

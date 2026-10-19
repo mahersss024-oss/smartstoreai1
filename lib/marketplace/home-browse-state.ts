@@ -2,6 +2,8 @@ export type HomeBrowseFilters = {
   searchInput: string;
   categoryGroup: string;
   subcategory: string;
+  categoryOption?: string;
+  carModel?: string;
   city: string;
 };
 
@@ -18,7 +20,7 @@ export type HomeBrowseState<Listing> = HomeBrowseFilters & {
 let snapshot: HomeBrowseState<unknown> | null = null;
 
 export function getHomeBrowseKey(filters: HomeBrowseFilters) {
-  return JSON.stringify([filters.searchInput.trim(), filters.categoryGroup, filters.subcategory, filters.city]);
+  return JSON.stringify([filters.searchInput.trim(), filters.categoryGroup, filters.subcategory, filters.city, filters.categoryOption ?? '', filters.carModel ?? '']);
 }
 
 export function readHomeBrowseState<Listing>(): HomeBrowseState<Listing> | null {

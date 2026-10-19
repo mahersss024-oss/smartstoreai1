@@ -455,7 +455,7 @@ test('floating categories do not interrupt loading the final partial listings pa
   await expectCategoriesVisible(page);
 });
 
-test('chat search preserves the market scroll, filters and pagination while keeping highlighted results', async ({ page, baseURL }) => {
+test('legacy chat search outputs cannot affect the independent market scroll, filters or pagination', async ({ page, baseURL }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const cookie = createSessionCookie({ id: 'chat-isolation-buyer', email: 'chat-isolation@smartstore.local' });
   await page.context().addCookies([{
@@ -502,7 +502,7 @@ test('chat search preserves the market scroll, filters and pagination while keep
   await page.getByPlaceholder(/اكتب طلبك/).fill('ابحث عن جوال');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
   await expect(page.getByText('نتيجة المساعد جاهزة', { exact: true })).toBeVisible();
-  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
   const chat = page.getByTestId('assistant-panel');
   const rect = (await chat.boundingBox())!;
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -521,7 +521,7 @@ test('chat search preserves the market scroll, filters and pagination while keep
   await list.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }));
   await expect(page.getByText('Product 53', { exact: true })).toBeAttached();
   await expect(page.locator('.marketplace-listing-card:not(.smart-assistant-result-card)')).toHaveCount(54);
-  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(1);
+  await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 844 });
   await scrollTo(page, 600);
   const desktopScroll = await list.evaluate(element => element.scrollTop);

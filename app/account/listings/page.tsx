@@ -3,6 +3,10 @@
 import { getArabicCustomerMessage } from '@/lib/customer-language';
 
 import { formatMarketplaceCategory as formatCategory, marketplaceCategoryIds as listingCategoryOptions } from '@/lib/marketplace/categories';
+import { CategoryOptionSelect } from '@/components/category-option-select';
+import { CarModelSelect } from '@/components/car-model-select';
+import { getListingCarModel, getListingCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
+import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -57,6 +61,7 @@ import {
 } from '@ui/dialog';
 
 type ApiListingRecord = {
+  attributes?: Record<string, unknown>;
   id: string;
   category: string;
   title?: string;
@@ -91,6 +96,8 @@ type ListingImageCard = {
 };
 
 type ListingCard = {
+  carModel: string;
+  categoryOption: string;
   id: string;
   title: string;
   price: string;
@@ -115,6 +122,8 @@ type ListingCard = {
 };
 
 type ListingEditForm = {
+  carModel: string;
+  categoryOption: string;
   title: string;
   description: string;
   priceMode: 'number' | 'bid' | 'negotiable';
@@ -303,6 +312,8 @@ function listingRecordToCard(listing: ApiListingRecord): ListingCard {
     city: listing.city ?? 'السعودية',
     category: formatCategory(listing.category),
     rawCategory: listing.category,
+    categoryOption: getListingCategoryOption(listing)?.id ?? '',
+    carModel: getListingCarModel(listing)?.id ?? '',
     condition: listing.condition,
     description: listing.description,
     image:
@@ -367,6 +378,8 @@ function createEditFormFromListing(listing: ListingCard): ListingEditForm {
     price: typeof listing.rawPrice === 'number' ? String(listing.rawPrice) : '',
     city: listing.city,
     category: listing.rawCategory,
+    categoryOption: listing.categoryOption,
+    carModel: listing.carModel,
     condition: listing.condition ?? '',
   };
 }
@@ -393,6 +406,8 @@ export default function AccountListingsPage() {
     useState<ListingCard | null>(null);
   const [savingListingId, setSavingListingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ListingEditForm>({
+    carModel: '',
+    categoryOption: '',
     title: '',
     description: '',
     priceMode: 'number',
@@ -821,12 +836,14 @@ export default function AccountListingsPage() {
           price?: number | 'bid' | 'negotiable';
           city: string;
           category: string;
+          attributes: Record<string, unknown>;
           condition?: 'new' | 'used' | 'like_new' | 'damaged';
         } = {
           title: editForm.title.trim(),
           description: editForm.description.trim(),
           city: editForm.city.trim(),
           category: editForm.category,
+          attributes: { [marketplaceCategoryOptionAttribute]: editForm.categoryOption || null, [marketplaceCarModelAttribute]: editForm.carModel || null },
         };
 
         if (editForm.condition) {
@@ -1828,16 +1845,27 @@ export default function AccountListingsPage() {
                                 setEditForm((current) => ({
                                   ...current,
                                   category: event.target.value,
+                                  categoryOption: '',
+                                  carModel: '',
                                 }))
                               }
                               value={editForm.category}
                             >
+                              {!listingCategoryOptions.some(category => category === editForm.category) && <option value={editForm.category}>{formatCategory(editForm.category)}</option>}
                               {listingCategoryOptions.map((category) => (
                                 <option key={category} value={category}>
                                   {formatCategory(category)}
                                 </option>
                               ))}
                             </select>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-[9rem_1fr_9rem]">
+                            <CategoryOptionSelect id={`listing-${listing.id}-category-option`} category={editForm.category} value={editForm.categoryOption}
+                              onChange={categoryOption => setEditForm(current => ({ ...current, categoryOption, carModel: '' }))}
+                              className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
+                            <CarModelSelect id={`listing-${listing.id}-car-model`} category={editForm.category} brand={editForm.categoryOption} value={editForm.carModel}
+                              onChange={carModel => setEditForm(current => ({ ...current, carModel }))}
+                              className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
                           </div>
                           <div className="grid gap-2 sm:grid-cols-[9rem_1fr_9rem]">
                             <select
