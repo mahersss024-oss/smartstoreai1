@@ -1,20 +1,19 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
+import test, { beforeEach } from 'node:test';
 import { parseChatConversationId } from '@/lib/chat/conversation';
 import { createSessionCookie } from '@/lib/auth/session';
 import { POST } from '@/app/api/chat/route';
 import { POST as resetChat } from '@/app/api/chat/reset/route';
-import { getMarketplaceSearchState, updateMarketplaceSearchState } from '@/agent/marketplace/search-state';
-import { parseExplicitMarketplaceSearchIntent } from '@/agent/marketplace/structured-search-intent';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { createListingDraft, getListing, publishListing, resetMarketplaceStoreForTests } from '@/agent/marketplace/store';
 import { getRealtimeEventsSince } from '@/lib/realtime/event-bus';
-import { textAnalysis } from './helpers/text-understanding';
+import { mockAllowedTextAnalysis, textAnalysis } from './helpers/text-understanding';
 
 const firstConversation = '11111111-1111-4111-8111-111111111111';
 const secondConversation = '22222222-2222-4222-8222-222222222222';
-const user = { id: 'google:isolated-search-owner', email: 'isolated@example.test' };
-const session = { user, issuedAt: 1, expiresAt: 2 };
+const user = { id: 'google:isolated-chat-owner', email: 'isolated@example.test' };
+
+beforeEach(t => { resetMarketplaceStoreForTests(); mockAllowedTextAnalysis(t); });
 
 function request(conversationId: string, reset = false) {
   return new Request(`http://localhost/api/chat${reset ? '/reset' : ''}`, {
@@ -25,74 +24,41 @@ function request(conversationId: string, reset = false) {
   });
 }
 
-test('conversation search keys stay stable per conversation and are always scoped to the authenticated account', () => {
-  const req = request(firstConversation);
-  const firstKey = getChatSearchOwnerKey(session, req, firstConversation);
-  assert.equal(firstKey, getChatSearchOwnerKey(session, req, firstConversation));
-  assert.notEqual(firstKey, getChatSearchOwnerKey(session, req, secondConversation));
-  assert.notEqual(firstKey, getChatSearchOwnerKey({ ...session, user: { ...user, id: 'another-account' } }, req, firstConversation));
-  assert.equal(getChatSearchOwnerKey(session, req), `user:${user.id}`, 'legacy clients retain their existing namespace');
+test('conversation IDs are validated without legacy search owner namespaces', () => {
+  for (const valid of [firstConversation, secondConversation]) assert.equal(parseChatConversationId(valid), valid);
   for (const invalid of ['', 'short', 'x'.repeat(81), 'a/b'.repeat(10), 123, null]) assert.equal(parseChatConversationId(invalid), null);
 });
 
-for (const store of ['file', 'database'] as const) {
-  test(`chat resets cannot change independent search state in ${store} storage`, async t => {
-    const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
-    process.env.SMARTSTORE_MARKETPLACE_STORE = store;
-    t.after(() => {
-      if (originalStore === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
-      else process.env.SMARTSTORE_MARKETPLACE_STORE = originalStore;
-    });
-    if (store === 'database') {
-      const { prisma } = await import('@/lib/db/prisma');
-      const rows = new Map<string, unknown>();
-      const delegate = prisma.marketplaceSearchState;
-      const original = { findUnique: delegate.findUnique, upsert: delegate.upsert, deleteMany: delegate.deleteMany };
-      Object.assign(delegate, {
-        findUnique: async ({ where }: { where: { ownerKey: string } }) => rows.has(where.ownerKey) ? { state: rows.get(where.ownerKey) } : null,
-        upsert: async ({ where, update }: { where: { ownerKey: string }; update: { state: unknown } }) => { rows.set(where.ownerKey, update.state); return {}; },
-        deleteMany: async ({ where }: { where: { ownerKey: string } }) => ({ count: Number(rows.delete(where.ownerKey)) }),
-      });
-      t.after(() => Object.assign(delegate, original));
-      // Draft cleanup is an existing reset operation and is isolated from the state delegate here.
-      t.mock.method(prisma, '$transaction', async () => []);
-    }
-    const firstKey = getChatSearchOwnerKey(session, request(firstConversation), firstConversation);
-    const secondKey = getChatSearchOwnerKey(session, request(secondConversation), secondConversation);
-    await updateMarketplaceSearchState(firstKey, parseExplicitMarketplaceSearchIntent('هاتف', { city: 'Riyadh' }));
-    await updateMarketplaceSearchState(secondKey, parseExplicitMarketplaceSearchIntent('سيارة', { city: 'Jeddah' }));
-    const refined = await updateMarketplaceSearchState(firstKey, parseExplicitMarketplaceSearchIntent(undefined, { searchMode: 'refine', maxPrice: 100 }));
-    assert.equal(refined.city, 'Riyadh');
-    assert.deepEqual(refined.terms, ['هاتف']);
-    assert.equal(refined.maxPrice, 100);
-    assert.equal((await getMarketplaceSearchState(secondKey))?.city, 'Jeddah');
-    const beforeReset = await getMarketplaceSearchState(secondKey);
-    assert.equal((await resetChat(request(firstConversation, true))).status, 200);
-    assert.deepEqual(await getMarketplaceSearchState(firstKey), refined);
-    assert.deepEqual(await getMarketplaceSearchState(secondKey), beforeReset);
-  });
-}
-
-test('malformed conversation identifiers are rejected before model calls or resetting another namespace', async t => {
-  let calls = 0;
-  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => { calls++; return null; });
+test('malformed conversation identifiers are rejected before model calls or draft cleanup', async t => {
+  const draft = createListingDraft({ sellerId: user.id, category: 'cars' });
+  const analyze = t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => null);
   assert.equal((await POST(request('bad/id'))).status, 400);
   assert.equal((await resetChat(request('bad/id', true))).status, 400);
-  assert.equal(calls, 0);
+  assert.equal(analyze.mock.callCount(), 0);
+  assert.equal(getListing(draft.id)?.status, 'draft');
 });
 
-test('a stale tab cannot reset the newly authenticated account search state', async () => {
-  const key = getChatSearchOwnerKey(session, request(firstConversation), firstConversation);
-  await updateMarketplaceSearchState(key, parseExplicitMarketplaceSearchIntent('هاتف'));
-  const before = await getMarketplaceSearchState(key);
+test('a stale tab cannot reset the newly authenticated account drafts', async () => {
+  const draft = createListingDraft({ sellerId: user.id, category: 'cars' });
   const response = await resetChat(new Request('http://localhost/api/chat/reset', { method: 'POST', headers: {
     cookie: createSessionCookie(user), 'x-chat-conversation-id': firstConversation, 'x-chat-owner-id': 'previous-account',
   } }));
   assert.equal(response.status, 409);
-  assert.deepEqual(await getMarketplaceSearchState(key), before);
+  assert.equal(getListing(draft.id)?.status, 'draft');
 });
 
-test('the real chat route cannot execute old product searches or emit search notifications', async t => {
+test('chat reset preserves published ads and another account drafts', async () => {
+  const incomplete = createListingDraft({ sellerId: user.id, category: 'cars' });
+  const otherAccount = createListingDraft({ sellerId: 'other-chat-owner', category: 'cars' });
+  const published = createListingDraft({ sellerId: user.id, category: 'cars', title: 'إعلان منشور', description: 'تفاصيل الإعلان' });
+  publishListing(published.id);
+  assert.equal((await resetChat(request(firstConversation, true))).status, 200);
+  assert.equal(getListing(incomplete.id)?.status, 'deleted');
+  assert.equal(getListing(otherAccount.id)?.status, 'draft');
+  assert.equal(getListing(published.id)?.status, 'published');
+});
+
+test('the real chat route cannot execute old product searches or emit marketplace notifications', async t => {
   const analysis = textAnalysis({ intent: 'search_listing' });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
@@ -105,9 +71,7 @@ test('the real chat route cannot execute old product searches or emit search not
         content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'البحث عن المنتجات ليس من دوري. يمكنك استخدام بحث السوق بنفسك.',
       } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });
-  const keys = [firstConversation, secondConversation].map(id => getChatSearchOwnerKey(session, request(id), id));
-  const before = await Promise.all(keys.map(key => getMarketplaceSearchState(key)));
-  const beforeEvents = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }).filter(event => event.type === 'ai_results_updated').length;
+  const beforeEvents = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false });
   for (const id of [firstConversation, secondConversation]) {
     const response = await POST(request(id));
     assert.equal(response.status, 200);
@@ -115,6 +79,5 @@ test('the real chat route cannot execute old product searches or emit search not
     assert.match(stream, /ليس من دوري/);
     assert.doesNotMatch(stream, /tool-output-available/);
   }
-  assert.deepEqual(await Promise.all(keys.map(key => getMarketplaceSearchState(key))), before);
-  assert.equal(getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }).filter(event => event.type === 'ai_results_updated').length, beforeEvents);
+  assert.deepEqual(getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }), beforeEvents);
 });

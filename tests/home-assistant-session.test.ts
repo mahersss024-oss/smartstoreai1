@@ -230,11 +230,15 @@ test('home header keeps account access available on mobile and wider screens', (
   assert.doesNotMatch(homePage, /className="hidden rounded-md lg:inline-flex"/);
 });
 
-test('home assistant starters offer documented platform help instead of buyer services', () => {
+test('home assistant starts without suggestion buttons and offers creation choices only when requested', () => {
   const homePage = readProjectFile('app', 'page.tsx');
+  const emptyState = homePage.split('data-testid="assistant-empty-state"')[1]?.split('filteredMessages.map(')[0];
 
-  assert.match(homePage, /'كيف أستخدم سوق حمد؟'/);
-  assert.match(homePage, /'ما سياسة الإعلانات؟'/);
+  assert.ok(emptyState);
+  assert.match(emptyState, /كيف أساعدك؟/);
+  assert.doesNotMatch(emptyState, /<Button|creationOptions|sendStarter/);
+  assert.doesNotMatch(homePage, /const starters|starters\.map/);
+  assert.match(homePage, /const creationOptions = !creationMethod && !isLoading && isRecord\(latestAssistantMetadata\) && latestAssistantMetadata\.creationChoice === true/);
   assert.match(homePage, /assistant-creation-options/);
   assert.doesNotMatch(homePage, /'أبحث عن منتج'|'افحص صور الإعلان'/);
 });

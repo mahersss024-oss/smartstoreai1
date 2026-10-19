@@ -9,7 +9,6 @@ export type RealtimeEventType =
   | 'conversation_updated'
   | 'commission_updated'
   | 'moderation_updated'
-  | 'ai_results_updated'
   | 'maintenance_cleanup';
 
 export type RealtimePayloadByType = {
@@ -83,10 +82,6 @@ export type RealtimePayloadByType = {
     entity: 'listing' | 'report';
     entityId: string;
     status: string;
-  };
-  ai_results_updated: {
-    ownerKey: string;
-    query?: string;
   };
   maintenance_cleanup: {
     scope: string;

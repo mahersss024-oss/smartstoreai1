@@ -38,11 +38,19 @@ test('generic ad creation offers both real methods and manual choice opens the u
   });
   await page.goto('/?chat=1');
   const input = page.getByPlaceholder('اكتب طلبك أو أرفق صور المنتج...');
-  await expect(page.getByTestId('assistant-creation-options')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'الإنشاء مع حمد', exact: true })).toBeVisible();
+  const emptyState = page.getByTestId('assistant-empty-state');
+  await expect(emptyState.getByRole('heading', { name: 'كيف أساعدك؟', exact: true })).toBeVisible();
+  await expect(emptyState.getByRole('button')).toHaveCount(0);
+  await expect(page.getByTestId('assistant-creation-options')).toHaveCount(0);
+  for (const prompt of ['كيف أستخدم سوق حمد؟', 'ما سياسة الإعلانات؟', 'كيف تعمل رسوم المنصة؟']) {
+    await expect(page.getByRole('button', { name: prompt, exact: true })).toHaveCount(0);
+  }
+  expect(requests).toHaveLength(0);
+  await page.screenshot({ path: info.outputPath('chat-without-starters.png'), fullPage: true });
   await input.fill('أريد إنشاء إعلان');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
   await expect(page.getByText('كيف تفضّل إنشاء إعلانك؟', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'الإنشاء مع حمد', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'الإنشاء اليدوي', exact: true }).click();
   await expect(page.getByLabel('عنوان الإعلان', { exact: true })).toBeVisible();
   expect(requests.length).toBe(1);
@@ -59,14 +67,28 @@ test('choosing Hamad sends explicit draft mode, ignores legacy search cards and 
     requests.push(body);
     expect(body.selectedListing).toBeUndefined();
     expect(body.resetSearchState).toBeUndefined();
+    if (requests.length === 1) {
+      await route.fulfill({ headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+        body: reply('choose-method', 'كيف تفضّل إنشاء إعلانك؟', { creationChoice: true }) });
+      return;
+    }
+    if (requests.length === 3) {
+      await route.fulfill({ headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+        body: reply('platform-help', 'يمكنك إنشاء إعلان يدويًا أو تجهيز مسودته مع حمد.') });
+      return;
+    }
     await route.fulfill({ headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
       body: reply('draft-reply-'+requests.length, 'ما المنتج الذي تريد تجهيز مسودته؟', { marketplaceIntent: 'create_listing' }, true) });
   });
   await page.goto('/?chat=1');
+  const input = page.getByPlaceholder('اكتب طلبك أو أرفق صور المنتج...');
+  await input.fill('أريد إنشاء إعلان');
+  await page.getByRole('button', { name: 'إرسال', exact: true }).click();
   await page.getByRole('button', { name: 'الإنشاء مع حمد', exact: true }).click();
   await expect(page.getByText('ما المنتج الذي تريد تجهيز مسودته؟', { exact: true })).toBeVisible();
-  expect(requests[0].creationMethod).toBe('chat');
-  expect(requests[0].beginDraftWithHamad).toBe(true);
+  expect(requests[0].creationMethod).toBeUndefined();
+  expect(requests[1].creationMethod).toBe('chat');
+  expect(requests[1].beginDraftWithHamad).toBe(true);
   await expect(page.getByTestId('assistant-creation-options')).toHaveCount(0);
   await expect(page.locator('.smart-assistant-result-card')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'مقارنة الإعلان', exact: true })).toHaveCount(0);
@@ -74,11 +96,14 @@ test('choosing Hamad sends explicit draft mode, ignores legacy search cards and 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('hamad-draft-choice.png'), fullPage: true });
   await page.getByRole('button', { name: 'مسح المحادثة وبدء محادثة جديدة', exact: true }).click();
-  await expect(page.getByTestId('assistant-creation-options')).toBeVisible();
-  const input = page.getByPlaceholder('اكتب طلبك أو أرفق صور المنتج...');
+  await expect(page.getByTestId('assistant-empty-state')).toBeVisible();
+  await expect(page.getByTestId('assistant-empty-state').getByRole('button')).toHaveCount(0);
+  await expect(page.getByTestId('assistant-creation-options')).toHaveCount(0);
   await input.fill('كيف أستخدم المنصة؟');
   await page.getByRole('button', { name: 'إرسال', exact: true }).click();
-  await expect.poll(() => requests.length).toBe(2);
-  expect(requests[1].creationMethod).toBeUndefined();
-  expect(requests[1].beginDraftWithHamad).toBeUndefined();
+  await expect(page.getByText('يمكنك إنشاء إعلان يدويًا أو تجهيز مسودته مع حمد.', { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(3);
+  expect(requests[2].creationMethod).toBeUndefined();
+  expect(requests[2].beginDraftWithHamad).toBeUndefined();
+  await expect(page.getByTestId('assistant-creation-options')).toHaveCount(0);
 });

@@ -3,7 +3,7 @@ import {
   getMarketplaceSearchTermVariants,
   normalizeMarketplaceSearchText,
 } from './search';
-import type { MarketplaceSearchState } from './search-state';
+import type { MarketplaceSearchState } from './structured-search-intent';
 import type { ListingRecord } from './store';
 
 export type RankedMarketplaceListing = {

@@ -4,60 +4,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { formatMarketplaceCategory, marketplaceCategoryGroups } from '@/lib/marketplace/categories';
 
-import {
-  getAssistantResultListings,
-  getCanLoadMoreExploreListings,
-  getExploreListings,
-} from '@/lib/chat-listing-display';
-
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
-
-test('limits assistant search listings so chat does not overwhelm the market', () => {
-  const searchToolListings = Array.from({ length: 20 }, (_, index) => ({
-    id: `tool-${index}`,
-  }));
-
-  const displayed = getAssistantResultListings({ searchToolListings });
-
-  assert.equal(displayed.length, 12);
-  assert.equal(displayed[0]?.id, 'tool-0');
-  assert.equal(displayed.at(-1)?.id, 'tool-11');
-});
-
-test('keeps marketplace exploration visible beside assistant results', () => {
-  const marketplaceListings = [{ id: 'api-1' }, { id: 'api-2' }];
-  const searchToolListings = [{ id: 'tool-1' }, { id: 'tool-2' }];
-
-  const displayed = getExploreListings({
-    marketplaceListings,
-    searchToolListings,
-  });
-
-  assert.deepEqual(displayed, marketplaceListings);
-});
-
-test('keeps assistant matches from changing marketplace browsing when ids overlap', () => {
-  const marketplaceListings = [{ id: 'api-1' }, { id: 'api-2' }];
-  const searchToolListings = [{ id: 'api-1' }];
-
-  const displayed = getExploreListings({
-    marketplaceListings,
-    searchToolListings,
-  });
-
-  assert.deepEqual(displayed, marketplaceListings);
-});
-
-test('allows load-more for marketplace exploration with remaining pages', () => {
-  const canLoadMore = getCanLoadMoreExploreListings({
-    hasMore: true,
-    displayedCount: 6,
-  });
-
-  assert.equal(canLoadMore, true);
-});
 
 test('home marketplace stays independent of Hamad while retaining search, cards and manual creation', () => {
   const homePage = readProjectFile('app', 'page.tsx');
@@ -157,8 +106,7 @@ test('home marketplace stays independent of Hamad while retaining search, cards 
   assert.doesNotMatch(homePage, /markListingImageReady/);
   assert.doesNotMatch(globalCss, /marketplace-listing-card\[data-image-loading="true"\]/);
   assert.doesNotMatch(globalCss, /marketplace-card-image-shimmer/);
-  assert.match(globalCss, /smart-assistant-results-panel-in/);
-  assert.match(globalCss, /smart-assistant-result-card-in/);
+  assert.doesNotMatch(globalCss, /smart-assistant-results-panel|smart-assistant-result-card/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);
 });
 

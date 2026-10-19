@@ -10,11 +10,6 @@ beforeEach(mockAllowedTextAnalysis);
 import { POST } from '@/app/api/chat/route';
 import { POST as RESET_CHAT_POST } from '@/app/api/chat/reset/route';
 import {
-  getMarketplaceSearchState,
-  resetMarketplaceSearchState,
-  updateMarketplaceSearchState,
-} from '@/agent/marketplace/search-state';
-import {
   createListingDraft,
   listSellerListings,
 } from '@/agent/marketplace/repository';
@@ -48,23 +43,8 @@ test('requires sign-in before any chat model interaction', async () => {
   assert.match(text, /\[\[SMARTSTORE_GOOGLE_AUTH_REQUIRED\]\]/);
 });
 
-test('chat reset clears incomplete drafts without touching the independent search state', async () => {
+test('chat reset clears only incomplete drafts and retains completed drafts', async () => {
   const userId = 'google:chat-reset-user';
-  const ownerKey = `user:${userId}`;
-
-  await resetMarketplaceSearchState(ownerKey);
-  await updateMarketplaceSearchState(ownerKey, {
-    intent: 'search_listing',
-    category: 'cars',
-    brand: 'Nissan',
-    city: 'Tabuk',
-    requiredFeatures: [],
-    excludedFeatures: [],
-    excludedColors: [],
-    rankingPreferences: [],
-    terms: [],
-    rawQuery: 'old retained search',
-  });
   const incompleteDraft = await createListingDraft(
     { id: userId, email: 'chat-reset@example.com' },
     {
@@ -80,8 +60,6 @@ test('chat reset clears incomplete drafts without touching the independent searc
     },
   );
 
-  const beforeSearch = await getMarketplaceSearchState(ownerKey);
-  assert.ok(beforeSearch);
   assert.equal(incompleteDraft.status, 'draft');
   assert.equal(completeDraft.status, 'draft');
   assert.equal(
@@ -110,7 +88,6 @@ test('chat reset clears incomplete drafts without touching the independent searc
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await getMarketplaceSearchState(ownerKey), beforeSearch);
   assert.equal(
     (await listSellerListings(userId)).some(
       (listing) => listing.id === incompleteDraft.id,

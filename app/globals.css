@@ -785,15 +785,6 @@ html[data-theme-switching] *::after {
     }
   }
 
-  .smart-assistant-results-panel {
-    animation: smart-assistant-results-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  .smart-assistant-result-card {
-    animation: smart-assistant-result-card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    will-change: opacity, transform;
-  }
-
   .marketplace-listing-card-enter {
     animation: marketplace-listing-card-enter 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
     will-change: opacity, transform;
@@ -900,28 +891,6 @@ html[data-theme-switching] *::after {
     }
   }
 
-  @keyframes smart-assistant-results-panel-in {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes smart-assistant-result-card-in {
-    from {
-      opacity: 0;
-      transform: translateY(7px) scale(0.992);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
   @keyframes marketplace-listing-card-enter {
     from {
       opacity: 0;
@@ -940,8 +909,6 @@ html[data-theme-switching] *::after {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .smart-assistant-results-panel,
-    .smart-assistant-result-card,
     .marketplace-listing-card,
     .marketplace-listing-card-enter,
     .marketplace-listing-card-skeleton,

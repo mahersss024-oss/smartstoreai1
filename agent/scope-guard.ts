@@ -171,23 +171,6 @@ function getDirectMarketplaceScopeDecision(latestRequest: string) {
   return null;
 }
 
-export function getMarketplaceContinuationScopeDecision(
-  latestRequest: string,
-  context: ReturnType<typeof buildScopeContext>,
-): ScopeDecision | null {
-  const analysis = marketplaceTextAnalyzer.peek(latestRequest);
-  if (context.length > 1 && analysis && analysis.confidence >= 0.8 && analysis.intent === 'search_listing' && analysis.search.searchMode === 'refine') {
-    return {
-      decision: 'ALLOW',
-      confidence: analysis.confidence,
-      reason_code: 'model_marketplace_follow_up',
-      intent: 'support',
-    };
-  }
-
-  return null;
-}
-
 function extractJsonObject(text: string) {
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
@@ -264,20 +247,6 @@ export async function checkInputScope({ messages }: ScopeCheckInput) {
         directMarketplaceDecision.reason_code,
       );
       return directMarketplaceDecision;
-    }
-
-    const continuationDecision = getMarketplaceContinuationScopeDecision(
-      latestRequest,
-      context,
-    );
-
-    if (continuationDecision) {
-      logScopeDecision(
-        'input',
-        continuationDecision.decision,
-        continuationDecision.reason_code,
-      );
-      return continuationDecision;
     }
 
     const result = await withTimeout(scopeTimeoutMs, (signal) =>

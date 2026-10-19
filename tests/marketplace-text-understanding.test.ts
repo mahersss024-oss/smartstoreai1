@@ -1,19 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createMarketplaceTextAnalyzer, listingSemanticText, marketplaceTextAnalysisSchema, marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
-import { resolveMarketplaceSearchUnderstanding } from '@/agent/marketplace/search-understanding';
+import { createMarketplaceTextAnalyzer, listingSemanticText, marketplaceTextAnalysisSchema, marketplaceTextAnalyzer, prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
 import { listingCategoryClassifier } from '@/agent/marketplace/listing-category-model';
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { getMarketplaceSearchTermVariants, parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 import { getComparableListings, analyzeListingMarket } from '@/agent/marketplace/market-intelligence';
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
-import { updateMarketplaceSearchState } from '@/agent/marketplace/search-state';
-import { buildRetrievalTermGroups } from '@/agent/marketplace/retrieval-engine';
-import { parseStructuredSearchIntent } from '@/agent/marketplace/structured-search-intent';
-import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
 import { createListingDraft } from '@/agent/marketplace/repository';
 import { publishListing } from '@/agent/marketplace/store';
-import { prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
 import type { ListingRecord } from '@/agent/marketplace/store';
 import { textAnalysis } from './helpers/text-understanding';
 
@@ -100,50 +94,6 @@ test('model transport batches independent texts and rejects duplicate response I
   assert.deepEqual(rejected, [null, null]);
 });
 
-test('explicit refinement retains contextual aliases and a new search clears them', async () => {
-  const initial = parseStructuredSearchIntent('initial request');
-  initial.terms = ['desk'];
-  initial.termAliases = [{ term: 'desk', variants: ['bureau'] }];
-  await updateMarketplaceSearchState('semantic-refinement', initial);
-  const refine = parseStructuredSearchIntent('cheaper');
-  refine.searchMode = 'refine';
-  refine.terms = [];
-  refine.maxPrice = 100;
-  const state = await updateMarketplaceSearchState('semantic-refinement', refine);
-  assert.deepEqual(buildRetrievalTermGroups(state), [['desk']]);
-  const fresh = await updateMarketplaceSearchState('semantic-refinement', parseStructuredSearchIntent('new product'));
-  assert.deepEqual(fresh.termAliases, []);
-});
-
-test('chat database search returns literal title matches without semantic removal of parts', async t => {
-  const query = 'integration semantic furniture request';
-  const whole = { category: 'furniture', title: 'unit semantic bureau fixed', price: 100, attributes: {} };
-  const part = { category: 'furniture', title: 'unit semantic bureau fixed leg', price: 5, attributes: {} };
-  const productAnalysis = textAnalysis({ category: 'furniture', product: 'desk' });
-  const queryAnalysis = textAnalysis({ ...productAnalysis, intent: 'search_listing',
-    aliases: [{ term: 'semantic-desk-fixture', variants: ['unit semantic bureau fixed'] }],
-    search: { ...productAnalysis.search, descriptiveTerms: ['semantic-desk-fixture'] } });
-  const outputs = new Map([
-    [query, queryAnalysis], [listingSemanticText(whole), productAnalysis],
-    [listingSemanticText(part), textAnalysis({ ...productAnalysis, offerKind: 'part' })],
-  ]);
-  const analyzer = createMarketplaceTextAnalyzer(async text => {
-    const result = outputs.get(text);
-    if (!result) throw new Error('No model fixture');
-    return result;
-  });
-  t.mock.method(marketplaceTextAnalyzer, 'analyze', analyzer.analyze);
-  t.mock.method(marketplaceTextAnalyzer, 'peek', analyzer.peek);
-  const owner = { id: 'semantic-integration-owner', email: 'semantic@example.test' };
-  const savedWhole = await createListingDraft(owner, whole);
-  const savedPart = await createListingDraft(owner, part);
-  publishListing(savedWhole.id);
-  publishListing(savedPart.id);
-  const result = await searchMarketplaceWithState({ ownerKey: 'semantic-integration-search', query: 'bureau' });
-  assert.ok(result.listings.some(item => item.listing.id === savedWhole.id));
-  assert.ok(result.listings.some(item => item.listing.id === savedPart.id));
-});
-
 test('classification search aliases and contextual policy reuse one result', async t => {
   const input = { title: 'shared-analysis-title', description: 'shared-analysis-description', attributes: {} };
   const source = listingSemanticText(input);
@@ -157,7 +107,7 @@ test('classification search aliases and contextual policy reuse one result', asy
   t.mock.method(marketplaceTextAnalyzer, 'peek', analyzer.peek);
   await analyzer.analyze(source);
   assert.equal((await listingCategoryClassifier.suggest(input)).category, 'furniture');
-  assert.equal((await resolveMarketplaceSearchUnderstanding({ query: source }))?.category, 'furniture');
+  assert.equal((await marketplaceTextAnalyzer.analyze(source))?.category, 'furniture');
   assert.equal(evaluateSaudiMarketplaceCompliance(source).decision, 'allow');
   assert.deepEqual(parseMarketplaceSearchQuery(source).terms, ['desk']);
   assert.ok(getMarketplaceSearchTermVariants('desk', source).includes('writing table'));

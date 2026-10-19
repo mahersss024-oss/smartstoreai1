@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { parseMarketplaceSearchQuery } from './search';
 import { marketplaceTextAnalyzer } from './text-understanding';
-import { getMarketplaceTitleTerms } from '@/lib/marketplace/title-search';
-import type { MarketplaceSearchUnderstandingInput } from './search-understanding-schema';
 
 export const rankingPreferenceSchema = z.enum(['relevance', 'price', 'location', 'condition', 'mileage', 'year', 'listing_quality', 'freshness', 'engagement']);
 export const sortPreferenceSchema = z.enum(['best_match', 'cheapest', 'newest', 'closest', 'best_condition', 'lowest_mileage']);
@@ -23,20 +21,13 @@ export const structuredSearchIntentSchema = z.object({
   termAliases: z.array(z.object({ term: z.string().min(1).max(160), variants: z.array(z.string().min(1).max(160)).max(12) })).max(40).optional(),
 });
 export type StructuredSearchIntent = z.infer<typeof structuredSearchIntentSchema>;
+export type MarketplaceSearchState = StructuredSearchIntent & {
+  revision: number;
+  updatedAt: string;
+};
 export type RankingPreference = z.infer<typeof rankingPreferenceSchema>;
 export type SortPreference = z.infer<typeof sortPreferenceSchema>;
 export type SearchMode = z.infer<typeof searchModeSchema>;
-
-export function parseExplicitMarketplaceSearchIntent(query?: string, filters: MarketplaceSearchUnderstandingInput = {}): StructuredSearchIntent {
-  const titleQuery = query?.trim() ?? '';
-  const structuredTerms = getMarketplaceTitleTerms([filters.brand, filters.model, filters.color, ...(filters.requiredFeatures ?? [])].filter(Boolean).join(' '));
-  return structuredSearchIntentSchema.parse({
-    ...filters,
-    terms: getMarketplaceTitleTerms(titleQuery || (filters.descriptiveTerms ?? []).join(' ')).filter(term => !structuredTerms.includes(term)),
-    rawQuery: titleQuery,
-    termAliases: [],
-  });
-}
 
 export function parseStructuredSearchIntent(query: string | null | undefined): StructuredSearchIntent {
   const rawQuery = query?.trim() ?? '';

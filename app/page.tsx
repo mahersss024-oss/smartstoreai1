@@ -6,6 +6,7 @@ import { getArabicCustomerMessage } from '@/lib/customer-language';
 import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryDefinitions, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
 import { CategoryOptionSelect } from '@/components/category-option-select';
 import { CarModelSelect } from '@/components/car-model-select';
+import { MarketplaceCarModelRow, MarketplaceCategoryOptionRow, MarketplaceFilterRow } from '@/components/marketplace-filter-row';
 import { getListingCarModel, getListingCategoryOption, getMarketplaceCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
 import { getMarketplaceCarModel, marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import {
@@ -600,12 +601,6 @@ function ChatSubmitButton({ status }: { status: ChatStatus }) {
 }
 
 const featuredListings: ListingCard[] = [];
-
-const starters = [
-  'كيف أستخدم سوق حمد؟',
-  'ما سياسة الإعلانات؟',
-  'كيف تعمل رسوم المنصة؟',
-];
 
 function getDurableImageUrls(...urls: Array<string | undefined>) {
   return urls.filter((url, index, list): url is string => {
@@ -3964,7 +3959,7 @@ export default function Page() {
         ? 'translate3d(0, calc(-100% + var(--marketplace-categories-height, 40px)), 0)'
         : 'translate3d(0, 0, 0)';
 
-  const creationOptions = !creationMethod && !isLoading && (filteredMessages.length === 0 || (isRecord(latestAssistantMetadata) && latestAssistantMetadata.creationChoice === true)) ? (
+  const creationOptions = !creationMethod && !isLoading && isRecord(latestAssistantMetadata) && latestAssistantMetadata.creationChoice === true ? (
     <div data-testid="assistant-creation-options" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <Button variant="outline" className="h-auto min-h-10 whitespace-normal rounded-md py-2" disabled={!hasRestoredChat} onClick={() => sendStarter('أختار الإنشاء مع حمد.', 'chat')}>
         <MessageCircle className="size-4 shrink-0" />
@@ -4644,69 +4639,23 @@ export default function Page() {
               </div>
               </div>
               <div className="grid gap-1 p-1" ref={marketplaceCategoriesRef} data-marketplace-categories>
-                <div className="flex touch-pan-x gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={activeMarketCategoryGroup === 'all' ? 'default' : 'outline'}
-                    className="h-8 shrink-0 rounded-full px-3 text-xs"
-                    onClick={() => {
-                      setSelectedMarketCategoryGroup('all');
-                      setSelectedMarketSubcategory('all');
-                      setSelectedMarketCategoryOption('');
-                      setSelectedMarketCarModel('');
-                    }}
-                  >
-                    الكل
-                  </Button>
-                  {marketplaceCategoryGroups.map((group) => (
-                    <Button
-                      key={group.label}
-                      type="button"
-                      size="sm"
-                      variant={activeMarketCategoryGroup === group.label ? 'default' : 'outline'}
-                      className="h-8 shrink-0 rounded-full px-3 text-xs"
-                      onClick={() => {
-                        setSelectedMarketCategoryGroup(group.label);
-                        setSelectedMarketSubcategory('all');
-                        setSelectedMarketCategoryOption('');
-                        setSelectedMarketCarModel('');
-                      }}
-                    >
-                      {group.label}
-                    </Button>
-                  ))}
-                </div>
+                <MarketplaceFilterRow level="groups" label="تصنيفات السوق" value={activeMarketCategoryGroup} allValue="all"
+                  options={marketplaceCategoryGroups.map(group => ({ id: group.label, label: group.label }))}
+                  onChange={value => {
+                    setSelectedMarketCategoryGroup(value);
+                    setSelectedMarketSubcategory('all');
+                    setSelectedMarketCategoryOption('');
+                    setSelectedMarketCarModel('');
+                  }} />
                 {activeMarketCategoryGroupConfig && (
-                  <div className="flex touch-pan-x gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={activeMarketSubcategory === 'all' ? 'default' : 'outline'}
-                      className="h-8 shrink-0 rounded-full px-2.5 text-xs"
-                      onClick={() => { setSelectedMarketSubcategory('all'); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }}
-                    >
-                      كل {activeMarketCategoryGroup}
-                    </Button>
-                    {activeMarketCategoryGroupConfig.categories.map((category) => (
-                      <Button
-                        key={category}
-                        type="button"
-                        size="sm"
-                        variant={activeMarketSubcategory === category ? 'default' : 'outline'}
-                        className="h-8 shrink-0 rounded-full px-2.5 text-xs"
-                        onClick={() => { setSelectedMarketSubcategory(category); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }}
-                      >
-                        {category}
-                      </Button>
-                    ))}
-                  </div>
+                  <MarketplaceFilterRow key={activeMarketCategoryGroup} level="categories" label="التصنيفات الفرعية" compact
+                    value={activeMarketSubcategory} allValue="all" options={activeMarketCategoryGroupConfig.categories.map(category => ({ id: category, label: category }))}
+                    onChange={value => { setSelectedMarketSubcategory(value); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }} />
                 )}
-                <CategoryOptionSelect id="marketplace-category-option" category={activeMarketCategoryId} value={activeMarketCategoryOption}
-                  onChange={value => { setSelectedMarketCategoryOption(value); setSelectedMarketCarModel(''); }} all
-                  className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
-                <CarModelSelect id="marketplace-car-model" category={activeMarketCategoryId} brand={activeMarketCategoryOption} value={activeMarketCarModel}
-                  onChange={setSelectedMarketCarModel} all className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
+                <MarketplaceCategoryOptionRow key={`options:${activeMarketCategoryId}`} category={activeMarketCategoryId} value={activeMarketCategoryOption}
+                  onChange={value => { setSelectedMarketCategoryOption(value); setSelectedMarketCarModel(''); }} />
+                <MarketplaceCarModelRow key={`models:${activeMarketCategoryId}:${activeMarketCategoryOption}`} category={activeMarketCategoryId} brand={activeMarketCategoryOption} value={activeMarketCarModel}
+                  onChange={setSelectedMarketCarModel} />
               </div>
               </div>
               </div>
@@ -4859,27 +4808,13 @@ export default function Page() {
                       enabled
                     />
                     {filteredMessages.length === 0 ? (
-                      <div className="grid h-full place-items-center text-center">
+                      <div data-testid="assistant-empty-state" className="grid h-full place-items-center text-center">
                         <div className="grid max-w-xs gap-4">
                           <div className="mx-auto grid size-14 place-items-center rounded-md bg-blue-100 text-blue-700">
                             <MessageCircle className="size-7" />
                           </div>
                           <div>
                             <h3 className="text-lg font-bold">كيف أساعدك؟</h3>
-                          </div>
-                          {creationOptions}
-                          <div className="grid gap-2">
-                            {starters.map((prompt) => (
-                              <Button
-                                key={prompt}
-                                variant="outline"
-                                className="rounded-md"
-                                disabled={isLoading || !hasRestoredChat}
-                                onClick={() => sendStarter(prompt)}
-                              >
-                                {prompt}
-                              </Button>
-                            ))}
                           </div>
                         </div>
                       </div>

@@ -28,6 +28,31 @@ The catalog is a reference selection of familiar current and legacy model famili
 
 Manual creation, seller editing, admin editing/filtering and draft tools use this catalog. The classifier uses title and description together to suggest a valid choice using the existing analysis result; unknown or invalid choices are omitted and customer corrections take precedence. No new model is introduced, and Hamad retains only draft preparation and platform help.
 
+## Market Browse Rows
+
+Public market browsing uses horizontal category-style buttons at every level:
+group, category, optional brand/type and optional car model. Every populated row
+starts with `الكل`, without visible brand/type/model field labels. The primary row
+is 32px high; branch rows/buttons are 28px high with slightly smaller text. Empty
+levels are not rendered. Selection is exposed with `aria-pressed`, and hidden
+group labels retain accessible names without adding visible headings.
+
+Each `الكل` clears that level and its descendants only; the text query, city and
+parent choice remain unchanged. Rows reset their horizontal position when the
+parent changes and reveal a restored selection within the row without scrolling
+the page/list. Existing API filters, stored IDs and home browse snapshots are
+unchanged. Manual creation and seller/admin editors retain their existing controls.
+`e2e/marketplace-filter-rows.spec.ts` covers order, dimensions, all category options,
+dependent resets, query/city preservation and horizontal selection restoration.
+
+Browse-row verification on 2026-10-19: 37 focused source/route checks and 18
+desktop/mobile Chromium cases passed, including exact home scroll restoration,
+all category/option rows, brand/model filtering and toolbar gestures. Production
+build/type checking and scoped ESLint passed. Desktop/mobile screenshots were
+inspected. The restored-position check waits for the existing filter-opening
+transition to finish before taking its baseline; its position tolerance remains
+unchanged. These focused checks do not represent a full-project suite rerun.
+
 ## Verification
 
 `tests/marketplace-category-options.test.ts` checks catalog membership, every brand/type through the local listing lifecycle, exact filtering, SQL parameters, ownership, invalid inputs, explicit clearing, category changes and draft-only chat tools. Browser coverage lives in `e2e/marketplace-categories.spec.ts`.

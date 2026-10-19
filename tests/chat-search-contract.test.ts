@@ -1,17 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseExplicitMarketplaceSearchIntent } from '@/agent/marketplace/structured-search-intent';
-import { buildRetrievalTermGroups } from '@/agent/marketplace/retrieval-engine';
-import { updateMarketplaceSearchState } from '@/agent/marketplace/search-state';
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { textAnalysis } from './helpers/text-understanding';
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
-
-test('explicit brand and model remain title constraints alongside a product query', () => {
-  const intent = parseExplicitMarketplaceSearchIntent('car', { brand: 'Toyota', model: 'Camry' });
-  assert.deepEqual(buildRetrievalTermGroups({ ...intent, revision: 1, updatedAt: '' }), [['car'], ['toyota'], ['camry']]);
-});
 
 test('replayed customer turns reuse the saved draft and a new turn creates a distinct draft', async t => {
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => textAnalysis());
@@ -33,30 +25,5 @@ test('metadata never invents visual quality measurements or rejects a small ordi
     assert.equal(result.lighting, 'unknown');
     assert.equal(result.productVisibility, 'unknown');
     assert.equal(result.listingImageStatus, 'approved');
-  }
-});
-
-test('refinement can clear filters without losing the product or unrelated constraints', async () => {
-  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
-  process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
-  try {
-    await updateMarketplaceSearchState('clear-filter-test', parseExplicitMarketplaceSearchIntent('phone', { city: 'Riyadh', maxPrice: 900, condition: 'used', searchMode: 'new_search' }));
-    const allCities = await updateMarketplaceSearchState('clear-filter-test', parseExplicitMarketplaceSearchIntent(undefined, { searchMode: 'refine', locationPreference: 'anywhere' }));
-    assert.equal(allCities.city, undefined);
-    assert.equal(allCities.maxPrice, 900);
-    assert.deepEqual(allCities.terms, ['phone']);
-    const noBudget = await updateMarketplaceSearchState('clear-filter-test', parseExplicitMarketplaceSearchIntent(undefined, { searchMode: 'refine', clearFilters: ['maxPrice'] }));
-    assert.equal(noBudget.maxPrice, undefined);
-    assert.equal(noBudget.condition, 'used');
-    const next = await updateMarketplaceSearchState('clear-filter-test', parseExplicitMarketplaceSearchIntent('chair', { searchMode: 'new_search' }));
-    assert.deepEqual(next.terms, ['chair']);
-    assert.equal(next.condition, undefined);
-    await updateMarketplaceSearchState('clear-brand-test', parseExplicitMarketplaceSearchIntent('Toyota car', { brand: 'Toyota', searchMode: 'new_search' }));
-    const anyBrand = await updateMarketplaceSearchState('clear-brand-test', parseExplicitMarketplaceSearchIntent(undefined, { searchMode: 'refine', clearFilters: ['brand'] }));
-    assert.equal(anyBrand.brand, undefined);
-    assert.deepEqual(buildRetrievalTermGroups(anyBrand), [['car']]);
-  } finally {
-    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
-    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
   }
 });

@@ -12,7 +12,7 @@ import {
 } from '@/agent/marketplace/market-intelligence';
 import { buildMarketplaceRecommendations } from '@/agent/marketplace/recommendation-engine';
 import { rankMarketplaceListings } from '@/agent/marketplace/ranking-engine';
-import type { MarketplaceSearchState } from '@/agent/marketplace/search-state';
+import type { MarketplaceSearchState } from '@/agent/marketplace/structured-search-intent';
 import type { ListingRecord } from '@/agent/marketplace/store';
 
 function listing(input: {

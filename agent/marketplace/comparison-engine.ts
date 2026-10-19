@@ -3,7 +3,7 @@ import {
   getComparableListings,
 } from './market-intelligence';
 import { rankMarketplaceListings } from './ranking-engine';
-import type { MarketplaceSearchState } from './search-state';
+import type { MarketplaceSearchState } from './structured-search-intent';
 import type { ListingRecord } from './store';
 
 export type MarketplaceComparisonItem = {

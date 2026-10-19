@@ -8,7 +8,6 @@ import {
   buildScopeContext,
   checkInputScope,
   getLatestUserRequest,
-  getMarketplaceContinuationScopeDecision,
   getSafeScopeResponse,
   latestUserMessageHasImageAttachment,
   messageHasImageAttachment,
@@ -119,49 +118,39 @@ test('does not treat earlier image attachments as latest vision input', () => {
   assert.equal(latestUserMessageHasImageAttachment(messages), false);
 });
 
-test('allows model-understood marketplace follow-ups without product dictionaries', t => {
-  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing', search: { searchMode: 'refine', requiredFeatures: [], excludedFeatures: [], excludedColors: [], descriptiveTerms: [], rankingPreferences: [] } }));
-  const context = buildScopeContext([
+test('understood legacy search follow-ups route only to platform guidance and read analysis once', async t => {
+  const analysis = textAnalysis({ intent: 'search_listing' });
+  analysis.search.searchMode = 'refine';
+  const peek = t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  t.mock.method(globalThis, 'fetch', async () => { assert.fail('cached intent must not trigger another model call'); });
+  const decision = await checkInputScope({ messages: [
     { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
-    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
-    { role: 'user', parts: [{ type: 'text', text: 'تايوتا كامري' }] },
-    { role: 'assistant', parts: [{ type: 'text', text: 'ما سنة الصنع؟' }] },
-    { role: 'user', parts: [{ type: 'text', text: '2020' }] },
-  ]);
-
-  const decision = getMarketplaceContinuationScopeDecision('2020', context);
-
-  assert.equal(decision?.decision, 'ALLOW');
-  assert.equal(decision?.reason_code, 'model_marketplace_follow_up');
-});
-
-test('allows model-understood budget follow-ups from marketplace context', t => {
-  t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ intent: 'search_listing', search: { searchMode: 'refine', requiredFeatures: [], excludedFeatures: [], excludedColors: [], descriptiveTerms: [], rankingPreferences: [] } }));
-  const context = buildScopeContext([
-    { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
-    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'يمكنك استخدام بحث السوق بنفسك.' }] },
     { role: 'user', parts: [{ type: 'text', text: 'ميزانيتي 50 ألف' }] },
-  ]);
-
-  const decision = getMarketplaceContinuationScopeDecision(
-    'ميزانيتي 50 ألف',
-    context,
-  );
-
-  assert.equal(decision?.decision, 'ALLOW');
-  assert.equal(decision?.reason_code, 'model_marketplace_follow_up');
+  ] });
+  assert.equal(decision.decision, 'ALLOW');
+  assert.equal(decision.intent, 'support');
+  assert.equal(decision.reason_code, 'model_marketplace_request');
+  assert.equal(peek.mock.callCount(), 1);
 });
 
-test('does not allow unrelated short follow-ups through marketplace context', () => {
-  const context = buildScopeContext([
-    { role: 'user', parts: [{ type: 'text', text: 'أبحث عن سيارة في الرياض' }] },
-    { role: 'assistant', parts: [{ type: 'text', text: 'ما نوع السيارة؟' }] },
+test('unrelated follow-ups still pass through the contextual scope checker', async t => {
+  const peek = t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
+  const fetch = t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    assert.ok(JSON.stringify(body.messages).includes('اخبار سياسية'));
+    return Response.json({ id: 'scope-cleanup', object: 'chat.completion', created: 1, model: 'test-model',
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify({ decision: 'BLOCK', confidence: 1, reason_code: 'unrelated' }) } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
+  });
+  const decision = await checkInputScope({ messages: [
+    { role: 'user', parts: [{ type: 'text', text: 'كيف أنشئ إعلانًا؟' }] },
+    { role: 'assistant', parts: [{ type: 'text', text: 'اختر الإنشاء اليدوي أو الإنشاء مع حمد.' }] },
     { role: 'user', parts: [{ type: 'text', text: 'اخبار سياسية' }] },
-  ]);
-
-  const decision = getMarketplaceContinuationScopeDecision('اخبار سياسية', context);
-
-  assert.equal(decision, null);
+  ] });
+  assert.equal(decision.decision, 'BLOCK');
+  assert.equal(peek.mock.callCount(), 1);
+  assert.equal(fetch.mock.callCount(), 1);
 });
 
 test('reuses high-confidence text understanding for marketplace scope', async t => {

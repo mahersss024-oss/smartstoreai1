@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
-import { searchMarketplaceWithState } from '@/agent/marketplace/search-engine';
 import { createMarketplaceTools, createReadOnlyMarketplaceTools } from '@/agent/tools/marketplace';
 import * as store from '@/agent/marketplace/store';
 import * as repository from '@/agent/marketplace/repository';
@@ -13,7 +12,7 @@ import { getLocalModelReviews, recordModelReview } from '@/lib/admin/model-revie
 import { acknowledgeReportNotification, listReportNotifications } from '@/lib/admin/report-notifications';
 import { textAnalysis } from './helpers/text-understanding';
 
-test('chat and site use identical title matches and explicit filters even when every model is unavailable', async t => {
+test('market search uses title matches and independent explicit filters even when every model is unavailable', async t => {
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis());
   store.resetMarketplaceStoreForTests();
   const make = (id: string, category: string, city: string, price: number, condition: 'used' | 'new', title = 'آيفون ١٥') => {
@@ -32,9 +31,7 @@ test('chat and site use identical title matches and explicit filters even when e
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
   try {
     const filters = { category: 'mobile_phones' as const, city: 'الرياض', minPrice: 40, maxPrice: 80, condition: 'used' as const, yearMin: 2024, mileageMax: 20000 };
-    const chat = await searchMarketplaceWithState({ ownerKey: 'no-model-search', query: 'ايفون 15', understoodIntent: filters });
     const site = await repository.listPublicMarketplaceListings({ query: 'ايفون 15', ...filters });
-    assert.deepEqual(chat.listings.map(item => item.listing.id), site.map(item => item.id));
     assert.deepEqual(site.map(item => item.id), ['db-only-1']);
     const url = new URL('https://example.test/api/marketplace/listings');
     url.searchParams.set('q', 'ايفون 15');
@@ -42,13 +39,12 @@ test('chat and site use identical title matches and explicit filters even when e
     const api = await GET(new Request(url));
     assert.equal(api.status, 200);
     assert.deepEqual((await api.json()).listings.map((item: { id: string }) => item.id), ['db-only-1']);
-    const refined = await searchMarketplaceWithState({ ownerKey: 'no-model-search', understoodIntent: { searchMode: 'refine', maxPrice: 45 } });
-    assert.equal(refined.listings.length, 0);
-    const fresh = await searchMarketplaceWithState({ ownerKey: 'no-model-search', query: 'ايفون 15' });
-    assert.equal(fresh.candidateCount, 4);
-    assert.equal(fresh.searchState.city, undefined);
-    const absent = await searchMarketplaceWithState({ ownerKey: 'no-model-search', query: 'exclusive-description' });
-    assert.equal(absent.candidateCount, 0);
+    const narrowed = await repository.listPublicMarketplaceListings({ query: 'ايفون 15', ...filters, maxPrice: 45 });
+    assert.equal(narrowed.length, 0);
+    const fresh = await repository.listPublicMarketplaceListings({ query: 'ايفون 15' });
+    assert.equal(fresh.length, 4);
+    const absent = await repository.listPublicMarketplaceListings({ query: 'exclusive-description' });
+    assert.equal(absent.length, 0);
     const badCategory = await GET(new Request('https://example.test/api/marketplace/listings?category=imaginary'));
     assert.equal(badCategory.status, 400);
     assert.equal(analyze.mock.callCount(), 0);

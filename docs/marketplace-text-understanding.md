@@ -29,26 +29,27 @@ or a cache shared across App Runner instances. Provider usage can incur charges.
 
 - Manual classification delegates to shared text analysis; explicit categories
   remain the seller's choice.
-- Public search and chat search consume model filters and equivalents. Matching
-  and numeric ranking remain deterministic. If analysis is unavailable, literal
-  normalized text matching is used without guessing a category or synonyms.
-- Explicit chat refinement retains model equivalents with existing search-state
-  JSON; independent searches clear previous constraints and equivalents.
+- Public market search reads literal title matches and explicit filters from the
+  database/file store only, without consulting model output or cached equivalents.
+  Hamad does not search products. The unused stateful chat search/retrieval and
+  interpretation wrappers have been removed, including their filter persistence.
 - Similar listings, comparison, pricing and similar-listing follow notifications
   use prepared semantic product identities to choose comparables. Unknown or
   low-confidence identity is not evidence of a comparable. Price calculations
   and adjustments are unchanged and never replaced with generated market data.
 - Draft creation/edits, administrative content edits and conversation messages
   use contextual policy analysis rather than forbidden-word/root matching.
-  Unavailable text inspection produces review, not an invented approval. Drafts
-  awaiting policy review cannot be published through the ordinary seller flow.
+  Model concerns, including unavailable inspection, create advisory administration
+  review signals, not automatic rejection. Existing human moderation decisions,
+  ownership checks and technical permissions remain enforced.
 - Chat can reuse a confident analyzed intent; conversation-dependent clarification
   still uses the existing contextual router when necessary. Sensitive actions
   remain user-interface-only under the server tool boundary.
 - Vision reads expected categories from prepared text context or supplied listing
   fields and receives the real category catalog. Low resolution/lighting/clarity
   and category mismatch alone are advisory, not publication conditions. Genuine
-  prohibited content remains blocked; technical image validation remains intact.
+  concerns are routed to administration review; human moderation and technical
+  image validation remain intact.
 
 The six legacy lexical modules and their dictionary-specific product tests have
 been removed. Category and policy contract tests now exercise shared-analysis
@@ -62,11 +63,12 @@ On 2026-10-18, 140 focused tests passed across eighteen test files. These are
 targeted checks of the changed paths, not a claim that the full project test
 suite or all browser journeys were run for this change.
 The production build, including TypeScript checking, and targeted ESLint also
-passed. All changes remain local and unpushed.
+passed. These figures describe the initial text-understanding change, not the
+later role restriction or retired-code cleanup; see [Hamad's current role](hamad-role.md).
 
 Focused tests exercise mocked provider transport, shared cache/in-flight reuse,
-failure/timeout handling, category validation, contextual equivalents, search
-reset/refinement, product/part separation, actual price arithmetic, image advice,
+failure/timeout handling, category validation, contextual equivalents,
+product/part separation, actual price arithmetic, image advice,
 ownership and client route lifecycle. Contextual fixtures are explicit test data,
 not a production synonym dictionary. They verify integration, not live-model
 semantic accuracy. No production database mutation, paid live evaluation or

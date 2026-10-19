@@ -89,7 +89,7 @@ async function expectHidden(panel: Locator, hidden: boolean) {
 
 async function expectCategoriesVisible(page: Page) {
   const categories = page.locator('[data-marketplace-categories]');
-  await expect(categories.getByRole('button', { name: 'الكل', exact: true })).toBeInViewport();
+  await expect(categories.locator('[data-marketplace-filter-row="groups"]').getByRole('button', { name: 'الكل', exact: true })).toBeInViewport();
   await expect.poll(async () => {
     const categoryBox = await categories.boundingBox();
     const sectionBox = await page.locator('#suggested-listings').boundingBox();
