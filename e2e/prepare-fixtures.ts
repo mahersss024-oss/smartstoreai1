@@ -14,6 +14,13 @@ for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
     description: 'Solid desk',
     city: 'الرياض',
     price: 100,
+    images: process.env.SMARTSTORE_LOAD_FIXTURES === '1' ? [{
+      id: `e2e-load-image-${project}`, listingId: `e2e-report-${project}`,
+      originalUrl: `${process.env.NEXT_PUBLIC_APP_URL}/hamad-market-logo.webp`,
+      displayUrl: `${process.env.NEXT_PUBLIC_APP_URL}/hamad-market-logo.webp`,
+      thumbnailUrl: `${process.env.NEXT_PUBLIC_APP_URL}/hamad-market-logo.webp`,
+      isPrimary: true, qualityScore: 100, status: 'approved', enhancements: [],
+    }] : [],
   });
   // This synthetic fixture has an explicit policy outcome; no live provider is used.
   listing.compliance = {

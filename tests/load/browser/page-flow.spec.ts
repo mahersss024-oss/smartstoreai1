@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { expect, test } from '@playwright/test';
+import { observePageVitals, readPageVitals } from '../../../e2e/helpers/page-vitals';
 
 type PageMetric = {
   route: string;
@@ -33,6 +34,7 @@ test.beforeAll(() => {
 
 test('page flow browser metrics', async ({ page }, testInfo) => {
   const metrics: PageMetric[] = [];
+  await observePageVitals(page);
 
   for (const route of routes) {
     const seen = new Map<string, number>();
@@ -59,22 +61,18 @@ test('page flow browser metrics', async ({ page }, testInfo) => {
     });
 
     const response = await page.goto(route, { waitUntil: 'load' });
-    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    // A fixed observation window remains bounded when realtime keeps a connection open.
+    await page.waitForTimeout(1000);
+    const vitals = await readPageVitals(page);
 
     const timing = await page.evaluate(() => {
       const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
       const paint = performance.getEntriesByType('paint');
       const fcp = paint.find((entry) => entry.name === 'first-contentful-paint');
-      const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-      const clsEntries = performance.getEntriesByType('layout-shift') as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>;
       return {
         domContentLoadedMs: navigation?.domContentLoadedEventEnd ?? 0,
         loadMs: navigation?.loadEventEnd ?? 0,
         fcpMs: fcp?.startTime ?? null,
-        lcpMs: lcpEntries.at(-1)?.startTime ?? null,
-        cls: clsEntries
-          .filter((entry) => !entry.hadRecentInput)
-          .reduce((total, entry) => total + (entry.value ?? 0), 0),
       };
     });
 
@@ -87,12 +85,15 @@ test('page flow browser metrics', async ({ page }, testInfo) => {
       apiRequests,
       transferredBytes,
       ...timing,
+      lcpMs: vitals.lcp,
+      cls: vitals.supported.includes('layout-shift') ? vitals.cls : null,
     });
 
     expect(response?.status()).toBeLessThan(500);
+    if (vitals.supported.includes('largest-contentful-paint')) expect(vitals.lcp).toBeGreaterThan(0);
   }
 
-  const outputPath = resolve(testInfo.config.rootDir, '..', 'reports', 'browser-page-flow.json');
+  const outputPath = resolve(testInfo.config.rootDir, '..', 'reports', `browser-page-flow-${testInfo.project.name}.json`);
   mkdirSync(resolve(testInfo.config.rootDir, '..', 'reports'), { recursive: true });
   writeFileSync(outputPath, JSON.stringify(metrics, null, 2));
 });

@@ -157,6 +157,8 @@ test('rearranged listing fields and user controls send their original save contr
       title: 'عنوان بعد الترتيب',
       description: 'الوصف بعد الترتيب',
       category: 'other',
+      categoryOption: null,
+      carModel: null,
       city: 'الرياض',
       condition: 'used',
       price: 100,

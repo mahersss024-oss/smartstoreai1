@@ -1,6 +1,9 @@
 import { performance } from 'node:perf_hooks';
+import { parseJsonEventStream, uiMessageChunkSchema } from 'ai';
 
 import { createSessionCookie } from '../lib/auth/session';
+import { chatServiceUnavailableMessage } from '../lib/chat-response-safety';
+import { createPlatformHelpCompletion } from './testing/platform-help-model-fixture.mjs';
 
 type DeepseekProviderModule = typeof import('../agent/deepseek-provider');
 
@@ -36,6 +39,7 @@ type RequestResult = {
   status: number;
   durationMs: number;
   body: string;
+  completedStream: boolean;
   error?: string;
 };
 
@@ -55,6 +59,7 @@ const providerMaxInFlight = Number.parseInt(
   process.env.AI_LOAD_PROVIDER_MAX_IN_FLIGHT ?? '0',
   10,
 );
+const providerStatus = Number.parseInt(process.env.AI_LOAD_PROVIDER_STATUS ?? '200', 10);
 const mode = process.env.AI_LOAD_MODE ?? 'mock';
 const realFetch = globalThis.fetch.bind(globalThis);
 const originalConsoleLog = console.log.bind(console);
@@ -63,6 +68,7 @@ let providerInFlight = 0;
 let providerRejectedCalls = 0;
 let maxProviderInFlight = 0;
 let deepseekProviderModule: DeepseekProviderModule | null = null;
+const scopeFallbackReplies = new Set<string>();
 
 process.env.SMARTSTORE_MARKETPLACE_STORE ||= 'memory';
 process.env.SMARTSTORE_DEEPSEEK_METRICS = '1';
@@ -93,39 +99,6 @@ async function getDeepseekProviderModule() {
   return deepseekProviderModule;
 }
 
-function getMockContent(body: string) {
-  if (body.includes('سوق حمد adaptive intent router')) {
-    return JSON.stringify({
-      intent: 'search_listing',
-      execution: 'search_listings',
-      confidence: 0.96,
-      reasonCode: 'load_test_search',
-      normalizedRequest: 'أبحث عن كامري في الرياض',
-      searchQuery: 'كامري الرياض',
-      requiresAuth: false,
-      requiresConfirmation: false,
-    });
-  }
-
-  if (body.includes('سوق حمد output Scope Checker')) {
-    return JSON.stringify({
-      decision: 'ALLOW',
-      confidence: 0.99,
-      reason_code: 'load_test_marketplace_answer',
-    });
-  }
-
-  if (body.includes('سوق حمد input Scope Checker')) {
-    return JSON.stringify({
-      decision: 'ALLOW',
-      confidence: 0.99,
-      reason_code: 'load_test_marketplace_request',
-    });
-  }
-
-  return 'وجدت لك نتائج مناسبة داخل سوق حمد. يمكنك تضييق البحث بالسعر أو الموديل أو المدينة.';
-}
-
 function installMockProvider() {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -136,6 +109,9 @@ function installMockProvider() {
       maxProviderInFlight = Math.max(maxProviderInFlight, providerInFlight);
 
       try {
+        if (providerStatus !== 200) {
+          return Response.json({ error: { message: 'mock provider unavailable' } }, { status: providerStatus });
+        }
         if (
           providerMaxInFlight > 0 &&
           providerInFlight > providerMaxInFlight
@@ -158,29 +134,7 @@ function installMockProvider() {
         }
 
         const body = typeof init?.body === 'string' ? init.body : '';
-        const content = getMockContent(body);
-
-        return Response.json({
-          id: `chatcmpl-load-${providerCalls}`,
-          object: 'chat.completion',
-          created: Math.floor(Date.now() / 1000),
-          model: 'smartstore-load-test',
-          choices: [
-            {
-              index: 0,
-              message: {
-                role: 'assistant',
-                content,
-              },
-              finish_reason: 'stop',
-            },
-          ],
-          usage: {
-            prompt_tokens: 20,
-            completion_tokens: 20,
-            total_tokens: 40,
-          },
-        });
+        return createPlatformHelpCompletion(body, `chatcmpl-load-${providerCalls}`);
       } finally {
         providerInFlight -= 1;
       }
@@ -190,7 +144,7 @@ function installMockProvider() {
   };
 }
 
-function buildRequest(index: number) {
+function buildRequest(index: number, signal: AbortSignal) {
   const cookie = createSessionCookie({
     id: `load-user-${index}`,
     email: `load-user-${index}@example.test`,
@@ -199,6 +153,7 @@ function buildRequest(index: number) {
 
   return new Request('http://localhost/api/chat', {
     method: 'POST',
+    signal,
     headers: {
       'content-type': 'application/json',
       cookie,
@@ -212,7 +167,7 @@ function buildRequest(index: number) {
           parts: [
             {
               type: 'text',
-              text: 'أبحث عن كامري في الرياض بسعر مناسب',
+              text: 'كيف أنشئ إعلانًا وأراجع مسودته في المنصة؟',
             },
           ],
         },
@@ -229,23 +184,49 @@ function buildRequest(index: number) {
 async function runOne(index: number): Promise<RequestResult> {
   const { POST } = await import('../app/api/chat/route');
   const start = performance.now();
+  const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    const requestPromise = POST(buildRequest(index));
-    const timeoutPromise = new Promise<Response>((_, reject) => {
+    const requestPromise = (async () => {
+      const response = await POST(buildRequest(index, controller.signal));
+      if (!response.ok || !response.body) return { response, body: await response.text(), completedStream: false };
+      const reader = parseJsonEventStream({ stream: response.body, schema: uiMessageChunkSchema }).getReader();
+      let body = '';
+      let completedStream = false;
+      let invalidStream = false;
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (!chunk.value.success) {
+          invalidStream = true;
+          continue;
+        }
+        const event = chunk.value.value;
+        if (event.type === 'text-delta') body += event.delta;
+        if (event.type === 'finish') completedStream = true;
+        if (event.type === 'error' || event.type === 'abort') invalidStream = true;
+      }
+      return { response, body, completedStream: completedStream && !invalidStream };
+    })();
+    const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        reject(new Error('RequestTimeout'));
+        controller.abort();
+        reject(new DOMException('AI load request exceeded its deadline', 'TimeoutError'));
       }, requestTimeoutMs);
     });
-    const response = await Promise.race([requestPromise, timeoutPromise]);
-    const body = await response.text();
+    const { response, body, completedStream } = await Promise.race([requestPromise, timeoutPromise]);
+    if (performance.now() - start > requestTimeoutMs) {
+      controller.abort();
+      throw new DOMException('AI load response exceeded its elapsed-time deadline', 'TimeoutError');
+    }
 
     return {
       ok: response.ok,
       status: response.status,
       durationMs: performance.now() - start,
       body,
+      completedStream,
     };
   } catch (error) {
     return {
@@ -253,6 +234,7 @@ async function runOne(index: number): Promise<RequestResult> {
       status: 0,
       durationMs: performance.now() - start,
       body: '',
+      completedStream: false,
       error: error instanceof Error ? error.name : 'UnknownError',
     };
   } finally {
@@ -294,21 +276,21 @@ function summarize(
       return false;
     }
 
-    return !result.body.includes('finish');
+    return !result.completedStream;
   };
   const bodyFailures = results.filter(isIncompleteSuccessfulResponse).length;
   const emptyBodies = results.filter(
     (result) => result.ok && !result.body.trim(),
   ).length;
-  const providerFallbackResponses = results.filter((result) =>
-    result.body.includes('تعذر إكمال الطلب الآن'),
-  ).length;
+  const isProviderFallback = (result: RequestResult) => scopeFallbackReplies.has(result.body) || result.body === chatServiceUnavailableMessage ||
+    result.body.startsWith('تعذر إكمال رد حمد الآن.') || result.body.startsWith('حُفظت مسودة إعلانك، لكن تعذر إكمال رد المساعد.');
+  const providerFallbackResponses = results.filter(isProviderFallback).length;
   const ok = results.filter(
     (result) =>
       result.ok &&
       result.body.trim() &&
       !isIncompleteSuccessfulResponse(result) &&
-      !result.body.includes('تعذر إكمال الطلب الآن'),
+      !isProviderFallback(result),
   ).length;
   const avgMs =
     durations.reduce((total, duration) => total + duration, 0) /
@@ -362,12 +344,18 @@ async function main() {
   if (mode !== 'mock' && mode !== 'real') {
     throw new Error('Use AI_LOAD_MODE=mock or AI_LOAD_MODE=real.');
   }
+  if (!levels.length) {
+    throw new Error('AI_LOAD_LEVELS must contain at least one positive concurrency level.');
+  }
 
   if (mode === 'mock') {
     installMockProvider();
   } else if (!(await getDeepseekProviderModule()).getDeepseekApiKey()) {
     throw new Error('DEEPSEEK_API_KEY is required for AI_LOAD_MODE=real.');
   }
+  const { getSafeScopeResponse } = await import('../agent/scope-guard');
+  scopeFallbackReplies.add(getSafeScopeResponse('BLOCK', 'ar'));
+  scopeFallbackReplies.add(getSafeScopeResponse('UNCLEAR', 'ar'));
 
   const summaries: LoadResult[] = [];
 
@@ -375,9 +363,14 @@ async function main() {
     const summary = await runLevel(level);
     summaries.push(summary);
     console.log(JSON.stringify(summary));
+    if (summary.failed > 0 || summary.providerCalls === 0) break;
   }
 
   console.log(JSON.stringify({ summaries }, null, 2));
+  if (summaries.some(summary => summary.failed > 0 || summary.providerCalls === 0)) {
+    console.error('AI load checks failed: every level must complete real route/provider work without failed responses.');
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {

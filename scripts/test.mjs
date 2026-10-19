@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 
 // Run the Node test runner with an isolated marketplace data directory so
 // parallel test files never race on a shared `.data/marketplace-store.json`.
@@ -51,7 +52,19 @@ loadEnvFile(resolve(process.cwd(), '.env.local'));
 const dataDir = mkdtempSync(join(tmpdir(), 'smartstore-test-data-'));
 const coverage = process.argv.includes('--coverage');
 const testTargets = process.argv.slice(2).filter(argument => argument !== '--coverage');
-const patterns = testTargets.length > 0 ? testTargets : ['tests/*.test.ts'];
+const { positionals } = parseArgs({
+  args: testTargets, strict: false, allowPositionals: true,
+  options: {
+    ...Object.fromEntries([
+      'test-concurrency', 'test-timeout', 'test-name-pattern', 'test-skip-pattern',
+      'test-reporter', 'test-reporter-destination', 'test-shard', 'experimental-test-isolation',
+      'test-coverage-branches', 'test-coverage-functions', 'test-coverage-lines',
+      'test-coverage-include', 'test-coverage-exclude', 'import',
+    ].map(name => [name, { type: 'string', multiple: true }])),
+    require: { type: 'string', multiple: true, short: 'r' },
+  },
+});
+const patterns = positionals.length > 0 ? testTargets : [...testTargets, 'tests/*.test.ts'];
 const coverageOptions = coverage ? [
   '--experimental-test-coverage',
   ...['agent/**', 'app/**', 'components/**', 'hooks/**', 'lib/**', 'public/**', 'scripts/**', 'proxy.ts', 'next.config.ts']

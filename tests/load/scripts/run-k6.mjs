@@ -13,7 +13,7 @@ if (!scenario || process.argv.includes('--help')) {
 
 const passthroughIndex = process.argv.indexOf('--');
 const passthroughArgs =
-  passthroughIndex === -1 ? [] : process.argv.slice(passthroughIndex + 1);
+  passthroughIndex === -1 ? process.argv.slice(3) : process.argv.slice(passthroughIndex + 1);
 const scenarioPath = resolve(process.cwd(), scenario);
 const reportDir = resolve(process.cwd(), 'tests/load/reports');
 mkdirSync(reportDir, { recursive: true });

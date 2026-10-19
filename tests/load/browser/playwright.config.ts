@@ -8,6 +8,7 @@ if (!baseURL) {
 
 export default defineConfig({
   testDir: '.',
+  outputDir: '../../../coverage/browser-load-artifacts',
   timeout: 60_000,
   globalTimeout: 180_000,
   retries: 0,

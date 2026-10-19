@@ -12,14 +12,14 @@ export const endpointRateLimited = new Rate('smartstore_endpoint_rate_limited');
 export const imageDuration = new Trend('smartstore_image_duration', true);
 export const imageErrors = new Rate('smartstore_image_errors');
 
-export function headers(extra = {}) {
+export function headers(extra = {}, includeSession = true) {
   const requestHeaders = {
     accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
     'user-agent': 'SmartStoreAI-k6-load/1.0',
     ...extra,
   };
 
-  if (loadEnv.sessionCookie) {
+  if (includeSession && loadEnv.sessionCookie) {
     requestHeaders.cookie = loadEnv.sessionCookie;
   }
 
@@ -46,7 +46,7 @@ export function timedGet(path, name, params = {}) {
   });
   endpointRateLimited.add(response.status === 429, { endpoint: name });
   check(response, {
-    [`${name} status < 400`]: (res) => res.status < 400,
+    [`${name} status < 400`]: (res) => res.status >= 200 && res.status < 400,
   });
 
   return response;
@@ -74,7 +74,7 @@ export function timedPost(path, name, body, params = {}) {
   });
   endpointRateLimited.add(response.status === 429, { endpoint: name });
   check(response, {
-    [`${name} status < 400`]: (res) => res.status < 400,
+    [`${name} status < 400`]: (res) => res.status >= 200 && res.status < 400,
   });
 
   return response;
@@ -85,15 +85,18 @@ export function timedImageGet(imageUrl, name) {
     timeout: '30s',
     tags: { endpoint: name, asset_type: 'image' },
     responseType: 'none',
-    headers: headers({ accept: 'image/avif,image/webp,image/*,*/*;q=0.8' }),
+    // Public listing images can be hosted outside the application origin.
+    headers: headers({ accept: 'image/avif,image/webp,image/*,*/*;q=0.8' }, false),
   });
 
+  const validImage = response.status >= 200 && response.status < 400 &&
+    /^image\//i.test(String(response.headers['Content-Type'] || ''));
   imageDuration.add(response.timings.duration, { endpoint: name });
-  imageErrors.add(response.status >= 400 || response.status === 0, {
+  imageErrors.add(!validImage, {
     endpoint: name,
   });
   check(response, {
-    [`${name} image status < 400`]: (res) => res.status < 400,
+    [`${name} returns an image`]: () => validImage,
   });
 
   return response;

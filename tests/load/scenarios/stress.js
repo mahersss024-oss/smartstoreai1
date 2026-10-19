@@ -6,9 +6,9 @@ export const options = {
     stress_read_mix: {
       executor: 'ramping-vus',
       stages: [
-        { duration: '2m', target: 50 },
-        { duration: '3m', target: 100 },
-        { duration: '3m', target: 250 },
+        { duration: '2m', target: Math.min(loadEnv.maxVus, 50) },
+        { duration: '3m', target: Math.min(loadEnv.maxVus, 100) },
+        { duration: '3m', target: Math.min(loadEnv.maxVus, 250) },
         { duration: '3m', target: Math.min(loadEnv.maxVus, 500) },
         { duration: '2m', target: 0 },
       ],
