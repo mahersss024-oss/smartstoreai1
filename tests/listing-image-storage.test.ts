@@ -22,7 +22,7 @@ import {
 import { createSessionCookie } from '@/lib/auth/session';
 import { mockImageContentReview } from './helpers/image-content';
 
-test('extracts the latest uploaded product images from prior chat context', () => {
+test('does not implicitly extract an earlier product photo from a text-only follow-up', () => {
   const messages: ModelMessage[] = [
     {
       role: 'user',
@@ -47,9 +47,10 @@ test('extracts the latest uploaded product images from prior chat context', () =
   ];
 
   const images = extractLatestUploadedListingImages(messages);
-  const image = images[0];
-
-  assert.equal(images.length, 1);
+  assert.equal(images.length, 0);
+  const currentUpload = extractLatestUploadedListingImages(messages.slice(0, 2));
+  const image = currentUpload[0];
+  assert.equal(currentUpload.length, 1);
   assert.ok(image);
   assert.equal(image.mediaType, 'image/png');
   assert.equal(image.fileName, 'chair.png');

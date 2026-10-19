@@ -24,6 +24,10 @@ for (const scenario of [
     assert.equal(review.status, scenario.status);
     assert.equal(calls(), scenario.calls);
     assert.equal(review.imageReviewStatuses.length, scenario.total);
+    if (review.compliance && !review.compliance.inspectionUnavailable) {
+      assert.deepEqual(review.compliance.imageProducts?.map(item => item.imageIndex), Array.from({ length: scenario.total }, (_, index) => index));
+      assert.ok(review.compliance.imageProducts?.every(item => item.detectedProduct === 'test product'));
+    }
     assert.ok(review.imageReviewStatuses.every(status => status === 'clear' || status === 'unclear' || status === 'unavailable'));
   });
 }
@@ -42,4 +46,13 @@ test('previous clear images do not bypass inspection of subsequently uploaded im
   assert.equal(calls(), 8);
   await reviewListingImageContent([{ data: new Uint8Array([99]), mediaType: 'image/png' }], previous(['clear']));
   assert.equal(calls(), 9, 'changed image bytes must be inspected again');
+});
+
+test('attaching separate photo subsets reuses each existing image assessment without repeating model calls', async t => {
+  const calls = mockImageContentReview(t, 'allow');
+  await reviewListingImageContent(images);
+  assert.equal(calls(), 8);
+  await reviewListingImageContent(images.slice(0, 3));
+  await reviewListingImageContent(images.slice(3));
+  assert.equal(calls(), 8);
 });

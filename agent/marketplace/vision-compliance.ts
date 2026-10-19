@@ -155,6 +155,7 @@ const imageComplianceSchema = z.preprocess((value) => {
 }));
 
 export type ImageComplianceDecision = {
+  imageProducts?: { imageIndex: number; detectedProduct?: string; detectedCategory?: string }[];
   imageReviewStatuses?: ImageContentReviewStatus[];
   inspectionUnavailable?: boolean;
   decision: 'allow' | 'block' | 'needs_review';
@@ -723,7 +724,10 @@ export async function checkImageMarketplaceCompliance({
     );
   }
 
-  const decision = aggregateImageComplianceDecisions(decisions);
+  const decision = {
+    ...aggregateImageComplianceDecisions(decisions),
+    imageProducts: decisions.map((item, imageIndex) => ({ imageIndex, detectedProduct: item.detectedProduct, detectedCategory: item.detectedCategory })),
+  };
 
   if (reviewMode !== 'primary_only') {
     return decision;

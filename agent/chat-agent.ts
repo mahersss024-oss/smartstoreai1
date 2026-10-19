@@ -9,12 +9,14 @@ import type { UploadedListingImage } from './marketplace/listing-image-storage';
 import { marketplaceSystemInstructions } from './marketplace/agents';
 import { systemPrompt } from './system-prompt';
 import { customerLanguage, customerLanguageInstructions } from '@/lib/customer-language';
+import type { AssistantSearchToolResult } from '@/lib/chat-tool-results';
 
 export function createChatAgent(
   session: AuthSession | null,
   options: {
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
+    imageSourceMessageId?: string;
     searchOwnerKey?: string;
     language?: AppLanguage;
     additionalInstructions?: string;
@@ -22,6 +24,7 @@ export function createChatAgent(
     answerOnly?: boolean;
     requestKey?: string;
     onDraftSaved?: (listingId: string) => void;
+    onSearchCompleted?: (result: AssistantSearchToolResult) => void;
   } = {},
 ) {
   return new ToolLoopAgent({
@@ -36,10 +39,12 @@ export function createChatAgent(
     tools: {
       ...(options.answerOnly ? {} : (options.readOnly ? createReadOnlyMarketplaceTools : createMarketplaceTools)(session, {
         latestUploadedImages: options.latestUploadedImages,
+        imageSourceMessageId: options.imageSourceMessageId,
         searchOwnerKey: options.searchOwnerKey,
         language: customerLanguage,
         requestKey: options.requestKey,
         onDraftSaved: options.onDraftSaved,
+        onSearchCompleted: options.onSearchCompleted,
       })),
     },
   });

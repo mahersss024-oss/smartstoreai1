@@ -1,5 +1,5 @@
 import type { UploadedListingImage } from './listing-image-storage';
-import { checkImageMarketplaceCompliance } from './vision-compliance';
+import { aggregateImageComplianceDecisions, checkImageMarketplaceCompliance } from './vision-compliance';
 import type { ListingImage, ImageContentReviewStatus } from './types';
 import { modelReviewImageFingerprint, recordModelReview } from '@/lib/admin/model-review';
 import { getDeepseekModelName } from '@/agent/deepseek-provider';
@@ -10,8 +10,8 @@ const pending = new Map<string, Promise<ImageAssessment>>();
 
 export function resetImageContentReviewCacheForTests() { cache.clear(); }
 
-async function inspectImages(images: UploadedListingImage[]): Promise<ImageAssessment> {
-  const key = `content-v2:${getDeepseekModelName('vision')}:${modelReviewImageFingerprint(images.map(image => image.data))}`;
+async function inspectImage(image: UploadedListingImage): Promise<ImageAssessment> {
+  const key = `content-v3:${getDeepseekModelName('vision')}:${image.mediaType}:${modelReviewImageFingerprint([image.data])}`;
   const existing = cache.get(key);
   if (existing && existing.expiresAt > Date.now()) return existing.value;
   if (pending.has(key)) return pending.get(key)!;
@@ -20,7 +20,7 @@ async function inspectImages(images: UploadedListingImage[]): Promise<ImageAsses
     let value: ImageAssessment = null;
     try {
       value = await checkImageMarketplaceCompliance({
-        messages: [{ role: 'user', content: images.map(image => ({ type: 'file' as const, mediaType: image.mediaType, data: image.data })) }],
+        messages: [{ role: 'user', content: [{ type: 'file' as const, mediaType: image.mediaType, data: image.data }] }],
         userRequest: 'Describe the actual product and assess content policy. Quality and category matching never restrict acceptance.',
         language: 'ar', reviewMode: 'all_images', prohibitedOnly: false,
       });
@@ -33,6 +33,19 @@ async function inspectImages(images: UploadedListingImage[]): Promise<ImageAsses
   })();
   pending.set(key, task);
   try { return await task; } finally { pending.delete(key); }
+}
+
+async function inspectImages(images: UploadedListingImage[]): Promise<ImageAssessment> {
+  const decisions: NonNullable<ImageAssessment>[] = [];
+  for (const image of images) {
+    const decision = await inspectImage(image);
+    if (!decision || decision.inspectionUnavailable) return null;
+    decisions.push(decision);
+  }
+  return {
+    ...aggregateImageComplianceDecisions(decisions),
+    imageProducts: decisions.map((decision, imageIndex) => ({ imageIndex, detectedProduct: decision.detectedProduct, detectedCategory: decision.detectedCategory })),
+  };
 }
 
 export async function reviewListingImageContent(images: UploadedListingImage[], existingImages: ListingImage[] = [], context?: { listingId: string; userId: string }) {

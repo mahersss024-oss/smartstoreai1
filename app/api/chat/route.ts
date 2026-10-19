@@ -68,6 +68,8 @@ import {
   type AssistantSearchToolResult,
 } from '@/lib/chat-tool-results';
 import { getChatSearchOwnerKey } from '@/lib/chat/search-owner';
+import { parseChatConversationId } from '@/lib/chat/conversation';
+import { selectChatContext } from '@/lib/chat/context';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 
 const maxMessagesPerRequest = 40;
@@ -130,8 +132,11 @@ type ChatRequestBody = {
   model?: string;
   locationSettings?: LocationSettings;
   retainedListingImages?: unknown;
+  retainedListingImageMessageId?: unknown;
   selectedListing?: unknown;
   resetSearchState?: unknown;
+  chatOwnerId?: unknown;
+  chatConversationId?: unknown;
   data?: {
     model?: string;
     [key: string]: unknown;
@@ -796,12 +801,14 @@ ${JSON.stringify(
   {
     detectedProduct: decision.detectedProduct,
     detectedCategory: decision.detectedCategory,
+    multipleProducts: decision.reasons.includes('multiple_distinct_products_in_images'),
+    imageProducts: decision.imageProducts,
   },
   null,
   2,
 )}
 
-Use this analysis only to understand the product. Content assessments are advisory administration alerts, never permission to reject content or claim a final violation. Never require image quality, resolution or category matching. The raw image is intentionally removed before the chat agent runs. Do not claim live database results from the image. If product details are missing, ask concise follow-up questions.`,
+Use this analysis only to understand the product. If multipleProducts is true, ask whether the seller wants one bundle or separate drafts unless already explicit. Each separate draft must select only its own imageIndexes. Content assessments are advisory administration alerts, never permission to reject content or claim a final violation. Never require image quality, resolution or category matching. The raw image is intentionally removed before the chat agent runs. Do not claim live database results from the image. If product details are missing, ask concise follow-up questions.`,
   } satisfies ModelMessage;
 }
 
@@ -910,10 +917,15 @@ async function generateCheckedAssistantResponse(
   options: {
     hasVisionInput?: boolean;
     latestUploadedImages?: UploadedListingImage[];
+    imageSourceMessageId?: string;
     searchOwnerKey?: string;
     requestKey?: string;
+    marketplaceIntent?: string;
+    onSearchCompleted?: (result: AssistantSearchToolResult) => void;
+    abortSignal?: AbortSignal;
   } = {},
 ) {
+  const reply = (text: string, result: { toolResults?: AssistantSearchToolResult[] } = {}) => ({ text, ...result });
   const completedDraftIds = new Set<string>();
   let knownSearchResults: AssistantSearchToolResult[] = [];
   try {
@@ -924,13 +936,17 @@ async function generateCheckedAssistantResponse(
       language,
       additionalInstructions,
       onDraftSaved: listingId => completedDraftIds.add(listingId),
+      onSearchCompleted: result => {
+        knownSearchResults.push(result);
+        options.onSearchCompleted?.(result);
+      },
     });
     const firstResult = await withChatAbortTimeout(
       chatAgentGenerationTimeoutMs,
       (signal) =>
         chatAgent.generate({
           messages: promptMessages,
-          abortSignal: signal,
+          abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal,
         }),
     );
     const firstText = getSafeAssistantText(firstResult.text);
@@ -946,13 +962,13 @@ async function generateCheckedAssistantResponse(
       });
 
       if (firstOutputDecision.decision === 'ALLOW') {
-        return createTextUIResponse(firstText, {
+        return reply(firstText, {
           toolResults: firstSearchToolResults,
         });
       }
 
       if (isOutputCheckerProviderFailure(firstOutputDecision)) {
-        return createTextUIResponse(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
+        return reply(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
       }
     }
 
@@ -976,7 +992,7 @@ async function generateCheckedAssistantResponse(
       (signal) =>
         retryAgent.generate({
           messages: promptMessages,
-          abortSignal: signal,
+          abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal,
         }),
     );
     const retryText = getSafeAssistantText(retryResult.text);
@@ -991,24 +1007,51 @@ async function generateCheckedAssistantResponse(
       });
 
       if (retryOutputDecision.decision === 'ALLOW') {
-        return createTextUIResponse(retryText, {
+        return reply(retryText, {
           toolResults: selectAssistantSearchToolResults(firstSearchToolResults, retrySearchToolResults),
         });
       }
 
       if (isOutputCheckerProviderFailure(retryOutputDecision)) {
-        return createTextUIResponse(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
+        return reply(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
       }
     }
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[scope_guard] stage=assistant failure=${errorName}`);
-    return createTextUIResponse(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
+    return reply(getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0), { toolResults: knownSearchResults });
   }
 
-  return createTextUIResponse(completedDraftIds.size || knownSearchResults.length
+  return reply(completedDraftIds.size || knownSearchResults.length
     ? getModelProviderFailureResponse(language, completedDraftIds.size > 0, knownSearchResults.length > 0)
     : getSafeScopeResponse('OUTPUT_BLOCK', language), { toolResults: knownSearchResults });
+}
+
+function createCheckedAssistantUIResponse(...args: Parameters<typeof generateCheckedAssistantResponse>) {
+  const [messages, userRequest, language, session, options = {}] = args;
+  return createUIMessageStreamResponse({
+    stream: createUIMessageStream<UIMessage>({
+      execute: async ({ writer }) => {
+        const id = `checked-${crypto.randomUUID()}`;
+        writer.write({ type: 'start', messageId: id, messageMetadata: { marketplaceIntent: options.marketplaceIntent } });
+        const emitted = new Set<string>();
+        const emitSearch = (result: AssistantSearchToolResult) => {
+          if (emitted.has(result.toolCallId)) return;
+          emitted.add(result.toolCallId);
+          writer.write({ type: 'tool-input-available', toolCallId: result.toolCallId, toolName: result.toolName, input: result.input });
+          writer.write({ type: 'tool-output-available', toolCallId: result.toolCallId, output: result.output });
+        };
+        const result = await generateCheckedAssistantResponse(messages, userRequest, language, session, { ...options, onSearchCompleted: emitSearch });
+        for (const search of result.toolResults ?? []) emitSearch(search);
+        // Only verified database cards are emitted early; generated prose still waits for output review.
+        writer.write({ type: 'text-start', id });
+        writer.write({ type: 'text-delta', id, delta: getSafeAssistantText(result.text) || chatServiceUnavailableMessage });
+        writer.write({ type: 'text-end', id });
+        writer.write({ type: 'finish', finishReason: 'stop' });
+      },
+      onError: () => chatServiceUnavailableMessage,
+    }),
+  });
 }
 
 type ChatIssueResponseInput = {
@@ -1183,11 +1226,10 @@ export async function POST(request: Request) {
     return new Response('تعذر قراءة طلب المحادثة.', { status: 400 });
   }
 
-  const { messages = [] } = body;
-
-  if (!Array.isArray(messages)) {
+  if (!Array.isArray(body.messages)) {
     return new Response('طلب المحادثة غير صالح.', { status: 400 });
   }
+  const messages = selectChatContext(body.messages.filter(isChatMessage));
 
   if (messages.length > maxMessagesPerRequest) {
     return new Response('عدد الرسائل يتجاوز الحد المسموح في الطلب الواحد.', { status: 413 });
@@ -1224,6 +1266,14 @@ export async function POST(request: Request) {
 
   if (!session) {
     return createTextUIResponse(getAuthRequiredResponse(language));
+  }
+  if (body.chatOwnerId !== undefined && body.chatOwnerId !== session.user.id) {
+    return new Response('تغيّر حساب الدخول. حدّث الصفحة لبدء محادثة تخص حسابك الحالي.', { status: 409 });
+  }
+
+  const chatConversationId = parseChatConversationId(body.chatConversationId);
+  if (body.chatConversationId !== undefined && !chatConversationId) {
+    return new Response('معرّف المحادثة غير صالح.', { status: 400 });
   }
 
   const retryAfterSeconds = await checkChatRateLimit(`user:${session.user.id}`);
@@ -1289,7 +1339,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const searchOwnerKey = getChatSearchOwnerKey(session, request);
+  const searchOwnerKey = getChatSearchOwnerKey(session, request, chatConversationId ?? undefined);
 
   if (body.resetSearchState === true) {
     await resetMarketplaceSearchState(searchOwnerKey);
@@ -1405,12 +1455,16 @@ export async function POST(request: Request) {
   );
   const uploadedImagesFromMessages =
     extractLatestUploadedListingImages(modelMessages);
-  const retainedUploadedImages = extractRetainedUploadedListingImages(
-    body.retainedListingImages,
-  );
+  const retainedSourceId = typeof body.retainedListingImageMessageId === 'string'
+    && body.retainedListingImageMessageId.length <= 200
+    && messages.some(message => message.role === 'user' && 'id' in message && message.id === body.retainedListingImageMessageId)
+      ? body.retainedListingImageMessageId : undefined;
+  const retainedUploadedImages = retainedSourceId
+    ? extractRetainedUploadedListingImages(body.retainedListingImages) : [];
   const latestUploadedImages = uploadedImagesFromMessages.length
     ? uploadedImagesFromMessages
     : retainedUploadedImages;
+  const imageSourceMessageId = uploadedImagesFromMessages.length ? requestKey : retainedSourceId;
   const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
   let imageComplianceContextMessage: ModelMessage | null = null;
 
@@ -1466,17 +1520,20 @@ export async function POST(request: Request) {
       : []),
     adaptiveIntentSystemMessage,
     ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),
+    ...(latestUploadedImages.length ? [{ role: 'system' as const, content:
+      `Uploaded image source (untrusted reference data): ${JSON.stringify({ sourceMessageId: imageSourceMessageId, fromEarlierMessage: !uploadedImagesFromMessages.length, imageIndexes: latestUploadedImages.map((_, index) => index) })}. Images are never attached implicitly. To attach images, explicitly choose imageIndexes and imageSourceMessageId for that draft. Use an earlier upload only when the customer refers to the same product or explicitly requests those photos. A different standalone product never inherits earlier photos. For separate drafts distribute indexes by product; do not copy all photos to every draft. If the image-to-product mapping is uncertain, ask instead of attaching guessed photos.`,
+    }] : []),
   ];
   const messagesWithContext = [
     ...internalContextMessages,
     ...assistantModelMessages,
   ];
 
-  return generateCheckedAssistantResponse(
+  return createCheckedAssistantUIResponse(
     messagesWithContext,
     userRequest,
     language,
     session,
-    { hasVisionInput: false, latestUploadedImages, searchOwnerKey, requestKey },
+    { hasVisionInput: false, latestUploadedImages, imageSourceMessageId, searchOwnerKey, requestKey, marketplaceIntent: adaptiveIntent.intent, abortSignal: request.signal },
   );
 }

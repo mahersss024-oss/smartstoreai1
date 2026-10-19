@@ -94,6 +94,9 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { Button } from '@ui/button';
 import { cn } from '@/lib/utils';
 import { isAssistantSearchToolOutput } from '@/lib/chat-tool-results';
+import { createChatImageContext, type RetainedChatImage } from '@/lib/chat/image-context';
+import { scopeChatSearchOwnerKey } from '@/lib/chat/conversation';
+import { clearChatSessionState, readChatSessionState, writeChatSessionState } from '@/lib/chat/session-state';
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
 
 const CommissionAgreementDialog = dynamic(
@@ -170,46 +173,28 @@ type ListingsResponsePayload = {
   };
 };
 
-type ClientIntentKind =
-  | 'general_info'
-  | 'search_listing'
-  | 'create_listing'
-  | 'open_conversation'
-  | 'compare_listings'
-  | 'image_review';
-
-type ClientIntentState = {
-  kind: ClientIntentKind;
-  label: string;
-};
-
 type AssistantState = 'expanded' | 'collapsed';
 
-type RetainedListingImage = Pick<
-  FileUIPart,
-  'type' | 'url' | 'mediaType' | 'filename'
->;
-
 type HomeAssistantRuntimeState = {
+  conversationId: string;
   messages: UIMessage[];
   activeListingQuery: string;
   selectedListingContext: SelectedListingContext | null;
-  retainedListingImages: RetainedListingImage[];
+  retainedListingImages: RetainedChatImage[];
+  retainedListingImageMessageId: string | null;
   shouldResetSearchState: boolean;
 };
 
-let homeAssistantRuntimeState: HomeAssistantRuntimeState | null = null;
-
-function readHomeAssistantRuntimeState() {
-  return homeAssistantRuntimeState;
+function readHomeAssistantRuntimeState(ownerId: string | null) {
+  return readChatSessionState<HomeAssistantRuntimeState>(ownerId);
 }
 
-function writeHomeAssistantRuntimeState(state: HomeAssistantRuntimeState) {
-  homeAssistantRuntimeState = state;
+function writeHomeAssistantRuntimeState(ownerId: string | null, state: HomeAssistantRuntimeState) {
+  writeChatSessionState(ownerId, state);
 }
 
 function clearHomeAssistantRuntimeState() {
-  homeAssistantRuntimeState = null;
+  clearChatSessionState();
 }
 
 async function prepareUploadableImageFilesOnDemand(files: File[]) {
@@ -231,6 +216,8 @@ const chatNetworkErrorMessage =
   'تعذر تحميل رد المساعد. تأكد من الاتصال ثم أعد إرسال الطلب.';
 const chatSessionExpiredMessage =
   'انتهت صلاحية جلسة الدخول. يرجى تسجيل الدخول من جديد ثم إعادة المحاولة.';
+const chatAccountChangedMessage =
+  'تغيّر حساب الدخول. حدّث الصفحة لبدء محادثة تخص حسابك الحالي.';
 const locationSettings: LocationSettings = {
   country: 'SA',
   currency: 'SAR',
@@ -619,151 +606,6 @@ const starters = [
   'افحص صور الإعلان',
 ];
 
-const defaultClientIntent: ClientIntentState = {
-  kind: 'general_info',
-  label: 'بانتظار طلب العميل',
-};
-
-function inferClientIntent(text: string, hasFiles = false): ClientIntentState {
-  const normalized = text.trim().toLowerCase();
-
-  if (hasFiles || /صور|صورة|ارفق|رفع|افحص|وضوح|دقة|طمس|تحسين/.test(normalized)) {
-    return {
-      kind: 'image_review',
-      label: 'فحص صور إعلان',
-    };
-  }
-
-  if (/بيع|اعلان|إعلان|انشر|اعرض|لدي|عندي/.test(normalized)) {
-    return {
-      kind: 'create_listing',
-      label: 'إنشاء إعلان بيع',
-    };
-  }
-
-  if (/تواصل|كلم|راسل|محادثة|البائع|المشتري/.test(normalized)) {
-    return {
-      kind: 'open_conversation',
-      label: 'فتح تواصل داخلي',
-    };
-  }
-
-  if (/قارن|مقارنة|افضل|أفضل|اختار|اختر|انصح/.test(normalized)) {
-    return {
-      kind: 'compare_listings',
-      label: 'مقارنة واختيار',
-    };
-  }
-
-  if (/ابحث|أبحث|احتاج|ابي|أبي|اريد|أريد|دور|وين|سعر/.test(normalized)) {
-    return {
-      kind: 'search_listing',
-      label: 'بحث عن منتج',
-    };
-  }
-
-  return defaultClientIntent;
-}
-
-function shouldRefreshListingsForIntent(intent: ClientIntentState) {
-  return intent.kind === 'search_listing' || intent.kind === 'compare_listings';
-}
-
-function isSearchRefinement(text: string) {
-  const normalized = text.trim().toLowerCase();
-
-  if (!normalized || normalized.length > 60) {
-    return false;
-  }
-
-  return (
-    /^(?:19|20)\d{2}$/.test(normalized) ||
-    /^[\d٠-٩\s,.٬]+(?:ر\.?س|ريال|sar)?$/i.test(normalized) ||
-    /(?:ميزانية|ميزانيه|ميزانيتي|حدي|بحدود|حدود|تحت|اقل|أقل|اكثر|أكثر|اكبر|أكبر|فوق|حتى|الف|ألف|ريال|ر\.?س|sar)/i.test(
-      normalized,
-    ) ||
-    /(?:لون|ابيض|أبيض|اسود|أسود|فضي|رمادي|ازرق|أزرق|احمر|أحمر|ذهبي|بيج|قير|اوتوماتيك|أوتوماتيك|عادي|ممشى|عداد|كيلو|كم|فل كامل|ستاندر|نص فل|بدون حوادث|مالك اول|مالك أول)/i.test(
-      normalized,
-    ) ||
-    /(?:تويوتا|تايوتا|كامري|كورولا|يارس|نيسان|هوندا|هيونداي|كيا|مازدا|لكزس|مرسيدس|الرياض|جدة|جده|الدمام|الخبر|مستعمل|مستعملة|جديد|جديدة|سيدان|هايبرد|بنزين|toyota|camry|corolla|nissan|honda|hyundai|kia|mazda|lexus|mercedes|riyadh|jeddah|used|new|sedan|hybrid)/i.test(
-      normalized,
-    )
-  );
-}
-
-function getNextListingQuery(
-  text: string,
-  activeQuery: string,
-  intent: ClientIntentState,
-) {
-  if (shouldRefreshListingsForIntent(intent)) {
-    return text;
-  }
-
-  if (activeQuery && isSearchRefinement(text)) {
-    return `${activeQuery} ${text}`.trim();
-  }
-
-  return '';
-}
-
-function isRetainableListingImage(file: unknown): file is FileUIPart {
-  return (
-    isRecord(file) &&
-    file.type === 'file' &&
-    typeof file.url === 'string' &&
-    typeof file.mediaType === 'string' &&
-    file.mediaType.startsWith('image/')
-  );
-}
-
-function toRetainedListingImages(files: unknown) {
-  if (!Array.isArray(files)) {
-    return [];
-  }
-
-  return files.filter(isRetainableListingImage).slice(0, 8).map((file) => ({
-    type: 'file' as const,
-    url: file.url,
-    mediaType: file.mediaType,
-    filename: file.filename,
-  }));
-}
-
-function shouldSendRetainedListingImages({
-  activeListingQuery,
-  hasCurrentImages,
-  intent,
-  retainedImages,
-  text,
-}: {
-  activeListingQuery: string;
-  hasCurrentImages: boolean;
-  intent: ClientIntentState;
-  retainedImages: RetainedListingImage[];
-  text: string;
-}) {
-  if (retainedImages.length === 0) {
-    return false;
-  }
-
-  if (hasCurrentImages) {
-    return true;
-  }
-
-  if (intent.kind === 'create_listing' || intent.kind === 'image_review') {
-    return true;
-  }
-
-  if (activeListingQuery) {
-    return false;
-  }
-
-  return /(?:نعم|ايه|اعتمد|انشر|نشر|موافق|اوك|تمام|اكمل|جاهز|yes|ok|publish|approve)/i.test(
-    text,
-  );
-}
-
 function getDurableImageUrls(...urls: Array<string | undefined>) {
   return urls.filter((url, index, list): url is string => {
     return (
@@ -982,11 +824,12 @@ function clearStoredChatState() {
   }
 }
 
-async function resetAssistantSearchState() {
+async function resetAssistantSearchState(conversationId: string, ownerId: string | null) {
   await fetch('/api/chat/reset', {
     cache: 'no-store',
     credentials: 'include',
     method: 'POST',
+    headers: { 'x-chat-conversation-id': conversationId, ...(ownerId ? { 'x-chat-owner-id': ownerId } : {}) },
   });
 }
 
@@ -1011,16 +854,6 @@ function openRetainedListingImagesDatabase() {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
-}
-
-async function readRetainedListingImages() {
-  await clearRetainedListingImages();
-  return [];
-}
-
-async function writeRetainedListingImages(images: RetainedListingImage[]) {
-  void images;
-  await clearRetainedListingImages();
 }
 
 async function clearRetainedListingImages() {
@@ -1877,6 +1710,7 @@ function getChatErrorMessage(error: Error | undefined) {
   if (error.message === chatSessionExpiredMessage) {
     return chatSessionExpiredMessage;
   }
+  if (error.message === chatAccountChangedMessage) return chatAccountChangedMessage;
 
   return chatServiceUnavailableMessage;
 }
@@ -1926,6 +1760,7 @@ const guardedChatFetch: typeof fetch = async (input, init) => {
     if (response.status === 401 || response.status === 403) {
       throw new Error(chatSessionExpiredMessage);
     }
+    if (response.status === 409) throw new Error(chatAccountChangedMessage);
 
     throw new Error(chatServiceUnavailableMessage);
   }
@@ -1945,19 +1780,24 @@ export default function Page() {
   useAppBridge();
   const pathname = usePathname();
   const router = useRouter();
+  const { session, isSessionLoading } = useAuthSession();
+  const chatOwnerId = session.authenticated ? session.user?.id ?? null : null;
+  const chatImages = useMemo(() => createChatImageContext(chatOwnerId), [chatOwnerId]);
   const chatTransport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
         credentials: 'include',
         fetch: guardedChatFetch,
+        prepareSendMessagesRequest: chatImages.prepareRequest,
       }),
-    [],
+    [chatImages],
   );
-  const { messages, sendMessage, status, error, setMessages } = useChat({
+  const { messages, sendMessage, status, error, setMessages, stop } = useChat({
+    id: `hamad:${chatOwnerId ?? 'signed-out'}`,
     transport: chatTransport,
   });
-  const { session } = useAuthSession();
+  useEffect(() => () => { void stop(); }, [stop]);
   const [marketplaceListings, setMarketplaceListings] =
     useState<ListingCard[]>(featuredListings);
   const [selectedMarketCategoryGroup, setSelectedMarketCategoryGroup] =
@@ -2064,7 +1904,8 @@ export default function Page() {
   const [activeListingQuery, setActiveListingQuery] = useState('');
   const [selectedListingContext, setSelectedListingContext] =
     useState<SelectedListingContext | null>(null);
-  const [hasRestoredChat, setHasRestoredChat] = useState(false);
+  const [restoredChatOwnerId, setRestoredChatOwnerId] = useState<string | null>();
+  const hasRestoredChat = !isSessionLoading && restoredChatOwnerId === chatOwnerId;
   const [assistantState, setAssistantState] =
     useState<AssistantState>('collapsed');
   const [isMobileChatViewOpen, setIsMobileChatViewOpen] = useState(false);
@@ -2077,8 +1918,8 @@ export default function Page() {
     useState<AssistantBubblePosition | null>(null);
   const [hasAssistantBubbleAttention, setHasAssistantBubbleAttention] =
     useState(false);
-  const retainedListingImagesRef = useRef<RetainedListingImage[]>([]);
   const lastSyncedAssistantMessageIdRef = useRef<string | null>(null);
+  const lastActivatedSearchMessageIdRef = useRef<string | null>(null);
   const assistantDragStartYRef = useRef<number | null>(null);
   const assistantBubbleDragRef = useRef<AssistantBubbleDragState | null>(null);
   const assistantBubbleRef = useRef<HTMLButtonElement | null>(null);
@@ -2204,12 +2045,9 @@ export default function Page() {
       ? null
       : manualListingImagePreviewUrls[manualListingImagePreviewIndex] ?? null;
   const shouldResetSearchStateRef = useRef(true);
-  const [clientIntent, setClientIntent] =
-    useState<ClientIntentState>(defaultClientIntent);
-
   const filteredMessages = useMemo(
-    () => messages.filter((message) => message.role !== 'system'),
-    [messages],
+    () => hasRestoredChat ? messages.filter((message) => message.role !== 'system') : [],
+    [hasRestoredChat, messages],
   );
   const latestAssistantMessageId = useMemo(
     () =>
@@ -2247,6 +2085,21 @@ export default function Page() {
     () => getLatestSearchToolOutput(filteredMessages),
     [filteredMessages],
   );
+  const latestAssistantIndex = filteredMessages.findLastIndex(message => message.role === 'assistant');
+  const latestAssistantMetadata = latestAssistantIndex > filteredMessages.findLastIndex(message => message.role === 'user')
+    ? filteredMessages[latestAssistantIndex]?.metadata : undefined;
+  const assistantIntent = isRecord(latestAssistantMetadata) ? latestAssistantMetadata.marketplaceIntent : undefined;
+  useEffect(() => {
+    if (latestSearchToolOutput) {
+      if (lastActivatedSearchMessageIdRef.current === latestAssistantMessageId) return;
+      lastActivatedSearchMessageIdRef.current = latestAssistantMessageId;
+      const latestUser = filteredMessages.findLast(message => message.role === 'user');
+      const label = latestUser?.parts.filter(part => part.type === 'text').map(part => part.text).join(' ') || 'نتائج البحث';
+      queueMicrotask(() => setActiveListingQuery(label));
+    } else if (assistantIntent === 'create_listing' || assistantIntent === 'update_listing') {
+      queueMicrotask(() => setActiveListingQuery(''));
+    }
+  }, [latestSearchToolOutput, latestAssistantMessageId, assistantIntent, filteredMessages]);
   const retainedSearchToolOutput = useMemo(
     () =>
       getLatestSearchToolOutput(filteredMessages, {
@@ -2255,9 +2108,8 @@ export default function Page() {
     [filteredMessages],
   );
   const hasActiveAssistantSearch = Boolean(activeListingQuery);
-  const visibleSearchToolOutput =
-    latestSearchToolOutput ??
-    (hasActiveAssistantSearch ? retainedSearchToolOutput : null);
+  const visibleSearchToolOutput = hasRestoredChat && hasActiveAssistantSearch
+    ? latestSearchToolOutput ?? retainedSearchToolOutput : null;
   const searchToolListings = useMemo(() => {
     if (!visibleSearchToolOutput) {
       return [];
@@ -3267,11 +3119,13 @@ export default function Page() {
   }, [collapseAssistant]);
 
   useEffect(() => {
+    if (isSessionLoading) return;
     let cancelled = false;
-    const restoredChatState = readHomeAssistantRuntimeState();
+    const restoredChatState = readHomeAssistantRuntimeState(chatOwnerId);
 
     if (restoredChatState) {
-      retainedListingImagesRef.current = restoredChatState.retainedListingImages;
+      chatImages.restore(restoredChatState.retainedListingImages, restoredChatState.retainedListingImageMessageId, restoredChatState.conversationId);
+      lastActivatedSearchMessageIdRef.current = restoredChatState.messages.findLast(message => message.role === 'assistant')?.id ?? null;
       shouldResetSearchStateRef.current = restoredChatState.shouldResetSearchState;
 
       queueMicrotask(() => {
@@ -3282,7 +3136,7 @@ export default function Page() {
         setMessages(restoredChatState.messages);
         setActiveListingQuery(restoredChatState.activeListingQuery);
         setSelectedListingContext(restoredChatState.selectedListingContext);
-        setHasRestoredChat(true);
+        setRestoredChatOwnerId(chatOwnerId);
       });
 
       return () => {
@@ -3291,7 +3145,9 @@ export default function Page() {
     }
 
     clearStaleStoredChatState();
-    retainedListingImagesRef.current = [];
+    chatImages.clear();
+    lastActivatedSearchMessageIdRef.current = null;
+    handledListingAssistantRef.current = null;
     shouldResetSearchStateRef.current = true;
     void clearRetainedListingImages().catch(() => {});
 
@@ -3310,48 +3166,36 @@ export default function Page() {
         return;
       }
 
-      setHasRestoredChat(true);
+      setRestoredChatOwnerId(chatOwnerId);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [setMessages]);
+  }, [chatImages, chatOwnerId, isSessionLoading, setMessages]);
 
   useEffect(() => {
     if (!hasRestoredChat) {
       return;
     }
 
-    writeHomeAssistantRuntimeState({
+    writeHomeAssistantRuntimeState(chatOwnerId, {
+      conversationId: chatImages.snapshot().conversationId,
       messages,
       activeListingQuery,
       selectedListingContext,
-      retainedListingImages: retainedListingImagesRef.current,
+      retainedListingImages: chatImages.snapshot().images,
+      retainedListingImageMessageId: chatImages.snapshot().sourceMessageId,
       shouldResetSearchState: shouldResetSearchStateRef.current,
     });
   }, [
     activeListingQuery,
+    chatImages,
+    chatOwnerId,
     hasRestoredChat,
     messages,
     selectedListingContext,
   ]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void readRetainedListingImages()
-      .then((images) => {
-        if (!cancelled && images.length) {
-          retainedListingImagesRef.current = images;
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -3428,7 +3272,7 @@ export default function Page() {
 
         const userId = session.user?.id;
 
-        if (!userId || event.payload.ownerKey !== `user:${userId}`) {
+        if (!userId || event.payload.ownerKey !== scopeChatSearchOwnerKey(`user:${userId}`, chatImages.snapshot().conversationId)) {
           return;
         }
 
@@ -3473,55 +3317,17 @@ export default function Page() {
 
       const text = hasText && 'text' in message ? message.text : '';
       const files = hasFiles && 'files' in message ? message.files : undefined;
-      const currentListingImages = toRetainedListingImages(files);
-
-      const intent = inferClientIntent(text, Boolean(files));
-      setClientIntent(intent);
-      if (intent.kind === 'create_listing') {
-        setIsManualListingFallbackDismissed(false);
-      }
-
-      if (currentListingImages.length) {
-        retainedListingImagesRef.current = currentListingImages;
-        void writeRetainedListingImages(currentListingImages).catch(() => {});
-      }
+      setIsManualListingFallbackDismissed(false);
 
       const resetSearchState =
         shouldResetSearchStateRef.current || filteredMessages.length === 0;
       shouldResetSearchStateRef.current = false;
-
-      const nextListingQuery = getNextListingQuery(
-        text,
-        activeListingQuery,
-        intent,
-      );
-
-      if (nextListingQuery) {
-        setActiveListingQuery(nextListingQuery);
-      } else if (
-        intent.kind === 'create_listing' ||
-        intent.kind === 'open_conversation' ||
-        intent.kind === 'image_review'
-      ) {
-        setActiveListingQuery('');
-      }
-
-      const retainedListingImages = shouldSendRetainedListingImages({
-        activeListingQuery,
-        hasCurrentImages: currentListingImages.length > 0,
-        intent,
-        retainedImages: retainedListingImagesRef.current,
-        text,
-      })
-        ? retainedListingImagesRef.current
-        : [];
 
       void sendMessage(
         { text, files },
         {
           body: {
             locationSettings,
-            retainedListingImages,
             resetSearchState,
             selectedListing: selectedListingContext,
           },
@@ -3529,7 +3335,6 @@ export default function Page() {
       );
     },
     [
-      activeListingQuery,
       hasRestoredChat,
       selectedListingContext,
       sendMessage,
@@ -3552,11 +3357,7 @@ export default function Page() {
         setSelectedListingContext(nextSelectedListingContext);
       }
 
-      const intent = inferClientIntent(prompt);
-      setClientIntent(intent);
-      if (intent.kind === 'create_listing') {
-        setIsManualListingFallbackDismissed(false);
-      }
+      setIsManualListingFallbackDismissed(false);
 
       if (isCompactViewport && !isMobileChatViewOpen) {
         openMobileChatView();
@@ -3567,22 +3368,6 @@ export default function Page() {
       const resetSearchState =
         shouldResetSearchStateRef.current || filteredMessages.length === 0;
       shouldResetSearchStateRef.current = false;
-
-      const nextListingQuery = getNextListingQuery(
-        prompt,
-        activeListingQuery,
-        intent,
-      );
-
-      if (nextListingQuery) {
-        setActiveListingQuery(nextListingQuery);
-      } else if (
-        intent.kind === 'create_listing' ||
-        intent.kind === 'open_conversation' ||
-        intent.kind === 'image_review'
-      ) {
-        setActiveListingQuery('');
-      }
 
       void sendMessage(
         { text: prompt },
@@ -3596,7 +3381,6 @@ export default function Page() {
       );
     },
     [
-      activeListingQuery,
       hasRestoredChat,
       isLoading,
       selectedListingContext,
@@ -3963,11 +3747,14 @@ export default function Page() {
   });
 
   const startNewChat = useCallback(() => {
+    const previousConversationId = chatImages.snapshot().conversationId;
+    void stop();
     setMessages([]);
     setActiveListingQuery('');
     setSelectedListingContext(null);
     handledListingAssistantRef.current = null;
-    retainedListingImagesRef.current = [];
+    chatImages.clear();
+    lastActivatedSearchMessageIdRef.current = null;
     shouldResetSearchStateRef.current = true;
     clearHomeAssistantRuntimeState();
     clearStoredChatState();
@@ -3976,8 +3763,8 @@ export default function Page() {
     url.searchParams.delete('listingId');
     window.history.replaceState(null, '', url);
     void clearRetainedListingImages().catch(() => {});
-    void resetAssistantSearchState().catch(() => {});
-  }, [setMessages]);
+    void resetAssistantSearchState(previousConversationId, chatOwnerId).catch(() => {});
+  }, [chatImages, chatOwnerId, setMessages, stop]);
 
   const clearAssistantSearch = useCallback(() => {
     setActiveListingQuery('');
@@ -3994,7 +3781,7 @@ export default function Page() {
       ? 'attention'
       : 'idle';
   const shouldShowManualListingFallback =
-    Boolean(error) && clientIntent.kind === 'create_listing';
+    Boolean(error) && assistantIntent === 'create_listing';
   const isManualListingVisible =
     isManualListingOpen ||
     (shouldShowManualListingFallback && !isManualListingFallbackDismissed);

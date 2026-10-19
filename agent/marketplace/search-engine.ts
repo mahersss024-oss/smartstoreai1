@@ -69,6 +69,7 @@ function summarizeSearchState(state: MarketplaceSearchState) {
 
 export async function searchMarketplaceWithState(input: {
   ownerKey: string;
+  userId?: string;
   query?: string;
   understoodIntent?: MarketplaceSearchUnderstandingInput;
   language?: AppLanguage;
@@ -82,24 +83,23 @@ export async function searchMarketplaceWithState(input: {
   const recommendations = buildMarketplaceRecommendations(results.shown, market);
   const visibleListingIds = results.shown.map((result) => result.listing.id);
 
-  if (input.ownerKey.startsWith('user:')) {
-    const userId = input.ownerKey.slice('user:'.length);
+  const userId = input.userId ?? (input.ownerKey.startsWith('user:')
+    ? input.ownerKey.slice('user:'.length) : undefined);
 
-    if (userId) {
-      try {
-        publishRealtimeEvent({
-          type: 'ai_results_updated',
-          payload: {
-            ownerKey: input.ownerKey,
-            query: input.query,
-          },
-          visibility: {
-            userIds: [userId],
-          },
-        });
-      } catch {
-        // Search should remain successful even if realtime publish fails.
-      }
+  if (userId) {
+    try {
+      publishRealtimeEvent({
+        type: 'ai_results_updated',
+        payload: {
+          ownerKey: input.ownerKey,
+          query: input.query,
+        },
+        visibility: {
+          userIds: [userId],
+        },
+      });
+    } catch {
+      // Search should remain successful even if realtime publish fails.
     }
   }
 

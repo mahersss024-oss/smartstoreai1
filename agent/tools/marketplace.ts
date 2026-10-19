@@ -31,6 +31,7 @@ import { evaluateNegotiationOffer } from '@/agent/marketplace/negotiation-engine
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
 import { getPublicListingUrl } from '@/lib/listing-url';
+import type { AssistantSearchToolResult } from '@/lib/chat-tool-results';
 
 type MarketplaceListingResult = Awaited<
   ReturnType<typeof listMarketplaceListings>
@@ -134,6 +135,13 @@ const listingDetailsSchema = {
 };
 
 const listingDetailsInputSchema = z.object(listingDetailsSchema);
+const uploadedImageSelection = {
+  imageIndexes: z.array(z.number().int().nonnegative()).max(8).optional()
+    .describe('Explicit zero-based indexes of photos for this product only. Omit or use [] for no photos. Never inherit earlier product photos or attach every photo to each separate draft.'),
+  imageSourceMessageId: z.string().min(1).max(200).optional()
+    .describe('Exact sourceMessageId from the uploaded-image context. Earlier uploads may be selected only for the same product or an explicit customer request to reuse those photos.'),
+};
+const createDraftInputSchema = listingDetailsInputSchema.extend(uploadedImageSelection);
 const updateListingDetailsInputSchema = listingDetailsInputSchema
   .partial()
   .extend({
@@ -209,13 +217,22 @@ export function createMarketplaceTools(
   session: AuthSession | null,
   options: {
     latestUploadedImages?: UploadedListingImage[];
+    imageSourceMessageId?: string;
     searchOwnerKey?: string;
     language?: AppLanguage;
     requestKey?: string;
     onDraftSaved?: (listingId: string) => void;
+    onSearchCompleted?: (result: AssistantSearchToolResult) => void;
   } = {},
 ) {
   const draftOperations = new Map<string, number>();
+  const imageOwners = new Map<number, string>();
+  function selectUploadedImages(input: z.infer<typeof createDraftInputSchema> | { imageIndexes?: number[]; imageSourceMessageId?: string }) {
+    const indexes = [...new Set(input.imageIndexes ?? [])];
+    if (indexes.length && ((options.imageSourceMessageId && input.imageSourceMessageId !== options.imageSourceMessageId)
+      || indexes.some(index => !options.latestUploadedImages?.[index]))) return null;
+    return indexes.map(index => ({ index, image: options.latestUploadedImages![index] }));
+  }
   const tools = {
     searchMarketplaceListings: tool({
       description:
@@ -224,17 +241,18 @@ export function createMarketplaceTools(
         query: z.string().trim().min(1).max(300).describe('Literal product/title words from the customer, preserving their language and spelling. Omit request wording, city and budget. This database tool does not interpret natural-language sentences or infer synonyms. For a filter-only refinement omit query.').optional(),
         understoodIntent: marketplaceSearchUnderstandingSchema.describe('Explicit customer-requested filters only. Never infer a category, manufacturer, city, budget, condition or feature that the customer did not request. Category discovery during listing creation is separate. Use new_search for independent requests and refine only for explicit follow-ups.').optional(),
       }),
-      execute: async ({ query, understoodIntent }) => {
+      execute: async ({ query, understoodIntent }, execution) => {
         const searchResult = await searchMarketplaceWithState({
           ownerKey:
             options.searchOwnerKey ??
             (session ? `user:${session.user.id}` : 'anonymous'),
+          userId: session?.user.id,
           query,
           understoodIntent,
           language: options.language,
         });
 
-        return {
+        const output = {
           status: searchResult.status,
           unavailablePreferences: understoodIntent?.sortPreference === 'closest' || understoodIntent?.locationPreference === 'nearby' ? ['geographic_distance'] : [],
           count: searchResult.listings.length,
@@ -248,6 +266,8 @@ export function createMarketplaceTools(
           note:
             'Each search replaces prior server filters unless searchMode="refine" explicitly continues the current search. clearFilters removes previous constraints. Return only the latest visible matches. No geographic distance is calculated: if geographic_distance is unavailable, say so and offer the explicit city filter; never claim that the ordering is nearest by distance. Do not invent unavailable listings or market averages.',
         };
+        options.onSearchCompleted?.({ toolCallId: execution.toolCallId, toolName: 'searchMarketplaceListings', input: { query, understoodIntent }, output });
+        return output;
       },
     }),
 
@@ -259,7 +279,7 @@ export function createMarketplaceTools(
         query: z.string().trim().min(1).max(300).optional(),
         limit: z.number().int().min(2).max(12).optional(),
       }),
-      execute: async ({ listingId, query, limit = 8 }) => {
+      execute: async ({ listingId, query, limit = 8 }, execution) => {
         const targetListing = await getListing(listingId);
 
         if (!targetListing || targetListing.status !== 'published') {
@@ -291,8 +311,8 @@ export function createMarketplaceTools(
           limit,
         );
 
-        return {
-          status: 'compared',
+        const output = {
+          status: 'compared' as const,
           target: getComparisonListingSummary(comparison.target),
           count: comparison.alternatives.length,
           listings: comparison.alternatives.map(getComparisonListingSummary),
@@ -300,6 +320,8 @@ export function createMarketplaceTools(
           comparisonBasis:
             'Comparison scores and labels are computed from real سوق حمد listing data. Explain these values; do not invent market averages or unavailable alternatives.',
         };
+        options.onSearchCompleted?.({ toolCallId: execution.toolCallId, toolName: 'compareMarketplaceListings', input: { listingId, query, limit }, output });
+        return output;
       },
     }),
 
@@ -363,12 +385,14 @@ export function createMarketplaceTools(
     createListingDraft: tool({
       description:
         'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
-      inputSchema: listingDetailsInputSchema,
+      inputSchema: createDraftInputSchema,
       execute: async (input) => {
         if (!session) {
           return authRequired();
         }
 
+        const selection = selectUploadedImages(createDraftInputSchema.parse(input));
+        if (!selection) return { status: 'invalid_image_selection', message: 'Choose only indexes from the exact available image source; no draft or photos were saved.' };
         const listingInput = normalizeListingDetailsInput(
           listingDetailsInputSchema.parse(input),
         ) as CreateListingInput;
@@ -376,7 +400,7 @@ export function createMarketplaceTools(
         let imageUploadUnavailable = false;
 
         try {
-          const signature = JSON.stringify(listingInput, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+          const signature = JSON.stringify({ ...listingInput, imageIndexes: input.imageIndexes, imageSourceMessageId: input.imageSourceMessageId }, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
             ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
           if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
           const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
@@ -410,12 +434,15 @@ export function createMarketplaceTools(
           };
         }
 
-        if (options.latestUploadedImages?.length) {
-          const review = await reviewListingImageContent(options.latestUploadedImages, listing.images, { listingId: listing.id, userId: session.user.id });
+        const imageSelectionConflict = selection.some(({ index }) => imageOwners.has(index) && imageOwners.get(index) !== listing.id);
+        if (selection.length && !imageSelectionConflict) {
+          selection.forEach(({ index }) => imageOwners.set(index, listing.id));
+          const images = selection.map(({ image }) => image);
+          const review = await reviewListingImageContent(images, listing.images, { listingId: listing.id, userId: session.user.id });
           const listingWithImages = await saveUploadedListingImagesForSeller({
             listingId: listing.id,
             sellerId: session.user.id,
-            images: options.latestUploadedImages,
+            images,
             contentReviewStatuses: review.imageReviewStatuses,
             draftOnly: true,
           }).catch((error: unknown) => {
@@ -431,9 +458,12 @@ export function createMarketplaceTools(
 
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'draft_created',
+          imageSelectionConflict,
           message:
             listing.status === 'pending'
               ? 'Draft created for manual review. Do not publish directly.'
+              : imageSelectionConflict
+                ? 'Draft created without photos: selected photos already belong to another product draft in this turn. Ask which remaining photos belong to this product; never copy unrelated photos.'
               : imageUploadUnavailable
                 ? 'Draft created. Some photos could not be saved, but photos are optional and the seller can publish manually from Account > My listings.'
               : listing.images.some((image) => image.status === 'approved')
@@ -515,8 +545,9 @@ export function createMarketplaceTools(
         'Prepare uploaded chat images on an owned unpublished draft only. Requires sign-in and a clear listingId. Never change images on published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings.',
       inputSchema: z.object({
         listingId: z.string().min(1),
+        ...uploadedImageSelection,
       }),
-      execute: async ({ listingId }) => {
+      execute: async ({ listingId, ...selectionInput }) => {
         if (!session) {
           return authRequired();
         }
@@ -542,11 +573,18 @@ export function createMarketplaceTools(
           return { status: 'user_action_required', message: 'Change images for non-draft listings yourself from Account > My listings.' };
         }
 
-        const review = await reviewListingImageContent(options.latestUploadedImages, targetListing.images, { listingId, userId: session.user.id });
+        const selection = selectUploadedImages(selectionInput);
+        if (!selection?.length) return { status: 'invalid_image_selection', message: 'Explicitly select photos from the exact available source before attaching them.' };
+        if (selection.some(({ index }) => imageOwners.has(index) && imageOwners.get(index) !== listingId)) {
+          return { status: 'image_selection_conflict', message: 'These photos belong to a different product draft in this turn. Ask for the correct product photos.' };
+        }
+        selection.forEach(({ index }) => imageOwners.set(index, listingId));
+        const images = selection.map(({ image }) => image);
+        const review = await reviewListingImageContent(images, targetListing.images, { listingId, userId: session.user.id });
         const listing = await saveUploadedListingImagesForSeller({
           listingId,
           sellerId: session.user.id,
-          images: options.latestUploadedImages,
+          images,
           contentReviewStatuses: review.imageReviewStatuses,
           draftOnly: true,
         });

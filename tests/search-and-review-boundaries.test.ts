@@ -100,8 +100,8 @@ test('regeneration exposes no draft write tools and unavailable output review ne
   assert.ok('compareMarketplaceListings' in safe);
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
   assert.match(route, /const retryAgent = createChatAgent\(session, \{[\s\S]*?readOnly: true/);
-  assert.match(route, /isOutputCheckerProviderFailure\(firstOutputDecision\)\) \{\s*return createTextUIResponse\(getModelProviderFailureResponse/);
-  assert.match(route, /isOutputCheckerProviderFailure\(retryOutputDecision\)\) \{\s*return createTextUIResponse\(getModelProviderFailureResponse/);
+  assert.match(route, /isOutputCheckerProviderFailure\(firstOutputDecision\)\) \{\s*return reply\(getModelProviderFailureResponse/);
+  assert.match(route, /isOutputCheckerProviderFailure\(retryOutputDecision\)\) \{\s*return reply\(getModelProviderFailureResponse/);
 });
 
 test('a concurrent human moderation decision cannot be overwritten by a seller content or publication write', async t => {

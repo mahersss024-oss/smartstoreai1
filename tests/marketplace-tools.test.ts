@@ -189,22 +189,22 @@ test(`chat creation and attachment continue when content review is ${reviewDecis
   });
   type Result = { status: string; contentCheck?: string; listing: { id: string; images: { status: string }[] } };
   const create = tools.createListingDraft.execute as unknown as (
-    input: { category: string; title: string }, options: Record<string, never>,
+    input: { category: string; title: string; imageIndexes: number[] }, options: Record<string, never>,
   ) => Promise<Result>;
   const add = tools.addUploadedImagesToListing.execute as unknown as (
-    input: { listingId: string }, options: Record<string, never>,
+    input: { listingId: string; imageIndexes: number[] }, options: Record<string, never>,
   ) => Promise<Result>;
-  const created = await create({ category: 'cars', title: 'Car listing' }, {});
+  const created = await create({ category: 'cars', title: 'Car listing', imageIndexes: [0] }, {});
   assert.equal(created.status, 'draft_created');
   assert.equal(created.listing.images.length, 1);
   assert.equal(created.listing.images[0].status, 'approved');
-  const attached = await add({ listingId: created.listing.id }, {});
+  const attached = await add({ listingId: created.listing.id, imageIndexes: [0] }, {});
   assert.equal(attached.status, 'images_added');
   assert.equal(attached.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
   assert.equal(attached.listing.images.length, 1, 'reattaching the same uploaded image must not duplicate it');
   assert.ok(attached.listing.images.every(image => image.status === 'approved'));
   const other = createListingDraft({ sellerId: 'seller:other-photo-owner', category: 'cars', title: 'Other car' });
-  assert.equal((await add({ listingId: other.id }, {})).status, 'not_found');
+  assert.equal((await add({ listingId: other.id, imageIndexes: [0] }, {})).status, 'not_found');
   assert.equal(networkCalls(), 1, 'reuse the same content assessment when attaching the same image');
 });
 }
@@ -226,10 +226,41 @@ test('chat draft survives optional object-storage failure without pretending pho
     latestUploadedImages: [{ data: new Uint8Array(data), mediaType: 'image/png' }],
   });
   const create = tools.createListingDraft.execute as unknown as (
-    input: { category: string; title: string }, options: Record<string, never>,
+    input: { category: string; title: string; imageIndexes: number[] }, options: Record<string, never>,
   ) => Promise<{ status: string; message: string; listing: { images: unknown[] } }>;
-  const created = await create({ category: 'other', title: 'Desk' }, {});
+  const created = await create({ category: 'other', title: 'Desk', imageIndexes: [0] }, {});
   assert.equal(created.status, 'draft_created');
   assert.equal(created.listing.images.length, 0);
   assert.match(created.message, /photos could not be saved/);
+});
+
+test('photos require an explicit source and selection and separate product drafts never inherit the whole upload', async t => {
+  mockImageContentReview(t);
+  const images = await Promise.all(['#ff0000', '#0000ff'].map(async background => ({
+    data: new Uint8Array(await sharp({ create: { width: 16, height: 16, channels: 3, background } }).png().toBuffer()),
+    mediaType: 'image/png',
+  })));
+  const tools = createMarketplaceTools(createTestSession('seller:separate-product-photos'), {
+    latestUploadedImages: images, imageSourceMessageId: 'original-photo-turn', requestKey: 'photo-selection-turn',
+  });
+  const create = tools.createListingDraft.execute as unknown as (
+    input: Record<string, unknown>, options: Record<string, never>,
+  ) => Promise<{ status: string; imageSelectionConflict?: boolean; listing?: { id: string; images: { id: string }[] } }>;
+  const noSelection = await create({ category: 'other', title: 'New unrelated product' }, {});
+  assert.equal(noSelection.status, 'draft_created');
+  assert.equal(noSelection.listing?.images.length, 0);
+  const invalid = await create({ category: 'other', title: 'Wrong source', imageIndexes: [0], imageSourceMessageId: 'different-turn' }, {});
+  assert.equal(invalid.status, 'invalid_image_selection');
+  assert.equal(invalid.listing, undefined);
+  const outOfRange = await create({ category: 'other', title: 'Unknown index', imageIndexes: [2], imageSourceMessageId: 'original-photo-turn' }, {});
+  assert.equal(outOfRange.status, 'invalid_image_selection');
+  const first = await create({ category: 'other', title: 'First product', imageIndexes: [0], imageSourceMessageId: 'original-photo-turn' }, {});
+  const second = await create({ category: 'other', title: 'Second product', imageIndexes: [1], imageSourceMessageId: 'original-photo-turn' }, {});
+  assert.equal(first.listing?.images.length, 1);
+  assert.equal(second.listing?.images.length, 1);
+  assert.notEqual(first.listing?.images[0].id, second.listing?.images[0].id);
+  const duplicate = await create({ category: 'other', title: 'Third unrelated product', imageIndexes: [0], imageSourceMessageId: 'original-photo-turn' }, {});
+  assert.equal(duplicate.status, 'draft_created');
+  assert.equal(duplicate.imageSelectionConflict, true);
+  assert.equal(duplicate.listing?.images.length, 0);
 });

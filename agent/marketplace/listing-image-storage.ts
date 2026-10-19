@@ -121,9 +121,10 @@ export function extractLatestUploadedListingImages(
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
 
-    if (message.role !== 'user' || !Array.isArray(message.content)) {
+    if (message.role !== 'user') {
       continue;
     }
+    if (!Array.isArray(message.content)) return [];
 
     const images: UploadedListingImage[] = [];
     const parts = message.content as unknown[];
@@ -146,9 +147,7 @@ export function extractLatestUploadedListingImages(
       });
     }
 
-    if (images.length) {
-      return images.slice(0, maxImages);
-    }
+    return images.slice(0, maxImages);
   }
 
   return [];
