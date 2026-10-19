@@ -31,23 +31,32 @@ Manual creation, seller editing, admin editing/filtering and draft tools use thi
 ## Market Browse Rows
 
 Public market browsing uses horizontal category-style buttons at every level:
-group, category, optional brand/type and optional car model. Every populated row
-starts with `الكل`, without visible brand/type/model field labels. The primary row
+group, category, optional brand/type and optional car model. Only the root row
+starts with `الكل`, without visible brand/type/model field labels. Branch rows
+show their choices directly, without extra reset buttons. The primary row
 is 32px high; branch rows/buttons are 28px high with slightly smaller text. Empty
 levels are not rendered. Selection is exposed with `aria-pressed`, and hidden
 group labels retain accessible names without adding visible headings.
 
-Each `الكل` clears that level and its descendants only; the text query, city and
-parent choice remain unchanged. Rows reset their horizontal position when the
-parent changes and reveal a restored selection within the row without scrolling
+Selecting a parent reveals its children but leaves every child unselected. A
+category, brand/type or car model is applied only after the customer clicks it;
+merely displaying a row does not add that branch to the search request. Changing
+a parent clears its descendants, never defaults to its first child. Root `الكل`
+clears category choices while preserving the text query and city. The existing
+general filter clears category choices and city without clearing the text query.
+Previously explicit choices still restore during same-tab navigation.
+Rows reset their horizontal position when the parent changes and reveal a
+restored selection within the row without scrolling
 the page/list. Existing API filters, stored IDs and home browse snapshots are
 unchanged. Manual creation and seller/admin editors retain their existing controls.
 `e2e/marketplace-filter-rows.spec.ts` covers order, dimensions, all category options,
-dependent resets, query/city preservation and horizontal selection restoration.
+explicit-only API filters, dependent resets, the general reset, query/city
+preservation and horizontal selection restoration.
 
-Browse-row verification on 2026-10-19: 37 focused source/route checks and 18
+Explicit-branch verification on 2026-10-19: 37 focused source/route checks and 20
 desktop/mobile Chromium cases passed, including exact home scroll restoration,
-all category/option rows, brand/model filtering and toolbar gestures. Production
+all category/option rows, explicit-only category/brand/model API filters, general
+filter clearing and toolbar gestures. Production
 build/type checking and scoped ESLint passed. Desktop/mobile screenshots were
 inspected. The restored-position check waits for the existing filter-opening
 transition to finish before taking its baseline; its position tolerance remains

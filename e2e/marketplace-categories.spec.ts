@@ -230,7 +230,7 @@ test('brand filtering reaches the market API, survives navigation and clears whe
   await expect(options.getByRole('button', { name: 'آبل', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(cards).toHaveCount(1);
   await categories.getByRole('button', { name: 'الحواسيب وملحقاتها', exact: true }).click();
-  await expect(options.getByRole('button', { name: 'الكل', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(options.locator('[aria-pressed="true"]')).toHaveCount(0);
   await expect.poll(() => requests.at(-1)?.get('category')).toBe('computers');
   expect(requests.at(-1)?.has('categoryOption')).toBe(false);
 });

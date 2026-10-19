@@ -4639,7 +4639,7 @@ export default function Page() {
               </div>
               </div>
               <div className="grid gap-1 p-1" ref={marketplaceCategoriesRef} data-marketplace-categories>
-                <MarketplaceFilterRow level="groups" label="تصنيفات السوق" value={activeMarketCategoryGroup} allValue="all"
+                <MarketplaceFilterRow level="groups" label="تصنيفات السوق" value={activeMarketCategoryGroup}
                   options={marketplaceCategoryGroups.map(group => ({ id: group.label, label: group.label }))}
                   onChange={value => {
                     setSelectedMarketCategoryGroup(value);
@@ -4649,7 +4649,7 @@ export default function Page() {
                   }} />
                 {activeMarketCategoryGroupConfig && (
                   <MarketplaceFilterRow key={activeMarketCategoryGroup} level="categories" label="التصنيفات الفرعية" compact
-                    value={activeMarketSubcategory} allValue="all" options={activeMarketCategoryGroupConfig.categories.map(category => ({ id: category, label: category }))}
+                    value={activeMarketSubcategory} options={activeMarketCategoryGroupConfig.categories.map(category => ({ id: category, label: category }))}
                     onChange={value => { setSelectedMarketSubcategory(value); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }} />
                 )}
                 <MarketplaceCategoryOptionRow key={`options:${activeMarketCategoryId}`} category={activeMarketCategoryId} value={activeMarketCategoryOption}

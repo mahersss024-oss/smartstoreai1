@@ -112,7 +112,7 @@ test('car filtering reaches the database API, survives navigation and clears on 
   await expect(model.getByRole('button', { name: 'كامري', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(cards).toHaveCount(1);
   await brands.getByRole('button', { name: 'نيسان', exact: true }).click();
-  await expect(model.getByRole('button', { name: 'الكل', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(model.locator('[aria-pressed="true"]')).toHaveCount(0);
   await expect(model.getByRole('button', { name: 'كامري', exact: true })).toHaveCount(0);
   await expect.poll(() => requests.at(-1)?.get('categoryOption')).toBe('nissan');
   expect(requests.at(-1)?.has('carModel')).toBe(false);
