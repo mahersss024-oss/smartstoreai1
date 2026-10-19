@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { bottomNavigationDestinations } from '@/lib/navigation/bottom-navigation';
 
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
@@ -180,12 +181,10 @@ test('mobile bottom navigation is hidden while assistant chat view is open', () 
 test('mobile bottom navigation exposes messages with a visible label', () => {
   const mobileNavigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
-  assert.match(mobileNavigation, /href: '\/account\/listings'/);
-  assert.match(mobileNavigation, /label: 'إعلاناتي'/);
-  assert.match(mobileNavigation, /href: '\/conversations'/);
-  assert.match(mobileNavigation, /label: 'محادثاتي'/);
-  assert.match(mobileNavigation, /href: '\/favorites'/);
-  assert.match(mobileNavigation, /label: 'المفضلة'/);
+  assert.equal(bottomNavigationDestinations.find(item => item.href === '/account/listings')?.label, 'إعلاناتي');
+  assert.equal(bottomNavigationDestinations.find(item => item.href === '/conversations')?.label, 'محادثاتي');
+  assert.equal(bottomNavigationDestinations.find(item => item.href === '/favorites')?.label, 'المفضلة');
+  assert.match(mobileNavigation, /bottomNavigationDestinations\.map/);
   assert.match(mobileNavigation, /grid-cols-5/);
   assert.match(mobileNavigation, /w-1\/5/);
   assert.match(mobileNavigation, /aria-label=\{item\.label\}/);
@@ -211,7 +210,7 @@ test('mobile bottom navigation highlights conversations when a new message arriv
   const alertHook = readProjectFile('hooks', 'use-conversation-message-alert.ts');
 
   assert.match(mobileNavigation, /useConversationMessageAlert/);
-  assert.match(mobileNavigation, /alert: hasConversationAlert/);
+  assert.match(mobileNavigation, /alert: destination\.href === '\/conversations' && hasConversationAlert/);
   assert.match(mobileNavigation, /showAlert/);
   assert.match(mobileNavigation, /shadow-\[0_0_18px_rgba\(244,63,94,0\.55\)\]/);
   assert.match(mobileNavigation, /from-rose-300 to-red-600/);

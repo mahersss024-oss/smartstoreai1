@@ -1,3 +1,5 @@
+import { bottomNavigationDestinations } from './bottom-navigation';
+
 export type PageNavigationType = 'push' | 'replace' | 'traverse';
 export type PageTransitionDirection = 'forward' | 'back';
 
@@ -10,6 +12,9 @@ export function getPageTransitionDirection(
 ): PageTransitionDirection | null {
   if (from.origin !== to.origin || from.pathname === to.pathname
     || to.pathname === '/api' || to.pathname.startsWith('/api/')) return null;
+  const fromTab = bottomNavigationDestinations.findIndex(item => item.href === from.pathname);
+  const toTab = bottomNavigationDestinations.findIndex(item => item.href === to.pathname);
+  if (fromTab >= 0 && toTab >= 0) return toTab > fromTab ? 'forward' : 'back';
   if (type === 'traverse' && fromIndex !== undefined && toIndex !== undefined && fromIndex !== toIndex) {
     return toIndex < fromIndex ? 'back' : 'forward';
   }

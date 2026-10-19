@@ -12,14 +12,22 @@ import {
 } from 'lucide-react';
 
 import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
+import { bottomNavigationDestinations } from '@/lib/navigation/bottom-navigation';
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   primary?: boolean;
-  active?: boolean;
   alert?: boolean;
+};
+
+const navigationIcons: Record<typeof bottomNavigationDestinations[number]['href'], LucideIcon> = {
+  '/account/listings': BadgePlus,
+  '/conversations': MessageCircle,
+  '/': Home,
+  '/favorites': Heart,
+  '/account': User,
 };
 
 function isActive(pathname: string, href: string) {
@@ -129,26 +137,13 @@ export function MobileBottomNavigation() {
     return null;
   }
 
-  const items: NavItem[] = [
-    { href: '/account/listings', label: 'إعلاناتي', icon: BadgePlus },
-    {
-      href: '/conversations',
-      label: 'محادثاتي',
-      icon: MessageCircle,
-      alert: hasConversationAlert,
-    },
-    {
-      href: '/',
-      label: 'الرئيسية',
-      icon: Home,
-      primary: true,
-      active: pathname === '/',
-    },
-    { href: '/favorites', label: 'المفضلة', icon: Heart },
-    { href: '/account', label: 'حسابي', icon: User },
-  ];
+  const items: NavItem[] = bottomNavigationDestinations.map(destination => ({
+    ...destination,
+    icon: navigationIcons[destination.href],
+    alert: destination.href === '/conversations' && hasConversationAlert,
+  }));
   const activeIndex = items.findIndex(
-    (item) => item.active ?? isActive(pathname, item.href),
+    (item) => isActive(pathname, item.href),
   );
   const indicatorIndex = activeIndex >= 0 ? activeIndex : 2;
 
@@ -176,7 +171,7 @@ export function MobileBottomNavigation() {
       <div className="relative z-10 grid h-14 grid-cols-5 text-[13px] font-bold text-slate-600 dark:text-slate-300">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.active ?? isActive(pathname, item.href);
+          const active = isActive(pathname, item.href);
           const pending = isPending && pendingHref === item.href;
           const showAlert = Boolean(item.alert && !active);
 

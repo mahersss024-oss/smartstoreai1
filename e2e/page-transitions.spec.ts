@@ -127,13 +127,64 @@ test('tab buttons and ordinary links share the fixed transition, without animati
   await frame(page, 1, 'forward');
   await release(page);
   await page.locator('a[href="/favorites"]:visible').first().click();
-  await frame(page, 2, 'forward');
+  await frame(page, 2, 'back');
   await release(page);
   await page.evaluate(() => history.pushState({ retained: 'untouched' }, '', `${location.pathname}?view=saved`));
   await expect(page).toHaveURL(/\/favorites\?view=saved$/);
   expect(await page.evaluate(() => (window as unknown as TransitionTestWindow).routeFrames.length)).toBe(2);
   expect(await page.evaluate(() => history.state.retained)).toBe('untouched');
   await expect(page.locator('html')).not.toHaveAttribute('data-page-transition');
+});
+
+test('bottom tabs follow their actual horizontal positions for every pair and browser back/forward', async ({ page, baseURL }, info) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await prepare(page, `e2e-report-${info.project.name}`, baseURL!);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  const navigation = page.locator('.marketplace-bottom-nav');
+  await expect(navigation).toBeVisible();
+  const initialBounds = await navigation.boundingBox();
+  const tabs = [
+    { label: '\u0625\u0639\u0644\u0627\u0646\u0627\u062a\u064a', path: '/account/listings' },
+    { label: '\u0645\u062d\u0627\u062f\u062b\u0627\u062a\u064a', path: '/conversations' },
+    { label: '\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629', path: '/' },
+    { label: '\u0627\u0644\u0645\u0641\u0636\u0644\u0629', path: '/favorites' },
+    { label: '\u062d\u0633\u0627\u0628\u064a', path: '/account' },
+  ];
+  const button = (index: number) => navigation.getByRole('button', { name: tabs[index].label, exact: true });
+  // Each directed pair occurs once, starting and ending at the centered home tab.
+  const route = [2, 0, 1, 0, 2, 1, 2, 3, 0, 3, 1, 3, 2, 4, 0, 4, 1, 4, 3, 4, 2];
+  const pairs = new Set<string>();
+  for (let step = 1; step < route.length; step++) {
+    const from = route[step - 1];
+    const to = route[step];
+    const previous = (await button(from).boundingBox())!;
+    const target = (await button(to).boundingBox())!;
+    const direction = target.x < previous.x ? 'forward' : 'back';
+    pairs.add(`${from}:${to}`);
+    await button(to).click();
+    await expect(page).toHaveURL(url => url.pathname === tabs[to].path);
+    await frame(page, step, direction);
+    expect(await navigation.boundingBox()).toEqual(initialBounds);
+    if (step === 1 || step === 7) await page.screenshot({ path: info.outputPath(`tab-${direction}.png`) });
+    await release(page);
+    await expect(button(to)).toHaveAttribute('aria-current', 'page');
+  }
+  expect(pairs.size).toBe(20);
+  await page.goBack();
+  await frame(page, 21, 'forward');
+  await release(page);
+  await expect(page).toHaveURL(url => url.pathname === '/account');
+  await page.goForward();
+  await frame(page, 22, 'back');
+  await release(page);
+  await expect(page).toHaveURL(url => url.pathname === '/');
+  await button(2).click();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await page.evaluate(() => (window as unknown as TransitionTestWindow).routeFrames.length)).toBe(22);
+  expect(errors).toEqual([]);
 });
 
 test('going back during an active slide releases the old capture and completes the latest navigation', async ({ page, baseURL }, info) => {

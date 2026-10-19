@@ -30,4 +30,15 @@ for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
     reference.compliance = { ...listing.compliance };
     publishListing(reference.id);
   }
+
+  for (const descriptionOnly of [false, true]) {
+    const searchFixture = createListingDraft({
+      id: `e2e-${descriptionOnly ? 'description' : 'title'}-search-${project}`,
+      sellerId: 'e2e-title-search-seller', category: 'other', price: 100, city: 'الرياض',
+      title: `${descriptionOnly ? 'DescriptionControl' : 'TitleSearch'}-${project}`,
+      description: `${descriptionOnly ? 'TitleSearch' : 'DescriptionOnly'}-${project}`,
+    });
+    searchFixture.compliance = { ...listing.compliance };
+    publishListing(searchFixture.id);
+  }
 }

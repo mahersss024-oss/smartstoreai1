@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { bottomNavigationDestinations } from '@/lib/navigation/bottom-navigation';
 
 function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
@@ -20,11 +21,9 @@ test('home marketplace toolbar keeps behavior while simplifying labels', () => {
 test('mobile bottom navigation keeps home centered with five compact destinations', () => {
   const navigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
-  assert.match(navigation, /href: '\/account\/listings'/);
-  assert.match(navigation, /href: '\/favorites'/);
-  assert.match(navigation, /href: '\/account'/);
-  assert.match(navigation, /href: '\/'/);
-  assert.match(navigation, /href: '\/conversations'/);
+  assert.deepEqual(bottomNavigationDestinations.map(item => item.href), ['/account/listings', '/conversations', '/', '/favorites', '/account']);
+  assert.match(navigation, /bottomNavigationDestinations\.map/);
+  assert.equal(bottomNavigationDestinations.findIndex(item => 'primary' in item && item.primary), 2);
   assert.match(navigation, /if \(href === '\/account'\) \{[\s\S]*return pathname === '\/account';[\s\S]*\}/);
   assert.match(navigation, /grid-cols-5/);
   assert.match(navigation, /w-1\/5/);

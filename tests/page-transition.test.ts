@@ -11,16 +11,30 @@ import {
 
 const url = (path: string) => new URL(path, 'https://market.example.test');
 
-test('page navigation slides forward into details and back into shallower pages', () => {
+test('page navigation slides forward into details and back into shallower non-tab pages', () => {
   assert.equal(getPageTransitionDirection(url('/'), url('/listings/item'), 'push'), 'forward');
   assert.equal(getPageTransitionDirection(url('/listings/item'), url('/'), 'push'), 'back');
-  assert.equal(getPageTransitionDirection(url('/account'), url('/favorites'), 'push'), 'forward');
-  assert.equal(getPageTransitionDirection(url('/account'), url('/account/listings'), 'push'), 'forward');
+  assert.equal(getPageTransitionDirection(url('/account'), url('/account/seller-profile'), 'push'), 'forward');
+  assert.equal(getPageTransitionDirection(url('/account/seller-profile'), url('/account'), 'push'), 'back');
 });
 
 test('browser history position determines both back and forward independently of page depth', () => {
-  assert.equal(getPageTransitionDirection(url('/'), url('/account'), 'traverse', 5, 4), 'back');
-  assert.equal(getPageTransitionDirection(url('/account/listings'), url('/account'), 'traverse', 4, 5), 'forward');
+  assert.equal(getPageTransitionDirection(url('/'), url('/listings/item'), 'traverse', 5, 4), 'back');
+  assert.equal(getPageTransitionDirection(url('/account/seller-profile'), url('/account'), 'traverse', 4, 5), 'forward');
+});
+
+test('every bottom tab pair follows its right-to-left screen order, not URL depth or history chronology', () => {
+  const rightToLeft = ['/account/listings', '/conversations', '/', '/favorites', '/account'];
+  for (const [fromIndex, from] of rightToLeft.entries()) {
+    for (const [toIndex, to] of rightToLeft.entries()) {
+      const expected = fromIndex === toIndex ? null : toIndex > fromIndex ? 'forward' : 'back';
+      for (const type of ['push', 'replace', 'traverse'] as const) {
+        for (const [previous, next] of [[10, 9], [9, 10]]) {
+          assert.equal(getPageTransitionDirection(url(from), url(to), type, previous, next), expected, `${type}: ${from} -> ${to}`);
+        }
+      }
+    }
+  }
 });
 
 test('query, hash, same-page and external authentication navigations do not slide the page', () => {

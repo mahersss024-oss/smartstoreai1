@@ -318,12 +318,17 @@ function getAttachmentLabel(file: PendingChatAttachment) {
 function getAssistantBubbleBounds() {
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const banner = document.querySelector('.open-in-app-banner')?.getBoundingClientRect();
+  const navigation = document.querySelector('.marketplace-bottom-nav')?.getBoundingClientRect();
   const minX = assistantBubbleMargin;
   const maxX = Math.max(minX, width - assistantBubbleSize - assistantBubbleMargin);
-  const minY = assistantBubbleMargin;
+  const minY = Math.max(0, banner?.bottom ?? 0) + assistantBubbleMargin;
+  const navigationTop = navigation && navigation.height > 0 && navigation.top > 0
+    ? navigation.top - assistantBubbleMargin
+    : height;
   const maxY = Math.max(
     minY,
-    height - assistantBubbleSize - assistantBubbleBottomReserve,
+    Math.min(height - assistantBubbleBottomReserve, navigationTop) - assistantBubbleSize,
   );
 
   return { minX, maxX, minY, maxY };
@@ -359,7 +364,8 @@ function readAssistantBubblePosition() {
 
     const parsed = JSON.parse(rawPosition) as Partial<AssistantBubblePosition>;
 
-    if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') {
+    if (typeof parsed.x !== 'number' || !Number.isFinite(parsed.x)
+      || typeof parsed.y !== 'number' || !Number.isFinite(parsed.y)) {
       return null;
     }
 
@@ -2726,10 +2732,22 @@ export default function Page() {
     };
 
     syncBubblePosition();
+    let observer: ResizeObserver | undefined;
+    // The mobile banner mounts after platform detection, so measure after that commit.
+    const layoutFrame = window.requestAnimationFrame(() => {
+      syncBubblePosition();
+      observer = new ResizeObserver(syncBubblePosition);
+      for (const selector of ['.open-in-app-banner', '.marketplace-bottom-nav']) {
+        const element = document.querySelector(selector);
+        if (element) observer.observe(element);
+      }
+    });
     window.addEventListener('resize', syncBubblePosition);
     window.visualViewport?.addEventListener('resize', syncBubblePosition);
 
     return () => {
+      window.cancelAnimationFrame(layoutFrame);
+      observer?.disconnect();
       window.removeEventListener('resize', syncBubblePosition);
       window.visualViewport?.removeEventListener('resize', syncBubblePosition);
     };
@@ -3884,7 +3902,8 @@ export default function Page() {
     if (!viewport || !list?.clientHeight || !hasRestoredChat || isCompactChatView || isManualListingVisible) return;
     const content = list.firstElementChild as HTMLElement | null;
     if (viewport.contentOffset) content?.style.setProperty('--marketplace-content-offset', viewport.contentOffset);
-    list.scrollTop = viewport.scrollTop;
+    // Restoration must bypass the list's smooth-scrolling preference before paint.
+    list.scrollTo({ top: viewport.scrollTop, behavior: 'instant' });
     lastMarketplaceScrollTopRef.current = list.scrollTop;
     lastMarketplaceScrollHeightRef.current = list.scrollHeight;
     pendingBrowseViewportRef.current = null;

@@ -1,6 +1,58 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createSessionCookie } from '@/lib/auth/session';
 
+type RestoreMeasurement = { requested: number; actual: number; frames: number[] };
+type RestoreTestWindow = Window & {
+  measureBrowseRestore: boolean;
+  browseRestoreMeasurements: RestoreMeasurement[];
+  browseDepartureScrollTop: number | null;
+};
+
+async function measureRestoration(page: Page) {
+  await page.addInitScript(() => {
+    const state = window as unknown as RestoreTestWindow;
+    state.measureBrowseRestore = false;
+    state.browseRestoreMeasurements = [];
+    state.browseDepartureScrollTop = null;
+    document.addEventListener('pointerdown', event => {
+      const card = event.target instanceof Element ? event.target.closest('.marketplace-listing-card') : null;
+      const list = card?.closest('.marketplace-listings-scroll');
+      if (list) state.browseDepartureScrollTop = list.scrollTop;
+    }, true);
+    const record = (element: Element, requested: number) => {
+      if (!state.measureBrowseRestore || !element.classList.contains('marketplace-listings-scroll')) return;
+      const measurement = { requested, actual: element.scrollTop, frames: [] as number[] };
+      state.browseRestoreMeasurements.push(measurement);
+      const sample = () => {
+        if (!element.isConnected) return;
+        measurement.frames.push(element.scrollTop);
+        if (measurement.frames.length < 6) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    };
+    const property = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')!;
+    Object.defineProperty(Element.prototype, 'scrollTop', { ...property, set(value: number) {
+      property.set!.call(this, value);
+      record(this, value);
+    } });
+    const scrollTo = Element.prototype.scrollTo;
+    Element.prototype.scrollTo = function (options?: ScrollToOptions | number, y?: number) {
+      Reflect.apply(scrollTo, this, typeof options === 'number' ? [options, y ?? 0] : [options]);
+      record(this, typeof options === 'number' ? y ?? 0 : options?.top ?? this.scrollTop);
+    };
+  });
+}
+
+async function expectInstantRestoration(page: Page, scrollTop: number) {
+  await expect.poll(() => page.evaluate(() => (window as unknown as RestoreTestWindow)
+    .browseRestoreMeasurements.some(item => item.frames.length === 6))).toBe(true);
+  const measurements = await page.evaluate(() => (window as unknown as RestoreTestWindow).browseRestoreMeasurements);
+  const restored = measurements.find(item => Math.abs(item.requested - scrollTop) <= 1);
+  expect(restored, 'the saved position must be applied synchronously').toBeDefined();
+  expect(restored!.actual).toBeCloseTo(scrollTop, 0);
+  for (const position of restored!.frames) expect(position).toBeCloseTo(scrollTop, 0);
+}
+
 async function prepare(page: Page, baseURL: string, listingId: string) {
   const cookie = createSessionCookie({ id: 'e2e-customer', email: 'e2e-customer@smartstore.local', name: 'عميل الاختبار' });
   await page.context().addCookies([{ name: 'smartstore_session',
@@ -42,6 +94,46 @@ function searchResponse(page: Page, query: string, pageNumber = '1', filtered = 
     return url.pathname === '/api/marketplace/listings' && url.searchParams.get('q') === query &&
       url.searchParams.get('page') === pageNumber && (!filtered ||
         url.searchParams.get('city') === 'الرياض' && url.searchParams.get('category') === 'furniture');
+  });
+}
+
+for (const capture of ['native', 'unsupported'] as const) {
+  test(`saved search returns directly to the previous card without a scroll animation when capture is ${capture}`, async ({ page, baseURL }, info) => {
+    test.setTimeout(60_000);
+    const id = `e2e-report-${info.project.name}`;
+    await prepare(page, baseURL!, id);
+    await measureRestoration(page);
+    if (capture === 'unsupported') await page.addInitScript(() => {
+      Object.defineProperty(document, 'startViewTransition', { configurable: true, value: undefined });
+    });
+    await page.goto('/');
+    const search = page.getByPlaceholder('\u0627\u0628\u062d\u062b \u0641\u064a \u0643\u0644 \u0627\u0644\u0633\u0648\u0642', { exact: true });
+    const searched = searchResponse(page, 'desk');
+    await search.fill('desk');
+    await searched;
+    await search.press('Tab');
+    const list = page.locator('#suggested-listings .marketplace-listings-scroll');
+    await list.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }));
+    const card = page.locator('.marketplace-listing-card').filter({ hasText: 'desk 30' });
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    const before = await page.evaluate(() => (window as unknown as RestoreTestWindow).browseDepartureScrollTop);
+    expect(before).not.toBeNull();
+    expect(before!).toBeGreaterThan(500);
+    await expect(page).toHaveURL(new RegExp(`/listings/${id}$`));
+    await expect(page.locator('html')).not.toHaveAttribute('data-page-transition');
+    await page.evaluate(() => { (window as unknown as RestoreTestWindow).measureBrowseRestore = true; });
+    await page.goBack();
+    await expect(search).toHaveValue('desk');
+    await expectInstantRestoration(page, before!);
+    await expect(list).toHaveCSS('scroll-behavior', 'smooth');
+
+    await navigate(page, '/account', '\u062d\u0633\u0627\u0628\u064a');
+    await page.evaluate(() => { (window as unknown as RestoreTestWindow).browseRestoreMeasurements = []; });
+    await navigate(page, '/', '\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629');
+    await expect(search).toHaveValue('desk');
+    await expectInstantRestoration(page, before!);
+    await page.screenshot({ path: info.outputPath(`instant-restoration-${capture}.png`) });
   });
 }
 
