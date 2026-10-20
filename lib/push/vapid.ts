@@ -38,7 +38,7 @@ function base64UrlEncode(value: string | Buffer) {
  * Builds a signed VAPID JWT (ES256) for the given push service audience.
  * @param audience origin of the push endpoint, e.g. https://fcm.googleapis.com
  */
-export function createVapidJwt(audience: string, config: VapidConfig) {
+function createVapidJwt(audience: string, config: VapidConfig) {
   const header = base64UrlEncode(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
   const now = Math.floor(Date.now() / 1000);
   const payload = base64UrlEncode(

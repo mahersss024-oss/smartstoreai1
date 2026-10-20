@@ -1,0 +1,2752 @@
+{
+  "date": "2026-10-20",
+  "tool": "Knip 6.42.1",
+  "config": "knip.jsonc; unchanged, no issue suppressions added",
+  "before": {
+    "rawFindings": 193,
+    "suspected": 185,
+    "knownUsed": 8
+  },
+  "review": {
+    "covered": 193,
+    "actions": {
+      "file-deleted": 3,
+      "dependency-removed": 3,
+      "export-removed": 47,
+      "retained": 13,
+      "definition-deleted": 127
+    },
+    "suspectsChanged": 180,
+    "suspectsRetained": 5
+  },
+  "limitations": [
+    "Reference evidence covers this private application repository and known entry points; unknown external consumers cannot be guaranteed absent.",
+    "Export removal preserves internal implementations and does not mean those implementations were dead.",
+    "Existing user changes in lib/auth/session.ts and its two authentication routes remain untouched.",
+    "No database, production, live model or real load validation was performed."
+  ],
+  "findings": [
+    {
+      "id": 1,
+      "path": "hooks/use-push-notifications.ts",
+      "kind": "files",
+      "names": [
+        "hooks/use-push-notifications.ts"
+      ],
+      "initialClassification": "suspected",
+      "action": "file-deleted",
+      "reason": "No import, hook call, dynamic path or configuration reference. Only historical docs mention it. Active notifications page renders components/push-notification-settings.tsx, independently tested."
+    },
+    {
+      "id": 2,
+      "path": "scripts/chat-load-test.mjs",
+      "kind": "files",
+      "names": [
+        "scripts/chat-load-test.mjs"
+      ],
+      "initialClassification": "suspected",
+      "action": "file-deleted",
+      "reason": "Orphan standalone CLI: no package script, CI, task, config, documentation or code references. Current documented load testing uses tests/load/scripts/run-k6.mjs and scripts/ai-path-load-test.ts. Legacy production-default script was never executed."
+    },
+    {
+      "id": 3,
+      "path": "scripts/load-test.mjs",
+      "kind": "files",
+      "names": [
+        "scripts/load-test.mjs"
+      ],
+      "initialClassification": "suspected",
+      "action": "file-deleted",
+      "reason": "Orphan standalone CLI: no package script, CI, task, config, documentation or code references. Current documented load testing uses tests/load/scripts/run-k6.mjs and scripts/ai-path-load-test.ts. Legacy production-default script was never executed."
+    },
+    {
+      "id": 4,
+      "path": "package.json",
+      "kind": "dependencies",
+      "names": [
+        "@radix-ui/react-use-controllable-state"
+      ],
+      "initialClassification": "suspected",
+      "action": "dependency-removed",
+      "reason": "No project imports. Radix components declare their own controllable-state transitive dependency; retain transitive graph."
+    },
+    {
+      "id": 5,
+      "path": "package.json",
+      "kind": "dependencies",
+      "names": [
+        "shiki"
+      ],
+      "initialClassification": "suspected",
+      "action": "dependency-removed",
+      "reason": "No import or highlighter/plugin setup in source/config/scripts; installed streamdown 2.6.0 neither depends nor peers on shiki."
+    },
+    {
+      "id": 6,
+      "path": "package.json",
+      "kind": "devDependencies",
+      "names": [
+        "baseline-browser-mapping"
+      ],
+      "initialClassification": "suspected",
+      "action": "dependency-removed",
+      "reason": "No direct project consumer. Next and browserslist declare this dependency and retain the same 2.11.20 transitive resolution."
+    },
+    {
+      "id": 7,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "endpointDuration"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 8,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "endpointErrors"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 9,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "endpointClientErrors"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 10,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "endpointServerErrors"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 11,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "endpointRateLimited"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 12,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "imageDuration"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 13,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "imageErrors"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 14,
+      "path": "tests/load/helpers/http.js",
+      "kind": "exports",
+      "names": [
+        "headers"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Metrics are registered and updated by timedGet/timedPost/timedImageGet; headers is called internally. Repository import search has no outside consumers of these names. Keep functionality, make module-private."
+    },
+    {
+      "id": 15,
+      "path": "tests/load/helpers/http.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 16,
+      "path": "tests/load/api/chat-read.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 17,
+      "path": "tests/load/api/write-smoke.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 18,
+      "path": "tests/load/images/image-flow.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 19,
+      "path": "tests/load/scenarios/page-flow.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 20,
+      "path": "tests/load/scenarios/public-read.js",
+      "kind": "unlisted",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 21,
+      "path": "tests/load/scripts/run-k6.mjs",
+      "kind": "binaries",
+      "names": [
+        "k6"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "k6 is a standalone runtime/CLI providing k6, k6/http and k6/metrics modules, not a missing npm dependency."
+    },
+    {
+      "id": 22,
+      "path": "scripts/testing/inventory.ts",
+      "kind": "exports",
+      "names": [
+        "sourceRoots"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "buildInventory uses sourceRoots and returns its value; inspectSource uses httpMethods; no external imports."
+    },
+    {
+      "id": 23,
+      "path": "scripts/testing/inventory.ts",
+      "kind": "exports",
+      "names": [
+        "httpMethods"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "buildInventory uses sourceRoots and returns its value; inspectSource uses httpMethods; no external imports."
+    },
+    {
+      "id": 24,
+      "path": "lib/auth/session.ts",
+      "kind": "duplicates",
+      "names": [
+        "platformAgreementVersion",
+        "commissionAgreementVersion"
+      ],
+      "initialClassification": "suspected",
+      "action": "retained",
+      "reason": "Existing user-owned uncommitted native authentication changes in this file; max age and agreement type are used internally, version aliases have distinct semantic consumers. Preserve entire file."
+    },
+    {
+      "id": 25,
+      "path": "lib/auth/session.ts",
+      "kind": "exports",
+      "names": [
+        "sessionMaxAgeSeconds"
+      ],
+      "initialClassification": "suspected",
+      "action": "retained",
+      "reason": "Existing user-owned uncommitted native authentication changes in this file; max age and agreement type are used internally, version aliases have distinct semantic consumers. Preserve entire file."
+    },
+    {
+      "id": 26,
+      "path": "lib/auth/session.ts",
+      "kind": "types",
+      "names": [
+        "CommissionAgreement"
+      ],
+      "initialClassification": "suspected",
+      "action": "retained",
+      "reason": "Existing user-owned uncommitted native authentication changes in this file; max age and agreement type are used internally, version aliases have distinct semantic consumers. Preserve entire file."
+    },
+    {
+      "id": 27,
+      "path": "agent/scope-guard.ts",
+      "kind": "exports",
+      "names": [
+        "getMessageText"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/scope-guard.ts:107, agent/scope-guard.ts:132, agent/scope-guard.ts:154. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 28,
+      "path": "agent/marketplace/listing-image-variants.ts",
+      "kind": "exports",
+      "names": [
+        "listingImageMaxInputPixels"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/listing-image-variants.ts:7, agent/marketplace/listing-image-variants.ts:113, agent/marketplace/listing-image-variants.ts:151, agent/marketplace/listing-image-variants.ts:189. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 29,
+      "path": "lib/security/same-origin.ts",
+      "kind": "exports",
+      "names": [
+        "isCsrfExemptApiPath"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/security/same-origin.ts:15, lib/security/same-origin.ts:67. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 30,
+      "path": "components/chat-elements/conversation.tsx",
+      "kind": "exports",
+      "names": [
+        "ConversationEmptyState"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 31,
+      "path": "components/chat-elements/conversation.tsx",
+      "kind": "types",
+      "names": [
+        "ConversationEmptyStateProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 32,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageActions"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 33,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageAction"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 34,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranch"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 35,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranchContent"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 36,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranchSelector"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 37,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranchPrevious"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 38,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranchNext"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 39,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageBranchPage"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 40,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageAttachments"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 41,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "exports",
+      "names": [
+        "MessageToolbar"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 42,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageActionsProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 43,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageActionProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 44,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 45,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchContentProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 46,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchSelectorProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 47,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchPreviousProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 48,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchNextProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 49,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageBranchPageProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 50,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageAttachmentsProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 51,
+      "path": "components/chat-elements/message.tsx",
+      "kind": "types",
+      "names": [
+        "MessageToolbarProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 52,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "usePromptInputController"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 53,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "useProviderAttachments"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 54,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputProvider"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 55,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputAttachments"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 56,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputActionAddAttachments"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 57,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputHeader"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 58,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputFooter"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 59,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTools"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 60,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputButton"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 61,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputActionMenu"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 62,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputActionMenuTrigger"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 63,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputActionMenuContent"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 64,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputActionMenuItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 65,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSubmit"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 66,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSpeechButton"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 67,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSelect"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 68,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSelectTrigger"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 69,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSelectContent"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 70,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSelectItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 71,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputSelectValue"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 72,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputHoverCard"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 73,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputHoverCardTrigger"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 74,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputHoverCardContent"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 75,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTabsList"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 76,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTab"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 77,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTabLabel"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 78,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTabBody"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 79,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputTabItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 80,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommand"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 81,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandInput"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 82,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandList"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 83,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandEmpty"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 84,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandGroup"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 85,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 86,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "exports",
+      "names": [
+        "PromptInputCommandSeparator"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 87,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "TextInputContext"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 88,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputProviderProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 89,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputAttachmentsProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 90,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputActionAddAttachmentsProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 91,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputHeaderProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 92,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputFooterProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 93,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputToolsProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 94,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputButtonProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 95,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputActionMenuProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 96,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputActionMenuTriggerProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 97,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputActionMenuContentProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 98,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputActionMenuItemProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 99,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSubmitProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 100,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSpeechButtonProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 101,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSelectProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 102,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSelectTriggerProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 103,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSelectContentProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 104,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSelectItemProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 105,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputSelectValueProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 106,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputHoverCardProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 107,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputHoverCardTriggerProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 108,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputHoverCardContentProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 109,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputTabsListProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 110,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputTabProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 111,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputTabLabelProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 112,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputTabBodyProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 113,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputTabItemProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 114,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 115,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandInputProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 116,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandListProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 117,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandEmptyProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 118,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandGroupProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 119,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandItemProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 120,
+      "path": "components/chat-elements/prompt-input.tsx",
+      "kind": "types",
+      "names": [
+        "PromptInputCommandSeparatorProps"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": [
+        "Fresh Knip report flags the named export; repository-wide text search found no consumers outside its own declaration module.",
+        "Only app/page.tsx imports this module, through static @chat-elements aliases with explicit named imports; no wildcard, namespace, barrel re-export, computed or dynamic module consumers found.",
+        "The removed component and its props belong only to the unused generic wrapper/provider subtree. Active app/page.tsx controls and active local attachment/textarea/message rendering remain."
+      ]
+    },
+    {
+      "id": 121,
+      "path": "components/ui/button.tsx",
+      "kind": "exports",
+      "names": [
+        "buttonVariants"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Button uses the variant function for its classes and props; no consumer imports this helper. Implementation retained unchanged."
+    },
+    {
+      "id": 122,
+      "path": "lib/utils.ts",
+      "kind": "exports",
+      "names": [
+        "formatCurrency"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 123,
+      "path": "lib/utils.ts",
+      "kind": "exports",
+      "names": [
+        "formatCamelCase"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 124,
+      "path": "lib/client-image-normalization.ts",
+      "kind": "exports",
+      "names": [
+        "readBlobAsDataUrl"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by convertImageBlobToJpegDataUrl and convertAttachmentBlobToDataUrl; callers use the public attachment/upload API. Implementation retained unchanged."
+    },
+    {
+      "id": 125,
+      "path": "lib/client-image-normalization.ts",
+      "kind": "exports",
+      "names": [
+        "convertImageBlobToJpegDataUrl"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by convertAttachmentBlobToDataUrl; callers use the public attachment/upload API. Implementation retained unchanged."
+    },
+    {
+      "id": 126,
+      "path": "lib/client-image-normalization.ts",
+      "kind": "exports",
+      "names": [
+        "createNormalizedImageFile"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by createUploadableImageFile and createListingImageUploadFiles for originals and derived images. Implementation retained unchanged."
+    },
+    {
+      "id": 127,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuPortal"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 128,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuGroup"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 129,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuLabel"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 130,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuCheckboxItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 131,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuRadioGroup"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 132,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuRadioItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 133,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuSeparator"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 134,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuShortcut"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 135,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuSub"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 136,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuSubTrigger"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 137,
+      "path": "components/ui/dropdown-menu.tsx",
+      "kind": "exports",
+      "names": [
+        "DropdownMenuSubContent"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 138,
+      "path": "components/ui/dialog.tsx",
+      "kind": "exports",
+      "names": [
+        "DialogClose"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 139,
+      "path": "components/ui/dialog.tsx",
+      "kind": "exports",
+      "names": [
+        "DialogOverlay"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "DialogContent renders the overlay directly; no consumer imports it. Implementation retained unchanged."
+    },
+    {
+      "id": 140,
+      "path": "components/ui/dialog.tsx",
+      "kind": "exports",
+      "names": [
+        "DialogPortal"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "DialogContent renders the portal directly; no consumer imports it. Implementation retained unchanged."
+    },
+    {
+      "id": 141,
+      "path": "agent/marketplace/repository.ts",
+      "kind": "exports",
+      "names": [
+        "listUserConversations"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/repository.ts:3048. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. Routes use listUserConversationsPage instead; the separately referenced store.listUserConversations fallback and paginated API remain unchanged."
+    },
+    {
+      "id": 142,
+      "path": "agent/marketplace/repository.ts",
+      "kind": "exports",
+      "names": [
+        "listUserFavorites"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/repository.ts:4440. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. Routes use listUserFavoritesPage instead; the separately referenced store.listUserFavorites fallback and paginated API remain unchanged."
+    },
+    {
+      "id": 143,
+      "path": "agent/marketplace/repository.ts",
+      "kind": "exports",
+      "names": [
+        "listModerationQueue"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/repository.ts:4879. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. Routes use listModerationQueuePage instead; the separately referenced store.listModerationQueue fallback and paginated API remain unchanged."
+    },
+    {
+      "id": 144,
+      "path": "agent/marketplace/repository.ts",
+      "kind": "exports",
+      "names": [
+        "listSellerCommissions"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/repository.ts:5393. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. Routes use listSellerCommissionsPage instead; the separately referenced store.listSellerCommissions fallback and paginated API remain unchanged."
+    },
+    {
+      "id": 145,
+      "path": "agent/marketplace/repository.ts",
+      "kind": "exports",
+      "names": [
+        "listAdminCommissions"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/repository.ts:5453. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. Routes use listAdminCommissionsPage instead; the separately referenced store.listAdminCommissions fallback and paginated API remain unchanged."
+    },
+    {
+      "id": 146,
+      "path": "agent/marketplace/vision-compliance.ts",
+      "kind": "exports",
+      "names": [
+        "imageComplianceSystemPrompt"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/vision-compliance.ts:560, agent/marketplace/vision-compliance.ts:561, agent/marketplace/vision-compliance.ts:586. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 147,
+      "path": "lib/chat/context.ts",
+      "kind": "exports",
+      "names": [
+        "chatContextMessageLimit"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/chat/context.ts:3, lib/chat/context.ts:30. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 148,
+      "path": "agent/marketplace/market-intelligence.ts",
+      "kind": "exports",
+      "names": [
+        "analyzeMarketForRankedListings"
+      ],
+      "initialClassification": "suspected",
+      "action": "retained",
+      "reason": "No current source caller, but docs/hamad-role.md explicitly preserves pricing/comparison/ranking/recommendation arithmetic engines. Kept this calculation entry point intentionally, without adding chat capabilities or suppressing the finding."
+    },
+    {
+      "id": 149,
+      "path": "agent/marketplace/evidence.ts",
+      "kind": "exports",
+      "names": [
+        "evidenceActions"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/evidence.ts:14, agent/marketplace/evidence.ts:152. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 150,
+      "path": "agent/marketplace/evidence.ts",
+      "kind": "exports",
+      "names": [
+        "evidenceEnabled"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/evidence.ts:16, agent/marketplace/evidence.ts:62, agent/marketplace/evidence.ts:96, agent/marketplace/evidence.ts:106, agent/marketplace/evidence.ts:122, agent/marketplace/evidence.ts:153. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 151,
+      "path": "agent/marketplace/evidence.ts",
+      "kind": "exports",
+      "names": [
+        "lockEvidenceWrites"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/evidence.ts:24, agent/marketplace/evidence.ts:69, agent/marketplace/evidence.ts:89, agent/marketplace/evidence.ts:163, agent/marketplace/evidence.ts:190. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 152,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "exports",
+      "names": [
+        "rankingPreferenceSchema"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:5, agent/marketplace/structured-search-intent.ts:17, agent/marketplace/structured-search-intent.ts:28. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 153,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "exports",
+      "names": [
+        "searchModeSchema"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:7, agent/marketplace/structured-search-intent.ts:10, agent/marketplace/structured-search-intent.ts:30. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 154,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "exports",
+      "names": [
+        "clearableSearchFilterSchema"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:8, agent/marketplace/structured-search-intent.ts:20. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 155,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "exports",
+      "names": [
+        "structuredSearchIntentSchema"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:9, agent/marketplace/structured-search-intent.ts:23, agent/marketplace/structured-search-intent.ts:36. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 156,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "types",
+      "names": [
+        "RankingPreference"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:28. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. This is an unused standalone inferred type alias; active schemas and preserved calculation input types remain."
+    },
+    {
+      "id": 157,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "types",
+      "names": [
+        "SortPreference"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:29. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. This is an unused standalone inferred type alias; active schemas and preserved calculation input types remain."
+    },
+    {
+      "id": 158,
+      "path": "agent/marketplace/structured-search-intent.ts",
+      "kind": "types",
+      "names": [
+        "SearchMode"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/structured-search-intent.ts:30. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. This is an unused standalone inferred type alias; active schemas and preserved calculation input types remain."
+    },
+    {
+      "id": 159,
+      "path": "agent/marketplace/profile-image-storage.ts",
+      "kind": "exports",
+      "names": [
+        "createPersistentProfileImageDataUrl"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/profile-image-storage.ts:9, agent/marketplace/profile-image-storage.ts:56. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 160,
+      "path": "lib/native/deep-links.ts",
+      "kind": "exports",
+      "names": [
+        "appCustomScheme"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/native/deep-links.ts:7, lib/native/deep-links.ts:84. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 161,
+      "path": "lib/native/deep-links.ts",
+      "kind": "exports",
+      "names": [
+        "toAbsoluteAppUrl"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: lib/native/deep-links.ts:87. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. No barrel, namespace lookup, native window bridge or documentation exposes this helper. Existing appUrl use, trusted-host checks and toAppDeepLink remain."
+    },
+    {
+      "id": 162,
+      "path": "agent/marketplace/agents.ts",
+      "kind": "exports",
+      "names": [
+        "marketplaceAgentBlueprint"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/agents.ts:4. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Only the declaration refers to this symbol; removed the unreferenced definition. The actual marketplaceSystemInstructions prompt remains intact; this blueprint object is never interpolated or consumed."
+    },
+    {
+      "id": 163,
+      "path": "lib/push/native-push.ts",
+      "kind": "exports",
+      "names": [
+        "isNativePushConfigured"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/push/native-push.ts:114, lib/push/native-push.ts:351. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 164,
+      "path": "agent/platform-capabilities.ts",
+      "kind": "exports",
+      "names": [
+        "platformDestinations"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/platform-capabilities.ts:10, agent/platform-capabilities.ts:45. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 165,
+      "path": "agent/platform-capabilities.ts",
+      "kind": "exports",
+      "names": [
+        "platformCapabilityRules"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/platform-capabilities.ts:24, agent/platform-capabilities.ts:49. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 166,
+      "path": "agent/platform-capabilities.ts",
+      "kind": "exports",
+      "names": [
+        "renderPlatformDestinationsForPrompt"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/platform-capabilities.ts:44, agent/platform-capabilities.ts:55. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 167,
+      "path": "lib/push/vapid.ts",
+      "kind": "exports",
+      "names": [
+        "createVapidJwt"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/push/vapid.ts:41, lib/push/vapid.ts:99. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 168,
+      "path": "tests/load/config/environment.js",
+      "kind": "exports",
+      "names": [
+        "requiredEnv"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by loadEnv construction and safety assertions inside this module. No outside imports; keep all safety logic and make helpers private."
+    },
+    {
+      "id": 169,
+      "path": "tests/load/config/environment.js",
+      "kind": "exports",
+      "names": [
+        "numberEnv"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by loadEnv construction and safety assertions inside this module. No outside imports; keep all safety logic and make helpers private."
+    },
+    {
+      "id": 170,
+      "path": "tests/load/config/environment.js",
+      "kind": "exports",
+      "names": [
+        "boolEnv"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by loadEnv construction and safety assertions inside this module. No outside imports; keep all safety logic and make helpers private."
+    },
+    {
+      "id": 171,
+      "path": "tests/load/config/environment.js",
+      "kind": "exports",
+      "names": [
+        "listEnv"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by loadEnv construction and safety assertions inside this module. No outside imports; keep all safety logic and make helpers private."
+    },
+    {
+      "id": 172,
+      "path": "tests/load/config/environment.js",
+      "kind": "exports",
+      "names": [
+        "isProduction"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "Used by loadEnv construction and safety assertions inside this module. No outside imports; keep all safety logic and make helpers private."
+    },
+    {
+      "id": 173,
+      "path": "tests/load/data/flows.js",
+      "kind": "exports",
+      "names": [
+        "pick"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "pick is called by searchTerm/city/configuredListingId locally; no external import."
+    },
+    {
+      "id": 174,
+      "path": "components/ui/button-group.tsx",
+      "kind": "exports",
+      "names": [
+        "ButtonGroupSeparator"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 175,
+      "path": "components/ui/button-group.tsx",
+      "kind": "exports",
+      "names": [
+        "buttonGroupVariants"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 176,
+      "path": "components/ui/command.tsx",
+      "kind": "exports",
+      "names": [
+        "CommandDialog"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 177,
+      "path": "components/ui/command.tsx",
+      "kind": "exports",
+      "names": [
+        "CommandShortcut"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 178,
+      "path": "components/ui/input-group.tsx",
+      "kind": "exports",
+      "names": [
+        "InputGroupText"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 179,
+      "path": "components/ui/input-group.tsx",
+      "kind": "exports",
+      "names": [
+        "InputGroupInput"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "Knip candidate confirmed by repository-wide symbol and module import searches, including @ui/* aliases, dynamic imports and source-reading tests. No local caller, JSX consumer, re-export, namespace consumer or framework entry contract. Only the declaration/export itself referenced the symbol."
+    },
+    {
+      "id": 180,
+      "path": "components/ui/select.tsx",
+      "kind": "exports",
+      "names": [
+        "SelectGroup"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 181,
+      "path": "components/ui/select.tsx",
+      "kind": "exports",
+      "names": [
+        "SelectLabel"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 182,
+      "path": "components/ui/select.tsx",
+      "kind": "exports",
+      "names": [
+        "SelectScrollDownButton"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 183,
+      "path": "components/ui/select.tsx",
+      "kind": "exports",
+      "names": [
+        "SelectScrollUpButton"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 184,
+      "path": "components/ui/select.tsx",
+      "kind": "exports",
+      "names": [
+        "SelectSeparator"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "After removing unused chat wrappers, the whole module has no importers through @ui/*, @/*, relative, namespace or dynamic imports. Repository-wide filename/symbol/source-test searches have no remaining consumers. Scroll helpers and button variants were internally used before the module became orphaned; they were not individually mistaken for unused implementations."
+    },
+    {
+      "id": 185,
+      "path": "app/app-config.ts",
+      "kind": "types",
+      "names": [
+        "AppConfig"
+      ],
+      "initialClassification": "suspected",
+      "action": "definition-deleted",
+      "reason": "AppConfig type name has no consumers anywhere in the repository; runtime appConfig remains."
+    },
+    {
+      "id": 186,
+      "path": "lib/admin/model-review.ts",
+      "kind": "types",
+      "names": [
+        "ModelAssessment"
+      ],
+      "initialClassification": "used",
+      "action": "retained",
+      "reason": "Confirmed false positive: qualified import type at agent/marketplace/types.ts:191 and local assessment field use. Kept the exported type because it is used outside this module."
+    },
+    {
+      "id": 187,
+      "path": "agent/marketplace/push-subscriptions.ts",
+      "kind": "types",
+      "names": [
+        "PushPlatform"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/push-subscriptions.ts:9, agent/marketplace/push-subscriptions.ts:16, agent/marketplace/push-subscriptions.ts:27, agent/marketplace/push-subscriptions.ts:106. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 188,
+      "path": "agent/marketplace/push-subscriptions.ts",
+      "kind": "types",
+      "names": [
+        "StoredPushSubscription"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/push-subscriptions.ts:21, agent/marketplace/push-subscriptions.ts:47, agent/marketplace/push-subscriptions.ts:75, agent/marketplace/push-subscriptions.ts:141. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 189,
+      "path": "lib/realtime/events.ts",
+      "kind": "types",
+      "names": [
+        "RealtimePayloadByType"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: lib/realtime/events.ts:14, lib/realtime/events.ts:96, lib/realtime/events.ts:110. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 190,
+      "path": "agent/marketplace/mobile-push-tokens.ts",
+      "kind": "types",
+      "names": [
+        "MobilePushPlatform"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/mobile-push-tokens.ts:5, agent/marketplace/mobile-push-tokens.ts:10, agent/marketplace/mobile-push-tokens.ts:20. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 191,
+      "path": "agent/marketplace/mobile-push-tokens.ts",
+      "kind": "types",
+      "names": [
+        "StoredMobilePushToken"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/mobile-push-tokens.ts:16, agent/marketplace/mobile-push-tokens.ts:41, agent/marketplace/mobile-push-tokens.ts:69, agent/marketplace/mobile-push-tokens.ts:132. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 192,
+      "path": "agent/marketplace/comparison-engine.ts",
+      "kind": "types",
+      "names": [
+        "MarketplaceComparisonItem"
+      ],
+      "initialClassification": "suspected",
+      "action": "export-removed",
+      "reason": "TypeScript language-service symbol references: agent/marketplace/comparison-engine.ts:9, agent/marketplace/comparison-engine.ts:26, agent/marketplace/comparison-engine.ts:27, agent/marketplace/comparison-engine.ts:51, agent/marketplace/comparison-engine.ts:58, agent/marketplace/comparison-engine.ts:59, agent/marketplace/comparison-engine.ts:59, agent/marketplace/comparison-engine.ts:60, agent/marketplace/comparison-engine.ts:81, agent/marketplace/comparison-engine.ts:150. Repository-wide exact-name search (including docs/config, imports, namespaces and dynamic import calls) found no additional consumers. Definition is used inside its own module; preserved its implementation/type and removed only the unused export surface. No runtime behavior is removed."
+    },
+    {
+      "id": 193,
+      "path": "agent/marketplace/listing-image-limits.ts",
+      "kind": "duplicates",
+      "names": [
+        "defaultMaxListingImages",
+        "hardMaxListingImages"
+      ],
+      "initialClassification": "suspected",
+      "action": "retained",
+      "reason": "Both names have real consumers: listing-image-storage.ts and image-limit/storage/store tests import defaultMaxListingImages; db-integration.test.ts and listing-image-limits.test.ts import hardMaxListingImages. One expresses the default and one the enforced cap; the cap aliases the default intentionally. This duplicate-export report is not dead code."
+    }
+  ],
+  "cascadingCleanup": [
+    {
+      "path": "components/chat-elements/message.tsx",
+      "names": [
+        "MessageBranchContextType",
+        "MessageBranchContext",
+        "useMessageBranch"
+      ],
+      "reason": "Only reached from deleted MessageBranch components; removed their React hooks, ButtonGroup and chevron imports."
+    },
+    {
+      "path": "components/chat-elements/prompt-input.tsx",
+      "names": [
+        "PromptInputControllerProps",
+        "PromptInputController",
+        "ProviderAttachmentsContext",
+        "useOptionalPromptInputController",
+        "useOptionalProviderAttachments"
+      ],
+      "reason": "PromptInputProvider is never rendered or imported; removed its context and all unreachable provider branches. Local attachment behavior is retained."
+    },
+    {
+      "path": "components/chat-elements/prompt-input.tsx",
+      "names": [
+        "PromptInputAttachmentProps",
+        "PromptInputAttachment"
+      ],
+      "reason": "Value component has no caller; the shared name with the active internal attachment type hid this value from the original export findings. app/page.tsx renders ChatAttachmentPreviewStrip directly. Kept internal PromptInputAttachment type and preparation pipeline."
+    },
+    {
+      "path": "components/chat-elements/prompt-input.tsx",
+      "names": [
+        "PromptInputButtonProps",
+        "SpeechRecognition",
+        "SpeechRecognitionEvent",
+        "SpeechRecognitionResultList",
+        "SpeechRecognitionResult",
+        "SpeechRecognitionAlternative",
+        "SpeechRecognitionErrorEvent",
+        "Window.SpeechRecognition",
+        "Window.webkitSpeechRecognition"
+      ],
+      "reason": "Reachable only from deleted unused generic PromptInputSpeechButton/PromptInputButton subtree; no other repository references. No mounted speech component or handler was changed."
+    },
+    {
+      "path": "components/chat-elements/prompt-input.tsx",
+      "names": [
+        "Command imports",
+        "DropdownMenu imports",
+        "HoverCard imports",
+        "Select imports",
+        "InputGroupAddon import",
+        "InputGroupButton import",
+        "Button import",
+        "ChatStatus import",
+        "lucide imports",
+        "unused React imports"
+      ],
+      "reason": "Used only by removed generic wrapper subtrees; active InputGroup/InputGroupTextarea and attachment normalization imports remain."
+    },
+    {
+      "path": "components/ui/button-group.tsx",
+      "kind": "file",
+      "name": "button-group.tsx",
+      "action": "removed-file",
+      "evidence": "Only importer was unused MessageBranchSelector; chat cleanup removed it. All ButtonGroup APIs and its variant styles became unreachable."
+    },
+    {
+      "path": "components/ui/select.tsx",
+      "kind": "file",
+      "name": "select.tsx",
+      "action": "removed-file",
+      "evidence": "Only importer was unused PromptInputSelect wrappers. Native HTML select elements remain and are independent of this Radix wrapper."
+    },
+    {
+      "path": "components/ui/hover-card.tsx",
+      "kind": "file",
+      "name": "hover-card.tsx",
+      "action": "removed-file",
+      "evidence": "Only importer was unused PromptInputHoverCard wrappers. No remaining @ui, relative, dynamic, string or exported symbol consumers."
+    },
+    {
+      "path": "components/ui/separator.tsx",
+      "kind": "file",
+      "name": "separator.tsx",
+      "action": "removed-file",
+      "evidence": "Only importer was removed button-group module. No remaining consumers."
+    },
+    {
+      "path": "components/ui/command.tsx",
+      "kind": "exports",
+      "name": "CommandGroup",
+      "action": "removed-declaration",
+      "evidence": "Only caller was unused prompt command wrapper. Admin shell still uses Command/Input/List/Empty/Item; these implementations were preserved."
+    },
+    {
+      "path": "components/ui/command.tsx",
+      "kind": "exports",
+      "name": "CommandSeparator",
+      "action": "removed-declaration",
+      "evidence": "Only caller was unused prompt command wrapper. Admin shell still uses Command/Input/List/Empty/Item; these implementations were preserved."
+    },
+    {
+      "path": "components/ui/input-group.tsx",
+      "kind": "exports",
+      "name": "InputGroupAddon",
+      "action": "removed-declaration",
+      "evidence": "Only callers were unused prompt toolbar/action wrappers. Active PromptInput retains InputGroup and InputGroupTextarea unchanged."
+    },
+    {
+      "path": "components/ui/input-group.tsx",
+      "kind": "exports",
+      "name": "InputGroupButton",
+      "action": "removed-declaration",
+      "evidence": "Only callers were unused prompt toolbar/action wrappers. Active PromptInput retains InputGroup and InputGroupTextarea unchanged."
+    },
+    {
+      "path": "components/ui/input-group.tsx",
+      "kind": "internal-declaration",
+      "name": "inputGroupAddonVariants",
+      "action": "removed-declaration",
+      "evidence": "Only callers were unused prompt toolbar/action wrappers. Active PromptInput retains InputGroup and InputGroupTextarea unchanged."
+    },
+    {
+      "path": "components/ui/input-group.tsx",
+      "kind": "internal-declaration",
+      "name": "inputGroupButtonVariants",
+      "action": "removed-declaration",
+      "evidence": "Only callers were unused prompt toolbar/action wrappers. Active PromptInput retains InputGroup and InputGroupTextarea unchanged."
+    },
+    {
+      "path": "components/ui/tooltip.tsx",
+      "kind": "exports",
+      "name": "TooltipProvider",
+      "action": "removed-export-only",
+      "evidence": "Unused MessageAction was the only external consumer. Tooltip still calls TooltipProvider internally; that behavior was preserved."
+    },
+    {
+      "path": "package.json",
+      "name": "@radix-ui/react-hover-card",
+      "action": "dependency-removed",
+      "evidence": "Only project importer was a UI module deleted after tracing all consumers. Existing Radix modules retain their independently declared transitive dependencies."
+    },
+    {
+      "path": "package.json",
+      "name": "@radix-ui/react-select",
+      "action": "dependency-removed",
+      "evidence": "Only project importer was a UI module deleted after tracing all consumers. Existing Radix modules retain their independently declared transitive dependencies."
+    },
+    {
+      "path": "package.json",
+      "name": "@radix-ui/react-separator",
+      "action": "dependency-removed",
+      "evidence": "Only project importer was a UI module deleted after tracing all consumers. Existing Radix modules retain their independently declared transitive dependencies."
+    }
+  ],
+  "after": {
+    "rawFindings": 13,
+    "allRemainingHaveDocumentedRetention": true,
+    "unusedFiles": 0,
+    "unusedDependencies": 0,
+    "unresolvedImports": 0
+  },
+  "verification": {
+    "frozenOfflineInstall": "passed",
+    "prismaClientGeneration": "passed; no database connection or migration",
+    "types": "passed",
+    "lint": "passed",
+    "dependencyAudit": "passed; zero vulnerabilities reported",
+    "internalDefinitionComparison": "47 of 47 unchanged except export modifier",
+    "nodeTests": {
+      "tests": 881,
+      "passed": 863,
+      "failed": 0,
+      "skipped": 18,
+      "skipReason": "Opt-in PostgreSQL integration; not executed"
+    },
+    "productionBuild": "passed; no warnings",
+    "browser": {
+      "stats": {
+        "startTime": "2026-10-20T10:02:39.129Z",
+        "duration": 229294.087,
+        "expected": 29,
+        "skipped": 1,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "errors": [],
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium-layout"
+      ],
+      "mode": "Isolated production build with local fixtures and intercepted model transport",
+      "skips": [
+        {
+          "title": "mobile assistant input stays attached to the visual viewport keyboard edge",
+          "tests": [
+            {
+              "project": "desktop-chromium",
+              "status": "skipped",
+              "result": [
+                "skipped"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "whitespace": "passed",
+    "independentDiffReview": "No concrete findings in independent UI and backend reviews",
+    "deletionValidation": "127 original definition findings absent; 7 deleted files absent; 6 direct dependencies absent",
+    "visualInspection": "Desktop Hamad draft-choice and 360px admin workspace screenshots inspected; Arabic/RTL layout and active controls present"
+  },
+  "changeSummary": {
+    "trackedChangedFiles": 47,
+    "sourceLinesAdded": 67,
+    "sourceLinesRemoved": 2819,
+    "deletedFiles": [
+      "components/ui/button-group.tsx",
+      "components/ui/hover-card.tsx",
+      "components/ui/select.tsx",
+      "components/ui/separator.tsx",
+      "hooks/use-push-notifications.ts",
+      "scripts/chat-load-test.mjs",
+      "scripts/load-test.mjs"
+    ],
+    "lockfile": {
+      "file": "pnpm-lock.yaml",
+      "added": 0,
+      "removed": 268
+    }
+  },
+  "baselineCommit": "20326da3758d3aa4e649e08680f72b27b9da19d3"
+}

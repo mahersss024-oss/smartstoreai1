@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 // switch as the rest of the marketplace so local dev and production share a
 // single API surface.
 
-export type PushPlatform = 'web' | 'ios' | 'android';
+type PushPlatform = 'web' | 'ios' | 'android';
 
 export type PushSubscriptionInput = {
   userId?: string | null;
@@ -18,7 +18,7 @@ export type PushSubscriptionInput = {
   locale?: string | null;
 };
 
-export type StoredPushSubscription = {
+type StoredPushSubscription = {
   id: string;
   userId: string | null;
   endpoint: string;

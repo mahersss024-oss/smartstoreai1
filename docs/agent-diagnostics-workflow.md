@@ -25,8 +25,11 @@ Use the smallest useful tool set:
 
 Treat Knip output as candidates. Classify each reviewed item as A used, B dynamic,
 C suspected or D high-confidence unused. Retain evidence and never delete code
-merely because the tool flags it. This inspection task authorizes no removals,
-automatic lint fixes, forced audit fixes or major dependency upgrades.
+merely because the tool flags it. An inspection-only task authorizes no removals,
+automatic lint fixes, forced audit fixes or major dependency upgrades. Follow an
+explicit subsequent cleanup request within its scope; preserve the review evidence.
+The completed candidate review is recorded in
+`docs/dead-code-review-2026-10-20.ar.md` and its per-finding JSON ledger.
 
 Use existing package scripts and the pinned pnpm. Check tools and versions before
 installing. The isolated audit installer writes only under `.data/` and does not

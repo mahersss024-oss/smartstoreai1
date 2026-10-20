@@ -104,7 +104,7 @@ export function messagesHaveImageAttachment(messages: unknown[]) {
   return messages.some(messageHasImageAttachment);
 }
 
-export function getMessageText(message: unknown) {
+function getMessageText(message: unknown) {
   if (!isMessageLike(message)) {
     return '';
   }

@@ -12,7 +12,7 @@ export function isUnsafeMutationMethod(method: string) {
   return unsafeMutationMethods.has(method.toUpperCase());
 }
 
-export function isCsrfExemptApiPath(pathname: string) {
+function isCsrfExemptApiPath(pathname: string) {
   return csrfExemptApiPaths.has(pathname);
 }
 

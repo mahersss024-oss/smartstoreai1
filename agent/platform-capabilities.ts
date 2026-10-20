@@ -7,7 +7,7 @@ export type PlatformCapability = {
   userGuidance?: string;
 };
 
-export const platformDestinations = {
+const platformDestinations = {
   home: '/: market browsing, database search, filters and manual listing creation.',
   account: '/account: profile, saved official contact phone and account settings.',
   listings: '/account/listings: review, edit and publish your own drafts yourself.',
@@ -21,7 +21,7 @@ export const platformDestinations = {
   deletion: '/delete-account: account-deletion information.',
 } as const;
 
-export const platformCapabilityRules = [
+const platformCapabilityRules = [
   'Hamad chat requires Google or Apple sign-in before any assistant interaction.',
   'The assistant only sees and acts through explicit platform capabilities and tools. Do not claim to see hidden UI state, click buttons, navigate pages, or read account data.',
   'There are only two roles: prepare unpublished drafts after the customer chooses Hamad, and explain the platform and its policies using getPlatformHelp.',
@@ -41,7 +41,7 @@ export const platformCapabilities: PlatformCapability[] = [
   { action: 'platform_help', canDo: 'Answer platform usage, policy, privacy, fees, account, search/filter instructions and safety questions from documented sources only.', requiresAuth: true, requiresConfirmation: false, allowedTools: ['getPlatformHelp'] },
 ];
 
-export function renderPlatformDestinationsForPrompt() {
+function renderPlatformDestinationsForPrompt() {
   return Object.values(platformDestinations).map(destination => `- ${destination}`).join('\n');
 }
 

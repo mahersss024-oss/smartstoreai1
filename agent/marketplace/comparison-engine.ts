@@ -6,7 +6,7 @@ import { rankMarketplaceListings } from './ranking-engine';
 import type { MarketplaceSearchState } from './structured-search-intent';
 import type { ListingRecord } from './store';
 
-export type MarketplaceComparisonItem = {
+type MarketplaceComparisonItem = {
   listing: ListingRecord;
   overallScore: number;
   priceScore: number;

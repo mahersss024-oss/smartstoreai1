@@ -4,7 +4,7 @@ import type { Metadata } from 'sharp';
 export const listingOriginalMaxDimension = 1800;
 export const listingDisplayMaxDimension = 900;
 export const listingThumbnailMaxDimension = 360;
-export const listingImageMaxInputPixels = 45_000_000;
+const listingImageMaxInputPixels = 45_000_000;
 
 export class ListingImageSecurityError extends Error {
   constructor(

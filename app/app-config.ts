@@ -83,5 +83,3 @@ Keep responses focused on helping the user complete marketplace tasks safely and
     },
   },
 } as const;
-
-export type AppConfig = typeof appConfig;

@@ -4,15 +4,15 @@ import { Rate, Trend } from 'k6/metrics';
 
 import { loadEnv, url } from '../config/environment.js';
 
-export const endpointDuration = new Trend('smartstore_endpoint_duration', true);
-export const endpointErrors = new Rate('smartstore_endpoint_errors');
-export const endpointClientErrors = new Rate('smartstore_endpoint_client_errors');
-export const endpointServerErrors = new Rate('smartstore_endpoint_server_errors');
-export const endpointRateLimited = new Rate('smartstore_endpoint_rate_limited');
-export const imageDuration = new Trend('smartstore_image_duration', true);
-export const imageErrors = new Rate('smartstore_image_errors');
+const endpointDuration = new Trend('smartstore_endpoint_duration', true);
+const endpointErrors = new Rate('smartstore_endpoint_errors');
+const endpointClientErrors = new Rate('smartstore_endpoint_client_errors');
+const endpointServerErrors = new Rate('smartstore_endpoint_server_errors');
+const endpointRateLimited = new Rate('smartstore_endpoint_rate_limited');
+const imageDuration = new Trend('smartstore_image_duration', true);
+const imageErrors = new Rate('smartstore_image_errors');
 
-export function headers(extra = {}, includeSession = true) {
+function headers(extra = {}, includeSession = true) {
   const requestHeaders = {
     accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
     'user-agent': 'SmartStoreAI-k6-load/1.0',

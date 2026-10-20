@@ -44,7 +44,7 @@ export function isProbablyImageFile(
   );
 }
 
-export function readBlobAsDataUrl(blob: Blob): Promise<string> {
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
@@ -82,7 +82,7 @@ async function loadDrawableImage(blob: Blob): Promise<CanvasImageSource> {
   return loadImageElement(blob);
 }
 
-export async function convertImageBlobToJpegDataUrl(
+async function convertImageBlobToJpegDataUrl(
   blob: Blob,
   options: {
     maxDimension?: number;
@@ -158,7 +158,7 @@ export async function convertAttachmentBlobToDataUrl(
   };
 }
 
-export async function createNormalizedImageFile(
+async function createNormalizedImageFile(
   file: File,
   options: {
     maxDimension?: number;

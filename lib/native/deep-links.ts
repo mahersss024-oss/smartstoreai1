@@ -4,7 +4,7 @@ import { appUrl } from '@/lib/app-url';
 // native shells (smartstore://). Also exposes a helper to detect in-app
 // browser limitations so we can route to the native app or the system browser.
 
-export const appCustomScheme = 'smartstore';
+const appCustomScheme = 'smartstore';
 
 const productionHosts = ['souqhamad.com', 'www.souqhamad.com'];
 
@@ -82,14 +82,6 @@ export function toAppDeepLink(internalUrl: string): string | null {
   const query = search ? `?${search}` : '';
 
   return `${appCustomScheme}://${pathname.replace(/^\//, '')}${query}`;
-}
-
-export function toAbsoluteAppUrl(internalUrl: string): string {
-  try {
-    return new URL(internalUrl, appUrl).toString();
-  } catch {
-    return appUrl;
-  }
 }
 
 const inAppBrowserPatterns = [

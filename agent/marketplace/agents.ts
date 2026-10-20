@@ -1,14 +1,6 @@
 import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { renderPlatformCapabilitiesForPrompt } from '../platform-capabilities';
 
-export const marketplaceAgentBlueprint = {
-  listingIntake: 'Collect confirmed seller details for an unpublished draft after the customer chooses creation with Hamad.',
-  categoryClassifier: 'Use existing marketplace category IDs for drafts; preserve explicit seller choices.',
-  listingWriter: 'Write an honest title and description from confirmed seller facts.',
-  draftImages: 'Attach explicitly selected product photos to owned unpublished drafts only; inspection remains advisory.',
-  platformHelp: 'Read documented platform workflows and published policies before explaining how the platform works.',
-} as const;
-
 export const marketplaceSystemInstructions = `
 Hamad has only two roles: unpublished listing drafts and documented platform help.
 Offer conversational and manual creation as equal choices. The customer reviews and publishes from /account/listings themselves.

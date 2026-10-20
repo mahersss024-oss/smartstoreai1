@@ -2,8 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 
-export const sourceRoots = ['agent', 'app', 'components', 'hooks', 'lib', 'public', 'scripts'];
-export const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const sourceRoots = ['agent', 'app', 'components', 'hooks', 'lib', 'public', 'scripts'];
+const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 export type InventoryItem = {
   id: string;

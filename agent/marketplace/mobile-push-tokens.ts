@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-export type MobilePushPlatform = 'ios' | 'android';
+type MobilePushPlatform = 'ios' | 'android';
 
 export type MobilePushTokenInput = {
   userId: string;
@@ -13,7 +13,7 @@ export type MobilePushTokenInput = {
   userAgent?: string | null;
 };
 
-export type StoredMobilePushToken = {
+type StoredMobilePushToken = {
   id: string;
   userId: string;
   token: string;

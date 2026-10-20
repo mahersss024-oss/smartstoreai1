@@ -6,7 +6,7 @@ const supportedMimeTypes = new Set([
   'image/webp',
 ]);
 
-export function createPersistentProfileImageDataUrl(
+function createPersistentProfileImageDataUrl(
   data: Uint8Array,
   mediaType: string,
 ) {

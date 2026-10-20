@@ -11,7 +11,7 @@ export type RealtimeEventType =
   | 'moderation_updated'
   | 'maintenance_cleanup';
 
-export type RealtimePayloadByType = {
+type RealtimePayloadByType = {
   ad_created: {
     listingId: string;
     sellerId: string;

@@ -3045,59 +3045,6 @@ export async function setPrimaryListingImageForSeller(
   return mappedListing;
 }
 
-export async function listUserConversations(userId: string) {
-  if (!shouldUseDatabaseStore()) {
-    return memoryStore.listUserConversations(userId);
-  }
-
-  const conversations = await prisma.conversation.findMany({
-    where: {
-      OR: [{ buyerId: userId }, { sellerId: userId }],
-      NOT: {
-        messages: {
-          some: {
-            senderId: userId,
-            type: 'conversation_hidden',
-          },
-        },
-      },
-    },
-    include: {
-      messages: { orderBy: { createdAt: 'asc' } },
-      seller: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          picture: true,
-          lastActiveAt: true,
-          deletedAt: true,
-        },
-      },
-      buyer: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          picture: true,
-          lastActiveAt: true,
-          deletedAt: true,
-        },
-      },
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          },
-        },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-
-  return conversations.map(toConversationRecord);
-}
-
 export async function listUserConversationsPage(
   userId: string,
   filters: PaginationInput = {},
@@ -4437,30 +4384,6 @@ export async function shareSellerContact(conversationId: string, actor: Actor) {
   };
 }
 
-export async function listUserFavorites(userId: string) {
-  if (!shouldUseDatabaseStore()) {
-    return memoryStore
-      .listUserFavorites(userId)
-      .filter((favorite) => favorite.listing?.status === 'published');
-  }
-
-  const favorites = await prisma.favorite.findMany({
-    where: { userId, listing: { status: 'published' } },
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  return favorites.map(toFavoriteRecord);
-}
-
 export async function listUserFavoritesPage(
   userId: string,
   filters: PaginationInput = {},
@@ -4874,33 +4797,6 @@ async function listListingsNeedingReview(pagination?: { skip: number; take: numb
       reviewReasons: Array.isArray(row.reviewReasons) ? row.reviewReasons.filter((reason): reason is string => typeof reason === 'string') : [],
     }] : [];
   });
-}
-
-export async function listModerationQueue() {
-  if (!shouldUseDatabaseStore()) {
-    return memoryStore.listModerationQueue();
-  }
-
-  const [listings, reports] = await Promise.all([
-    listListingsNeedingReview(),
-    prisma.report.findMany({
-      include: {
-        listing: {
-          include: {
-            images: {
-              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
-
-  return {
-    listings,
-    reports: reports.map(toReportRecord),
-  };
 }
 
 export async function listModerationQueuePage(filters: PaginationInput = {}, focus?: { reportId: string; sourceType: 'Report' | 'UserReport' }) {
@@ -5390,28 +5286,6 @@ export async function setReportModerationStatus(
   };
 }
 
-export async function listSellerCommissions(sellerId: string) {
-  if (!shouldUseDatabaseStore()) {
-    return memoryStore.listSellerCommissions(sellerId);
-  }
-
-  const commissions = await prisma.commission.findMany({
-    where: { sellerId },
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          },
-        },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-
-  return commissions.map(toCommissionRecord);
-}
-
 export async function listSellerCommissionsPage(
   sellerId: string,
   filters: PaginationInput = {},
@@ -5448,27 +5322,6 @@ export async function listSellerCommissionsPage(
   });
 
   return toPaginatedResponse(commissions.map(toCommissionRecord), pagination);
-}
-
-export async function listAdminCommissions() {
-  if (!shouldUseDatabaseStore()) {
-    return memoryStore.listAdminCommissions();
-  }
-
-  const commissions = await prisma.commission.findMany({
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          },
-        },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-
-  return commissions.map(toCommissionRecord);
 }
 
 export async function listAdminCommissionsPage(filters: PaginationInput = {}) {

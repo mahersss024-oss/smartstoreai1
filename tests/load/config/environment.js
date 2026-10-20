@@ -1,19 +1,19 @@
-export function requiredEnv(name, fallback = '') {
+function requiredEnv(name, fallback = '') {
   return (__ENV[name] || fallback).trim();
 }
 
-export function numberEnv(name, fallback) {
+function numberEnv(name, fallback) {
   const parsed = Number.parseInt(requiredEnv(name), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function boolEnv(name, fallback = false) {
+function boolEnv(name, fallback = false) {
   const value = requiredEnv(name).toLowerCase();
   if (!value) return fallback;
   return value === '1' || value === 'true' || value === 'yes';
 }
 
-export function listEnv(name, fallback) {
+function listEnv(name, fallback) {
   const raw = requiredEnv(name);
   const values = raw
     .split(',')
@@ -57,7 +57,7 @@ export function url(path) {
   return `${loadEnv.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-export function isProduction() {
+function isProduction() {
   return loadEnv.environment === 'production' || /souqhamad\.com$/i.test(loadEnv.baseUrl);
 }
 

@@ -11,9 +11,9 @@ import { deleteEvidenceObject, readEvidenceObject, readEvidenceSource, storeEvid
 
 export type EvidenceSource = 'Report' | 'UserReport';
 const activeCases = { status: { not: 'disposed' } };
-export const evidenceActions = new Set(['evidence_retry', 'evidence_extend', 'evidence_hold', 'evidence_release', 'evidence_dispose']);
+const evidenceActions = new Set(['evidence_retry', 'evidence_extend', 'evidence_hold', 'evidence_release', 'evidence_dispose']);
 
-export function evidenceEnabled() {
+function evidenceEnabled() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
 }
 
@@ -21,7 +21,7 @@ export function evidenceHash(data: Buffer) {
   return createHash('sha256').update(data).digest('hex');
 }
 
-export async function lockEvidenceWrites(tx: Prisma.TransactionClient) {
+async function lockEvidenceWrites(tx: Prisma.TransactionClient) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(771203, 1)`;
 }
 

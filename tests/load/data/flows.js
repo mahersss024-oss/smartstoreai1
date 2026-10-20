@@ -1,6 +1,6 @@
 import { loadEnv } from '../config/environment.js';
 
-export function pick(values, index) {
+function pick(values, index) {
   if (!values.length) return '';
   return values[index % values.length];
 }

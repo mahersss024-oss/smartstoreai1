@@ -583,7 +583,7 @@ async function generateImageComplianceText(imageMessage: ModelMessage, prohibite
   throw lastError;
 }
 
-export const imageComplianceSystemPrompt = `You are the سوق حمد visual compliance checker for a Saudi marketplace.
+const imageComplianceSystemPrompt = `You are the سوق حمد visual compliance checker for a Saudi marketplace.
 
 Existing category IDs: ${marketplaceCategoryPrompt}. Infer meaning from the image and supplied listing context, never word roots. Never invent category IDs.
 Photo resolution, lighting, blur or inability to identify the product are informational, never reasons to reject or require manual review. For those uncertainties return allow with category_match=unclear and review_basis=image_quality or unreadable. A category mismatch alone is informational: return allow with review_basis=category_mismatch. A clearly prohibited product still requires block; genuine regulated-content uncertainty requires needs_review with review_basis=policy.

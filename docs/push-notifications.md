@@ -7,8 +7,9 @@ runtime dependency.
 ## How it works
 
 1. The service worker registers on launch (`components/service-worker-registrar.tsx`).
-2. `hooks/use-push-notifications.ts` checks `/api/push/subscribe` for support and
-   the VAPID public key, then subscribes the browser.
+2. `components/push-notification-settings.tsx`, mounted on `/notifications`, checks
+   `/api/push/subscribe` for support and the VAPID public key, then subscribes the
+   browser after the customer chooses to enable notifications.
 3. Subscriptions are persisted via `agent/marketplace/push-subscriptions.ts`
    (file store locally, `PushSubscription` table in database mode).
 4. Server-side sends use `lib/push/web-push.ts` (aes128gcm encryption + VAPID JWT).

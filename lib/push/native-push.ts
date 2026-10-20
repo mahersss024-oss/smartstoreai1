@@ -111,7 +111,7 @@ function getApnsConfig(): ApnsConfig | null {
   };
 }
 
-export function isNativePushConfigured() {
+function isNativePushConfigured() {
   return Boolean(getFirebaseServiceAccountConfig() || getApnsConfig());
 }
 

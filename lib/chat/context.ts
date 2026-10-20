@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 
-export const chatContextMessageLimit = 40;
+const chatContextMessageLimit = 40;
 export const chatContextTextLimit = 24_000;
 
 export function chatMessageTextLength(message: unknown): number {
