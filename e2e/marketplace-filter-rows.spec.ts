@@ -160,6 +160,29 @@ test('the existing general filter clears explicit category choices without clear
 });
 
 test('off-screen selected category chips restore visibly without scrolling the page or changing the feed position', async ({ page }, info) => {
+  const captureLayout = () => page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('.marketplace-shell')!;
+    const list = document.querySelector<HTMLElement>('.marketplace-listings-scroll')!;
+    const content = document.querySelector<HTMLElement>('.marketplace-listings-content')!;
+    return {
+      documentScroll: document.scrollingElement?.scrollTop,
+      documentHeight: document.scrollingElement?.scrollHeight,
+      viewportHeight: innerHeight,
+      bodyScroll: document.body.scrollTop,
+      bodyHeight: document.body.clientHeight,
+      bodyScrollHeight: document.body.scrollHeight,
+      bodyPaddingTop: getComputedStyle(document.body).paddingTop,
+      bannerHeight: document.querySelector('.open-in-app-banner')?.getBoundingClientRect().height,
+      shellTop: shell.getBoundingClientRect().top,
+      shellHeight: shell.getBoundingClientRect().height,
+      shellMinHeight: getComputedStyle(shell).minHeight,
+      listTop: list.getBoundingClientRect().top,
+      listScroll: list.scrollTop,
+      contentOffset: content.style.getPropertyValue('--marketplace-content-offset'),
+      contentTransform: getComputedStyle(content).transform,
+      cardTop: document.querySelector('.marketplace-listing-card')?.getBoundingClientRect().top,
+    };
+  });
   await page.route('**/api/marketplace/listings**', route => route.fulfill({ json: {
     listings: [{ id: 'filter-row-car', sellerId: 'filter-row-seller', category: 'cars', title: 'فيات دوكاتو للبيع', city: 'الرياض', price: 100,
       status: 'published', image: '/hamad-market-logo.webp', attributes: { [marketplaceCategoryOptionAttribute]: 'fiat', [marketplaceCarModelAttribute]: 'ducato' } }],
@@ -176,6 +199,10 @@ test('off-screen selected category chips restore visibly without scrolling the p
   await page.locator('.marketplace-listings-content').evaluate(element => Promise.all(element.getAnimations({ subtree: true })
     .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))));
   const before = await card.boundingBox();
+  const beforeLayout = await captureLayout();
+  expect(beforeLayout.bodyScrollHeight - beforeLayout.bodyHeight).toBeLessThanOrEqual(1);
+  expect(beforeLayout.bodyScroll).toBe(0);
+  expect(beforeLayout.shellTop + beforeLayout.shellHeight).toBeCloseTo(beforeLayout.viewportHeight, 0);
   const account = page.locator('a[href="/account"]:visible').first();
   if (await account.count()) await account.click();
   else await page.getByRole('button', { name: 'حسابي', exact: true }).click();
@@ -184,6 +211,11 @@ test('off-screen selected category chips restore visibly without scrolling the p
   await expect(row('options').getByRole('button', { name: 'فيات', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(row('options').getByRole('button', { name: 'فيات', exact: true })).toBeInViewport();
   await expect(row('models').getByRole('button', { name: 'دوكاتو', exact: true })).toBeInViewport();
+  const afterLayout = await captureLayout();
+  await info.attach('filter-row-restoration-layout', { contentType: 'application/json',
+    body: JSON.stringify({ before: beforeLayout, after: afterLayout }, null, 2) });
+  expect(afterLayout.bodyScrollHeight - afterLayout.bodyHeight).toBeLessThanOrEqual(1);
+  expect(afterLayout.bodyScroll).toBe(0);
   await expect.poll(async () => (await card.boundingBox())?.y).toBeCloseTo(before!.y, 0);
   expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
   await page.screenshot({ path: info.outputPath('restored-filter-row-selection.png') });

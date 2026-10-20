@@ -3980,7 +3980,7 @@ export default function Page() {
   return (
     <main
       className={cn(
-        'marketplace-shell h-dvh min-h-dvh overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground',
+        'marketplace-shell overflow-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground',
         isCompactChatView && 'h-dvh overflow-hidden',
       )}
       dir="rtl"
