@@ -77,8 +77,10 @@ export function createListingCategoryClassifier(
               timer = setTimeout(() => { controller.abort(); reject(new Error('category_timeout')); }, options.timeoutMs ?? 6000);
             }),
           ]);
-          if (cache.size >= 256) cache.delete(cache.keys().next().value!);
-          cache.set(key, { value, expires: now() + 5 * 60_000 });
+          if (value.status !== 'unavailable') {
+            if (cache.size >= 256) cache.delete(cache.keys().next().value!);
+            cache.set(key, { value, expires: now() + 5 * 60_000 });
+          }
           return value;
         } catch {
           // No keyword fallback or raw listing text in failure logs.

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { marketplaceCategoryDefinitions, marketplaceCategoryGroups } from '@/lib/marketplace/categories';
 import { getMarketplaceCategoryOptions, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
 import { createSessionCookie } from '@/lib/auth/session';
+import { revealMarketplaceFilterLevel } from './helpers/marketplace-filter-window';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
@@ -26,17 +27,20 @@ test('every shared group and category filters the existing marketplace cards', a
   const cards = page.locator('.marketplace-listings-content .marketplace-listing-card');
   await expect(cards).toHaveCount(marketplaceCategoryDefinitions.length);
   for (const group of marketplaceCategoryGroups) {
-    await categories.locator(':scope > div').first().getByRole('button', { name: group.label, exact: true }).click();
+    await revealMarketplaceFilterLevel(page, 'groups');
+    await categories.locator('[data-marketplace-filter-row="groups"]').getByRole('button', { name: group.label, exact: true }).click();
     await expect(cards).toHaveCount(group.categories.length);
     for (const label of group.categories) {
+      await revealMarketplaceFilterLevel(page, 'categories');
       const category = marketplaceCategoryDefinitions.find(category => category.label === label)!;
-      await categories.locator(':scope > div').nth(1).getByRole('button', { name: label, exact: true }).click();
+      await categories.locator('[data-marketplace-filter-row="categories"]').getByRole('button', { name: label, exact: true }).click();
       await expect(cards).toHaveCount(1);
       await expect(cards.first()).toContainText(`Catalog ${category.id}`);
       await expect(cards.first()).toContainText(label);
     }
   }
-  await categories.locator(':scope > div').first().getByRole('button', { name: 'الكل', exact: true }).click();
+  await revealMarketplaceFilterLevel(page, 'groups');
+  await categories.locator('[data-marketplace-filter-row="groups"]').getByRole('button', { name: 'الكل', exact: true }).click();
   await expect(cards).toHaveCount(marketplaceCategoryDefinitions.length);
   await page.screenshot({ path: info.outputPath('shared-categories.png') });
 });
@@ -260,8 +264,8 @@ test('seller editing preserves the saved choice and sends explicit changes using
   await page.screenshot({ path: info.outputPath('seller-brand-edit.png') });
 });
 
-test('manual suggestions use title and description together and respect customer correction', async ({ page }) => {
-  const requests: Array<{ title: string; description: string }> = [];
+test('manual suggestions use only the title and respect customer correction', async ({ page }) => {
+  const requests: Array<{ title: string }> = [];
   await page.route('**/api/marketplace/listing-category', route => {
     const input = route.request().postDataJSON();
     requests.push(input);
@@ -274,18 +278,45 @@ test('manual suggestions use title and description together and respect customer
   const select = form.locator('#manual-listing-category-option');
   await expect(select).toHaveValue('apple');
   await form.locator('textarea').fill('حاسب محمول ماك بوك مع الشاحن');
-  await expect(form.locator('select').first()).toHaveValue('computers');
+  await page.waitForTimeout(1100);
+  await expect(form.locator('select').first()).toHaveValue('mobile_phones');
   await expect(select).toHaveValue('apple');
   expect(requests).toEqual([
-    { title: 'جهاز آبل للبيع', description: '' },
-    { title: 'جهاز آبل للبيع', description: 'حاسب محمول ماك بوك مع الشاحن' },
+    { title: 'جهاز آبل للبيع' },
   ]);
   await select.selectOption('samsung');
   await form.locator('input[maxlength="140"]').fill('عنوان معدل');
   await form.locator('textarea').fill('وصف معدل بعد اختيار العميل');
   await page.waitForTimeout(1100);
   await expect(select).toHaveValue('samsung');
-  expect(requests).toHaveLength(2);
+  expect(requests).toHaveLength(1);
+});
+
+test('manual save preserves the displayed automatic category instead of reclassifying its description', async ({ page }) => {
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/api/marketplace/listing-category', route => route.fulfill({ json: {
+    category: 'watches_accessories', categoryOption: 'eyewear', status: 'suggested',
+  } }));
+  await page.route('**/api/marketplace/listings**', route => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: { listings: [], pagination: { page: 1, hasMore: false } } });
+    saved = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { listing: { ...saved, id: 'manual-title-category', status: 'draft', images: [] } } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
+  const form = page.locator('.marketplace-home-controls form');
+  await form.locator('input[maxlength="140"]').fill('نظاره شمسية');
+  await expect(form.locator('select').first()).toHaveValue('watches_accessories');
+  await expect(form.locator('#manual-listing-category-option')).toHaveValue('eyewear');
+  await form.locator('textarea').fill('النظارة للبيع، الحاسب في الخلفية غير معروض.');
+  await form.getByRole('button', { name: 'اختر المدينة', exact: true }).click();
+  await page.getByRole('option', { name: 'الرياض', exact: true }).click();
+  await form.getByLabel('السعر', { exact: true }).fill('100');
+  await form.getByRole('button', { name: 'حفظ الإعلان', exact: true }).click();
+  await expect.poll(() => saved?.category).toBe('watches_accessories');
+  expect(saved?.autoCategory).toBe(false);
+  expect((saved?.attributes as Record<string, unknown>).marketplaceCategoryOption).toBe('eyewear');
+  expect(saved?.description).toBe('النظارة للبيع، الحاسب في الخلفية غير معروض.');
 });
 
 test('administration filters and edits the same brands and property types on desktop and mobile', async ({ page, baseURL }, info) => {

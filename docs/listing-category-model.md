@@ -8,17 +8,20 @@ It uses the existing DeepSeek connection/key and `search` profile, including
 `DEEPSEEK_SEARCH_MODEL`. No separate classification model is configured or
 provisioned. A classification request can reuse the full text-analysis result.
 
-The authenticated `POST /api/marketplace/listing-category` accepts title and
-description only. Requests are bounded to 24KiB, 140 title characters and 4000
-description characters, and rate-limited to 20 requests per user per minute.
+The authenticated `POST /api/marketplace/listing-category` classifies the title
+only. A legacy description field remains accepted and bounded, but is discarded
+before inference. Requests require at least two title characters and are bounded
+to 24KiB, 140 title characters and 4000 description characters, and rate-limited
+to 20 requests per user per minute.
 Model responses must match an existing category ID or null and confidence in
 the range 0..1. Scores below 0.8 yield an uncertain result, not a guessed
 category. Model confidence is self-reported, not a calibrated accuracy metric.
 
-The manual form places description immediately after title and sends both to
-the same existing classifier. Title identifies the offer and description adds
-context. Changes to either field refresh automatic suggestions; manual choices
-remain authoritative. Cached results are keyed by both fields.
+The manual form still places description immediately after title, but sends only
+the title for category suggestions. Description changes neither restart nor cancel
+title classification. The existing classifier receives an empty description, so
+identical titles reuse the same bounded cache. Shared chat/draft classification
+continues to accept title and description together.
 
 Optional `categoryOption` must belong to the suggested category. For cars only,
 optional `carModel` must belong to that selected brand in the shared car-family
@@ -27,7 +30,7 @@ Both analysis and classifier cache keys include the catalog, so catalog updates
 cannot reuse an obsolete selection. This uses the same existing model task, not
 another inference step. Customer selection always takes precedence.
 
-Client suggestions wait 900ms after typing stops. Editing the text clears the
+Client suggestions wait 900ms after title typing stops. Editing the title clears the
 previous automatic suggestion; aborted or stale replies cannot overwrite new
 text or a manual selection. Blur does not trigger duplicate calls. The UI
 shows loading, uncertain and unavailable states while retaining manual choice.
@@ -38,6 +41,10 @@ five-minute TTL), and identical in-flight requests are shared (maximum 32).
 The cache is not persistent or shared across server instances. Failures are
 not cached, and no raw listing text is written to failure logs by this service.
 Model calls consume the existing provider's quota and may incur charges.
+
+The manual form saves its displayed category with `autoCategory=false`, including
+an accepted automatic suggestion. Saving cannot reinterpret that category from
+the description. Shared full-content policy analysis still runs at save time.
 
 The asynchronous repository draft creation path applies the same model when
 `autoCategory=true`, including drafts created through marketplace tools. An

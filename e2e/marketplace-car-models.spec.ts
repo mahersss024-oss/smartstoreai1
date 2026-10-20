@@ -41,7 +41,7 @@ test('each car brand exposes its shared models without years or trims in manual 
   await expect(model).toHaveCount(0);
 });
 
-test('title and description suggestions include a valid car model and preserve customer correction when saving', async ({ page }) => {
+test('title suggestions include a valid car model and preserve customer correction when saving', async ({ page }) => {
   let payload: Record<string, unknown> | undefined;
   let calls = 0;
   await page.route('**/api/marketplace/listing-category', route => {
@@ -58,7 +58,7 @@ test('title and description suggestions include a valid car model and preserve c
   await page.goto('/');
   await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
   const form = page.locator('.marketplace-home-controls form');
-  await form.locator('input[maxlength="140"]').fill('تويوتا للبيع');
+  await form.locator('input[maxlength="140"]').fill('تويوتا كامري للبيع');
   await form.locator('textarea').fill('كامري نظيفة، اللون أبيض');
   const model = form.locator('#manual-listing-car-model');
   await expect(model).toHaveValue('camry');

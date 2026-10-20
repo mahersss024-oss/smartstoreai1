@@ -22,11 +22,11 @@ Public search combines the category and exact JSON choice with existing title, c
 
 Cars store a model-family ID in `Listing.attributes.marketplaceCarModel`, using the same existing JSON field. The model must belong to the selected car brand. Unrelated edits preserve it; changing brand/category clears it, and explicit null clears only that choice. A catalog-controlled `model` text value is maintained in Arabic, without rewriting uncataloged legacy details. Choosing `other` keeps an unlisted vehicle possible. No existing records, URLs or database schema are migrated.
 
-Manual creation, seller/admin editing, public/admin filters, the existing category classifier and Hamad draft tools share this car catalog. Public search still uses only database/file filters, never model interpretation. The classifier can suggest category, brand and model together from title and description; invalid model/brand combinations are discarded, not guessed. The car selection participates in home browse memory and its cache key.
+Manual creation, seller/admin editing, public/admin filters, the existing category classifier and Hamad draft tools share this car catalog. Public search still uses only database/file filters, never model interpretation. Manual suggestions use the title only; shared Hamad draft classification retains title and description. Invalid model/brand combinations are discarded, not guessed. The car selection participates in home browse memory and its cache key.
 
 The catalog is a reference selection of familiar current and legacy model families, not a statistical sales/popularity ranking or a guarantee of current local availability. Manufacturer references for less familiar families include [SOUEAST](https://www.soueast-motor.com/soueast/), [ZXAUTO](https://en.zxauto.com.cn/TERRALORD.html), [OMODA and JAECOO](https://www.omodajaecoo.com/global/globalWebsite/) and [Deepal](https://www.deepal-eg.com/en/). Years and trim levels belong in customer text rather than more catalog levels.
 
-Manual creation, seller editing, admin editing/filtering and draft tools use this catalog. The classifier uses title and description together to suggest a valid choice using the existing analysis result; unknown or invalid choices are omitted and customer corrections take precedence. No new model is introduced, and Hamad retains only draft preparation and platform help.
+Manual creation, seller editing, admin editing/filtering and draft tools use this catalog. Classification reuses the existing analysis task; unknown or invalid choices are omitted and customer corrections take precedence. No new model is introduced, and Hamad retains only draft preparation and platform help. Manual saves retain the displayed category rather than requesting another classification from the description.
 
 ## Market Browse Rows
 
@@ -45,10 +45,20 @@ a parent clears its descendants, never defaults to its first child. Root `الك
 clears category choices while preserving the text query and city. The existing
 general filter clears category choices and city without clearing the text query.
 Previously explicit choices still restore during same-tab navigation.
+At most two levels are visible in an internally clipped window. Selecting the
+second row advances the window when children exist; selecting any choice in the
+first row moves the window one level back. Re-selecting an unchanged parent only
+moves the window, preserving its dependent filters and causing no new search.
+Changing a parent still clears descendants. Hidden rows are inert and excluded
+from accessibility navigation. A 200ms vertical transform animates the existing
+rows; it adds no scroll listeners and does not change toolbar drag/scroll timing.
+The window position is stored in the existing browse viewport snapshot, not in
+the query key. Its two-row height stays stable while shifting deeper levels.
 Rows reset their horizontal position when the parent changes and reveal a
 restored selection within the row without scrolling
-the page/list. Existing API filters, stored IDs and home browse snapshots are
-unchanged. Manual creation and seller/admin editors retain their existing controls.
+the page/list. Existing API filters, stored IDs and result keys are unchanged;
+the existing browse viewport snapshot additionally retains the window position.
+Manual creation and seller/admin editors retain their existing controls.
 `e2e/marketplace-filter-rows.spec.ts` covers order, dimensions, all category options,
 explicit-only API filters, dependent resets, the general reset, query/city
 preservation and horizontal selection restoration.

@@ -451,6 +451,18 @@ html[data-theme-switching] *::after {
     clip-path: inset(0 -100vmax -100vmax);
   }
 
+  .marketplace-category-window {
+    height: 32px;
+    overflow: hidden;
+  }
+
+  .marketplace-category-track {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   /* Reserve the first card's starting space without moving the scroll viewport. */
   #suggested-listings > [data-floating-list] > .marketplace-listings-content {
     transform: translate3d(0, calc(var(--marketplace-content-offset, var(--marketplace-tools-height, 180px)) + var(--marketplace-tools-top, 0.5rem) - var(--marketplace-list-edge)), 0);

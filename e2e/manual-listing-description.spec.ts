@@ -43,35 +43,33 @@ for (const category of ['animals', 'mobile_phones']) {
   });
 }
 
-test('changing only the description discards an older classification response', async ({ page }) => {
+test('changing the description neither cancels a title suggestion nor starts another classification', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
   await page.route('**/api/auth/session', route => route.fulfill({ json: {
     authenticated: true, user: { id: 'description-context-user', email: 'description-context@example.test' },
   } }));
   let release!: () => void;
   const delayed = new Promise<void>(resolve => { release = resolve; });
-  const requests: Array<{ title: string; description: string }> = [];
+  const requests: Array<{ title: string }> = [];
   await page.route('**/api/marketplace/listing-category', async route => {
     const input = route.request().postDataJSON();
     requests.push(input);
-    if (input.description === 'الوصف السابق') await delayed;
-    await route.fulfill({ json: { category: input.description === 'الوصف السابق' ? 'cars' : 'furniture', status: 'suggested' } });
+    await delayed;
+    await route.fulfill({ json: { category: 'furniture', status: 'suggested' } });
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
   const form = page.locator('.marketplace-home-controls form');
-  await form.locator('input[maxlength="140"]').fill('معروض للبيع');
+  await form.locator('input[maxlength="140"]').fill('مكتب للبيع');
   await form.locator('textarea').fill('الوصف السابق');
   try {
     await expect.poll(() => requests.length).toBe(1);
     await form.locator('textarea').fill('الوصف الجديد');
-    await expect(form.locator('select').first()).toHaveValue('furniture');
+    await page.waitForTimeout(1100);
+    expect(requests).toEqual([{ title: 'مكتب للبيع' }]);
     release();
-    await page.waitForTimeout(300);
     await expect(form.locator('select').first()).toHaveValue('furniture');
-    expect(requests).toEqual([
-      { title: 'معروض للبيع', description: 'الوصف السابق' },
-      { title: 'معروض للبيع', description: 'الوصف الجديد' },
-    ]);
+    await expect(form.locator('textarea')).toHaveValue('الوصف الجديد');
+    expect(requests).toEqual([{ title: 'مكتب للبيع' }]);
   } finally { release(); }
 });

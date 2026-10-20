@@ -61,6 +61,47 @@ test('database public title search normalizes Arabic, filters before pagination 
   }
 });
 
+test('database manual title category and option survive save, description edits and reopening without reclassification', async t => {
+  if (!shouldRunDatabaseIntegration()) {
+    t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');
+    return;
+  }
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const { listingCategoryClassifier } = await import('@/agent/marketplace/listing-category-model');
+  const suffix = crypto.randomUUID();
+  const seller = { id: `manual-title-${suffix}`, email: `manual-title-${suffix}@example.test` };
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  const conflicting = textAnalysis({ category: 'computers' });
+  const analyzed: string[] = [];
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async (text: string) => { analyzed.push(text); return conflicting; });
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => conflicting);
+  const classify = t.mock.method(listingCategoryClassifier, 'suggest', async () => { throw new Error('Do not reclassify an accepted manual category'); });
+  try {
+    const listing = await repository.createListingDraft(seller, { category: 'watches_accessories', autoCategory: false,
+      title: 'نظارة شمسية', description: 'النظارة للبيع والحاسب المذكور ليس للبيع.',
+      attributes: { marketplaceCategoryOption: 'eyewear' } });
+    const saved = await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } });
+    assert.equal(saved.category, 'watches_accessories');
+    assert.equal((saved.attributes as Record<string, unknown>).marketplaceCategoryOption, 'eyewear');
+    assert.equal(saved.status, 'draft');
+    assert.ok(analyzed.some(text => JSON.parse(text).description === listing.description));
+    await repository.updateListingForSeller(listing.id, seller.id, { description: 'وصف معدل للنظارة، وليس للحاسب.' });
+    const reopened = await repository.getListing(listing.id);
+    assert.equal(reopened?.category, 'watches_accessories');
+    assert.equal(reopened?.attributes.marketplaceCategoryOption, 'eyewear');
+    assert.equal(reopened?.description, 'وصف معدل للنظارة، وليس للحاسب.');
+    assert.equal(classify.mock.callCount(), 0);
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId: seller.id } });
+    await prisma.user.deleteMany({ where: { id: seller.id } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
 test('database advisory review survives shared reads and closes only after a human listing decision', async t => {
   if (!shouldRunDatabaseIntegration()) {
     t.skip('Set DATABASE_URL and run pnpm test:db:integration to exercise a real database.');

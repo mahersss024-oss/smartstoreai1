@@ -82,3 +82,27 @@ for (const category of ['animals', 'mobile_phones']) {
     assert.equal(Object.hasOwn(saved, 'condition'), false);
   });
 }
+
+test('accepted manual title category survives conflicting description analysis at save time', async t => {
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
+  t.after(() => { if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE; else process.env.SMARTSTORE_MARKETPLACE_STORE = previous; });
+  const analysis = textAnalysis({ category: 'computers' });
+  const analyze = t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  const classify = t.mock.method(listingCategoryClassifier, 'suggest', async () => { throw new Error('Accepted manual categories must not be reclassified'); });
+  const response = await POST(new Request('http://localhost/api/marketplace/listings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json',
+      Cookie: createSessionCookie({ id: 'manual-title-save', email: 'manual-title-save@example.test' }).split(';')[0] },
+    body: JSON.stringify({ category: 'watches_accessories', autoCategory: false, title: 'نظارة شمسية',
+      description: 'أبيع النظارة ولا أبيع الحاسب المذكور للمقارنة.',
+      attributes: { marketplaceCategoryOption: 'eyewear' } }),
+  }));
+  assert.equal(response.status, 201);
+  const { listing } = await response.json();
+  assert.equal(listing.category, 'watches_accessories');
+  assert.equal(listing.attributes.marketplaceCategoryOption, 'eyewear');
+  assert.equal(listing.status, 'draft');
+  assert.equal(classify.mock.callCount(), 0);
+  assert.equal(analyze.mock.callCount(), 1);
+});

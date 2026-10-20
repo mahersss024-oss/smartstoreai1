@@ -13,7 +13,7 @@ export type HomeBrowseState<Listing> = HomeBrowseFilters & {
   pagination: { page: number; hasMore: boolean };
   nearbyCity: string | null;
   filterOpen: boolean;
-  viewport: { scrollTop: number; contentOffset: string; toolsHidden: boolean };
+  viewport: { scrollTop: number; contentOffset: string; toolsHidden: boolean; categoryWindowStart?: number };
 };
 
 // Public browsing state lives only in this tab's runtime, separately from chat.

@@ -301,7 +301,7 @@ test('blank toolbar space supports mouse and touch drag while controls remain us
   await expectHidden(panel, false);
   await page.waitForTimeout(1200);
   if (session) {
-    const row = panel.locator('[data-marketplace-categories] > div').first();
+    const row = panel.locator('[data-marketplace-filter-row="groups"]');
     const rect = (await row.boundingBox())!;
     const startX = rect.x + rect.width * 0.25;
     const y = rect.y + rect.height / 2;

@@ -10,7 +10,7 @@ function state(): HomeBrowseState<{ id: string }> {
   const filters = { searchInput: 'desk', categoryGroup: 'home', subcategory: 'furniture', city: 'Riyadh' };
   return { ...filters, listings: [{ id: 'one' }, { id: 'two' }], listingsKey: getHomeBrowseKey(filters),
     pagination: { page: 2, hasMore: true }, filterOpen: true, nearbyCity: null,
-    viewport: { scrollTop: 870, contentOffset: '180px', toolsHidden: true } };
+    viewport: { scrollTop: 870, contentOffset: '180px', toolsHidden: true, categoryWindowStart: 1 } };
 }
 
 test('home browsing retains search, filters, loaded results, pagination and viewport separately from chat', () => {
@@ -31,6 +31,16 @@ test('a changed search or filter cannot label old cached results as current', ()
     { categoryGroup: 'all' }, { subcategory: 'all' }, { searchInput: '' }, { categoryOption: 'apple' }]) {
     assert.notEqual(getHomeBrowseKey({ ...saved, ...change }), saved.listingsKey);
   }
+});
+
+test('category window navigation is presentation state, not another search filter', () => {
+  const saved = state();
+  const moved = { ...saved, viewport: { ...saved.viewport, categoryWindowStart: 0 } };
+  assert.equal(getHomeBrowseKey(moved), saved.listingsKey);
+  writeHomeBrowseState(moved);
+  assert.equal(readHomeBrowseState()?.viewport.categoryWindowStart, 0);
+  assert.equal(readHomeBrowseState()?.subcategory, saved.subcategory);
+  clearHomeBrowseState();
 });
 
 test('background restoration reloads the entire previously loaded window and deduplicates shifting pages', async () => {

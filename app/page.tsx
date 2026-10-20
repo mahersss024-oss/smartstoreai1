@@ -6,7 +6,7 @@ import { getArabicCustomerMessage } from '@/lib/customer-language';
 import { formatMarketplaceCategory as formatCategory, isMarketplaceCategory, marketplaceCategoryDefinitions, marketplaceCategoryGroups, marketplaceCategoryIds as manualListingCategoryOptions } from '@/lib/marketplace/categories';
 import { CategoryOptionSelect } from '@/components/category-option-select';
 import { CarModelSelect } from '@/components/car-model-select';
-import { MarketplaceCarModelRow, MarketplaceCategoryOptionRow, MarketplaceFilterRow } from '@/components/marketplace-filter-row';
+import { MarketplaceFilterRows } from '@/components/marketplace-filter-row';
 import { getListingCarModel, getListingCategoryOption, getMarketplaceCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
 import { getMarketplaceCarModel, marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import {
@@ -1697,6 +1697,7 @@ export default function Page() {
     useState(restoredBrowseState?.subcategory ?? 'all');
   const [selectedMarketCategoryOption, setSelectedMarketCategoryOption] = useState(restoredBrowseState?.categoryOption ?? '');
   const [selectedMarketCarModel, setSelectedMarketCarModel] = useState(restoredBrowseState?.carModel ?? '');
+  const [categoryWindowStart, setCategoryWindowStart] = useState(restoredBrowseResults?.viewport.categoryWindowStart ?? 0);
   const [selectedMarketCity, setSelectedMarketCity] = useState(restoredBrowseState?.city ?? 'all');
   const [nearbyMarketplaceCity, setNearbyMarketplaceCity] =
     useState<string | null>(restoredBrowseState?.nearbyCity ?? null);
@@ -1713,10 +1714,9 @@ export default function Page() {
   useEffect(() => {
     if (!isManualListingOpen || !manualListingForm.autoCategory) return;
     const title = manualListingForm.title;
-    const description = manualListingForm.description;
     setManualListingForm(form => form.autoCategory ? { ...form, category: 'other', categoryOption: '', carModel: '' } : form);
     setManualCategoryStatus('idle');
-    if (!session.authenticated || (title.trim().length < 2 && description.trim().length < 2)) return;
+    if (!session.authenticated || title.trim().length < 2) return;
     let active = true;
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
@@ -1724,7 +1724,7 @@ export default function Page() {
       try {
         const response = await fetch('/api/marketplace/listing-category', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, description }), signal: controller.signal,
+          body: JSON.stringify({ title }), signal: controller.signal,
         });
         if (!response.ok) throw new Error('category_unavailable');
         const result = await response.json() as { category?: unknown; categoryOption?: unknown; carModel?: unknown; status?: string };
@@ -1733,7 +1733,7 @@ export default function Page() {
           && result.status === 'suggested' ? result.category : null;
         const categoryOption = category ? getMarketplaceCategoryOption(category, result.categoryOption)?.id ?? '' : '';
         const carModel = category === 'cars' ? getMarketplaceCarModel(categoryOption, result.carModel)?.id ?? '' : '';
-        setManualListingForm(form => form.autoCategory && form.title === title && form.description === description
+        setManualListingForm(form => form.autoCategory && form.title === title && !manualListingSubmissionRef.current
           ? { ...form, category: category ?? 'other', categoryOption, carModel } : form);
         setManualCategoryStatus(category ? 'suggested' : 'uncertain');
       } catch {
@@ -1741,7 +1741,7 @@ export default function Page() {
       }
     }, 900);
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [isManualListingOpen, manualListingForm.autoCategory, manualListingForm.title, manualListingForm.description, session.authenticated]);
+  }, [isManualListingOpen, manualListingForm.autoCategory, manualListingForm.title, session.authenticated]);
   const [manualListingImages, setManualListingImages] = useState<File[]>([]);
   const [manualListingImagePreviewUrls, setManualListingImagePreviewUrls] =
     useState<string[]>([]);
@@ -3228,7 +3228,7 @@ export default function Page() {
       category: string;
       attributes?: Record<string, unknown>;
     } = {
-      autoCategory: manualListingForm.autoCategory,
+      autoCategory: false,
       title,
       description,
       city,
@@ -3636,10 +3636,11 @@ export default function Page() {
         contentOffset: (list?.firstElementChild as HTMLElement | null)?.style
           .getPropertyValue('--marketplace-content-offset') ?? '',
         toolsHidden: isMarketplaceTopActionsHidden,
+        categoryWindowStart,
       },
     });
   }, [activeMarketCategoryGroup, activeMarketCity, activeMarketSubcategory, activeMarketCategoryOption, activeMarketCarModel, browseListingsKey, isMarketFilterOpen,
-    isMarketplaceTopActionsHidden, listingPagination, marketplaceListings, marketplaceSearchInput, nearbyMarketplaceCity]);
+    isMarketplaceTopActionsHidden, categoryWindowStart, listingPagination, marketplaceListings, marketplaceSearchInput, nearbyMarketplaceCity]);
 
   const cancelMarketplaceTopReveal = useCallback(() => {
     if (marketplaceToolsTopRevealTimerRef.current !== null) {
@@ -4626,6 +4627,7 @@ export default function Page() {
                           setSelectedMarketSubcategory('all');
                           setSelectedMarketCategoryOption('');
                           setSelectedMarketCarModel('');
+                          setCategoryWindowStart(0);
                           setSelectedMarketCity('all');
                           setNearbyMarketplaceCity(null);
                           setNearbyMarketplaceNotice('');
@@ -4639,23 +4641,31 @@ export default function Page() {
               </div>
               </div>
               <div className="grid gap-1 p-1" ref={marketplaceCategoriesRef} data-marketplace-categories>
-                <MarketplaceFilterRow level="groups" label="تصنيفات السوق" value={activeMarketCategoryGroup}
-                  options={marketplaceCategoryGroups.map(group => ({ id: group.label, label: group.label }))}
-                  onChange={value => {
-                    setSelectedMarketCategoryGroup(value);
-                    setSelectedMarketSubcategory('all');
-                    setSelectedMarketCategoryOption('');
-                    setSelectedMarketCarModel('');
-                  }} />
-                {activeMarketCategoryGroupConfig && (
-                  <MarketplaceFilterRow key={activeMarketCategoryGroup} level="categories" label="التصنيفات الفرعية" compact
-                    value={activeMarketSubcategory} options={activeMarketCategoryGroupConfig.categories.map(category => ({ id: category, label: category }))}
-                    onChange={value => { setSelectedMarketSubcategory(value); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel(''); }} />
-                )}
-                <MarketplaceCategoryOptionRow key={`options:${activeMarketCategoryId}`} category={activeMarketCategoryId} value={activeMarketCategoryOption}
-                  onChange={value => { setSelectedMarketCategoryOption(value); setSelectedMarketCarModel(''); }} />
-                <MarketplaceCarModelRow key={`models:${activeMarketCategoryId}:${activeMarketCategoryOption}`} category={activeMarketCategoryId} brand={activeMarketCategoryOption} value={activeMarketCarModel}
-                  onChange={setSelectedMarketCarModel} />
+                <MarketplaceFilterRows category={activeMarketCategoryId} brand={activeMarketCategoryOption}
+                  start={categoryWindowStart} onStartChange={setCategoryWindowStart} rows={[
+                  { level: 'groups', label: 'تصنيفات السوق', value: activeMarketCategoryGroup,
+                    options: marketplaceCategoryGroups.map(group => ({ id: group.label, label: group.label })),
+                    onChange: value => {
+                      if (value === activeMarketCategoryGroup) return;
+                      setSelectedMarketCategoryGroup(value);
+                      setSelectedMarketSubcategory('all');
+                      setSelectedMarketCategoryOption('');
+                      setSelectedMarketCarModel('');
+                    } },
+                  { level: 'categories', scope: activeMarketCategoryGroup, label: 'التصنيفات الفرعية', compact: true, value: activeMarketSubcategory,
+                    options: activeMarketCategoryGroupConfig?.categories.map(category => ({ id: category, label: category })) ?? [],
+                    onChange: value => {
+                      if (value === activeMarketSubcategory) return;
+                      setSelectedMarketSubcategory(value); setSelectedMarketCategoryOption(''); setSelectedMarketCarModel('');
+                    } },
+                  { level: 'options', scope: activeMarketCategoryId, label: 'تفريعات التصنيف', compact: true, value: activeMarketCategoryOption,
+                    onChange: value => {
+                      if (value === activeMarketCategoryOption) return;
+                      setSelectedMarketCategoryOption(value); setSelectedMarketCarModel('');
+                    } },
+                  { level: 'models', scope: activeMarketCategoryOption, label: 'تفريعات الخيار', compact: true, value: activeMarketCarModel,
+                    onChange: setSelectedMarketCarModel },
+                ]} />
               </div>
               </div>
               </div>
