@@ -27,13 +27,16 @@ export type StoredMobilePushToken = {
   updatedAt: string;
 };
 
-function resolveDataDirectory() {
+function resolveStoreFilePath() {
   const configured = process.env.SMARTSTORE_DATA_DIR?.trim();
 
-  return configured ? configured : join(process.cwd(), '.data');
+  // Trace the store file, not every file in the writable data directory.
+  return configured
+    ? join(configured, 'mobile-push-tokens-store.json')
+    : join(process.cwd(), '.data', 'mobile-push-tokens-store.json');
 }
 
-const filePath = join(resolveDataDirectory(), 'mobile-push-tokens-store.json');
+const filePath = resolveStoreFilePath();
 
 const tokens = new Map<string, StoredMobilePushToken>();
 let storeLoaded = false;

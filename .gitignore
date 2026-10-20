@@ -13,6 +13,7 @@
 /screenshots
 /test-results
 /playwright-report
+/.playwright-mcp/
 /tests/load/reports/*.json
 
 # app build output

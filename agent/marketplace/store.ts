@@ -81,18 +81,22 @@ const commissions = new Map<string, CommissionRecord>();
 let storeLoaded = false;
 
 /**
- * Directory that holds the file-based marketplace store. Defaults to the
- * project-local `.data` folder used in development, but can be overridden
+ * Path of the file-based marketplace store. Defaults to the
+ * project-local `.data/marketplace-store.json` used in development, but its directory can be overridden
  * with `SMARTSTORE_DATA_DIR` so isolated processes (e.g. parallel test
  * runners) never race on a shared file.
  */
-function resolveDataDirectory() {
+function resolveStoreFilePath() {
   const configured = process.env.SMARTSTORE_DATA_DIR?.trim();
 
-  return configured ? configured : join(process.cwd(), '.data');
+  // Keep the filename in the same join so build tracing never treats the
+  // entire writable data directory as a bundled application asset.
+  return configured
+    ? join(configured, 'marketplace-store.json')
+    : join(process.cwd(), '.data', 'marketplace-store.json');
 }
 
-const storeFilePath = join(resolveDataDirectory(), 'marketplace-store.json');
+const storeFilePath = resolveStoreFilePath();
 
 type PersistedMarketplaceStore = {
   listings: ListingRecord[];

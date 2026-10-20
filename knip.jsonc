@@ -1,0 +1,33 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Audit only: a finding requires reference/runtime review before removal.
+  // Keep automatic Next.js and Playwright plugin discovery and their defaults.
+  "entry": [
+    // Node's test runner and these fixtures are invoked through string paths.
+    "tests/*.test.ts",
+    "tests/fixtures/*.{ts,mjs}",
+    "scripts/testing/isolated-model-provider.mjs",
+    "scripts/testing/coverage-reporter.mjs",
+    // Explicit entry points invoked by the project VS Code diagnostics tasks.
+    "scripts/dev-tools/{devtools-local,lighthouse-local}.mjs",
+    // Next's fixture server starts this script through Playwright webServer.
+    "e2e/prepare-fixtures.ts",
+    // Registered at runtime with navigator.serviceWorker.register('/sw.js').
+    "public/sw.js",
+    // The k6 wrapper receives scenario filenames as command-line arguments.
+    "tests/load/{scenarios,api,images}/**/*.js"
+  ],
+  "project": [
+    "**/*.{ts,tsx,mts,js,mjs,cjs}",
+    "!**/node_modules/**",
+    "!.next/**",
+    "!.data/**",
+    "!.pnpm-store/**",
+    "!coverage/**",
+    "!test-results/**",
+    "!playwright-report/**",
+    "!screenshots/**",
+    "!.playwright-mcp/**",
+    "!.patch-work/**"
+  ]
+}

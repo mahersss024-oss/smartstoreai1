@@ -1,0 +1,102 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SmartStore: Check DevTools browser and trace (local)",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/dev-tools/devtools-local.mjs", "${input:diagnosticLocalUrl}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "SmartStore: Lighthouse prepared-context audit (local)",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/dev-tools/lighthouse-local.mjs", "${input:diagnosticLocalUrl}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "SmartStore: Install isolated diagnostic tools",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/install-audit-tools.ps1"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SmartStore: Inspect PostgreSQL metadata (read only)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres-inspect.ps1", "-Database", "all"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SmartStore: Knip audit (no fixes)",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/.data/environment-audit/tools/node_modules/knip/bin/knip.js", "--config", "knip.jsonc"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "CI": "1", "K6_BASE_URL": "http://127.0.0.1:3102" }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "SmartStore: Start local PostgreSQL",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres.ps1", "-Action", "Start"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SmartStore: Stop local PostgreSQL",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres.ps1", "-Action", "Stop"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SmartStore: Verify local PostgreSQL",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres.ps1", "-Action", "Verify"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "SmartStore: Develop with local PostgreSQL",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres.ps1", "-Action", "Dev"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "SmartStore: Test PostgreSQL integration",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/dev-tools/postgres.ps1", "-Action", "Test"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "diagnosticLocalUrl",
+      "type": "promptString",
+      "description": "URL of an already-running local test app (HTTP loopback only)",
+      "default": "http://127.0.0.1:3197/"
+    }
+  ]
+}

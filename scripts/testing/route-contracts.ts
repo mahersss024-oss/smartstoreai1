@@ -27,6 +27,7 @@ export const guestContracts: Record<string, string> = {
   'DELETE /api/push/subscribe': 'Subscription endpoint identifies device',
   'GET /api/marketplace/listings': 'Public listing search',
   'GET /api/marketplace/listings/[listingId]': 'Public published listing',
+  'GET /api/marketplace/users/[userId]/profile': 'Public seller profile and published listings',
 };
 
 export function routeContract(endpoint: InventoryItem): 'guest' | 'session' | 'staff' | undefined {
