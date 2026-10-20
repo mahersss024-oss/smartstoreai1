@@ -17,8 +17,10 @@ test('filter rows show All only at the root and leave compact branches unselecte
   const categories = page.locator('[data-marketplace-categories]');
   const groups = categories.locator('[data-marketplace-filter-row="groups"]');
   expect(await groups.getByRole('button').allTextContents()).toEqual(['الكل', ...marketplaceCategoryGroups.map(group => group.label)]);
-  const primaryHeight = (await groups.boundingBox())!.height;
+  // Translated viewport bounds can round; layout heights must remain exact.
+  const primaryHeight = await groups.evaluate(element => (element as HTMLElement).offsetHeight);
   expect(primaryHeight).toBe(32);
+  expect((await groups.boundingBox())!.height).toBeCloseTo(primaryHeight, 3);
   for (const group of marketplaceCategoryGroups) {
     await revealMarketplaceFilterLevel(page, 'groups');
     await groups.getByRole('button', { name: group.label, exact: true }).click();
@@ -26,7 +28,8 @@ test('filter rows show All only at the root and leave compact branches unselecte
     expect(await row.getByRole('button').allTextContents()).toEqual(group.categories);
     await expect(row.locator('[aria-pressed="true"]')).toHaveCount(0);
     await expect(categories.locator('[data-marketplace-filter-row="options"], [data-marketplace-filter-row="models"]')).toHaveCount(0);
-    expect((await row.boundingBox())!.height).toBeLessThan(primaryHeight);
+    expect(await row.evaluate(element => (element as HTMLElement).offsetHeight)).toBe(28);
+    expect((await row.boundingBox())!.height).toBeCloseTo(28, 3);
     for (const label of group.categories) {
       await revealMarketplaceFilterLevel(page, 'categories');
       await row.getByRole('button', { name: label, exact: true }).click();
@@ -37,7 +40,8 @@ test('filter rows show All only at the root and leave compact branches unselecte
       await revealMarketplaceFilterLevel(page, 'options');
       expect(await options.getByRole('button').allTextContents()).toEqual(choices.map(option => option.label));
       await expect(options.locator('[aria-pressed="true"]')).toHaveCount(0);
-      expect((await options.boundingBox())!.height).toBe(28);
+      expect(await options.evaluate(element => (element as HTMLElement).offsetHeight)).toBe(28);
+      expect((await options.boundingBox())!.height).toBeCloseTo(28, 3);
     }
   }
   await revealMarketplaceFilterLevel(page, 'groups');
@@ -52,10 +56,11 @@ test('filter rows show All only at the root and leave compact branches unselecte
   const rows = await categories.locator('[data-marketplace-filter-row][data-row-active="true"]').evaluateAll(elements => elements.map(element => {
     const row = element.getBoundingClientRect();
     const first = element.querySelector('button')!.getBoundingClientRect();
-    return { height: row.height, firstRight: first.right, rowRight: row.right,
+    return { height: (element as HTMLElement).offsetHeight, visualHeight: row.height, firstRight: first.right, rowRight: row.right,
       fits: [...element.querySelectorAll('button')].every(button => button.scrollWidth <= button.clientWidth + 1) };
   }));
   expect(rows.map(row => row.height)).toEqual([28, 28]);
+  for (const row of rows) expect(row.visualHeight).toBeCloseTo(row.height, 3);
   expect(rows.every(row => row.fits)).toBe(true);
   expect(rows.every(row => Math.abs(row.firstRight - row.rowRight) <= 1)).toBe(true);
   await expect(categories.getByRole('button', { name: 'الكل', exact: true, includeHidden: true })).toHaveCount(1);

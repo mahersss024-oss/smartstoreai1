@@ -28,7 +28,7 @@ test('home marketplace stays independent of Hamad while retaining search, cards 
   assert.match(homePage, /maxChatListingCardsPerMessage = 3/);
   assert.match(homePage, /omittedListingCardCount > 0/);
   assert.match(homePage, /moreChatListingsGuidance/);
-  assert.match(homePage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
+  assert.match(homePage, /marketplace-shell overflow-hidden/);
   assert.match(homePage, /marketplace-home-controls shrink-0/);
   assert.match(homePage, /isManualListingVisible[\s\S]*max-h-\[min\(58dvh,34rem\)\]/);
   assert.match(homePage, /popoverClassName="z-\[80\]"/);
@@ -108,6 +108,19 @@ test('home marketplace stays independent of Hamad while retaining search, cards 
   assert.doesNotMatch(globalCss, /marketplace-card-image-shimmer/);
   assert.doesNotMatch(globalCss, /smart-assistant-results-panel|smart-assistant-result-card/);
   assert.match(globalCss, /prefers-reduced-motion: reduce/);
+});
+
+test('home viewport reserves mobile banner space without full-viewport height overrides', () => {
+  const homePage = readProjectFile('app', 'page.tsx');
+  const globalCss = readProjectFile('app', 'globals.css');
+  const shellClasses = homePage.match(/'marketplace-shell\s+([^']*)'/)?.[1];
+  const shellStyles = globalCss.match(/^\s*\.marketplace-shell\s*\{([^}]+)\}/m)?.[1];
+
+  assert.ok(shellClasses);
+  assert.ok(shellStyles);
+  assert.doesNotMatch(shellClasses, /(?:^|\s)(?:h|min-h)-(?:dvh|screen|full)(?:\s|$)/);
+  assert.match(shellStyles, /^\s*height:\s*calc\(100dvh - var\(--mobile-web-app-banner-space\)\);/m);
+  assert.match(shellStyles, /^\s*min-height:\s*calc\(100dvh - var\(--mobile-web-app-banner-space\)\);/m);
 });
 
 test('home auxiliary links avoid route prefetch during normal browsing', () => {
