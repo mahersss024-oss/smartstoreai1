@@ -60,7 +60,7 @@ async function frame(page: Page, count: number, direction: string) {
   const latest = await page.evaluate(() => (window as unknown as TransitionTestWindow).routeFrames.at(-1)!);
   const desktop = await page.evaluate(() => matchMedia('(min-width: 64rem) and (pointer: fine)').matches);
   const motion = desktop ? 'page-fade' : 'page-slide';
-  const duration = desktop ? 180 : 280;
+  const duration = desktop ? 180 : 200;
   expect(latest.direction).toBe(direction);
   expect(latest.names).toContain(direction === 'forward' ? `${motion}-in-left` : `${motion}-in-right`);
   expect(latest.names).toContain(direction === 'forward' ? `${motion}-out-right` : `${motion}-out-left`);

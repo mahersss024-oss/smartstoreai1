@@ -5,7 +5,7 @@ It has no feature flag, stored preference or reduced-motion override.
 
 - Between primary tabs, motion follows their actual right-to-left bar order: a destination to the left enters from the left, and one to the right enters from the right. This also applies to browser back/forward between these tabs.
 - Other page openings enter from the left and exits to shallower pages reverse the direction. Browser back/forward outside the tab pair use the history entry index when available.
-- Touch-first mobile and tablet layouts keep the 280 ms full-width directional slide. Desktop layouts with a fine pointer use a shorter 180 ms fade and 14 px nudge in the same direction, so navigation remains legible without moving the whole page across a wide screen. The mobile bottom navigation and app banner remain outside the moving content.
+- Touch-first mobile and tablet layouts keep a 200 ms full-width directional slide. Desktop layouts with a fine pointer use a shorter 180 ms fade and 14 px nudge in the same direction, so navigation remains legible without moving the whole page across a wide screen. The mobile bottom navigation and app banner remain outside the moving content.
 - Query/hash-only changes, same-page actions, API endpoints and external authentication redirects are not page slides.
 
 ## Implementation
@@ -51,7 +51,7 @@ The browser tests run on desktop and mobile Chromium with isolated fixtures and
 mocked model transport. They inspect actual native animation names, duration,
 horizontal transforms and screenshots, rather than just checking a CSS class.
 They verify that desktop uses the restrained fade-and-nudge motion while mobile
-keeps the full RTL slide.
+keeps the full RTL slide at 200 ms.
 They cover forward/back traversal, stationary bottom navigation, query-only
 history updates, navigation during an active animation, reduced-motion settings,
 missing/throwing capture APIs, native Android insets/clipping, and the existing

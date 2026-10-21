@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@ui/button';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
+import { useAuthSession } from '@/hooks/use-auth-session';
 
 function createClientIdempotencyKey(scope: string) {
   return `${scope}:${crypto.randomUUID()}`;
@@ -18,6 +19,7 @@ export function SimilarListingFollowButton({
   listingId: string;
 }) {
   const router = useRouter();
+  const { isSessionLoading, session } = useAuthSession();
   const requestKeyRef = useRef<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +28,17 @@ export function SimilarListingFollowButton({
   const endpoint = `/api/marketplace/listings/${encodeURIComponent(listingId)}/similar-follow`;
 
   useEffect(() => {
+    if (isSessionLoading) {
+      setIsLoading(true);
+      return;
+    }
+
+    if (!session.authenticated) {
+      setIsFollowing(false);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadState() {
@@ -64,7 +77,7 @@ export function SimilarListingFollowButton({
       cancelled = true;
       cancelIdleLoad();
     };
-  }, [endpoint]);
+  }, [endpoint, isSessionLoading, session.authenticated]);
 
   const toggleFollow = useCallback(async () => {
     if (isLoading || requestKeyRef.current) {

@@ -1,4 +1,5 @@
 
+import { Suspense } from 'react';
 import { formatMarketplaceCategory as formatCategory } from '@/lib/marketplace/categories';
 import { getListingCarModel, getListingCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
 import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
@@ -599,6 +600,91 @@ function getDetailSimilarListings(
   return [...uniqueMatches.values()].slice(0, 20);
 }
 
+async function SimilarListingsSection({ listing }: { listing: ListingRecord }) {
+  const candidateSimilarListings = await listMarketplaceListings({
+    category: listing.category,
+    city: listing.city,
+    limit: 48,
+  });
+  await prepareListingUnderstanding([listing, ...candidateSimilarListings]);
+  let similarListings = getDetailSimilarListings(listing, candidateSimilarListings);
+
+  if (similarListings.length < 3) {
+    const widerSimilarListings = await listMarketplaceListings({
+      category: listing.category,
+      limit: 48,
+    });
+
+    await prepareListingUnderstanding(widerSimilarListings);
+    similarListings = getDetailSimilarListings(
+      listing,
+      [...candidateSimilarListings, ...widerSimilarListings],
+    );
+  }
+
+  if (!similarListings.length) return null;
+
+  return (
+    <section className="px-1 py-3 sm:px-2">
+      <div className="mb-3 flex items-center gap-2 text-sm font-bold">
+        <PackageCheck className="size-4 text-blue-600" />
+        إعلانات مشابهة
+      </div>
+      <div className="grid gap-2">
+        {similarListings.map((similarListing) => {
+          const imageUrl = getListingPrimaryImage(similarListing);
+
+          return (
+            <Link
+              key={similarListing.id}
+              className="marketplace-listing-card grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
+              href={getSimilarListingHref(similarListing.id, listing.id)}
+              prefetch={false}
+            >
+              <div className="aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900">
+                {imageUrl ? (
+                  <ListingCardImage
+                    alt={similarListing.title ?? 'صورة الإعلان'}
+                    fallback={
+                      <div className="grid h-full place-items-center">
+                        <PackageCheck className="size-6 text-slate-400" />
+                      </div>
+                    }
+                    height={88}
+                    sizes="88px"
+                    src={imageUrl}
+                    width={88}
+                  />
+                ) : (
+                  <div className="grid h-full place-items-center">
+                    <PackageCheck className="size-6 text-slate-400" />
+                  </div>
+                )}
+              </div>
+              <div className="grid min-w-0 content-center gap-1 px-3 py-2">
+                <div className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-700 dark:text-emerald-300">
+                  {similarListing.title ?? 'إعلان مشابه'}
+                </div>
+                <div className="truncate text-sm font-bold">
+                  {formatPrice(similarListing.price)}
+                </div>
+                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">
+                    {similarListing.city ?? 'السعودية'}
+                  </span>
+                  <span className="truncate">
+                    {formatCategory(similarListing.category)}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default async function ListingDetailsPage({ params, searchParams }: PageProps) {
   const { listingId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -608,42 +694,20 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
     notFound();
   }
 
-  const requestHeaders = await headers();
+  const [requestHeaders, sellerProfile] = await Promise.all([
+    headers(),
+    getPublicSellerProfile(listing.sellerId),
+  ]);
   const session = getAuthSession(
     new Request('https://souqhamad.local/listing-details', {
       headers: requestHeaders,
     }),
   );
   const isOwnListing = session?.user.id === listing.sellerId;
-  const sellerProfile = await getPublicSellerProfile(listing.sellerId);
   const returnHref = getListingReturnHref(resolvedSearchParams);
   const sellerProfileHref = sellerProfile
     ? getSellerProfileHref(listing.sellerId, listing.id)
     : returnHref;
-  const candidateSimilarListings = await listMarketplaceListings({
-    category: listing.category,
-    city: listing.city,
-    limit: 48,
-  });
-    await prepareListingUnderstanding([listing, ...candidateSimilarListings]);
-    let similarListings = getDetailSimilarListings(
-    listing,
-    candidateSimilarListings,
-  );
-
-  if (similarListings.length < 3) {
-    const widerSimilarListings = await listMarketplaceListings({
-      category: listing.category,
-      limit: 48,
-    });
-
-      await prepareListingUnderstanding(widerSimilarListings);
-      similarListings = getDetailSimilarListings(
-      listing,
-      [...candidateSimilarListings, ...widerSimilarListings],
-    );
-  }
-
   const approvedImages = listing.images.filter(
     (image) => image.status === 'approved',
   );
@@ -909,65 +973,9 @@ export default async function ListingDetailsPage({ params, searchParams }: PageP
               </section>
             )}
 
-            {similarListings.length > 0 && (
-              <section className="px-1 py-3 sm:px-2">
-                <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                  <PackageCheck className="size-4 text-blue-600" />
-                  إعلانات مشابهة
-                </div>
-                <div className="grid gap-2">
-                  {similarListings.map((similarListing) => {
-                    const imageUrl = getListingPrimaryImage(similarListing);
-
-                    return (
-                      <Link
-                        key={similarListing.id}
-                        className="marketplace-listing-card grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-200 bg-white text-right transition hover:border-blue-300 hover:bg-blue-50/35 dark:border-white/10 dark:bg-card dark:hover:bg-blue-400/10"
-                        href={getSimilarListingHref(similarListing.id, listing.id)}
-                        prefetch={false}
-                      >
-                        <div className="aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900">
-                          {imageUrl ? (
-                            <ListingCardImage
-                              alt={similarListing.title ?? 'صورة الإعلان'}
-                              fallback={
-                                <div className="grid h-full place-items-center">
-                                  <PackageCheck className="size-6 text-slate-400" />
-                                </div>
-                              }
-                              height={88}
-                              sizes="88px"
-                              src={imageUrl}
-                              width={88}
-                            />
-                          ) : (
-                            <div className="grid h-full place-items-center">
-                              <PackageCheck className="size-6 text-slate-400" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="grid min-w-0 content-center gap-1 px-3 py-2">
-                          <div className="line-clamp-2 text-[13px] font-bold leading-5 text-emerald-700 dark:text-emerald-300">
-                            {similarListing.title ?? 'إعلان مشابه'}
-                          </div>
-                          <div className="truncate text-sm font-bold">
-                            {formatPrice(similarListing.price)}
-                          </div>
-                          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                            <span className="truncate">
-                              {similarListing.city ?? 'السعودية'}
-                            </span>
-                            <span className="truncate">
-                              {formatCategory(similarListing.category)}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+            <Suspense fallback={null}>
+              <SimilarListingsSection listing={listing} />
+            </Suspense>
           </div>
         </section>
       </div>
