@@ -293,10 +293,10 @@ export function ListingImageGallery({
       if (event.key === 'Escape') {
         setIsLightboxOpen(false);
       }
-      if (event.key === 'ArrowLeft' && shouldShowThumbnails) {
+      if (event.key === 'ArrowRight' && shouldShowThumbnails) {
         showPreviousImage();
       }
-      if (event.key === 'ArrowRight' && shouldShowThumbnails) {
+      if (event.key === 'ArrowLeft' && shouldShowThumbnails) {
         showNextImage();
       }
     };
@@ -469,19 +469,19 @@ export function ListingImageGallery({
               <>
                 <button
                   aria-label="الصورة السابقة"
-                  className="absolute left-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:left-6 sm:size-14"
+                  className="absolute right-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:right-6 sm:size-14"
                   onClick={showPreviousImage}
                   type="button"
                 >
-                  <ChevronLeft className="size-8" />
+                  <ChevronRight className="size-8" />
                 </button>
                 <button
                   aria-label="الصورة التالية"
-                  className="absolute right-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:right-6 sm:size-14"
+                  className="absolute left-3 top-1/2 z-20 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-white/15 sm:left-6 sm:size-14"
                   onClick={showNextImage}
                   type="button"
                 >
-                  <ChevronRight className="size-8" />
+                  <ChevronLeft className="size-8" />
                 </button>
               </>
             )}
@@ -532,7 +532,7 @@ export function ListingImageGallery({
                 onClick={showPreviousImage}
                 type="button"
               >
-                <ChevronLeft className="size-8" />
+                <ChevronRight className="size-8" />
               </button>
               <span className="min-w-16 text-center text-xl font-medium tabular-nums text-white/95">
                 {selectedImageLabel}
@@ -544,7 +544,7 @@ export function ListingImageGallery({
                 onClick={showNextImage}
                 type="button"
               >
-                <ChevronRight className="size-8" />
+                <ChevronLeft className="size-8" />
               </button>
             </div>
           </div>

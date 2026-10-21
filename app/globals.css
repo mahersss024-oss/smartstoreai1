@@ -58,6 +58,51 @@ html[data-page-transition="back"]::view-transition-new(page-content) {
   animation-name: page-slide-in-right;
 }
 
+/* Touch devices use a clear full-page slide. Desktop keeps the same
+   navigation direction with a shorter, restrained fade and nudge. */
+@media (min-width: 64rem) and (pointer: fine) {
+  ::view-transition-old(page-content),
+  ::view-transition-new(page-content) {
+    animation-duration: 180ms;
+  }
+
+  html[data-page-transition="forward"]::view-transition-old(page-content) {
+    animation-name: page-fade-out-right;
+  }
+
+  html[data-page-transition="forward"]::view-transition-new(page-content) {
+    animation-name: page-fade-in-left;
+  }
+
+  html[data-page-transition="back"]::view-transition-old(page-content) {
+    animation-name: page-fade-out-left;
+  }
+
+  html[data-page-transition="back"]::view-transition-new(page-content) {
+    animation-name: page-fade-in-right;
+  }
+
+  @keyframes page-fade-in-left {
+    from { opacity: 0; transform: translateX(-14px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes page-fade-out-right {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(14px); }
+  }
+
+  @keyframes page-fade-in-right {
+    from { opacity: 0; transform: translateX(14px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes page-fade-out-left {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-14px); }
+  }
+}
+
 @keyframes page-slide-in-left {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }

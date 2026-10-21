@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   Bell,
+  ChevronDown,
   FileText,
   Heart,
   LogOut,
@@ -600,6 +601,7 @@ export default function AccountPage() {
 
             <section className="grid gap-2">
               <button
+                aria-expanded={isProfileEditorOpen}
                 className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-slate-200/70 bg-white/82 p-2.5 text-right shadow-sm transition hover:border-blue-300 dark:border-white/10 dark:bg-card/72"
                 onClick={() => {
                   const nextOpen = !isProfileEditorOpen;
@@ -619,7 +621,7 @@ export default function AccountPage() {
                 <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-bold">الملف الشخصي</span>
                 </span>
-                <ArrowRight className={`size-4 text-muted-foreground transition ${isProfileEditorOpen ? '-rotate-90' : 'rotate-180'}`} />
+                <ChevronDown className={`size-4 text-muted-foreground transition-transform ${isProfileEditorOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isProfileEditorOpen && (

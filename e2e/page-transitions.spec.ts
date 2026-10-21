@@ -18,7 +18,7 @@ async function prepare(page: Page, listingId: string, baseURL: string) {
     state.holdRouteAnimation = true;
     state.releaseRouteAnimation = () => {
       for (const animation of document.getAnimations()) {
-        if (animation instanceof CSSAnimation && animation.animationName.startsWith('page-slide-')) animation.play();
+        if (animation instanceof CSSAnimation && animation.animationName.startsWith('page-')) animation.play();
       }
     };
     if (typeof document.startViewTransition !== 'function') return;
@@ -27,7 +27,7 @@ async function prepare(page: Page, listingId: string, baseURL: string) {
       const transition = native(options);
       void transition.ready.then(() => {
         const animations = document.getAnimations().filter((animation): animation is CSSAnimation =>
-          animation instanceof CSSAnimation && animation.animationName.startsWith('page-slide-'));
+          animation instanceof CSSAnimation && animation.animationName.startsWith('page-'));
         if (state.holdRouteAnimation) {
           for (const animation of animations) { animation.pause(); animation.currentTime = 45; }
         }
@@ -58,15 +58,18 @@ async function release(page: Page) {
 async function frame(page: Page, count: number, direction: string) {
   await expect.poll(() => page.evaluate(() => (window as unknown as TransitionTestWindow).routeFrames.length)).toBe(count);
   const latest = await page.evaluate(() => (window as unknown as TransitionTestWindow).routeFrames.at(-1)!);
+  const desktop = await page.evaluate(() => matchMedia('(min-width: 64rem) and (pointer: fine)').matches);
+  const motion = desktop ? 'page-fade' : 'page-slide';
+  const duration = desktop ? 180 : 280;
   expect(latest.direction).toBe(direction);
-  expect(latest.names).toContain(direction === 'forward' ? 'page-slide-in-left' : 'page-slide-in-right');
-  expect(latest.names).toContain(direction === 'forward' ? 'page-slide-out-right' : 'page-slide-out-left');
-  expect(latest.durations).toEqual([280, 280]);
+  expect(latest.names).toContain(direction === 'forward' ? `${motion}-in-left` : `${motion}-in-right`);
+  expect(latest.names).toContain(direction === 'forward' ? `${motion}-out-right` : `${motion}-out-left`);
+  expect(latest.durations).toEqual([duration, duration]);
   expect(latest.oldX * (direction === 'forward' ? 1 : -1)).toBeGreaterThan(0);
   expect(latest.newX * (direction === 'forward' ? 1 : -1)).toBeLessThan(0);
 }
 
-test('listing pages slide in both directions with a stationary bottom bar and unchanged history behavior', async ({ page, baseURL }, info) => {
+test('listing pages use viewport-appropriate motion with a stationary bottom bar and unchanged history behavior', async ({ page, baseURL }, info) => {
   const id = `e2e-report-${info.project.name}`;
   await prepare(page, id, baseURL!);
   const errors: string[] = [];
