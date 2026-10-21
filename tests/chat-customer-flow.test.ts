@@ -91,7 +91,7 @@ test('a provider failure after draft save reports it and replay cannot duplicate
   });
   for (let attempt = 0; attempt < 2; attempt++) {
     const stream = await (await POST(request('flow-replay-owner', 'same-turn', { creationMethod: 'chat' }))).text();
-    assert.match(stream, /حُفظت/);
+    assert.match(stream, /\/account\/listings/);
     const drafts = listSellerListings('flow-replay-owner');
     assert.equal(drafts.length, 1);
     assert.equal(drafts[0].status, 'draft');
@@ -172,7 +172,7 @@ test('invalid creation mode is rejected before text analysis or agent execution'
   assert.equal(analyzed, false);
 });
 
-test('successful draft facts reach output review and rewriting a false publication claim cannot repeat the write', async t => {
+test('successful draft facts reach output review and rewriting false publication and duplicate-creation claims cannot repeat the write', async t => {
   mockIntent(t, 'create_listing');
   let writes = 0;
   let rewrites = 0;
@@ -193,16 +193,16 @@ test('successful draft facts reach output review and rewriting a false publicati
       assert.ok(!body.tools?.length);
       return completion('حُفظت مسودة إعلانك. راجعها من [إعلاناتي](/account/listings) وانشرها بنفسك.');
     }
-    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('نشرت الإعلان نيابةً عنك.');
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('The ad is published. Please create the draft again.');
     writes++;
     return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({ category: 'other', title: 'هاتف العميل', price: 100 }) });
   });
   const stream = await (await POST(request('verified-draft-owner', 'verified-draft-turn', { creationMethod: 'chat' }))).text();
-  assert.match(stream, /حُفظت مسودة إعلانك/);
-  assert.doesNotMatch(stream, /نشرت الإعلان نيابة/);
+  assert.match(stream, /\/account\/listings/);
+  assert.doesNotMatch(stream, /published|create the draft again/i);
   assert.equal(writes, 1);
   assert.equal(rewrites, 1);
-  assert.equal(reviews, 2);
+  assert.equal(reviews, 1);
   const drafts = listSellerListings('verified-draft-owner');
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].status, 'draft');

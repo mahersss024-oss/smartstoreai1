@@ -1,4 +1,5 @@
 import { isArabicCustomerText } from './customer-language';
+import { normalizeFirstPartyChatLinks } from './chat/internal-links';
 
 export const chatServiceUnavailableMessage =
   'تعذر إكمال رد المساعد الآن. راجع مسوداتك قبل إعادة طلب إنشاء إعلان؛ النشر والإجراءات الحساسة تنفّذها بنفسك.';
@@ -16,7 +17,7 @@ export function isRawServiceErrorResponse(text: string) {
 }
 
 export function getSafeAssistantText(text: string) {
-  const trimmed = text.trim();
+  const trimmed = normalizeFirstPartyChatLinks(text.trim());
 
   return isRawServiceErrorResponse(trimmed) || !isArabicCustomerText(trimmed) ? '' : trimmed;
 }

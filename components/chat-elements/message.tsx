@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +24,7 @@ import type {
 } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";
+import { normalizeInternalChatHref } from "@/lib/chat/internal-links";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -65,31 +67,8 @@ export const MessageContent = ({
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 function getSmartStoreListingPath(href: unknown) {
-  if (typeof href !== "string") {
-    return null;
-  }
-
-  if (/^\/listings\/[^/?#]+/.test(href)) {
-    return href;
-  }
-
-  try {
-    const url = new URL(href);
-
-    if (
-      (url.hostname === "www.smartstore-ai.com" ||
-        url.hostname === "smartstore-ai.com" ||
-        url.hostname === "localhost" ||
-        url.hostname === "127.0.0.1") &&
-      /^\/listings\/[^/?#]+/.test(url.pathname)
-    ) {
-      return `${url.pathname}${url.search}${url.hash}`;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
+  const path = normalizeInternalChatHref(href);
+  return path && /^\/listings\/[^/?#]+/.test(path) ? path : null;
 }
 
 function SmartStoreListingLink({
@@ -121,8 +100,9 @@ const messageMarkdownComponents = {
   p: ({ children, ...props }: ComponentPropsWithoutRef<'div'>) => (
     <div {...props}>{children}</div>
   ),
-  a: ({ children, href, ...props }: ComponentPropsWithoutRef<'a'>) => {
+  a: ({ children, href }: ComponentPropsWithoutRef<'a'>) => {
     const listingPath = getSmartStoreListingPath(href);
+    const internalPath = normalizeInternalChatHref(href);
 
     if (listingPath) {
       return (
@@ -132,16 +112,22 @@ const messageMarkdownComponents = {
       );
     }
 
+    if (internalPath) {
+      return (
+        <Link
+          className="font-semibold text-blue-700 underline underline-offset-4 dark:text-blue-300"
+          href={internalPath}
+          prefetch={false}
+        >
+          {children}
+        </Link>
+      );
+    }
+
     return (
-      <a
-        className="font-semibold text-blue-700 underline underline-offset-4 dark:text-blue-300"
-        href={href}
-        rel="noreferrer"
-        target="_blank"
-        {...props}
-      >
+      <span className="font-semibold text-blue-700 underline underline-offset-4 dark:text-blue-300">
         {children}
-      </a>
+      </span>
     );
   },
 };

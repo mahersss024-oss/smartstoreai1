@@ -12,6 +12,7 @@ import { mockImageContentReview } from './helpers/image-content';
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import {
   createListingDraft,
+  listSellerListings,
   publishListing,
 } from '@/agent/marketplace/store';
 import type { AuthSession } from '@/lib/auth/session';
@@ -125,6 +126,24 @@ test('adds many follow-up details to the current draft when listingId is omitted
     'spare_key',
     'floor_mats',
   ]);
+});
+
+test('the same product title cannot create a second draft in one chat turn when details change', async () => {
+  const sellerId = 'seller:duplicate-draft-turn';
+  const tools = createMarketplaceTools(createTestSession(sellerId), { requestKey: 'duplicate-product-turn' });
+  const create = tools.createListingDraft.execute as unknown as (
+    input: Record<string, unknown>, options: Record<string, never>,
+  ) => Promise<{ status: string; message: string; listing: { id: string; title: string; description?: string } }>;
+
+  const first = await create({ category: 'other', title: 'Office Desk' }, {});
+  const repeated = await create({ category: 'other', title: 'office desk', description: 'Solid wood, confirmed by seller' }, {});
+
+  assert.equal(first.status, 'draft_created');
+  assert.equal(repeated.status, 'already_saved');
+  assert.equal(repeated.listing.id, first.listing.id);
+  assert.match(repeated.message, /Do not create it again/);
+  assert.equal(listSellerListings(sellerId).length, 1);
+  assert.equal(listSellerListings(sellerId)[0].description, undefined, 'new details must be added through updateListing, not silently discarded into another draft');
 });
 
 test('chat cannot change a published listing even with model-generated confirmation flags', async () => {

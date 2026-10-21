@@ -26,6 +26,7 @@ import {
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
+import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 
 function authRequired() {
   return {
@@ -165,6 +166,7 @@ export function createMarketplaceTools(
   } = {},
 ) {
   const draftOperations = new Map<string, number>();
+  const createdDraftsByProduct = new Map<string, Awaited<ReturnType<typeof createListingDraft>>>();
   const imageOwners = new Map<number, string>();
   function selectUploadedImages(input: z.infer<typeof createDraftInputSchema> | { imageIndexes?: number[]; imageSourceMessageId?: string }) {
     const indexes = [...new Set(input.imageIndexes ?? [])];
@@ -176,7 +178,7 @@ export function createMarketplaceTools(
     ...createReadOnlyMarketplaceTools(),
     createListingDraft: tool({
       description:
-        'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Omit unknown specifications and attributes; never put meta notes about missing seller details in listing fields. Ask about useful missing details separately in chat. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
+        'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Omit unknown specifications and attributes; never put meta notes about missing seller details in listing fields. After a successful result the draft is already saved: do not ask the seller to create it again or call this tool again for the same product. Use updateListing with the saved listingId for later details; create another draft only for a different product or an explicit request for a separate ad. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
       inputSchema: createDraftInputSchema,
       execute: async (input) => {
         if (!session) {
@@ -188,6 +190,17 @@ export function createMarketplaceTools(
         const listingInput = normalizeListingDetailsInput(
           listingDetailsInputSchema.parse(input),
         ) as CreateListingInput;
+        const productIdentity = listingInput.title
+          ? JSON.stringify([listingInput.category, normalizeMarketplaceSearchText(listingInput.title)])
+          : undefined;
+        const alreadyCreated = productIdentity ? createdDraftsByProduct.get(productIdentity) : undefined;
+        if (alreadyCreated) {
+          return {
+            status: 'already_saved',
+            listing: alreadyCreated,
+            message: 'This product draft is already saved in this chat turn. Do not create it again. Use updateListing with this listingId to add confirmed details, or add explicitly selected new photos with addUploadedImagesToListing. Create a separate draft only for a different product explicitly requested by the seller.',
+          };
+        }
         let listing: Awaited<ReturnType<typeof createListingDraft>>;
         let imageUploadUnavailable = false;
 
@@ -197,7 +210,7 @@ export function createMarketplaceTools(
           if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
           const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
           listing = await createListingDraft(session.user, listingInput, { idempotencyKey });
-          if (listing.status === 'draft') options.onDraftSaved?.(listing.id);
+          if (listing.status === 'draft' || listing.status === 'pending') options.onDraftSaved?.(listing.id);
         } catch (error) {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
           if (isListingLimitReachedError(error)) {
@@ -247,6 +260,10 @@ export function createMarketplaceTools(
           if (listingWithImages) {
             listing = listingWithImages;
           }
+        }
+
+        if (productIdentity && (listing.status === 'draft' || listing.status === 'pending')) {
+          createdDraftsByProduct.set(productIdentity, listing);
         }
 
         return {

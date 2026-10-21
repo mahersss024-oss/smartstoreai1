@@ -35,9 +35,10 @@ test('foreign-language prose is not displayed even in a mixed-language assistant
 test('Arabic replies preserve functional links and authentication protocol markers', () => {
   for (const text of [
     'افتح [الإعلان](/listings/example-id?source=chat).',
-    'راجع [التفاصيل](https://souqhamad.com/listings/example-id).',
+    'راجع [التفاصيل](/listings/example-id).',
     '[[SMARTSTORE_GOOGLE_AUTH_REQUIRED]] يرجى تسجيل الدخول.',
   ]) assert.equal(getSafeAssistantText(text), text);
+  assert.equal(getSafeAssistantText('راجع [التفاصيل](https://souqhamad.com/listings/example-id).'), 'راجع [التفاصيل](/listings/example-id).');
   assert.equal(getSafeAssistantText('[Open listing](https://souqhamad.com/listings/example-id)'), '');
 });
 
