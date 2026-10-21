@@ -27,3 +27,10 @@ test('draft images stay optional and shared safety remains advisory', () => {
   assert.match(systemPrompt, /Different standalone products must not be merged/);
   assert.match(systemPrompt, /one bundled listing or separate listings/);
 });
+
+test('draft content omits unknown specifications and asks for them outside listing fields', () => {
+  assert.match(systemPrompt, /use only seller-confirmed facts/);
+  assert.match(systemPrompt, /Omit unknown optional specifications and attributes/);
+  assert.match(systemPrompt, /never add meta notes.*to a title or description/);
+  assert.match(systemPrompt, /Ask about useful missing details separately in chat/);
+});

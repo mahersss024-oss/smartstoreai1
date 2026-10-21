@@ -41,7 +41,9 @@ const listingDetailsSchema = {
   categoryOption: z.string().max(80).nullable().optional().describe(`One optional brand/type ID belonging to the selected category, never a model or detailed variant. Use only a seller-confirmed or unambiguous value, omit when unknown; null clears it. Catalog:\n${marketplaceCategoryOptionsPrompt}`),
   carModel: z.string().max(80).nullable().optional().describe('Cars only: exact model-family ID under the selected categoryOption brand from the system catalog. Omit when unknown; null clears it. Never years or trim levels.'),
   title: z.string().min(2).optional(),
-  description: z.string().min(2).optional(),
+  description: z.string().min(2)
+    .describe('Customer-facing product description using only seller-confirmed facts. Omit unknown details; never narrate missing or unprovided specifications in the description.')
+    .optional(),
   price: z
     .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
     .optional(),
@@ -174,7 +176,7 @@ export function createMarketplaceTools(
     ...createReadOnlyMarketplaceTools(),
     createListingDraft: tool({
       description:
-        'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
+        'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Omit unknown specifications and attributes; never put meta notes about missing seller details in listing fields. Ask about useful missing details separately in chat. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
       inputSchema: createDraftInputSchema,
       execute: async (input) => {
         if (!session) {
@@ -259,7 +261,7 @@ export function createMarketplaceTools(
                 ? 'Draft created. Some photos could not be saved, but photos are optional and the seller can publish manually from Account > My listings.'
               : listing.images.some((image) => image.status === 'approved')
                 ? 'Draft created with the uploaded product image. The seller must review and publish it from Account > My listings.'
-                : 'Draft created. Photos are optional. Ask for useful missing details and direct the seller to Account > My listings when they want to publish.',
+                : 'Draft created. Photos are optional. Ask about useful missing details separately in chat; do not put notes about missing details in listing fields. Direct the seller to Account > My listings when they want to publish.',
           listing,
         };
       },
@@ -267,7 +269,7 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes. Omit listingId only to select the latest owned draft. A new standalone product requires a new draft. A draft price change requires confirmedPriceChange=true.',
+        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes; omit unknown specifications, and never add notes about missing details to listing fields. Ask follow-up questions separately in chat. Omit listingId only to select the latest owned draft. A new standalone product requires a new draft. A draft price change requires confirmedPriceChange=true.',
       inputSchema: updateListingDetailsInputSchema,
       execute: async (input) => {
         if (!session) {
