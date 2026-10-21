@@ -146,6 +146,9 @@ async function runRegistrationAgreementFlow(page: Page) {
   await expect(page).toHaveURL(/\/commission-agreement\?provider=google$/);
   await expect(page.locator('.marketplace-bottom-nav')).toHaveCount(0);
   await assertNoHorizontalOverflow(page);
+  await expect(page.locator('button[type="submit"]')).toBeInViewport({
+    ratio: 0.9,
+  });
   const agreementVitals = await assertLoginVitals(page, 'registration agreement');
 
   await page.locator('#platform-agreement-accepted').check();
@@ -172,7 +175,7 @@ async function runRegistrationAgreementFlow(page: Page) {
 test('new visitor accepts the registration agreement and returns to the home page on mobile', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 360, height: 640 });
   await runRegistrationAgreementFlow(page);
 });
 

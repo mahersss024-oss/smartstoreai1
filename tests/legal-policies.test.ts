@@ -15,7 +15,8 @@ test('registration agreement explicitly accepts platform policies', () => {
   assert.match(agreementPage, /سياسة الخصوصية/);
   assert.match(agreementPage, /سياسة الإعلانات/);
   assert.match(agreementPage, /سياسة رسوم المنصة/);
-  assert.match(agreementPage, /أقر برسوم منصة 1%/);
+  assert.match(agreementPage, /أقر باطلاعي وموافقتي على السياسات الأربع/);
+  assert.match(agreementPage, /رسوم المنصة 1% من قيمة البيع المكتمل عبر سوق حمد/);
   for (const href of ['/terms', '/privacy', '/listing-policy', '/commission-policy']) {
     assert.match(
       agreementPage,

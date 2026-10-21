@@ -48,8 +48,8 @@ export default function CommissionAgreementPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
-      <div className="mx-auto grid min-h-screen max-w-4xl content-center gap-4 px-4 py-6 sm:px-6">
+    <main className="commission-agreement-page min-h-screen touch-pan-y overflow-y-auto bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
+      <div className="mx-auto grid min-h-screen max-w-4xl content-center gap-2 px-3 py-3 sm:gap-4 sm:px-6 sm:py-6">
         <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild variant="outline" size="icon" className="rounded-md">
@@ -66,32 +66,32 @@ export default function CommissionAgreementPage() {
           </div>
         </header>
 
-        <section className="grid gap-5 p-5 md:grid-cols-[16rem_1fr]">
-          <div className="grid content-start gap-4 rounded-md bg-blue-50 p-4 text-blue-950 dark:bg-blue-400/10 dark:text-blue-50">
-            <div className="grid size-14 place-items-center rounded-md bg-white text-blue-700 shadow-sm dark:bg-background dark:text-blue-200">
-              <Percent className="size-7" />
+        <section className="grid gap-3 p-3 sm:gap-5 sm:p-5 md:grid-cols-[16rem_1fr]">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] content-start items-center gap-3 rounded-md bg-blue-50 p-3 text-blue-950 dark:bg-blue-400/10 dark:text-blue-50 md:grid-cols-1 md:items-start md:gap-4 md:p-4">
+            <div className="grid size-10 place-items-center rounded-md bg-white text-blue-700 shadow-sm dark:bg-background dark:text-blue-200 md:size-14">
+              <Percent className="size-5 md:size-7" />
             </div>
             <div>
-              <div className="text-3xl font-bold">1%</div>
-              <p className="mt-1 text-sm leading-7">
-                رسوم منصة مستحقة من قيمة المنتج عند إتمام البيع عن طريق الموقع.
+              <div className="text-2xl font-bold md:text-3xl">1%</div>
+              <p className="mt-0.5 text-xs leading-5 md:mt-1 md:text-sm md:leading-7">
+                رسوم المنصة: 1% من قيمة البيع المكتمل عبر سوق حمد.
               </p>
             </div>
           </div>
 
-          <form className="grid gap-5" onSubmit={submitAgreement}>
+          <form className="grid gap-3 md:gap-5" onSubmit={submitAgreement}>
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
                 <ShieldCheck className="size-4" />
                 قبل التسجيل
               </div>
-              <h2 className="text-2xl font-bold leading-9">
+              <h2 className="text-xl font-bold leading-7 md:text-2xl md:leading-9">
                 إقرار استخدام سوق حمد
               </h2>
-              <p className="mt-3 text-sm leading-8 text-muted-foreground">
-                أقر بأنني اطلعت على شروط الاستخدام وسياسة الخصوصية وسياسة الإعلانات وسياسة رسوم المنصة، وأوافق عليها. كما أقر بأنني إذا أتممت عملية بيع منتج عن طريق سوق حمد، فإنني أوافق على دفع رسوم منصة مقدارها 1% من قيمة المنتج. لا تمنع هذه الخطوة التصفح أو السؤال، لكنها مطلوبة قبل إنشاء حساب وتنفيذ العمليات المرتبطة بالحساب.
+              <p className="mt-2 text-sm leading-6 text-muted-foreground md:mt-3 md:leading-8">
+                اطلعت على السياسات الأربع وأوافق عليها، وأتعهد بدفع 1% من قيمة البيع المكتمل عبر سوق حمد. يلزم الإقرار لإنشاء الحساب، ولا يمنع التصفح أو الأسئلة العامة.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+              <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 md:mt-3">
                 <Link className="inline-flex h-9 items-center rounded-md border px-2 hover:bg-blue-50 dark:hover:bg-blue-400/10" href="/terms" prefetch={false}>
                   شروط الاستخدام
                 </Link>
@@ -107,7 +107,7 @@ export default function CommissionAgreementPage() {
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border bg-[#f7f9fc] p-4 text-sm leading-7 dark:bg-background">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border bg-[#f7f9fc] p-3 text-sm leading-6 dark:bg-background md:p-4">
               <input
                 checked={accepted}
                 className="mt-1 size-4 accent-blue-600"
@@ -117,17 +117,17 @@ export default function CommissionAgreementPage() {
                 type="checkbox"
               />
               <span>
-                أوافق على شروط الاستخدام وسياسة الخصوصية وسياسة الإعلانات وسياسة رسوم المنصة، وأقر برسوم منصة 1% من قيمة المنتج إذا تمت عملية البيع عن طريق الموقع.
+                أقر باطلاعي وموافقتي على السياسات الأربع، وبرسوم المنصة 1% من قيمة البيع المكتمل عبر سوق حمد.
               </span>
             </label>
 
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-              <div className="flex items-start gap-2 text-xs leading-6 text-muted-foreground">
+            <div className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-slate-200 bg-[#e8edf3]/95 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-700 dark:bg-[#0a111c]/95 sm:static sm:grid-cols-[1fr_auto] sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+              <div className="flex items-start gap-2 text-xs leading-4 text-muted-foreground">
                 <BadgeCheck className="mt-1 size-4 shrink-0 text-blue-600" />
                 يتم حفظ الإقرار قبل تحويلك إلى مزود الدخول المختار.
               </div>
               <Button
-                className="rounded-md bg-blue-600 hover:bg-blue-700"
+                className="w-full rounded-md bg-blue-600 hover:bg-blue-700 sm:w-auto"
                 disabled={!accepted || isLoading}
                 type="submit"
               >
@@ -137,7 +137,7 @@ export default function CommissionAgreementPage() {
             </div>
 
             {error && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
             )}
