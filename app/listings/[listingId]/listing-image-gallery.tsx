@@ -362,8 +362,18 @@ export function ListingImageGallery({
                     alt={`${title} - الصورة ${index + 1}`}
                     className="h-full w-full object-cover"
                     decoding="async"
-                    fallback={<ImageIcon className="size-4 text-slate-500 dark:text-slate-400" />}
+                    fallback={(
+                      <div className="grid h-full w-full place-items-center bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                        <div className="grid justify-items-center gap-2">
+                          <ImageIcon className="size-7" />
+                          <span className="text-xs">تعذّر تحميل الصورة</span>
+                        </div>
+                      </div>
+                    )}
+                    fallbackSrcs={typeof image === 'string' ? [] : [image.originalUrl, image.thumbnailUrl]}
                     loading={index === 0 ? 'eager' : 'lazy'}
+                    loadTimeoutMs={6_000}
+                    maxRetries={0}
                     src={displayUrl}
                   />
                 </button>

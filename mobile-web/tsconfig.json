@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "plugins": [{ "name": "next" }],
+    "incremental": false,
+    "paths": {
+      "@/*": ["./*"],
+      "@chat-elements/*": ["./components/chat-elements/*"],
+      "@ui/*": ["./components/ui/*"],
+      "next/navigation": ["./mobile-web/runtime/navigation.tsx"],
+      "next/link": ["./mobile-web/runtime/link.tsx"]
+    }
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../app/page.tsx",
+    "../next-env.d.ts"
+  ],
+  "exclude": ["../node_modules", "./.next-mobile"]
+}

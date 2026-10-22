@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.souqhamad.app",
       "sha256_cert_fingerprints": [
-        "3A:0A:A0:AD:75:8A:D0:9A:32:DF:70:96:9A:B2:A2:E0:BD:C3:55:DE:40:03:AD:33:6F:54:16:39:E5:0C:4F:BC"
+        "3A:0A:A0:AD:75:8A:D0:9A:32:DF:70:96:9A:B2:A2:E0:BD:C3:55:DE:40:03:AD:33:6F:54:16:39:E5:0C:4F:BC",
+        "17:85:DC:CB:F4:35:0D:2C:62:A5:05:C7:54:B4:3E:BB:F1:2F:61:B9:F2:8B:A4:E8:8E:B1:15:FC:EC:35:62:28"
       ]
     }
   }

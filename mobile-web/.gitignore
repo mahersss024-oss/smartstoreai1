@@ -1,0 +1,5 @@
+/.next/
+/.next-mobile/
+/next-env.d.ts
+/public/*
+!/public/mobile-api-origin.js
