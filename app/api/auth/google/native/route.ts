@@ -6,6 +6,7 @@ import {
   verifyGoogleIdentityToken,
 } from '@/lib/auth/google';
 import {
+  createSignedSession,
   createSessionCookie,
   hasCommissionAgreement,
   type AuthSessionUser,
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
     {
       authenticated: true,
       user: registeredUser,
+      sessionToken: createSignedSession(registeredUser),
     },
     {
       headers: {

@@ -160,7 +160,15 @@ export function getCookieValue(request: Request, name: string) {
 }
 
 export function getAuthSession(request: Request) {
-  return parseSignedSession(getCookieValue(request, sessionCookieName));
+  const authorization = request.headers.get('authorization') ?? '';
+  const bearerPrefix = 'Bearer ';
+  const bearerToken = authorization.startsWith(bearerPrefix)
+    ? authorization.slice(bearerPrefix.length).trim()
+    : '';
+
+  return parseSignedSession(
+    getCookieValue(request, sessionCookieName) ?? bearerToken,
+  );
 }
 
 export function createSessionCookie(user: AuthSessionUser) {
@@ -175,7 +183,7 @@ export function clearSessionCookie() {
   return serializeCookie(sessionCookieName, '', { maxAge: 0 });
 }
 
-export function createCommissionAgreementCookie() {
+export function createCommissionAgreementToken() {
   const agreement: CommissionAgreement = {
     version: commissionAgreementVersion,
     platformAgreementVersion,
@@ -189,9 +197,13 @@ export function createCommissionAgreementCookie() {
   const payload = base64UrlEncode(JSON.stringify(agreement));
   const signature = signPayload(payload);
 
+  return `${payload}.${signature}`;
+}
+
+export function createCommissionAgreementCookie() {
   return serializeCookie(
     commissionAgreementCookieName,
-    encodeURIComponent(`${payload}.${signature}`),
+    encodeURIComponent(createCommissionAgreementToken()),
     { maxAge: commissionAgreementMaxAgeSeconds },
   );
 }
@@ -230,8 +242,10 @@ export function parseCommissionAgreement(value: string | undefined | null) {
 }
 
 export function getCommissionAgreement(request: Request) {
+  const headerAgreement = request.headers.get('x-souq-hamad-commission-agreement');
+
   return parseCommissionAgreement(
-    getCookieValue(request, commissionAgreementCookieName),
+    getCookieValue(request, commissionAgreementCookieName) ?? headerAgreement,
   );
 }
 

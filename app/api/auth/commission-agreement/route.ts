@@ -1,5 +1,6 @@
 import {
   commissionPolicyVersion,
+  createCommissionAgreementToken,
   createCommissionAgreementCookie,
   listingPolicyVersion,
   platformAgreementVersion,
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
   return Response.json(
     {
       accepted: true,
+      agreementToken: createCommissionAgreementToken(),
       commissionRatePercent: 1,
       platformAgreementVersion,
       termsVersion,
