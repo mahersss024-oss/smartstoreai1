@@ -240,6 +240,60 @@ test('google auth start uses mobile state inside the native wrapper', async () =
   }
 });
 
+test('google auth start uses mobile state for the wrapper browser fallback', async () => {
+  const previous = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+  };
+
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.NEXT_PUBLIC_APP_URL = 'https://souqhamad.com';
+
+  try {
+    const response = await startGoogleAuth(
+      new Request(
+        'https://souqhamad.com/api/auth/google/start?native_fallback=1',
+        { headers: { cookie: createCommissionAgreementCookie() } },
+      ),
+    );
+    const location = response.headers.get('location');
+
+    assert.ok(location);
+    assert.match(new URL(location).searchParams.get('state') ?? '', /^mobile:/);
+    assert.equal(response.headers.get('set-cookie'), null);
+  } finally {
+    restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
+    restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
+  }
+});
+
+test('google auth start preserves wrapper fallback across agreement acceptance', async () => {
+  const previous = {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+  };
+
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.NEXT_PUBLIC_APP_URL = 'https://souqhamad.com';
+
+  try {
+    const response = await startGoogleAuth(
+      new Request(
+        'https://souqhamad.com/api/auth/google/start?native_fallback=1',
+      ),
+    );
+    const location = response.headers.get('location');
+
+    assert.ok(location);
+    assert.equal(new URL(location).pathname, '/commission-agreement');
+    assert.equal(new URL(location).searchParams.get('provider'), 'google');
+    assert.equal(new URL(location).searchParams.get('native_fallback'), '1');
+  } finally {
+    restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
+    restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
+  }
+});
+
 test('home login control offers Google and Apple choices', () => {
   const homePage = readProjectFile('app', 'page.tsx');
 

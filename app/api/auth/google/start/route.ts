@@ -13,6 +13,9 @@ import { getAppBaseUrl } from '@/lib/app-url';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const mobileFallback = url.searchParams.get('native_fallback') === '1';
+
   const rateLimitResponse = await enforceApiRateLimit(request, {
     namespace: 'auth_google_start',
     maxRequests: 30,
@@ -24,9 +27,15 @@ export async function GET(request: Request) {
   }
 
   if (!hasCommissionAgreement(request)) {
-    return NextResponse.redirect(
-      new URL('/commission-agreement?provider=google', getAppBaseUrl(request)),
+    const agreementUrl = new URL(
+      '/commission-agreement?provider=google',
+      getAppBaseUrl(request),
     );
+    if (mobileFallback) {
+      agreementUrl.searchParams.set('native_fallback', '1');
+    }
+
+    return NextResponse.redirect(agreementUrl);
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -38,7 +47,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const isMobileAuth = isMobileAppRequest(request);
+  const isMobileAuth = isMobileAppRequest(request) || mobileFallback;
   const oauthState = isMobileAuth ? createMobileAuthState() : createOauthState();
   const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');

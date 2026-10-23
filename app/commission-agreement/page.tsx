@@ -40,8 +40,12 @@ export default function CommissionAgreementPage() {
         new URLSearchParams(window.location.search).get('provider') === 'apple'
           ? 'apple'
           : 'google';
+      const nativeFallback =
+        new URLSearchParams(window.location.search).get('native_fallback') === '1';
 
-      router.push(`/api/auth/${provider}/start`);
+      router.push(
+        `/api/auth/${provider}/start${nativeFallback ? '?native_fallback=1' : ''}`,
+      );
     } finally {
       setIsLoading(false);
     }
