@@ -22,14 +22,27 @@ function getTrustedHosts() {
 const knownDeepLinkPaths = new Set([
   '/',
   '/account',
-  '/favorites',
-  '/conversations',
-  '/commissions',
+  '/account/follows',
+  '/account/listings',
+  '/account/seller-profile',
+  '/admin',
+  '/admin/audit-log',
+  '/admin/commissions',
+  '/admin/listings',
+  '/admin/maintenance',
+  '/admin/moderation',
+  '/admin/users',
   '/commission-agreement',
-  '/terms',
-  '/privacy',
-  '/listing-policy',
   '/commission-policy',
+  '/commissions',
+  '/conversations',
+  '/delete-account',
+  '/favorites',
+  '/listing-policy',
+  '/notifications',
+  '/offline',
+  '/privacy',
+  '/terms',
 ]);
 
 export function isSafeInternalPath(pathname: string): boolean {
@@ -52,8 +65,8 @@ export function isSafeInternalPath(pathname: string): boolean {
     return true;
   }
 
-  // Dynamic routes: /listings/:id and /conversations/:id.
-  return /^\/(listings|conversations)\/[A-Za-z0-9_-]+$/.test(base);
+  // Dynamic routes rendered by the local mobile web host.
+  return /^\/(listings|sellers|conversations)\/[A-Za-z0-9_-]+$/.test(base);
 }
 export function toAppDeepLink(internalUrl: string): string | null {
   let path = internalUrl;

@@ -3,6 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import test from 'node:test';
 
+import { isSafeInternalPath } from '@/lib/native/deep-links';
+
 const appRoot = join(process.cwd(), 'app');
 const routerSource = readFileSync(
   join(process.cwd(), 'mobile-web', 'runtime', 'router.tsx'),
@@ -54,6 +56,15 @@ test('the mobile web host represents every current app page route', () => {
     '/listings/[listingId]',
     '/sellers/[sellerId]',
   ]);
+
+  for (const route of appRoutes) {
+    const deepLinkPath = route.replace(/\[[^/]+\]/g, 'sample_123');
+    assert.equal(
+      isSafeInternalPath(deepLinkPath),
+      true,
+      `the application deep-link validator must allow ${route}`,
+    );
+  }
 
   for (const [route, matchName, collection] of [
     ['/conversations/[conversationId]', 'conversationMatch', 'conversations'],
