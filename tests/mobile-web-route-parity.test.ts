@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import test from 'node:test';
+
+const appRoot = join(process.cwd(), 'app');
+const routerSource = readFileSync(
+  join(process.cwd(), 'mobile-web', 'runtime', 'router.tsx'),
+  'utf8',
+);
+const routeHostSource = readFileSync(
+  join(process.cwd(), 'mobile-web', 'runtime', 'route-host.tsx'),
+  'utf8',
+);
+
+function collectPageRoutes(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      if (entry.name === 'api' || entry.name.startsWith('_')) return [];
+      return collectPageRoutes(entryPath);
+    }
+
+    if (entry.name !== 'page.tsx') return [];
+
+    const route = relative(appRoot, directory)
+      .split(sep)
+      .filter((segment) => segment && !/^\([^/]+\)$/.test(segment))
+      .join('/');
+    return [`/${route}`.replace(/\/$/, '') || '/'];
+  });
+}
+
+function readRouteSet(source: string) {
+  const routeSet = source.match(/const staticRoutes = new Set\(\[([\s\S]*?)\]\);/);
+  assert.ok(routeSet, 'the mobile router must declare its local static routes');
+  return [...routeSet[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+}
+
+test('the mobile web host represents every current app page route', () => {
+  const appRoutes = collectPageRoutes(appRoot).sort();
+  const dynamicRoutes = appRoutes.filter((route) => route.includes('['));
+  const staticAppRoutes = appRoutes.filter((route) => !route.includes('['));
+  const localRoutes = readRouteSet(routerSource).sort();
+  const hostedStaticRoutes = [...routeHostSource.matchAll(/if \(pathname === '([^']+)'\)/g)]
+    .map((match) => match[1])
+    .sort();
+
+  assert.deepEqual(localRoutes, staticAppRoutes);
+  assert.deepEqual(hostedStaticRoutes, staticAppRoutes);
+  assert.deepEqual(dynamicRoutes, [
+    '/conversations/[conversationId]',
+    '/listings/[listingId]',
+    '/sellers/[sellerId]',
+  ]);
+
+  for (const [route, matchName, collection] of [
+    ['/conversations/[conversationId]', 'conversationMatch', 'conversations'],
+    ['/listings/[listingId]', 'listingMatch', 'listings'],
+    ['/sellers/[sellerId]', 'sellerMatch', 'sellers'],
+  ]) {
+    const matchLine = routeHostSource
+      .split(/\r?\n/)
+      .find((line) => line.includes(`const ${matchName} = pathname.match`));
+    assert.ok(matchLine?.includes(collection), `${route} has a matching route pattern`);
+    assert.match(routeHostSource, new RegExp(`if \\(${matchName}\\)`));
+    assert.ok(
+      routerSource.includes(String.raw`/^\/${collection}\/[^/]+$/`),
+      `${route} can be loaded by the local router`,
+    );
+  }
+});
