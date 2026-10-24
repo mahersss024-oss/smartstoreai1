@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Clock3, Heart, ImageIcon, MapPin } from 'lucide-react';
+import { Clock3, Heart, ImageIcon, MapPin } from 'lucide-react';
 
 import { AppleMark, GoogleMark } from '@/components/auth-provider-mark';
 import { ListingCardImage } from '@/components/listing-card-image';
@@ -287,11 +287,7 @@ export default function FavoritesPage() {
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
         <header className="smartstore-page-header flex shrink-0 items-center justify-between gap-3 px-1">
           <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/account">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold">المفضلة</h1>
             </div>

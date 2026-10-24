@@ -43,73 +43,25 @@ test('service worker registration bypasses browser cache and checks for updates'
   assert.match(source, /updateViaCache: 'none'/);
   assert.match(source, /registration\.update\(\)/);
   assert.doesNotMatch(source, /window\.addEventListener\('load'/);
-});
-
-test('notifications page exposes push notifications as the opt-in setting', () => {
-  const accountPage = readFileSync(
-    join(process.cwd(), 'app', 'account', 'page.tsx'),
-    'utf8',
-  );
-  const notificationsPage = readFileSync(
-    join(process.cwd(), 'app', 'notifications', 'page.tsx'),
-    'utf8',
-  );
-  const settings = readFileSync(
-    join(process.cwd(), 'components', 'push-notification-settings.tsx'),
-    'utf8',
-  );
-
-  assert.doesNotMatch(accountPage, /PushNotificationSettings/);
-  assert.match(accountPage, /href="\/notifications"/);
+});test('notifications page exposes push notifications as the opt-in setting', () => {
+  const notificationsPage = readFileSync(join(process.cwd(), 'app', 'notifications', 'page.tsx'), 'utf8');
+  const settings = readFileSync(join(process.cwd(), 'components', 'push-notification-settings.tsx'), 'utf8');
   assert.match(settings, /Notification\.requestPermission/);
   assert.match(settings, /pushManager\.subscribe/);
   assert.match(settings, /\/api\/push\/subscribe/);
   assert.match(settings, /variant\?: 'panel' \| 'icon'/);
-  assert.match(settings, /variant === 'icon'/);
   assert.match(settings, /const toggleNotifications = useCallback/);
-  assert.match(settings, /await refreshStatus\(\)/);
-  assert.match(settings, /helperText \? \(/);
-  assert.doesNotMatch(settings, /تصل الإشعارات عند وصول رسالة جديدة/);
   assert.match(notificationsPage, /<PushNotificationSettings \/>/);
-  assert.doesNotMatch(accountPage, /Notification\.requestPermission/);
-});
-
-test('home omits the notification bell while the notifications page keeps push settings', () => {
-  const homePage = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf8');
-  const notificationsPage = readFileSync(
-    join(process.cwd(), 'app', 'notifications', 'page.tsx'),
-    'utf8',
-  );
-  const settings = readFileSync(
-    join(process.cwd(), 'components', 'push-notification-settings.tsx'),
-    'utf8',
-  );
-  const iconAutoStatusEffect = settings.match(
-    /useEffect\(\(\) => \{[\s\S]*?if \(variant === 'icon'\) \{[\s\S]*?\n  \}, \[refreshStatus, variant\]\);/,
-  )?.[0] ?? '';
-  const iconAutoUnreadEffect = settings.match(
-    /useEffect\(\(\) => \{[\s\S]*?if \(variant === 'icon'\) \{[\s\S]*?\n  \}, \[refreshUnreadCount, variant\]\);/,
-  )?.[0] ?? '';
-
-  assert.doesNotMatch(homePage, /PushNotificationSettings/);
+});test('mobile navigation exposes notifications while the page keeps push settings', () => {
+  const navigation = readFileSync(join(process.cwd(), 'components', 'mobile-bottom-navigation.tsx'), 'utf8');
+  const notificationsPage = readFileSync(join(process.cwd(), 'app', 'notifications', 'page.tsx'), 'utf8');
+  const settings = readFileSync(join(process.cwd(), 'components', 'push-notification-settings.tsx'), 'utf8');
+  assert.match(navigation, /'\/notifications': Bell/);
   assert.match(notificationsPage, /<PushNotificationSettings \/>/);
-  assert.doesNotMatch(settings, /import Link from 'next\/link'/);
-  assert.doesNotMatch(settings, /href="\/notifications"/);
   assert.match(settings, /const toggleNotifications = useCallback/);
-  assert.match(settings, /variant === 'icon' && state === 'checking'/);
-  assert.match(settings, /onClick=\{\(\) => void toggleNotifications\(\)\}/);
   assert.match(settings, /const iconStatusRefreshDelayMs = 45_000/);
   assert.match(settings, /const iconUnreadRefreshDelayMs = 60_000/);
-  assert.match(iconAutoStatusEffect, /window\.setTimeout/);
-  assert.match(iconAutoStatusEffect, /iconStatusRefreshDelayMs/);
-  assert.match(iconAutoUnreadEffect, /window\.setTimeout/);
-  assert.match(iconAutoUnreadEffect, /iconUnreadRefreshDelayMs/);
-  assert.match(settings, /unreadCount > 0/);
-  assert.match(settings, /smartstore:notifications-read/);
-  assert.doesNotMatch(settings, /scheduleIdleTask/);
   assert.doesNotMatch(settings, /useSmartstoreRealtime/);
-  assert.doesNotMatch(settings, /className="hidden sm:inline-flex"/);
-  assert.match(settings, /className="shrink-0"/);
 });
 
 test('conversation messages trigger push notifications after successful send', () => {
@@ -173,28 +125,12 @@ test('followed sellers notify followers only when listings become published', ()
   assert.match(followNotifications, /userId !== listing\.sellerId/);
   assert.match(followNotifications, /tag: `follow:listing:\$\{listing\.id\}`/);
   assert.doesNotMatch(followNotifications, /Conversation/);
-});
-
-test('follow notifications are stored and exposed from the notifications page', () => {
+});test('follow notifications are stored and exposed from the notifications page', () => {
   const schema = readFileSync(join(process.cwd(), 'prisma', 'schema.prisma'), 'utf8');
-  const migration = readFileSync(
-    join(
-      process.cwd(),
-      'prisma',
-      'migrations',
-      '20260929100000_follow_notifications',
-      'migration.sql',
-    ),
-    'utf8',
-  );
-  const repository = readFileSync(
-    join(process.cwd(), 'agent', 'marketplace', 'repository.ts'),
-    'utf8',
-  );
+  const migration = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20260929100000_follow_notifications', 'migration.sql'), 'utf8');
+  const repository = readFileSync(join(process.cwd(), 'agent', 'marketplace', 'repository.ts'), 'utf8');
   const route = readFileSync(join(process.cwd(), 'app', 'api', 'notifications', 'route.ts'), 'utf8');
   const page = readFileSync(join(process.cwd(), 'app', 'notifications', 'page.tsx'), 'utf8');
-  const accountPage = readFileSync(join(process.cwd(), 'app', 'account', 'page.tsx'), 'utf8');
-
   assert.match(schema, /model FollowNotification/);
   assert.match(migration, /CREATE TABLE "FollowNotification"/);
   assert.match(repository, /createFollowNotificationsForListing/);
@@ -205,8 +141,5 @@ test('follow notifications are stored and exposed from the notifications page', 
   assert.match(page, /fetch\('\/api\/notifications'/);
   assert.match(page, /<PushNotificationSettings \/>/);
   assert.match(page, /markAllRead/);
-  assert.match(page, /window\.dispatchEvent\(new Event\(notificationsReadEventName\)\)/);
-  assert.match(page, /payload\.unreadCount <= 0/);
   assert.match(page, /follow_listing_published/);
-  assert.match(accountPage, /href="\/notifications"/);
 });

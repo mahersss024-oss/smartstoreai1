@@ -21,7 +21,6 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.02'],
     smartstore_endpoint_errors: ['rate<0.02'],
-    'http_req_duration{endpoint:home_page}': ['p(95)<1500'],
     'http_req_duration{endpoint:listing_detail_page}': ['p(95)<1800'],
   },
 };
@@ -29,8 +28,7 @@ export const options = {
 export { handleSummary };
 
 export default function pageFlow() {
-  group('home to search to detail', () => {
-    timedGet('/', 'home_page');
+  group('search to detail', () => {
     const query = encodeURIComponent(searchTerm());
     const listingsResponse = timedGet(
       `/api/marketplace/listings?q=${query}&page=1&limit=24`,
@@ -47,7 +45,6 @@ export default function pageFlow() {
   });
 
   group('account and protected read probes', () => {
-    timedGet('/account', 'account_page');
     timedGet('/api/auth/session', 'session_api');
     timedGet('/conversations', 'conversations_page');
     timedGet('/favorites', 'favorites_page');

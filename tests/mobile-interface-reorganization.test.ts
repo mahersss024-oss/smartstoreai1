@@ -8,25 +8,13 @@ function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
 
-test('home marketplace toolbar keeps behavior while simplifying labels', () => {
-  const page = readProjectFile('app', 'page.tsx');
-
-  assert.doesNotMatch(page, /واجهة الإعلانات/);
-  assert.match(page, /onClick=\{handleNearbyMarketplaceSearch\}/);
-  assert.match(page, /setIsMarketFilterOpen\(\(value\) => !value\)/);
-  assert.match(page, /موقعي/);
-  assert.match(page, /تصفية البحث/);
-});
-
-test('mobile bottom navigation keeps home centered with five compact destinations', () => {
+test('mobile bottom navigation only links to surviving customer sections', () => {
   const navigation = readProjectFile('components', 'mobile-bottom-navigation.tsx');
 
-  assert.deepEqual(bottomNavigationDestinations.map(item => item.href), ['/account/listings', '/conversations', '/', '/favorites', '/account']);
+  assert.deepEqual(bottomNavigationDestinations.map(item => item.href), ['/conversations', '/favorites', '/notifications', '/commissions']);
   assert.match(navigation, /bottomNavigationDestinations\.map/);
-  assert.equal(bottomNavigationDestinations.findIndex(item => 'primary' in item && item.primary), 2);
-  assert.match(navigation, /if \(href === '\/account'\) \{[\s\S]*return pathname === '\/account';[\s\S]*\}/);
-  assert.match(navigation, /grid-cols-5/);
-  assert.match(navigation, /w-1\/5/);
+  assert.match(navigation, /grid-cols-4/);
+  assert.match(navigation, /w-1\/4/);
   assert.match(navigation, /indicatorIndex = activeIndex >= 0 \? activeIndex : 2/);
   assert.match(navigation, /fixed inset-x-3/);
   assert.match(navigation, /overflow-visible/);
@@ -36,7 +24,7 @@ test('mobile bottom navigation keeps home centered with five compact destination
   assert.match(navigation, /\[mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.88\)_32%,rgba\(0,0,0,0\.48\)_68%,transparent_100%\)\]/);
   assert.match(navigation, /\[-webkit-mask-image:linear-gradient\(to_bottom,black_0%,rgba\(0,0,0,0\.88\)_32%,rgba\(0,0,0,0\.48\)_68%,transparent_100%\)\]/);
   assert.doesNotMatch(navigation, /bg-slate-700\/28/);
-  assert.match(navigation, /h-14 grid-cols-5 text-\[13px\]/);
+  assert.match(navigation, /h-14 grid-cols-4 text-\[13px\]/);
   assert.doesNotMatch(navigation, /action: 'more'/);
   assert.doesNotMatch(navigation, /isMoreOpen/);
   assert.doesNotMatch(navigation, /Grid2X2/);
@@ -63,34 +51,11 @@ test('mobile navigation and conversation alert avoid eager cold-load work', () =
   assert.doesNotMatch(alertHook, /queueMicrotask\(\(\) => \{\s*if \(!cancelled\) \{\s*if \(currentUserId\)/);
 });
 
-test('account page condenses policy links without changing customer routes', () => {
-  const page = readProjectFile('app', 'account', 'page.tsx');
-
-  assert.match(page, /الملف الشخصي/);
-  assert.match(page, /variant="switch"/);
-  assert.doesNotMatch(page, /الخدمات والإعدادات/);
-  assert.match(page, /الشروط والسياسات/);
-  assert.match(page, /href="\/terms"/);
-  assert.match(page, /href="\/account\/seller-profile"/);
-  assert.match(page, /رسوم المنصة/);
-  assert.doesNotMatch(page, /grid grid-cols-2 gap-1\.5 sm:grid-cols-3/);
-  assert.doesNotMatch(page, /min-h-16 place-items-center/);
-  assert.doesNotMatch(page, /href="\/privacy"/);
-  assert.doesNotMatch(page, /href="\/listing-policy"/);
-  assert.doesNotMatch(page, /href="\/commission-policy"/);
-});
-
-test('customer section pages keep headers stable while content scrolls', () => {
-  const accountPage = readProjectFile('app', 'account', 'page.tsx');
-  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
+test('remaining customer pages keep headers stable while content scrolls', () => {
   const conversationsPage = readProjectFile('app', 'conversations', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
   const styles = readProjectFile('app', 'globals.css');
 
-  assert.match(accountPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?min-h-0[\s\S]*?flex-1[\s\S]*?overflow-y-auto[\s\S]*?overscroll-contain/);
-  assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(conversationsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(conversationsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
@@ -135,11 +100,6 @@ test('customer section pages keep headers stable while content scrolls', () => {
   assert.doesNotMatch(styles, /\.marketplace-listings-scroll::after/);
   assert.match(readProjectFile('app', 'favorites', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
   assert.match(readProjectFile('app', 'conversations', 'page.tsx'), /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
-  assert.match(accountListingsPage, /marketplace-listings-scroll[\s\S]*?pb-\[var\(--marketplace-bottom-nav-space\)\]/);
-  assert.doesNotMatch(
-    readProjectFile('app', 'page.tsx'),
-    /DropdownMenuTrigger[\s\S]{0,360}data-testid="auth-provider-trigger"/,
-  );
   assert.doesNotMatch(styles, /\.smartstore-stable-content::after/);
   assert.match(styles, /@media \(pointer: coarse\) and \(max-width: 1023px\)[\s\S]*?touch-action: pan-y;/);
 });
@@ -147,8 +107,6 @@ test('customer section pages keep headers stable while content scrolls', () => {
 test('web customer pages keep touchpad scrolling inside the page shell', () => {
   const layout = readProjectFile('app', 'layout.tsx');
   const styles = readProjectFile('app', 'globals.css');
-  const accountPage = readProjectFile('app', 'account', 'page.tsx');
-  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const conversationsPage = readProjectFile('app', 'conversations', 'page.tsx');
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
 
@@ -159,20 +117,14 @@ test('web customer pages keep touchpad scrolling inside the page shell', () => {
   assert.match(styles, /body:has\(main\.smartstore-stable-page\)/);
   assert.match(styles, /\.smartstore-stable-page,[\s\S]*?overflow-y: auto;/);
 
-  assert.match(accountPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(accountPage, /marketplace-listings-scroll[\s\S]*?min-h-0[\s\S]*?flex-1[\s\S]*?overflow-y-auto[\s\S]*?overscroll-contain/);
-  assert.match(accountListingsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(accountListingsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(conversationsPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(conversationsPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
   assert.match(favoritesPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
   assert.match(favoritesPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });
 
-test('customer market pages avoid heavy nested card styling', () => {
+test('remaining customer pages avoid heavy nested card styling', () => {
   const files = [
-    readProjectFile('app', 'account', 'page.tsx'),
-    readProjectFile('app', 'account', 'listings', 'page.tsx'),
     readProjectFile('app', 'favorites', 'page.tsx'),
     readProjectFile('app', 'sellers', '[sellerId]', 'page.tsx'),
     readProjectFile('app', 'commissions', 'page.tsx'),

@@ -7,27 +7,6 @@ function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
 
-test('manual listing save and save publish use separate active states', () => {
-  const homePage = readProjectFile('app', 'page.tsx');
-
-  assert.match(homePage, /type ManualListingSubmission = 'saving' \| 'saving_and_publishing'/);
-  assert.match(homePage, /manualListingSubmissionRef/);
-  assert.match(homePage, /manualListingSubmissionRef\.current/);
-  assert.match(homePage, /setManualListingSubmission\(nextSubmission\)/);
-  assert.match(homePage, /loading=\{manualListingSubmission === 'saving'\}/);
-  assert.match(
-    homePage,
-    /disabled=\{manualListingSubmission === 'saving_and_publishing'\}/,
-  );
-  assert.match(
-    homePage,
-    /loading=\{manualListingSubmission === 'saving_and_publishing'\}/,
-  );
-  assert.match(homePage, /disabled=\{manualListingSubmission === 'saving'\}/);
-  assert.doesNotMatch(homePage, /loading=\{isSubmittingManualListing\}/);
-  assert.doesNotMatch(homePage, /const \[isSubmittingManualListing/);
-});
-
 test('notifications can be deleted from the server and remain scoped to the account', () => {
   const route = readProjectFile('app', 'api', 'notifications', 'route.ts');
   const repository = readProjectFile('agent', 'marketplace', 'repository.ts');

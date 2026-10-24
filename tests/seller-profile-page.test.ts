@@ -46,7 +46,7 @@ test('public seller profile renders safe public data and published listing links
   assert.match(page, /getSellerReturnHref/);
   assert.match(page, /source === 'conversation'/);
   assert.match(page, /source === 'listing'/);
-  assert.match(page, /source === 'follows'/);
+
   assert.doesNotMatch(page, /returnUrl/);
   assert.doesNotMatch(page, /العودة لإدارة المستخدمين/);
   assert.doesNotMatch(page, /العودة للسوق/);
@@ -102,30 +102,21 @@ test('public seller profile shows a copyable seller identifier', () => {
   assert.match(identity, /navigator\.share/);
   assert.match(identity, /postToNative/);
   assert.match(identity, /<span className="sr-only">\{copied \? 'تم النسخ' : 'نسخ'\}<\/span>/);
-});
-
-test('listing and seller pages keep return navigation on whitelisted sources only', () => {
+});test('listing and seller pages keep return navigation on surviving sources only', () => {
   const listingPage = readSource('app/listings/[listingId]/page.tsx');
   const sellerPage = readSource('app/sellers/[sellerId]/page.tsx');
   const conversationPage = readSource('app/conversations/[conversationId]/page.tsx');
   const favoritesPage = readSource('app/favorites/page.tsx');
-  const accountListingsPage = readSource('app/account/listings/page.tsx');
-  const followsPage = readSource('app/account/follows/page.tsx');
-
   assert.match(listingPage, /getListingReturnHref/);
   assert.match(listingPage, /source === 'conversation'/);
   assert.match(listingPage, /source === 'seller'/);
   assert.match(listingPage, /source === 'favorites'/);
-  assert.match(listingPage, /source === 'account-listings'/);
   assert.match(listingPage, /getSellerProfileHref\(listing\.sellerId, listing\.id\)/);
-  assert.doesNotMatch(listingPage, /returnUrl/);
-  assert.doesNotMatch(sellerPage, /returnUrl/);
-
+  assert.doesNotMatch(listingPage, /returnUrl|account-listings/);
+  assert.doesNotMatch(sellerPage, /returnUrl|source === 'follows'/);
   assert.match(conversationPage, /source=conversation&conversationId=/);
   assert.match(conversationPage, /conversationListingHref/);
   assert.match(favoritesPage, /source=favorites/);
-  assert.match(accountListingsPage, /source=account-listings/);
-  assert.match(followsPage, /source=follows/);
 });
 
 test('listing details renders compact similar ads from existing comparable logic', () => {

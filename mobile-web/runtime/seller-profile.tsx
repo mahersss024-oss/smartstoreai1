@@ -46,7 +46,6 @@ function getSellerReturnHref(params: URLSearchParams) {
   if (source === 'listing' && listingId && /^[a-zA-Z0-9_-]+$/.test(listingId)) {
     return '/listings/' + encodeURIComponent(listingId);
   }
-  if (source === 'follows') return '/account/follows';
   return '/';
 }
 
@@ -55,7 +54,7 @@ function getSellerListingHref(listingId: string, sellerId: string, params: URLSe
   const source = params.get('source');
   const conversationId = params.get('conversationId');
   const sourceListingId = params.get('listingId');
-  if (source === 'admin-users' || source === 'follows') query.set('sellerSource', source);
+  if (source === 'admin-users') query.set('sellerSource', source);
   if (source === 'conversation' && conversationId && /^[a-zA-Z0-9_-]+$/.test(conversationId)) {
     query.set('sellerSource', source);
     query.set('conversationId', conversationId);

@@ -192,12 +192,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               )}
             </nav>
             <Link
-              href="/account"
+              href="/admin"
               className="admin-nav-item m-3 mt-auto"
-              title="العودة إلى حسابي"
+              title="العودة إلى لوحة الإدارة"
             >
               <ArrowRight className="size-5 shrink-0" />
-              <span className="admin-sidebar-label">العودة إلى حسابي</span>
+              <span className="admin-sidebar-label">لوحة الإدارة</span>
             </Link>
           </aside>
           <header className="admin-topbar">

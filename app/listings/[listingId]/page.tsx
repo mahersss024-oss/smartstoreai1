@@ -90,7 +90,7 @@ function getListingReturnHref(searchParams: Awaited<PageProps['searchParams']>) 
   if (source === 'seller' && isSafePathSegment(sellerId)) {
     const query = new URLSearchParams();
 
-    if (sellerSource === 'admin-users' || sellerSource === 'follows') {
+    if (sellerSource === 'admin-users') {
       query.set('source', sellerSource);
     }
 
@@ -110,10 +110,6 @@ function getListingReturnHref(searchParams: Awaited<PageProps['searchParams']>) 
 
   if (source === 'favorites') {
     return '/favorites';
-  }
-
-  if (source === 'account-listings') {
-    return '/account/listings';
   }
 
   if (source === 'listing' && isSafePathSegment(sourceListingId)) {

@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
-import path from 'node:path';
+
 import { createSessionCookie } from '@/lib/auth/session';
 
 async function expectInViewport(locator: Locator) {
@@ -100,76 +100,6 @@ test('shared confirmation fits a short viewport, preserves Escape, and tracks si
   await expectInViewport(dialog);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-});
-
-test('city options stay in the viewport and retain search, selection and Escape', async ({ page }) => {
-  await page.setViewportSize({ width: 844, height: 390 });
-  await page.goto('/');
-  await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-  const trigger = page.locator('.marketplace-tools-region button[aria-haspopup="listbox"]');
-  await trigger.click();
-  const options = page.getByRole('listbox');
-  await expect(options).toBeVisible();
-  await expectInViewport(options.locator('..'));
-  await page.getByRole('searchbox', { name: 'البحث عن مدينة' }).fill('الرياض');
-  await page.getByRole('option', { name: 'الرياض', exact: true }).click();
-  await expect(trigger).toContainText('الرياض');
-  await expect(options).toHaveCount(0);
-  await trigger.click();
-  await page.keyboard.press('Escape');
-  await expect(options).toHaveCount(0);
-});
-
-test('manual image preview and publication agreement escape the floating toolbar', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
-  await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-  await page.getByRole('button', { name: 'أنشئ إعلانك يدويًا', exact: true }).click();
-  const form = page.locator('.marketplace-home-controls form');
-  await form.locator('input[type="file"]').setInputFiles(path.resolve('public/hamad-market-logo.webp'));
-  const thumbnail = page.getByRole('button', { name: 'معاينة صورة الإعلان 1', exact: true });
-  await expect(thumbnail).toBeAttached();
-  await thumbnail.evaluate(element => (element as HTMLButtonElement).click());
-  const preview = page.locator('body > .viewport-overlay[role="dialog"]');
-  await expect(preview).toHaveCount(1);
-  await expectInViewport(preview.locator(':scope > div'));
-  await expect.poll(() => preview.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-  await page.screenshot({ path: testInfo.outputPath('manual-preview.png') });
-  await preview.getByRole('button', { name: /إغلاق/ }).click();
-  await expect(preview).toHaveCount(0);
-  await expect(thumbnail).toBeAttached();
-  // Open only the existing confirmation; never submit a synthetic product.
-  await form.getByRole('button', { name: 'حفظ ونشر الإعلان', exact: true })
-    .evaluate(element => (element as HTMLButtonElement).click());
-  const agreement = page.locator('body > .viewport-overlay > [role="dialog"]');
-  await expectInViewport(agreement);
-  await page.setViewportSize({ width: 844, height: 390 });
-  await expectInViewport(agreement);
-  await expect(agreement.getByRole('button', { name: 'أقسم بالله وأتعهد بذلك', exact: true })).toBeDisabled();
-  await agreement.getByRole('button', { name: 'رجوع', exact: true }).click();
-  await expect(agreement).toHaveCount(0);
-  await expect(thumbnail).toBeAttached();
-});
-
-test('assistant attachment preview stays above the transformed chat panel without sending the attachment', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
-  await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-  const input = page.getByPlaceholder(/اكتب طلبك/);
-  if (!await input.isVisible()) await page.getByRole('button', { name: /فتح حمد/ }).click();
-  await expect(input).toBeVisible();
-  await page.locator('input[type="file"][title="رفع الملفات"]')
-    .setInputFiles(path.resolve('public/hamad-market-logo.webp'));
-  const thumbnail = page.getByRole('button', { name: /معاينة hamad-market-logo/ });
-  await thumbnail.click();
-  const preview = page.locator('body > .viewport-overlay[role="dialog"]');
-  await expect(preview).toHaveCount(1);
-  await expectInViewport(preview.locator(':scope > div'));
-  await page.setViewportSize({ width: 844, height: 390 });
-  await expectInViewport(preview.locator(':scope > div'));
-  await preview.getByRole('button', { name: 'إغلاق المعاينة', exact: true }).click();
-  await expect(preview).toHaveCount(0);
-  await expect(thumbnail).toBeAttached();
 });
 
 test('conversation message options are portaled and cancel without mutating the message', async ({ page, baseURL }) => {

@@ -7,22 +7,6 @@ function readProjectFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), 'utf8');
 }
 
-test('home listing cards avoid eager favorite state requests', () => {
-  const homePage = readProjectFile('app', 'page.tsx');
-
-  assert.doesNotMatch(homePage, /favoriteListingIds/);
-  assert.doesNotMatch(homePage, /refreshFavoriteListingIds/);
-  assert.doesNotMatch(homePage, /isFavorite=\{Boolean/);
-  assert.doesNotMatch(homePage, /onFavorite=\{favoriteListing\}/);
-  assert.doesNotMatch(homePage, /isOwnListing=\{Boolean/);
-  assert.doesNotMatch(homePage, /aria-pressed=\{isFavorite\}/);
-  assert.doesNotMatch(homePage, /<Heart/);
-  assert.doesNotMatch(
-    homePage,
-    /\/api\/marketplace\/me\/favorites\?page=1&limit=48/,
-  );
-});
-
 test('listing details favorite action fills the heart after saving', () => {
   const actions = readProjectFile(
     'app',

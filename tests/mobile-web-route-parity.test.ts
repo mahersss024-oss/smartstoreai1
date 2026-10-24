@@ -40,7 +40,7 @@ function readRouteSet(source: string) {
   return [...routeSet[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
 }
 
-test('the mobile web host represents every current app page route', () => {
+test('the mobile web host represents current app routes and keeps the retired root unavailable', () => {
   const appRoutes = collectPageRoutes(appRoot).sort();
   const dynamicRoutes = appRoutes.filter((route) => route.includes('['));
   const staticAppRoutes = appRoutes.filter((route) => !route.includes('['));
@@ -49,8 +49,10 @@ test('the mobile web host represents every current app page route', () => {
     .map((match) => match[1])
     .sort();
 
-  assert.deepEqual(localRoutes, staticAppRoutes);
-  assert.deepEqual(hostedStaticRoutes, staticAppRoutes);
+  assert.ok(!staticAppRoutes.includes('/'), 'the public market homepage remains removed');
+  assert.deepEqual(localRoutes, [...staticAppRoutes, '/'].sort());
+  assert.deepEqual(hostedStaticRoutes, [...staticAppRoutes, '/'].sort());
+  assert.ok(routeHostSource.includes("if (pathname === '/') return <MobileNotFoundPage />;"));
   assert.deepEqual(dynamicRoutes, [
     '/conversations/[conversationId]',
     '/listings/[listingId]',
@@ -81,4 +83,17 @@ test('the mobile web host represents every current app page route', () => {
       `${route} can be loaded by the local router`,
     );
   }
+});
+test('surviving web pages do not link to removed account routes', () => {
+  const retainedPages = [
+    'app/favorites/page.tsx',
+    'app/conversations/page.tsx',
+    'app/notifications/page.tsx',
+    'app/commissions/page.tsx',
+  ];
+  const pageSources = retainedPages.map(path => readFileSync(join(process.cwd(), path), 'utf8'));
+  const adminShell = readFileSync(join(process.cwd(), 'components/admin/admin-shell.tsx'), 'utf8');
+  for (const pageSource of pageSources) assert.doesNotMatch(pageSource, /href=["']\/account(?:[/?#]|$)/);
+  assert.match(adminShell, /href="\/admin"/);
+  assert.doesNotMatch(adminShell, /href="\/account"/);
 });
