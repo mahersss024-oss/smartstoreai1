@@ -22,6 +22,7 @@ overrides:
   picomatch@>=4.0.0 <4.0.4: 4.0.4
   postcss@<8.5.23: 8.5.23
   source-map-js@<1.2.2: 1.2.2
+  undici: 7.30.1
 
 patchedDependencies:
   '@next/eslint-plugin-next@16.4.0':
@@ -34,10 +35,10 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: 4.0.65
-        version: 4.0.65(zod@4.1.12)
+        version: 4.0.65(zod@4.6.6)
       '@ai-sdk/react':
         specifier: 4.0.100
-        version: 4.0.100(react@19.3.0)(zod@4.1.12)
+        version: 4.0.100(react@19.3.0)(zod@4.6.6)
       '@fullcalendar/react':
         specifier: 7.1.3
         version: 7.1.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(temporal-polyfill@1.0.6)
@@ -58,7 +59,7 @@ importers:
         version: 1.2.8(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       ai:
         specifier: 7.0.97
-        version: 7.0.97(zod@4.1.12)
+        version: 7.0.97(zod@4.6.6)
       apexcharts:
         specifier: 7.9.1
         version: 7.9.1
@@ -108,8 +109,8 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(react@19.3.0)
       zod:
-        specifier: ^4.1.12
-        version: 4.1.12
+        specifier: ^4.6.6
+        version: 4.6.6
     devDependencies:
       '@playwright/test':
         specifier: ^1.63.0
@@ -3033,8 +3034,8 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@7.29.1:
-    resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
+  undici@7.30.1:
+    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
 
   unified@11.0.5:
@@ -3147,54 +3148,54 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  zod@4.1.12:
-    resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.78(zod@4.1.12)':
+  '@ai-sdk/gateway@4.0.78(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.13
-      '@ai-sdk/provider-utils': 5.0.39(zod@4.1.12)
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.6.6)
       '@vercel/oidc': 3.2.0
-      zod: 4.1.12
+      zod: 4.6.6
 
-  '@ai-sdk/mcp@2.0.48(zod@4.1.12)':
+  '@ai-sdk/mcp@2.0.48(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.13
-      '@ai-sdk/provider-utils': 5.0.39(zod@4.1.12)
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.6.6)
       cross-spawn: 7.0.6
       pkce-challenge: 5.0.1
-      zod: 4.1.12
+      zod: 4.6.6
 
-  '@ai-sdk/openai@4.0.65(zod@4.1.12)':
+  '@ai-sdk/openai@4.0.65(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.13
-      '@ai-sdk/provider-utils': 5.0.39(zod@4.1.12)
-      zod: 4.1.12
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.6.6)
+      zod: 4.6.6
 
-  '@ai-sdk/provider-utils@5.0.39(zod@4.1.12)':
+  '@ai-sdk/provider-utils@5.0.39(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.13
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.29.1
-      zod: 4.1.12
+      undici: 7.30.1
+      zod: 4.6.6
 
   '@ai-sdk/provider@4.0.13':
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@4.0.100(react@19.3.0)(zod@4.1.12)':
+  '@ai-sdk/react@4.0.100(react@19.3.0)(zod@4.6.6)':
     dependencies:
-      '@ai-sdk/mcp': 2.0.48(zod@4.1.12)
+      '@ai-sdk/mcp': 2.0.48(zod@4.6.6)
       '@ai-sdk/provider': 4.0.13
-      '@ai-sdk/provider-utils': 5.0.39(zod@4.1.12)
-      ai: 7.0.97(zod@4.1.12)
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.6.6)
+      ai: 7.0.97(zod@4.6.6)
       react: 19.3.0
       swr: 2.5.1(react@19.3.0)
       throttleit: 2.1.0
@@ -4292,12 +4293,12 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@7.0.97(zod@4.1.12):
+  ai@7.0.97(zod@4.6.6):
     dependencies:
-      '@ai-sdk/gateway': 4.0.78(zod@4.1.12)
+      '@ai-sdk/gateway': 4.0.78(zod@4.6.6)
       '@ai-sdk/provider': 4.0.13
-      '@ai-sdk/provider-utils': 5.0.39(zod@4.1.12)
-      zod: 4.1.12
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.6.6)
+      zod: 4.6.6
 
   ajv@6.14.0:
     dependencies:
@@ -4825,8 +4826,8 @@ snapshots:
       '@babel/parser': 7.29.8
       eslint: 9.39.1(jiti@2.7.0)
       hermes-parser: 0.25.1
-      zod: 4.1.12
-      zod-validation-error: 4.0.2(zod@4.1.12)
+      zod: 4.6.6
+      zod-validation-error: 4.0.2(zod@4.6.6)
     transitivePeerDependencies:
       - supports-color
 
@@ -6418,7 +6419,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@7.29.1: {}
+  undici@7.30.1: {}
 
   unified@11.0.5:
     dependencies:
@@ -6578,10 +6579,10 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-validation-error@4.0.2(zod@4.1.12):
+  zod-validation-error@4.0.2(zod@4.6.6):
     dependencies:
-      zod: 4.1.12
+      zod: 4.6.6
 
-  zod@4.1.12: {}
+  zod@4.6.6: {}
 
   zwitch@2.0.4: {}
