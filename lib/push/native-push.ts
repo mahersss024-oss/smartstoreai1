@@ -6,6 +6,7 @@ import {
 } from '@/agent/marketplace/mobile-push-tokens';
 
 import { fetchWithTimeout } from '../api/fetch-timeout';
+import { postApnsHttp2 } from './apns-http2';
 
 type NativePushMessage = {
   title: string;
@@ -186,14 +187,20 @@ async function sendFirebaseMessage(
     return { ok: false, reason: 'native_push_not_configured' };
   }
 
+  const controller = new AbortController();
+  let responseDeadline: ReturnType<typeof setTimeout> | undefined;
   try {
     const accessToken = await getFirebaseAccessToken(config);
-    const response = await fetchWithTimeout(
+    // Keep this signal active while parsing a rejection body as well as while
+    // waiting for headers; token cleanup must not hang on a stalled provider.
+    responseDeadline = setTimeout(() => controller.abort(), getNativePushTimeoutMs());
+    const response = await fetch(
       `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(
         config.projectId,
       )}/messages:send`,
       {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json; charset=utf-8',
@@ -226,24 +233,35 @@ async function sendFirebaseMessage(
           },
         }),
       },
-      getNativePushTimeoutMs(),
     );
 
     if (response.ok) {
       return { ok: true };
     }
 
+    const failure = await response.json().catch(() => null) as {
+      error?: { details?: Array<{ '@type'?: string; errorCode?: string; fieldViolations?: Array<{ field?: string }> }> };
+    } | null;
+    const details = Array.isArray(failure?.error?.details) ? failure.error.details : [];
+    const unregistered = details.some(detail => detail?.['@type'] === 'type.googleapis.com/google.firebase.fcm.v1.FcmError' && detail.errorCode === 'UNREGISTERED');
+    const invalidToken = details.some(detail => detail?.['@type'] === 'type.googleapis.com/google.rpc.BadRequest' &&
+      Array.isArray(detail.fieldViolations) && detail.fieldViolations.some(violation => violation?.field === 'message.token'));
+
     return {
       ok: false,
       status: response.status,
       reason: `native_push_failed_${response.status}`,
-      expired: response.status === 404 || response.status === 400,
+      // INVALID_ARGUMENT also covers payload/configuration errors. Do not
+      // delete a valid device token merely because its message was rejected.
+      expired: (response.status === 404 && unregistered) || (response.status === 400 && invalidToken),
     };
   } catch (error) {
     return {
       ok: false,
       reason: error instanceof Error ? error.message : 'UnknownError',
     };
+  } finally {
+    clearTimeout(responseDeadline);
   }
 }
 
@@ -289,52 +307,35 @@ async function sendApnsMessage(
     const host = config.useSandbox
       ? 'https://api.sandbox.push.apple.com'
       : 'https://api.push.apple.com';
-    const response = await fetchWithTimeout(
-      `${host}/3/device/${encodeURIComponent(token)}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `bearer ${createApnsJwt(config)}`,
-          'Content-Type': 'application/json; charset=utf-8',
-          'apns-topic': config.bundleId,
-          'apns-push-type': 'alert',
-          'apns-priority': '10',
-          'apns-expiration': '0',
-        },
-        body: JSON.stringify({
-          aps: {
-            alert: {
-              title: message.title,
-              body: message.body,
-            },
-            sound: 'default',
-            category: message.tag,
+    const response = await postApnsHttp2({
+      host,
+      token,
+      authorization: `bearer ${createApnsJwt(config)}`,
+      topic: config.bundleId,
+      payload: {
+        aps: {
+          alert: {
+            title: message.title,
+            body: message.body,
           },
-          url: message.url ?? '/',
-          tag: message.tag ?? '',
-        }),
+          sound: 'default',
+          category: message.tag,
+        },
+        url: message.url ?? '/',
+        tag: message.tag ?? '',
       },
-      getNativePushTimeoutMs(),
-    );
+      timeoutMs: getNativePushTimeoutMs(),
+    });
 
-    if (response.ok) {
+    if (response.status === 200) {
       return { ok: true };
-    }
-
-    let reason: string | undefined;
-
-    try {
-      const payload = (await response.json()) as { reason?: string };
-      reason = payload.reason;
-    } catch {
-      reason = undefined;
     }
 
     return {
       ok: false,
       status: response.status,
-      reason: reason ? `apns_${reason}` : `apns_failed_${response.status}`,
-      expired: response.status === 410 || isExpiredApnsReason(reason),
+      reason: response.reason ? `apns_${response.reason}` : `apns_failed_${response.status}`,
+      expired: response.status === 410 || isExpiredApnsReason(response.reason),
     };
   } catch (error) {
     return {

@@ -6,12 +6,15 @@ export const guestContracts: Record<string, string> = {
   'GET /splash': 'Public splash document',
   'POST /api/analytics/visit': 'Anonymous visit analytics',
   'GET /api/health': 'Hosting health probe',
+  'GET /api/mobile/bootstrap': 'Public native application data and policies',
   'GET /api/auth/session': 'Anonymous session discovery',
   'POST /api/auth/logout': 'Idempotent logout',
   'POST /api/auth/commission-agreement': 'Agreement before authentication',
   'GET /api/auth/apple/start': 'OAuth start',
   'GET /api/auth/apple/callback': 'OAuth callback state validation',
   'POST /api/auth/apple/callback': 'OAuth form callback state validation',
+  'POST /api/auth/apple/native/challenge': 'Native Apple flow proof and commission agreement',
+  'POST /api/auth/apple/native': 'Native Apple identity and bound challenge validation',
   'GET /api/auth/google/start': 'OAuth start',
   'GET /api/auth/google/callback': 'OAuth callback state validation',
   'GET /api/auth/google/native-config': 'Native OAuth configuration',
@@ -27,6 +30,7 @@ export const guestContracts: Record<string, string> = {
   'DELETE /api/push/subscribe': 'Subscription endpoint identifies device',
   'GET /api/marketplace/listings': 'Public listing search',
   'GET /api/marketplace/listings/[listingId]': 'Public published listing',
+  'GET /api/marketplace/listings/[listingId]/contact': 'Published listing contact matching the public website',
   'GET /api/marketplace/users/[userId]/profile': 'Public seller profile and published listings',
 };
 

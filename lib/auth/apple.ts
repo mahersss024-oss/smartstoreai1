@@ -24,6 +24,7 @@ type AppleJwtPayload = {
   sub?: string;
   email?: string;
   email_verified?: boolean | string;
+  nonce?: string;
 };
 
 export type AppleIdentity = {
@@ -108,8 +109,7 @@ function derToJoseSignature(signature: Buffer, byteLength: number) {
   ]).toString('base64url');
 }
 
-function getRequiredAppleConfig() {
-  const clientId = process.env.APPLE_CLIENT_ID?.trim();
+function getRequiredAppleConfig(clientId = process.env.APPLE_CLIENT_ID?.trim()) {
   const teamId = process.env.APPLE_TEAM_ID?.trim();
   const keyId = process.env.APPLE_KEY_ID?.trim();
   const privateKey = process.env.APPLE_PRIVATE_KEY?.trim().replace(/\\n/g, '\n');
@@ -121,16 +121,16 @@ function getRequiredAppleConfig() {
   return { clientId, teamId, keyId, privateKey };
 }
 
-export function isAppleAuthConfigured() {
-  return Boolean(getRequiredAppleConfig());
+export function isAppleAuthConfigured(clientId?: string) {
+  return Boolean(getRequiredAppleConfig(clientId));
 }
 
 export function getAppleClientId() {
   return process.env.APPLE_CLIENT_ID?.trim() ?? '';
 }
 
-export function createAppleClientSecret(now = Math.floor(Date.now() / 1000)) {
-  const config = getRequiredAppleConfig();
+export function createAppleClientSecret(now = Math.floor(Date.now() / 1000), clientId?: string) {
+  const config = getRequiredAppleConfig(clientId);
 
   if (!config) {
     throw new Error('APPLE_AUTH_NOT_CONFIGURED');
@@ -146,7 +146,7 @@ export function createAppleClientSecret(now = Math.floor(Date.now() / 1000)) {
     iat: now,
     exp: now + clientSecretMaxAgeSeconds,
     aud: appleIssuer,
-    sub: config.clientId,
+    sub: clientId ?? config.clientId,
   };
   const signingInput = `${base64UrlJson(header)}.${base64UrlJson(payload)}`;
   const signer = createSign('SHA256');
@@ -168,6 +168,7 @@ function isAudienceValid(audience: string | string[] | undefined, clientId: stri
 export async function verifyAppleIdentityToken(
   idToken: string,
   clientId = getAppleClientId(),
+  expectedNonce?: string,
 ): Promise<AppleIdentity | null> {
   const [encodedHeader, encodedPayload, encodedSignature] = idToken.split('.');
 
@@ -188,7 +189,8 @@ export async function verifyAppleIdentityToken(
     typeof payload.exp !== 'number' ||
     payload.exp <= Math.floor(Date.now() / 1000) ||
     payload.email_verified === false ||
-    payload.email_verified === 'false'
+    payload.email_verified === 'false' ||
+    (expectedNonce !== undefined && payload.nonce !== expectedNonce)
   ) {
     return null;
   }
