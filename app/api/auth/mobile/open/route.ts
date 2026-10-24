@@ -5,15 +5,9 @@ import { noStoreHeaders } from '@/lib/api/no-store';
 import { getAppBaseUrl } from '@/lib/app-url';
 import { createMobileAuthTicket } from '@/lib/auth/mobile-oauth';
 import { getAuthSession } from '@/lib/auth/session';
+import { getMobileAppStoreUrl } from '@/lib/mobile/app-store-links';
 
 const androidPackageName = 'com.souqhamad.app';
-const androidStoreUrl = `https://play.google.com/store/apps/details?id=${androidPackageName}`;
-
-function getIosStoreUrl() {
-  const url = process.env.NEXT_PUBLIC_IOS_APP_STORE_URL?.trim();
-
-  return url && /^https:\/\/apps\.apple\.com\//i.test(url) ? url : null;
-}
 
 function normalizeNextPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
@@ -37,23 +31,23 @@ function createMobileAuthUrl(ticket: string, nextPath: string) {
   return callbackUrl.toString();
 }
 
-function createAndroidAuthIntent(ticket: string, nextPath: string) {
+function createAndroidAuthIntent(ticket: string, nextPath: string, fallbackUrl: string) {
   const params = new URLSearchParams({ ticket, next: nextPath });
 
   return (
     `intent://auth?${params.toString()}` +
     `#Intent;scheme=smartstore;package=${androidPackageName};` +
-    `S.browser_fallback_url=${encodeURIComponent(androidStoreUrl)};end`
+    `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`
   );
 }
 
-function createAndroidWebIntent(webUrl: string) {
+function createAndroidWebIntent(webUrl: string, fallbackUrl: string) {
   const url = new URL(webUrl);
 
   return (
     `intent://${url.host}${url.pathname}${url.search}` +
     `#Intent;scheme=https;package=${androidPackageName};` +
-    `S.browser_fallback_url=${encodeURIComponent(androidStoreUrl)};end`
+    `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`
   );
 }
 
@@ -74,11 +68,13 @@ export async function GET(request: Request) {
   const webUrl = new URL(nextPath, getAppBaseUrl(request)).toString();
   const session = getAuthSession(request);
   const ticket = session ? createMobileAuthTicket(session.user) : null;
+  const storeUrl = getMobileAppStoreUrl(platform);
+  const fallbackUrl = storeUrl ?? webUrl;
   const launchUrl =
     platform === 'android'
       ? ticket
-        ? createAndroidAuthIntent(ticket, nextPath)
-        : createAndroidWebIntent(webUrl)
+        ? createAndroidAuthIntent(ticket, nextPath, fallbackUrl)
+        : createAndroidWebIntent(webUrl, fallbackUrl)
       : ticket
         ? createMobileAuthUrl(ticket, nextPath)
         : webUrl;
@@ -87,7 +83,7 @@ export async function GET(request: Request) {
     {
       platform,
       launchUrl,
-      storeUrl: platform === 'android' ? androidStoreUrl : getIosStoreUrl(),
+      storeUrl,
       webUrl,
       hasSession: Boolean(session),
     },

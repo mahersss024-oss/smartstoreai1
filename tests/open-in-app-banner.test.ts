@@ -36,8 +36,9 @@ test('mobile open endpoint creates safe app links without exposing long sessions
 
   assert.match(route, /createMobileAuthTicket/);
   assert.match(route, /com\.souqhamad\.app/);
-  assert.match(route, /play\.google\.com\/store\/apps\/details/);
-  assert.match(route, /NEXT_PUBLIC_IOS_APP_STORE_URL/);
+  assert.match(route, /getMobileAppStoreUrl/);
+  assert.match(route, /fallbackUrl = storeUrl \?\? webUrl/);
+  assert.doesNotMatch(route, /play\.google\.com\/store\/apps\/details/);
   assert.match(route, /function normalizeNextPath/);
   assert.match(route, /value\.startsWith\('\/\/'\)/);
   assert.match(route, /noStoreHeaders/);

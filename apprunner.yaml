@@ -20,6 +20,10 @@ run:
       value: production
     - name: NEXT_PUBLIC_APP_URL
       value: https://souqhamad.com
+    - name: SMARTSTORE_ANDROID_STORE_URL
+      value: ""
+    - name: SMARTSTORE_IOS_STORE_URL
+      value: ""
     - name: SMARTSTORE_MARKETPLACE_STORE
       value: database
     - name: SMARTSTORE_HEALTH_INCLUDE_METRICS
