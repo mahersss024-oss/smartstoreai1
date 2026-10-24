@@ -119,37 +119,40 @@ test('listing detail secondary action state waits for idle time', () => {
 
 test('listing details localizes visible attribute labels and common values', () => {
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const presentation = readProjectFile('lib', 'marketplace', 'listing-presentation.ts');
 
-  assert.match(listingPage, /model: 'الموديل'/);
-  assert.match(listingPage, /year: 'سنة الصنع'/);
-  assert.match(listingPage, /mileageKm: 'الممشى'/);
-  assert.match(listingPage, /transmission: 'ناقل الحركة'/);
-  assert.match(listingPage, /fuelType: 'نوع الوقود'/);
-  assert.match(listingPage, /inspectionStatus: 'حالة الفحص'/);
-  assert.match(listingPage, /paymentMethod: 'طريقة الدفع'/);
-  assert.match(listingPage, /deliveryMethod: 'طريقة التسليم'/);
-  assert.match(listingPage, /warrantyStatus: 'حالة الضمان'/);
-  assert.match(listingPage, /propertyType: 'نوع العقار'/);
-  assert.match(listingPage, /screenSize: 'حجم الشاشة'/);
-  assert.match(listingPage, /automatic: 'أوتوماتيك'/);
-  assert.match(listingPage, /gasoline: 'بنزين'/);
-  assert.match(listingPage, /valid: 'سليم'/);
-  assert.match(listingPage, /fixed: 'سعر ثابت'/);
-  assert.match(listingPage, /open_to_offers: 'يقبل العروض'/);
-  assert.match(listingPage, /bank_transfer: 'تحويل بنكي'/);
-  assert.match(listingPage, /free_shipping: 'شحن مجاني'/);
-  assert.match(listingPage, /under_warranty: 'تحت الضمان'/);
-  assert.match(listingPage, /apartment: 'شقة'/);
-  assert.match(listingPage, /return labels\[key\] \?\? labels\[normalizedKey\] \?\? labels\[camelKey\] \?\? 'تفصيل إضافي'/);
+  assert.match(presentation, /model: 'الموديل'/);
+  assert.match(presentation, /year: 'سنة الصنع'/);
+  assert.match(presentation, /mileageKm: 'الممشى'/);
+  assert.match(presentation, /transmission: 'ناقل الحركة'/);
+  assert.match(presentation, /fuelType: 'نوع الوقود'/);
+  assert.match(presentation, /inspectionStatus: 'حالة الفحص'/);
+  assert.match(presentation, /paymentMethod: 'طريقة الدفع'/);
+  assert.match(presentation, /deliveryMethod: 'طريقة التسليم'/);
+  assert.match(presentation, /warrantyStatus: 'حالة الضمان'/);
+  assert.match(presentation, /propertyType: 'نوع العقار'/);
+  assert.match(presentation, /screenSize: 'حجم الشاشة'/);
+  assert.match(presentation, /automatic: 'أوتوماتيك'/);
+  assert.match(presentation, /gasoline: 'بنزين'/);
+  assert.match(presentation, /valid: 'سليم'/);
+  assert.match(presentation, /fixed: 'سعر ثابت'/);
+  assert.match(presentation, /open_to_offers: 'يقبل العروض'/);
+  assert.match(presentation, /bank_transfer: 'تحويل بنكي'/);
+  assert.match(presentation, /free_shipping: 'شحن مجاني'/);
+  assert.match(presentation, /under_warranty: 'تحت الضمان'/);
+  assert.match(presentation, /apartment: 'شقة'/);
+  assert.match(presentation, /return labels\[key\] \?\? labels\[normalizedKey\] \?\? labels\[camelKey\] \?\? 'تفصيل إضافي'/);
+  assert.match(listingPage, /from '@\/lib\/marketplace\/listing-presentation'/);
   assert.match(listingPage, /formatAttributeLabel\(key\)/);
   assert.match(listingPage, /formatAttributeValue\(key, value\)/);
 });
 
 test('listing details shows the listing age from its creation time', () => {
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const presentation = readProjectFile('lib', 'marketplace', 'listing-presentation.ts');
 
-  assert.match(listingPage, /function formatRelativeListingTime/);
-  assert.match(listingPage, /Intl\.RelativeTimeFormat\('ar-SA'/);
+  assert.match(presentation, /export function formatRelativeListingTime/);
+  assert.match(presentation, /Intl\.RelativeTimeFormat\('ar-SA'/);
   assert.match(listingPage, /نُشر/);
   assert.match(listingPage, /formatRelativeListingTime\(listing\.createdAt\)/);
   assert.match(listingPage, /آخر تحديث/);
