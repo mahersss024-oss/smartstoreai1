@@ -3,12 +3,11 @@
 import { useEffect, useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  BadgePlus,
+  Bell,
   Heart,
-  Home,
   MessageCircle,
+  Percent,
   type LucideIcon,
-  User,
 } from 'lucide-react';
 
 import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
@@ -23,31 +22,14 @@ type NavItem = {
 };
 
 const navigationIcons: Record<typeof bottomNavigationDestinations[number]['href'], LucideIcon> = {
-  '/account/listings': BadgePlus,
   '/conversations': MessageCircle,
-  '/': Home,
   '/favorites': Heart,
-  '/account': User,
+  '/notifications': Bell,
+  '/commissions': Percent,
 };
 
 function isActive(pathname: string, href: string) {
-  if (href === '/') {
-    return pathname === '/';
-  }
-
-  if (href === '/account') {
-    return pathname === '/account';
-  }
-
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function closeAssistantViewForPrimaryNavigation(href: string) {
-  if (href !== '/' && href !== '/account') {
-    return;
-  }
-
-  window.dispatchEvent(new Event('smartstore:close-assistant-view'));
+  return pathname === href || pathname.startsWith(href + '/');
 }
 
 export function MobileBottomNavigation() {
@@ -148,7 +130,6 @@ export function MobileBottomNavigation() {
   const indicatorIndex = activeIndex >= 0 ? activeIndex : 2;
 
   function navigate(href: string) {
-    closeAssistantViewForPrimaryNavigation(href);
     setPendingHref(href);
     startTransition(() => {
       router.push(href);
@@ -165,10 +146,10 @@ export function MobileBottomNavigation() {
     >
       <div className="pointer-events-none absolute -inset-x-5 top-full h-[calc(3rem+env(safe-area-inset-bottom))] rounded-b-[2.25rem] bg-white/28 backdrop-blur-[44px] backdrop-saturate-[180%] [mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.88)_32%,rgba(0,0,0,0.48)_68%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,rgba(0,0,0,0.88)_32%,rgba(0,0,0,0.48)_68%,transparent_100%)] dark:bg-slate-950/38" />
       <div
-        className="pointer-events-none absolute -top-px h-0.5 w-1/5 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
-        style={{ right: `${indicatorIndex * (100 / 5)}%` }}
+        className="pointer-events-none absolute -top-px h-0.5 w-1/4 rounded-full bg-blue-500 transition-[right] duration-300 ease-out"
+        style={{ right: `${indicatorIndex * (100 / 4)}%` }}
       />
-      <div className="relative z-10 grid h-14 grid-cols-5 text-[13px] font-bold text-slate-600 dark:text-slate-300">
+      <div className="relative z-10 grid h-14 grid-cols-4 text-[13px] font-bold text-slate-600 dark:text-slate-300">
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActive(pathname, item.href);

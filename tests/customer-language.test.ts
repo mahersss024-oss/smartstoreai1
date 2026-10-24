@@ -71,16 +71,10 @@ test('missing-photo illustrations contain Arabic rather than embedded English te
     assert.match(svg, />لا توجد صورة<\/text>/);
     assert.doesNotMatch(svg, /No real photo/);
   }
-});
-
-test('server and client guard generated replies but do not rewrite customer message parts', () => {
+});test('server and client guard generated replies without page-specific rendering checks', () => {
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
-  const page = readFileSync('app/page.tsx', 'utf8');
   const agent = readFileSync('agent/chat-agent.ts', 'utf8');
   assert.match(route, /return resolveCustomerLanguage\(settings\?\.language\)/);
   assert.match(route, /text = getSafeAssistantText\(text\)/);
   assert.match(agent, /customerLanguageInstructions/);
-  assert.match(page, /renderMessageParts\(message.parts, chatListingCardsById, true\)/);
-  assert.match(page, /assistant \? getSafeAssistantText\(part.text\)/);
-  assert.match(page, /renderMessageParts\(userContentParts, chatListingCardsById\)/);
 });

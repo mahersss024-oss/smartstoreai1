@@ -15,10 +15,6 @@ const mobileRouteKey = '__souq_hamad_route';
 
 const staticRoutes = new Set([
   '/',
-  '/account',
-  '/account/follows',
-  '/account/listings',
-  '/account/seller-profile',
   '/admin',
   '/admin/audit-log',
   '/admin/commissions',

@@ -42,7 +42,7 @@ test('Next.js globSync directory discovery preserves default, literal, glob and 
 
 test('effective ESLint rules match the pre-replacement baseline for TSX and TypeScript', async () => {
   const eslint = new ESLint();
-  for (const file of ['app/page.tsx', 'agent/marketplace/search.ts']) {
+  for (const file of ['app/listings/[listingId]/page.tsx', 'agent/marketplace/search.ts']) {
     const config = await eslint.calculateConfigForFile(file);
     const rules = Object.entries(config.rules).sort(([a], [b]) => a.localeCompare(b));
     assert.equal(rules.length, 113);

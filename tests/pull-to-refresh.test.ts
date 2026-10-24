@@ -30,8 +30,6 @@ test('pull to refresh is touch scoped and avoids global touch blocking', () => {
 
 test('main client data pages subscribe to pull refresh events', () => {
   const files = [
-    ['app', 'page.tsx'],
-    ['app', 'account', 'listings', 'page.tsx'],
     ['app', 'conversations', 'page.tsx'],
     ['app', 'conversations', '[conversationId]', 'page.tsx'],
     ['app', 'favorites', 'page.tsx'],

@@ -24,18 +24,12 @@ test('public seller urls are stable profile links without listing context', () =
     getPublicSellerUrl('seller:share 1', 'https://www.smartstore-ai.com/'),
     'https://www.smartstore-ai.com/sellers/seller%3Ashare%201',
   );
-});
-
-test('published listings expose share controls in seller account and details pages', () => {
+});test('published listings expose share controls in detail pages', () => {
   const shareButton = readProjectFile('components', 'listing-share-button.tsx');
-  const accountListingsPage = readProjectFile('app', 'account', 'listings', 'page.tsx');
   const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
-
   assert.match(shareButton, /navigator\.share/);
   assert.match(shareButton, /navigator\.clipboard/);
   assert.match(shareButton, /postToNative/);
-  assert.match(accountListingsPage, /listing\.rawStatus === 'published'/);
-  assert.match(accountListingsPage, /<ListingShareButton/);
   assert.match(listingPage, /<ListingShareButton/);
 });
 
@@ -159,13 +153,6 @@ test('listing details shows the listing age from its creation time', () => {
   assert.match(listingPage, /formatDate\(listing\.updatedAt\)/);
 });
 
-test('home listing contact button opens listing details instead of asking chat to open a conversation', () => {
-  const homePage = readProjectFile('app', 'page.tsx');
-
-  assert.match(homePage, /onOpen\(listing\)/);
-  assert.doesNotMatch(homePage, /أريد التواصل مع البائع بخصوص الإعلان رقم/);
-});
-
 test('listing contact passes the selected listing into the conversation page', () => {
   const contactActions = readProjectFile(
     'app',
@@ -198,29 +185,4 @@ test('assistant context contains owned drafts only and directs manual review wit
   assert.match(chatRoute, /reviewUrl: '\/account\/listings'/);
   assert.doesNotMatch(chatRoute, /getVerifiedSelectedListingContext|getListing\(parsed\.id\)/);
   assert.match(marketplaceInstructions, /customer reviews and publishes from \/account\/listings themselves/);
-});
-
-test('assistant message renderer turns listing links into a listing card inside chat', () => {
-  const homePage = readProjectFile('app', 'page.tsx');
-
-  assert.match(homePage, /function getListingHrefFromMarkdownLink/);
-  assert.match(homePage, /normalizedLabel === 'فتح الإعلان'/);
-  assert.match(homePage, /normalizedLabel === 'open listing'/);
-  assert.match(homePage, /\^\\\/listings\\\/\[\^\/\]\+/);
-  assert.match(homePage, /return `\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`/);
-  assert.match(homePage, /function ListingChatLinkCard/);
-  assert.match(homePage, /<Link[\s\S]*href=\{href\}/);
-  assert.match(homePage, /listing\?: ListingCard/);
-  assert.match(homePage, /effectiveListing\.image/);
-  assert.match(homePage, /api\/marketplace\/listings/);
-  assert.match(homePage, /listingRecordToCard\(payload\.listing\)/);
-  assert.match(homePage, /maxChatListingCardsPerMessage = 3/);
-  assert.match(homePage, /renderedListingCardCount < maxChatListingCardsPerMessage/);
-  assert.match(homePage, /moreChatListingsGuidance/);
-  assert.match(homePage, /chatListingCardsById/);
-  assert.match(homePage, /getListingIdFromHref\(listingHref\)/);
-  assert.match(homePage, /عرض بطاقة الإعلان/);
-  assert.match(homePage, /return renderTextMessagePart\(text, index, listingsById\)/);
-  assert.match(homePage, /getSafeAssistantText\(part\.text\)/);
-  assert.match(homePage, /فتح الإعلان/);
 });

@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowRight,
   BadgeCheck,
   Check,
   Copy,
@@ -334,11 +333,7 @@ export default function CommissionsPage() {
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-5 sm:px-6">
         <header className="smartstore-page-header flex items-center justify-between gap-3 px-1">
           <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/account">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+
             <div className="grid size-10 place-items-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
               <Percent className="size-5" />
             </div>

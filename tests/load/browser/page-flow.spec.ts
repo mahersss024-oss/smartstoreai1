@@ -19,7 +19,7 @@ type PageMetric = {
   cls: number | null;
 };
 
-const routes = ['/', '/account', '/conversations', '/favorites', '/notifications'];
+const routes = ['/conversations', '/favorites', '/notifications'];
 
 function isProductionUrl(value: string) {
   return /souqhamad\.com\/?$/i.test(value);

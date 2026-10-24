@@ -70,9 +70,6 @@ export function LegalPolicyPage({
               <h1 className="truncate text-xl font-bold">{title}</h1>
             </div>
           </div>
-          <Button asChild variant="outline" size="sm" className="rounded-md">
-            <Link href="/" prefetch={false}>العودة للسوق</Link>
-          </Button>
         </header>
 
         <section className="grid gap-4 p-5">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Bell, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
@@ -280,11 +280,7 @@ export default function NotificationsPage() {
       <div className="mx-auto grid max-w-3xl gap-4 px-4 py-5 sm:px-6">
         <header className="smartstore-page-header flex items-center justify-between gap-3 px-1">
           <div className="flex min-w-0 items-center gap-3">
-            <Button asChild variant="outline" size="icon" className="rounded-md">
-              <Link href="/account">
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold">الإشعارات</h1>
             </div>

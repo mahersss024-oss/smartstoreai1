@@ -47,8 +47,6 @@ test('admin pages use a stable touch viewport without disabling page scrolling',
 
 test('app pages use in-app confirmations instead of browser dialogs', () => {
   const pages = [
-    ['app', 'account', 'page.tsx'],
-    ['app', 'account', 'listings', 'page.tsx'],
     ['app', 'conversations', 'page.tsx'],
     ['app', 'conversations', '[conversationId]', 'page.tsx'],
     ['app', 'admin', 'users', 'page.tsx'],
@@ -353,14 +351,6 @@ test('admin listings search supports listing id lookup', () => {
 
   assert.match(route, /id:\s*\{\s*contains:\s*query,\s*mode:\s*'insensitive' as const\s*\}/);
   assert.match(page, /placeholder="[^"]*رقم الإعلان/);
-});
-
-test('account page shows the admin dashboard to the owner and appointed admins', () => {
-  const page = readProjectFile('app', 'account', 'page.tsx');
-
-  assert.match(page, /session\.user\?\.role === 'owner'/);
-  assert.match(page, /session\.user\?\.role === 'admin'/);
-  assert.match(page, /لوحة الإدارة/);
 });
 
 test('admin listings offer permanent deletion only for deleted listings', () => {

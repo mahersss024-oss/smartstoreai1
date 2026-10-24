@@ -111,7 +111,7 @@ test('backfill is batched, dry-run by default, idempotent by database state and 
 
 test('listing surfaces retain thumbnail, display and zoom-only original behavior', async () => {
   const files = await Promise.all([
-    'app/page.tsx', 'app/account/listings/page.tsx', 'app/favorites/page.tsx',
+    'app/favorites/page.tsx',
     'app/conversations/[conversationId]/page.tsx', 'app/admin/listings/page.tsx',
     'app/sellers/[sellerId]/page.tsx',
   ].map((path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')));

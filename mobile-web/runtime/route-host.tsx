@@ -1,15 +1,13 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import type { ReactNode } from 'react';
 import { useMobileRouter } from './router';
-import { MobileAccountSellerProfile } from './account-seller-profile';
 import { MobileListingDetails } from './listing-details';
 import { MobileOfflinePage } from './offline-page';
 import { MobilePolicyPage } from './policy-page';
 import { MobileSellerProfile } from './seller-profile';
-import MobileLink from './link';
-import { Button } from '../../components/ui/button';
+
+
 
 const LoadingPage = () => (
   <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">جارٍ تحميل الصفحة…</main>
@@ -22,15 +20,11 @@ function MobileNotFoundPage() {
         <p className="text-sm font-semibold text-blue-600">404</p>
         <h1 className="text-xl font-bold">الصفحة غير موجودة</h1>
         <p className="text-sm leading-6 text-muted-foreground">تعذّر العثور على الصفحة المطلوبة.</p>
-        <Button asChild><MobileLink href="/">العودة إلى السوق</MobileLink></Button>
       </section>
     </main>
   );
 }
 
-const AccountPage = dynamic(() => import('../../app/account/page'), { loading: LoadingPage, ssr: false });
-const AccountFollowsPage = dynamic(() => import('../../app/account/follows/page'), { loading: LoadingPage, ssr: false });
-const AccountListingsPage = dynamic(() => import('../../app/account/listings/page'), { loading: LoadingPage, ssr: false });
 const AdminHomePage = dynamic(() => import('../../app/admin/page'), { loading: LoadingPage, ssr: false });
 const AdminAuditLogPage = dynamic(() => import('../../app/admin/audit-log/page'), { loading: LoadingPage, ssr: false });
 const AdminCommissionsPage = dynamic(() => import('../../app/admin/commissions/page'), { loading: LoadingPage, ssr: false });
@@ -45,7 +39,7 @@ const ConversationPage = dynamic(() => import('../../app/conversations/[conversa
 const FavoritesPage = dynamic(() => import('../../app/favorites/page'), { loading: LoadingPage, ssr: false });
 const NotificationsPage = dynamic(() => import('../../app/notifications/page'), { loading: LoadingPage, ssr: false });
 
-export function MobileRouteHost({ home }: { home: ReactNode }) {
+export function MobileRouteHost() {
   const { pathname } = useMobileRouter();
   const listingMatch = pathname.match(/^\/listings\/([^/]+)\/?$/);
   const sellerMatch = pathname.match(/^\/sellers\/([^/]+)\/?$/);
@@ -57,11 +51,7 @@ export function MobileRouteHost({ home }: { home: ReactNode }) {
 
   if (sellerMatch) return <MobileSellerProfile />;
   if (conversationMatch) return <ConversationPage />;
-  if (pathname === '/') return <>{home}</>;
-  if (pathname === '/account') return <AccountPage />;
-  if (pathname === '/account/follows') return <AccountFollowsPage />;
-  if (pathname === '/account/listings') return <AccountListingsPage />;
-  if (pathname === '/account/seller-profile') return <MobileAccountSellerProfile />;
+  if (pathname === '/') return <MobileNotFoundPage />;
   if (pathname === '/admin') return <AdminHomePage />;
   if (pathname === '/admin/audit-log') return <AdminAuditLogPage />;
   if (pathname === '/admin/commissions') return <AdminCommissionsPage />;

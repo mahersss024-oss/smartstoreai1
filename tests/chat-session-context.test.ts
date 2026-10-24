@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { FileUIPart, UIMessage } from 'ai';
 import { createChatImageContext } from '@/lib/chat/image-context';
-import { readFileSync } from 'node:fs';
 import { chatContextTextLimit, chatMessageTextLength, selectChatContext } from '@/lib/chat/context';
 import { clearChatSessionState, readChatSessionState, setChatSessionOwner, writeChatSessionState } from '@/lib/chat/session-state';
 
@@ -54,16 +53,6 @@ test('older photos become source references, while the current upload and custom
   assert.match(JSON.stringify(context[0]), /turn-0/);
   assert.deepEqual(context.at(-1)?.parts, [photo]);
   assert.deepEqual(history[0].parts, [photo]);
-});
-
-test('the interface uses verified server results instead of keyword-based request inference', () => {
-  const page = readFileSync('app/page.tsx', 'utf8');
-  for (const name of ['inferClientIntent', 'isSearchRefinement', 'getNextListingQuery', 'shouldSendRetainedListingImages']) {
-    assert.ok(!page.includes(name), name);
-  }
-  assert.match(page, /marketplaceIntent/);
-  assert.match(page, /prepareSendMessagesRequest: chatImages.prepareRequest/);
-  assert.match(readFileSync('lib/chat/image-context.ts', 'utf8'), /selectChatContext\(messages\)/);
 });
 
 test('the actual transport keeps one owner-scoped photo source without keyword decisions or resending old message bytes', async () => {

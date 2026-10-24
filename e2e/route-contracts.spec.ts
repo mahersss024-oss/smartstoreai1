@@ -62,7 +62,7 @@ for (const entry of pages) {
         // Verify the real auth redirect without contacting a live identity provider.
         await page.route('**/api/auth/google/start**', route => {
           authStarts++;
-          return route.fulfill({ status: 302, headers: { location: '/account?contract-auth-required=1' } });
+          return route.fulfill({ status: 302, headers: { location: '/privacy?contract-auth-required=1' } });
         });
       }
       if (role === 'customer') {
@@ -79,8 +79,8 @@ for (const entry of pages) {
       await expect(page.locator('body')).toBeVisible();
       await expect.poll(() => page.locator('body').innerText()).not.toBe('');
       await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-      const expectedPath = guestAdmin || (role === 'guest' && entry.path === '/account/seller-profile')
-        ? '/account'
+      const expectedPath = guestAdmin
+        ? '/privacy'
         : role === 'guest' && entry.path === '/conversations/[conversationId]'
           ? '/commission-agreement'
           : path;

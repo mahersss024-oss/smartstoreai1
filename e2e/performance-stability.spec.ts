@@ -59,7 +59,6 @@ const viewports = [
 ] as const;
 
 const auditedPages = [
-  { name: 'home', path: '/', requireAdmin: false },
   { name: 'admin-home', path: '/admin', requireAdmin: true },
   { name: 'admin-audit-log', path: '/admin/audit-log', requireAdmin: true },
 ] as const;
@@ -395,46 +394,6 @@ async function auditCurrentPage(page: Page, path: string) {
   await page.evaluate(() => window.scrollTo({ top: 0 }));
 }
 
-async function auditThemeToggle(page: Page) {
-  await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/account', { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(500);
-
-  const toggle = page.getByRole('button', { name: /الوضع|المظهر|الليلي|الفاتح/ }).first();
-  await expect(toggle).toBeVisible();
-
-  const before = await readVitals(page);
-  const startedAt = Date.now();
-  await toggle.click();
-  await page.waitForTimeout(350);
-  const afterDark = await readVitals(page);
-  await toggle.click();
-  await page.waitForTimeout(350);
-  const afterLight = await readVitals(page);
-
-  console.log(
-    JSON.stringify({
-      page: 'account theme-toggle 360x800',
-      toggleElapsedMs: Date.now() - startedAt,
-      before,
-      afterDark,
-      afterLight,
-    }),
-  );
-
-  expect(
-    afterLight.cls - before.cls,
-    'theme toggle CLS delta',
-  ).toBeLessThanOrEqual(0.02);
-  expect(afterLight.inp || 0, `theme toggle INP (${afterLight.inpEvent})`).toBeLessThanOrEqual(
-    200,
-  );
-  expect(afterLight.totalBlockingTime - before.totalBlockingTime, 'theme toggle TBT delta').toBeLessThanOrEqual(
-    120,
-  );
-}
-
 // Functional specs retain traces; timing samples must not include trace screencasting overhead.
 test.use({ trace: 'off' });
 
@@ -506,7 +465,6 @@ test.describe('mobile and tablet production performance stability audit', () => 
       }
     }
 
-    await auditThemeToggle(page);
 
     expect(failedRequests).toEqual([]);
     expect(consoleErrors).toEqual([]);

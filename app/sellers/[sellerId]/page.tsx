@@ -146,10 +146,6 @@ function getSellerReturnHref(searchParams: Awaited<PageProps['searchParams']>) {
     return `/listings/${encodeURIComponent(listingId)}`;
   }
 
-  if (source === 'follows') {
-    return '/account/follows';
-  }
-
   return '/';
 }
 
@@ -166,7 +162,7 @@ function getSellerListingHref(
   const conversationId = getSingleSearchParam(searchParams.conversationId);
   const sourceListingId = getSingleSearchParam(searchParams.listingId);
 
-  if (source === 'admin-users' || source === 'follows') {
+  if (source === 'admin-users') {
     query.set('sellerSource', source);
   }
 

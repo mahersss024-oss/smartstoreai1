@@ -118,7 +118,7 @@ function getListingReturnHref(params: URLSearchParams) {
   }
   if (source === 'seller' && isSafePathSegment(sellerId)) {
     const query = new URLSearchParams();
-    if (sellerSource === 'admin-users' || sellerSource === 'follows') query.set('source', sellerSource);
+    if (sellerSource === 'admin-users') query.set('source', sellerSource);
     if (sellerSource === 'conversation' && isSafePathSegment(conversationId)) {
       query.set('source', sellerSource);
       query.set('conversationId', conversationId);
@@ -131,7 +131,6 @@ function getListingReturnHref(params: URLSearchParams) {
     return `/sellers/${encodeURIComponent(sellerId)}${suffix}`;
   }
   if (source === 'favorites') return '/favorites';
-  if (source === 'account-listings') return '/account/listings';
   if (source === 'listing' && isSafePathSegment(sourceListingId)) {
     return `/listings/${encodeURIComponent(sourceListingId)}`;
   }
@@ -221,7 +220,7 @@ export function MobileListingDetails({ listingId }: { listingId: string }) {
           setSeller(sellerPayload.seller ?? null);
         }
         setState('ready');
-      } catch (error) {
+      } catch {
         if (!controller.signal.aborted) setState('error');
       }
     })();

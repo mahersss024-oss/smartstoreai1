@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "**/.next/**",
+    "**/.next-mobile/**",
     // Runtime data and downloaded browser/tool caches are not project source.
     ".data/**",
     ".patch-work/**",

@@ -59,16 +59,3 @@ test('similar listing follows are persisted and matched using comparable listing
   assert.match(pushSettings, /window\.setTimeout/);
   assert.doesNotMatch(pushSettings, /listing_notification_created/);
 });
-
-test('similar listing follows appear inside the account follow list', () => {
-  const followsPage = readSource('app/account/follows/page.tsx');
-  const repository = readSource('agent/marketplace/repository.ts');
-
-  assert.match(followsPage, /similarListingFollows/);
-  assert.match(followsPage, /similarListingFollowCount/);
-  assert.match(followsPage, /activeTab === 'similar'/);
-  assert.match(followsPage, /encodeListingHref\(follow\.listingId\)/);
-  assert.match(followsPage, /toggleSimilarListingFollow/);
-  assert.match(repository, /similarListingFollow\.findMany/);
-  assert.match(repository, /similarListingFollowCount/);
-});
