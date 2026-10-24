@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { isInsideNativeApp } from '@/lib/native/app-bridge';
 
@@ -25,11 +26,12 @@ function getCurrentNextPath() {
 }
 
 export function OpenInAppBanner() {
+  const pathname = usePathname();
   const [platform, setPlatform] = useState<MobilePlatform | null>(null);
   const [isOpening, setIsOpening] = useState(false);
 
   useEffect(() => {
-    if (isInsideNativeApp()) {
+    if (pathname === '/' || isInsideNativeApp()) {
       return;
     }
 
@@ -40,9 +42,9 @@ export function OpenInAppBanner() {
     }
 
     setPlatform(mobilePlatform);
-  }, []);
+  }, [pathname]);
 
-  if (!platform) {
+  if (pathname === '/' || !platform) {
     return null;
   }
 

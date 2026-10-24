@@ -40,16 +40,17 @@ function readRouteSet(source: string) {
   return [...routeSet[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
 }
 
-test('the mobile web host represents current app routes and keeps the retired root unavailable', () => {
+test('the mobile web host keeps the app-install root outside native runtime routes', () => {
   const appRoutes = collectPageRoutes(appRoot).sort();
-  const dynamicRoutes = appRoutes.filter((route) => route.includes('['));
-  const staticAppRoutes = appRoutes.filter((route) => !route.includes('['));
+  const hostedAppRoutes = appRoutes.filter((route) => route !== '/');
+  const dynamicRoutes = hostedAppRoutes.filter((route) => route.includes('['));
+  const staticAppRoutes = hostedAppRoutes.filter((route) => !route.includes('['));
   const localRoutes = readRouteSet(routerSource).sort();
   const hostedStaticRoutes = [...routeHostSource.matchAll(/if \(pathname === '([^']+)'\)/g)]
     .map((match) => match[1])
     .sort();
 
-  assert.ok(!staticAppRoutes.includes('/'), 'the public market homepage remains removed');
+  assert.ok(appRoutes.includes('/'), 'the main site keeps its app-install landing page');
   assert.deepEqual(localRoutes, [...staticAppRoutes, '/'].sort());
   assert.deepEqual(hostedStaticRoutes, [...staticAppRoutes, '/'].sort());
   assert.ok(routeHostSource.includes("if (pathname === '/') return <MobileNotFoundPage />;"));
