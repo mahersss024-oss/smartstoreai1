@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 const port = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '3102', 10);
 const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const serverReadyUrl = new URL('/api/health', baseURL).toString();
 const testDataDir = process.env.PLAYWRIGHT_BASE_URL
   ? undefined : mkdtempSync(join(tmpdir(), 'smartstore-e2e-'));
 
@@ -31,7 +32,9 @@ export default defineConfig({
     ? undefined
     : {
         command: 'pnpm exec tsx e2e/prepare-fixtures.ts && pnpm build && pnpm start',
-        url: baseURL,
+        // The marketplace home route is intentionally retired and returns 404.
+        // Probe the health API so Playwright can detect the server after startup.
+        url: serverReadyUrl,
         reuseExistingServer: false,
         timeout: 120_000,
         env: {

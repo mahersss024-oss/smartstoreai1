@@ -5,6 +5,8 @@ matrix jobs: desktop-chromium and mobile-chromium-layout. Each runner prepares
 its own isolated test store and production build. No tests are excluded by
 file, tag or title. The existing one-worker setting, retries, performance
 budgets, per-test timeouts and 30-minute Playwright deadline are unchanged.
+Playwright waits for `/api/health`, because the retired marketplace home route
+returns 404 and is not a valid server-readiness response.
 
 The job deadline is 45 minutes, with a 35-minute test-step deadline and a
 five-minute artifact-upload deadline. This leaves setup time plus room to

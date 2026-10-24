@@ -42,6 +42,9 @@ test('CI browser matrix runs every configured project independently without canc
   assert.equal(playwrightConfig.workers, 1);
   assert.equal(playwrightConfig.timeout, 30_000);
   assert.equal(playwrightConfig.globalTimeout, 1_800_000);
+  const webServers = playwrightConfig.webServer;
+  const webServer = Array.isArray(webServers) ? webServers[0] : webServers;
+  assert.equal(webServer?.url, 'http://127.0.0.1:3102/api/health');
 });
 
 test('CI reserves time for Playwright termination, report upload and setup', () => {
