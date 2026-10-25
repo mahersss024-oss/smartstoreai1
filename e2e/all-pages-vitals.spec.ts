@@ -6,9 +6,12 @@ import { observePageVitals, readPageVitals } from './helpers/page-vitals';
 
 // Trace screencasting adds presentation latency to the timing being measured.
 // Keep post-measurement screenshots and metric attachments without recording frames during input.
-test.use({ trace: 'off' });
+// This suite measures rendered pages with intercepted client data, rather than
+// service-worker caching or delivery of analytics to the shared test server.
+test.use({ trace: 'off', serviceWorkers: 'block' });
 
-const pages = buildInventory().items.filter(item => item.kind === 'page');
+const pages = buildInventory().items.filter(item =>
+  item.kind === 'page' && (item.path === '/admin' || item.path?.startsWith('/admin/')));
 const layouts = [
   { width: 320, height: 568 },
   { width: 390, height: 844 },
@@ -24,6 +27,15 @@ for (const entry of pages) {
       const role = entry.path!.startsWith('/admin') ? 'owner' : 'user';
       await prepare(page, baseURL!, role);
       await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
+      const analyticsVisits: string[] = [];
+      await page.route('**/api/analytics/visit', route => {
+        expect(route.request().method()).toBe('POST');
+        const payload = route.request().postDataJSON() as { path: string };
+        analyticsVisits.push(payload.path);
+        // Repeated page matrices share a server/IP. Keep telemetry outside this
+        // rendering fixture; the real endpoint's limits are tested separately.
+        return route.fulfill({ json: { ok: true } });
+      });
       await page.route('**/api/auth/session', route => route.fulfill({ json: {
         authenticated: true, commissionAgreementAccepted: true, commissionAgreement: null,
         user: { id: 'presentation-admin', name: 'Performance account', email: 'performance@example.test', role },
@@ -76,8 +88,15 @@ for (const entry of pages) {
       const response = await page.goto(path, { waitUntil: 'load' });
       await expect(page).toHaveURL(url => url.pathname === path);
       await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-      await page.waitForLoadState('networkidle');
       await page.evaluate(() => document.fonts.ready);
+      // Pages can keep background/prefetch requests open. Readiness is the app's
+      // rendered state and visible image decoding, not a silent network.
+      await expect.poll(() => page.evaluate(() => [...document.images]
+        .filter(image => image.loading !== 'lazy' && image.getBoundingClientRect().width > 0)
+        .every(image => image.complete))).toBe(true);
+      await page.evaluate(() => Promise.all([...document.images]
+        .filter(image => image.complete && image.naturalWidth > 0)
+        .map(image => image.decode())));
       await page.waitForTimeout(1000);
       const text = await page.locator('body').innerText();
       expect(text.trim().length).toBeGreaterThan(10);
@@ -88,6 +107,7 @@ for (const entry of pages) {
         await page.waitForTimeout(60);
       }
       await page.waitForTimeout(250);
+      await expect.poll(() => analyticsVisits).toContain(path);
       const vitals = await readPageVitals(page);
       const result = { route: entry.path, path, viewport, role, status: response?.status(),
         finalUrl: page.url(), fixtureMode: 'local production build; mocked client data; seeded SSR listing/seller',

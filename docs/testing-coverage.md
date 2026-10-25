@@ -6,8 +6,9 @@
 | --- | --- |
 | `pnpm test:inventory` | Discover source functions, pages, HTTP methods and JSX controls with the TypeScript parser. |
 | `pnpm test:coverage` | Run the Node suite with native runtime coverage and produce an explicit gap report. |
-| `pnpm test:routes` | Check all discovered route handlers and render every page as guest and customer on desktop/mobile Chromium. |
-| `pnpm test:e2e` | Run all browser specifications, including route baselines and existing interaction journeys. |
+| `pnpm test:routes` | Render discovered administrator pages as guest and customer on desktop/mobile Chromium. |
+| `pnpm test:e2e` | Run the explicit administrator browser projects and the independent request-only API project. |
+| `pnpm test:e2e --project=api-contracts` | Check HTTP methods, unauthenticated/staff access boundaries and authenticated listing draft contracts without a browser. |
 | `pnpm test:db:integration` | Run database integration tests against an explicitly isolated test database. |
 | `pnpm verify` | Type check, lint, Node tests, production build and dependency audit. |
 
@@ -36,11 +37,14 @@ TypeScript functions and require their own integration, visual and deployment ch
 
 ## Baselines Versus Complete Behavior
 
-The route contracts verify OPTIONS/Allow, rejection of an unsupported method,
-missing/forged/expired sessions, and ordinary-user denial on staff endpoints.
-Page checks exercise rendering/access as guests and customers, including dynamic
-listing/seller routes with fixtures and a missing-conversation state. They do not
-certify successful administrator workflows or every state of each dynamic route.
+The request-only API contracts verify OPTIONS/Allow, rejection of an unsupported
+method, unauthenticated rejection, ordinary-user denial on staff endpoints, and
+authenticated draft creation without publication. Node route-access tests also
+verify forged and expired sessions. Administrator page checks exercise
+rendering/access as guests and customers for `/admin` and `/admin/*` only. Public
+listing/seller, account, policy and other customer web journeys are outside the
+current browser CI scope. The administrator baselines do not certify successful
+administrator workflows or every state of each dynamic route.
 Expected final URLs are asserted. Guest administration redirects are verified with
 an intercepted OAuth-start boundary, so live identity-provider pages are never
 needed for these baseline tests. A redirected page is not counted as successful
@@ -52,10 +56,12 @@ conversation access, pause, republication, sale and deletion. Existing specifica
 exercise further UI journeys. Source-text assertions remain structural tests, not
 substitutes for executing a handler or clicking a control.
 
-`e2e/account-actions.spec.ts` clicks profile edit/cancel/save/retry/phone removal
-controls and checks account deletion acknowledgment, cancel, authentication failure,
-server failure and success navigation. All destructive account requests in that
-specification are intercepted; passing it does not certify database deletion.
+Customer browser scenarios were previously part of the CI matrix. The remaining
+`e2e/account-actions.spec.ts` source checks the public deletion page with intercepted
+requests, but it is not selected by the administrator-only browser allowlist. The
+historical public-page runs do not establish current native-app account behavior
+or database deletion. Native UI verification belongs to the mobile repository;
+shared account handlers continue to have Node/API authorization checks.
 
 Complete functional coverage is still unfinished. For each inventoried control and
 business operation, add a named scenario asserting its observable outcome, not just
@@ -64,7 +70,8 @@ submission, missing records, concurrency and dependency failure where applicable
 Exercise guest, buyer, seller, moderator, administrator and owner separately.
 Test confirmation dialogs with both cancel and confirm using disposable fixtures.
 
-All inventory additions are discovered on subsequent runs. Unclassified endpoints
+All inventory additions are discovered on subsequent runs; discovery does not
+enroll customer pages into the administrator-only browser allowlist. Unclassified endpoints
 and stale guest exceptions fail the Node inventory test. No baseline pass upgrades
 an item to `completeBehaviorVerified: true` automatically. Even 100% executed code
 coverage would not prove that every possible input or interaction is correct.

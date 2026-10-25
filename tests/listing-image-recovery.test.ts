@@ -156,3 +156,48 @@ test('concurrent uploads report the actual saved image and clean up the rejected
   const payload = await savedResponse.json();
   assert.ok(getListing(listing.id)?.images.some(image => image.id === payload.image.id));
 });
+
+test('replays the final allowed upload after a lost response without adding another image', async t => {
+  storageEnvironment(t);
+  const listing = createListingDraft({ sellerId: 'recovery-final-upload', category: 'other', title: 'Desk' });
+  for (let index = 0; index < 7; index++) {
+    addListingImageForSeller(listing.id, listing.sellerId, {
+      id: `before-replay-${index}`, listingId: listing.id,
+      originalUrl: `https://images.example.test/before-replay-${index}.jpg`,
+      displayUrl: '', thumbnailUrl: '', isPrimary: index === 0,
+      status: 'approved', qualityScore: 90, enhancements: [],
+    });
+  }
+  mockImageContentReview(t, 'allow');
+  const providerFetch = globalThis.fetch;
+  let objectWrites = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (!new URL(String(input)).hostname.endsWith('r2.cloudflarestorage.com')) return providerFetch(input, init);
+    if (init?.method === 'PUT') objectWrites++;
+    return new Response(null, { status: 200 });
+  });
+  const { input } = await sample();
+  const cookie = createSessionCookie({ id: listing.sellerId, email: 'final-upload@example.test' });
+  const upload = (key: string) => {
+    const body = new FormData();
+    body.set('image', new File([input.data as Uint8Array<ArrayBuffer>], 'desk.png', { type: input.mediaType }));
+    return POST(new Request('https://smartstore.test/upload', {
+      method: 'POST', headers: { cookie, 'Idempotency-Key': key }, body,
+    }), { params: Promise.resolve({ listingId: listing.id }) });
+  };
+  const first = await upload('final-upload-same-key');
+  assert.equal(first.status, 201);
+  const saved = await first.json();
+  assert.equal(getListing(listing.id)?.images.length, 8);
+
+  // Simulate a client that never received the successful response and retries.
+  const replay = await upload('final-upload-same-key');
+  assert.equal(replay.status, 201);
+  assert.equal((await replay.json()).image.id, saved.image.id);
+  assert.equal(getListing(listing.id)?.images.length, 8);
+  assert.equal(objectWrites, 3, 'replay must not upload any additional variants');
+
+  const additional = await upload('another-image-new-key');
+  assert.equal(additional.status, 409);
+  assert.equal((await additional.json()).error, 'listing_image_limit_reached');
+});

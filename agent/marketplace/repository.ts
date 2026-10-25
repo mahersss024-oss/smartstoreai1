@@ -3243,6 +3243,36 @@ export async function deleteConversationForUser(
   return { status: 'deleted' as const, conversation };
 }
 
+// Merge against the current locked PostgreSQL row rather than a metadata
+// snapshot read before concurrent delivery/read/delete operations completed.
+function mergeConversationMessageMetadata(
+  messageId: string,
+  userId: string,
+  field: 'readBy' | 'deliveredTo' | 'deletedFor' | 'deletedForEveryone',
+  value: Record<string, string>,
+  deleteEveryone = false,
+) {
+  return prisma.$executeRaw`
+    UPDATE "ConversationMessage" AS message
+    SET "metadata" =
+      (CASE WHEN jsonb_typeof(message."metadata") = 'object'
+        THEN message."metadata" ELSE '{}'::jsonb END)
+      || jsonb_build_object(${field}::text,
+        (CASE WHEN jsonb_typeof(message."metadata" -> ${field}::text) = 'object'
+          THEN message."metadata" -> ${field}::text ELSE '{}'::jsonb END)
+        || ${JSON.stringify(value)}::jsonb),
+      "body" = CASE WHEN ${deleteEveryone} THEN 'message_deleted' ELSE message."body" END,
+      "type" = CASE WHEN ${deleteEveryone} THEN 'message_deleted' ELSE message."type" END
+    FROM "Conversation" AS conversation
+    WHERE message."id" = ${messageId}
+      AND message."conversationId" = conversation."id"
+      AND (conversation."buyerId" = ${userId} OR conversation."sellerId" = ${userId})
+      AND message."status" = 'sent'
+      AND message."type" <> 'conversation_hidden'
+      AND (NOT ${deleteEveryone} OR message."senderId" = ${userId})
+  `;
+}
+
 export async function markConversationReadForUser(
   conversationId: string,
   userId: string,
@@ -3285,17 +3315,8 @@ export async function markConversationReadForUser(
         return null;
       }
 
-      return prisma.conversationMessage.update({
-        where: { id: message.id },
-        data: {
-          metadata: toPrismaJsonObject({
-            ...metadata,
-            readBy: {
-              ...readBy,
-              [userId]: readAt,
-            },
-          }),
-        },
+      return mergeConversationMessageMetadata(message.id, userId, 'readBy', {
+        [userId]: readAt,
       });
     })
     .filter((update): update is NonNullable<typeof update> => Boolean(update));
@@ -3365,17 +3386,8 @@ export async function markConversationsDeliveredForUser(
           return null;
         }
 
-        return prisma.conversationMessage.update({
-          where: { id: message.id },
-          data: {
-            metadata: toPrismaJsonObject({
-              ...metadata,
-              deliveredTo: {
-                ...deliveredTo,
-                [userId]: deliveredAt,
-              },
-            }),
-          },
+        return mergeConversationMessageMetadata(message.id, userId, 'deliveredTo', {
+          [userId]: deliveredAt,
         });
       })
       .filter((update): update is NonNullable<typeof update> =>
@@ -3465,43 +3477,16 @@ export async function deleteConversationMessageForUser(
     };
   }
 
-  const metadata = asRecord(message.metadata);
   const deletedAt = new Date().toISOString();
 
   if (mode === 'for_everyone') {
-    await prisma.conversationMessage.update({
-      where: { id: message.id },
-      data: {
-        body: 'message_deleted',
-        type: 'message_deleted',
-        metadata: toPrismaJsonObject({
-          ...metadata,
-          deletedForEveryone: {
-            by: userId,
-            at: deletedAt,
-          },
-        }),
-      },
-    });
+    await mergeConversationMessageMetadata(message.id, userId, 'deletedForEveryone', {
+      by: userId,
+      at: deletedAt,
+    }, true);
   } else {
-    const deletedFor =
-      typeof metadata.deletedFor === 'object' &&
-      metadata.deletedFor !== null &&
-      !Array.isArray(metadata.deletedFor)
-        ? (metadata.deletedFor as Record<string, unknown>)
-        : {};
-
-    await prisma.conversationMessage.update({
-      where: { id: message.id },
-      data: {
-        metadata: toPrismaJsonObject({
-          ...metadata,
-          deletedFor: {
-            ...deletedFor,
-            [userId]: deletedAt,
-          },
-        }),
-      },
+    await mergeConversationMessageMetadata(message.id, userId, 'deletedFor', {
+      [userId]: deletedAt,
     });
   }
 

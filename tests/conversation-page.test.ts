@@ -336,7 +336,8 @@ test('conversation messages support long press deletion without removing the thr
   assert.match(route, /message_delete_not_allowed/);
   assert.match(repository, /deletedFor/);
   assert.match(repository, /deletedForEveryone/);
-  assert.match(repository, /type: 'message_deleted'/);
+  assert.match(repository, /UPDATE "ConversationMessage" AS message[\s\S]*"body" = CASE WHEN \$\{deleteEveryone\} THEN 'message_deleted' ELSE message\."body" END,[\s\S]*"type" = CASE WHEN \$\{deleteEveryone\} THEN 'message_deleted' ELSE message\."type" END/);
+  assert.match(repository, /mergeConversationMessageMetadata\(message\.id, userId, 'deletedForEveryone',[\s\S]*by: userId,[\s\S]*at: deletedAt,[\s\S]*\}, true\)/);
   assert.match(memoryStore, /deleteConversationMessageForUser/);
   assert.match(types, /'message_deleted'/);
   assert.match(page, /handleMessageLongPressStart/);

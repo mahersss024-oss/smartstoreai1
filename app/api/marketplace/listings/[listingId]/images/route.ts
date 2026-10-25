@@ -95,9 +95,21 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
+  // Replays must be served before checking the current image count: the
+  // successful upload being retried may itself have filled the last slot.
+  const idempotency = await reserveIdempotencyKey(request, {
+    namespace: 'image_upload',
+    actorKey: `${session.user.id}:${listingId}`,
+  });
+
+  if (idempotency?.response) {
+    return idempotency.response;
+  }
+
   const maxImages = getMaxListingImagesPerListing();
 
   if (hasReachedListingImageLimit(existingListing.images)) {
+    await idempotency?.abandon();
     incrementRuntimeCounter('listing.image_upload.rejected', {
       reason: 'image_limit',
     });
@@ -116,6 +128,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     formData = await request.formData();
   } catch {
+    await idempotency?.abandon();
     incrementRuntimeCounter('listing.image_upload.rejected', {
       reason: 'invalid_multipart',
     });
@@ -125,6 +138,7 @@ export async function POST(request: Request, context: RouteContext) {
   const file = formData.get('image');
 
   if (!(file instanceof File)) {
+    await idempotency?.abandon();
     incrementRuntimeCounter('listing.image_upload.rejected', {
       reason: 'missing_image',
     });
@@ -132,6 +146,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (!supportedMimeTypes.has(file.type)) {
+    await idempotency?.abandon();
     incrementRuntimeCounter('listing.image_upload.rejected', {
       reason: 'unsupported_type',
     });
@@ -139,19 +154,11 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (file.size > maxImageBytes) {
+    await idempotency?.abandon();
     incrementRuntimeCounter('listing.image_upload.rejected', {
       reason: 'image_too_large',
     });
     return Response.json({ error: 'image_too_large' }, { status: 413 });
-  }
-
-  const idempotency = await reserveIdempotencyKey(request, {
-    namespace: 'image_upload',
-    actorKey: `${session.user.id}:${listingId}`,
-  });
-
-  if (idempotency?.response) {
-    return idempotency.response;
   }
 
   try {

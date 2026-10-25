@@ -1,36 +1,84 @@
-# Browser CI Jobs
+# Administrator Browser CI and Server API Contracts
 
-The Production Gate runs its complete Playwright suite in two independent
-matrix jobs: desktop-chromium and mobile-chromium-layout. Each runner prepares
-its own isolated test store and production build. No tests are excluded by
-file, tag or title. The existing one-worker setting, retries, performance
-budgets, per-test timeouts and 30-minute Playwright deadline are unchanged.
-Playwright waits for `/api/health`, because the retired marketplace home route
-returns 404 and is not a valid server-readiness response.
+The Production Gate runs administrator browser checks and server API contracts
+as separate jobs. Android/iPhone application binaries are built in the independent
+mobile repository; neither Playwright browser project runs an installed native app.
 
-The job deadline is 45 minutes, with a 35-minute test-step deadline and a
-five-minute artifact-upload deadline. This leaves setup time plus room to
-collect reports after Playwright times out. Matrix fail-fast is disabled so
-one project failing does not cancel the other. Failures still fail their jobs;
-the quality and dependency-audit gates are unchanged.
+## Administrator browser scope
 
-The upload step uses `always()` to attempt saving playwright-report/ and
-test-results/ on success, failure or cancellation. Artifacts are named by
-project and run attempt and retained for 14 days. A hard runner termination,
-forced cancellation, unavailable artifact service or missing output files can
-still prevent preservation; this is not a guarantee against infrastructure loss.
+`Browser E2E (desktop-chromium)` and `Browser E2E (mobile-chromium-layout)` run an
+explicit allowlist of administrator UI specs. The mobile project emulates a
+mobile browser viewport. It does not run the Expo application.
 
-Checks now appear as `Browser E2E (desktop-chromium)` and
-`Browser E2E (mobile-chromium-layout)`. If branch protection required the old
-`Browser E2E` name, update the required checks to both matrix job names. Remote
-branch protection was not inspected or changed by this local task.
+The allowlist covers administrator presentation, users, workspace, evidence,
+listing categories/car models, performance, and page access/rendering contracts.
+The two inventory-driven specs select only `/admin` and paths beginning with
+`/admin/`. Customer account, market, listing-detail, seller, policy, offline and
+other public page journeys are outside the browser jobs' current scope.
 
-Local verification parses the workflow as YAML, checks project coverage and
-deadline ordering, and lists the registered Playwright cases separately for
-both projects. It does not execute GitHub Actions or claim remote CI success.
+The administrator performance fixture intercepts telemetry rather than consuming
+the shared test server's per-IP visit quota. It still verifies that the browser
+sends the visit's POST payload. API response failures, browser exceptions, layout
+overflow, LCP/CLS and sampled interaction budgets remain asserted. Rendering
+readiness uses the application's ready marker, fonts and images, rather than
+waiting for all background network connections to stop. These fixtures do not
+prove service-worker, real-provider, or production infrastructure behavior.
 
-Verified locally on 2026-10-18: all three workflow contract tests passed;
-targeted ESLint and TypeScript passed; Playwright listed 285 cases per project
-(570 total in 20 files). No full browser rerun was necessary for this workflow-
-only change. The subsequent removal of the braces dependency is documented
-separately in `braces-security-mitigation.md`; the full audit gate is unchanged.
+## Independent request-only API scope
+
+`Server API Contracts` runs the `api-contracts` Playwright project without a
+browser installation. It selects only:
+
+- `e2e/api-contracts.spec.ts`: supported HTTP methods, unsupported-method rejection,
+  unauthenticated rejection, and customer denial at staff-only APIs.
+- `e2e/listing-reference.spec.ts`: authenticated draft creation, identifier format,
+  draft state, and exclusion of unpublished records from public search.
+
+Both files use Playwright's request fixture and explicitly refuse non-loopback
+test targets. Browser page/context fixtures are prohibited by the local workflow
+contract test. APIs used by the native app retain these independent contracts;
+removing customer web journeys does not remove server authorization checks.
+
+## Isolation, deadlines and reports
+
+Each CI runner prepares its own temporary file store and production build.
+Playwright probes `/api/health` for server readiness. The browser matrix is kept
+separate from the API project, and matrix fail-fast is disabled. A failure in
+either browser job does not cancel the other browser job or the API job.
+
+The one-worker setting, configured retry behavior, per-test limits and 30-minute
+Playwright deadline are unchanged. Each job has a 45-minute deadline, a
+35-minute test-step deadline, and five minutes reserved for artifact upload.
+Failures still fail their jobs. The quality, unit/integration-safe test,
+production build and dependency-audit gates remain enabled.
+
+Report upload runs with `always()` after success, failure or cancellation. Browser
+artifacts are named by project and run attempt; API reports use
+`playwright-api-contracts-<attempt>`. Reports and traces are retained for 14 days.
+Hard runner termination, infrastructure failure or absent output may still
+prevent artifact preservation.
+
+## Local checks
+
+```powershell
+node scripts/test.mjs tests/ci-browser-matrix.test.ts
+pnpm.cmd test:e2e --project=desktop-chromium
+pnpm.cmd test:e2e --project=mobile-chromium-layout
+pnpm.cmd test:e2e --project=api-contracts
+```
+
+The workflow contract test parses YAML, verifies browser/API selection and
+deadline/report protections, and checks that API specs have no browser fixtures.
+Use Playwright's `--list` to inspect registered cases without running them.
+These local checks do not establish that GitHub Actions or a native-device build
+passed. Required branch-protection checks should include both administrator
+browser names, `Server API Contracts`, and the existing quality gate. Remote
+branch protection is not changed by this source configuration.
+
+Verified locally on 2026-10-25 against an isolated production build and test store:
+67 desktop administrator cases, 66 mobile administrator cases, and 66 request-only
+API cases passed with retries disabled (199 passed, zero failed, one skipped,
+8.8 minutes). The existing performance audit intentionally runs only in the desktop
+project because it sets mobile/tablet viewports internally; it passed there and
+was skipped in the mobile project. All five workflow contract tests, TypeScript,
+and targeted ESLint passed. These are local results, not a remote CI result.

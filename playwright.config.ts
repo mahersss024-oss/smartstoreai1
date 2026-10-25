@@ -11,10 +11,24 @@ const serverReadyUrl = new URL('/api/health', baseURL).toString();
 const testDataDir = process.env.PLAYWRIGHT_BASE_URL
   ? undefined : mkdtempSync(join(tmpdir(), 'smartstore-e2e-'));
 
+// Customer journeys run in the native applications. Browser coverage is for
+// the remaining administration UI; server contracts run without a browser.
+const adminBrowserSpecs = [
+  '**/admin-page-presentation.spec.ts',
+  '**/admin-users-loading.spec.ts',
+  '**/admin-workspace.spec.ts',
+  '**/all-pages-vitals.spec.ts',
+  '**/customer-evidence.spec.ts',
+  '**/marketplace-car-models.spec.ts',
+  '**/marketplace-categories.spec.ts',
+  '**/performance-stability.spec.ts',
+  '**/route-contracts.spec.ts',
+];
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
-  // Include the complete route/page matrix and interaction journeys on both projects.
+  // Allow the admin layout matrix and server contracts to finish without weakening per-test budgets.
   globalTimeout: 1_800_000,
   expect: {
     timeout: 10_000,
@@ -32,7 +46,7 @@ export default defineConfig({
     ? undefined
     : {
         command: 'pnpm exec tsx e2e/prepare-fixtures.ts && pnpm build && pnpm start',
-        // The marketplace home route is intentionally retired and returns 404.
+        // Server readiness must not depend on a customer-facing landing page.
         // Probe the health API so Playwright can detect the server after startup.
         url: serverReadyUrl,
         reuseExistingServer: false,
@@ -58,11 +72,17 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
+      testMatch: adminBrowserSpecs,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'mobile-chromium-layout',
+      testMatch: adminBrowserSpecs,
       use: { ...devices['Pixel 5'], browserName: 'chromium' },
+    },
+    {
+      name: 'api-contracts',
+      testMatch: ['**/api-contracts.spec.ts', '**/listing-reference.spec.ts'],
     },
   ],
 });
