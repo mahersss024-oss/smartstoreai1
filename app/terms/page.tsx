@@ -6,7 +6,8 @@ import { LegalPolicyPage } from '@/components/legal-policy-page';
 export const metadata: Metadata = {
   title: 'شروط الاستخدام | سوق حمد',
   description:
-    'شروط استخدام سوق حمد كسوق ذكي للتسويق وبيع وشراء المنتجات داخل المنصة.',
+    'شروط استخدام تطبيق سوق حمد ونشر الإعلانات والتواصل بين المستخدمين.',
+  alternates: { canonical: '/terms' },
 };
 
 const { updatedAt, sections } = platformPolicies.terms;
@@ -16,9 +17,10 @@ export default function TermsPage() {
     <LegalPolicyPage
       title="شروط الاستخدام"
       eyebrow="سوق حمد"
-      description="هذه الشروط تنظم استخدام سوق حمد كسوق ذكي يعتمد على المحادثة والذكاء الاصطناعي لمساعدة المعلنين والمهتمين بالإعلانات."
+      description="توضح هذه الشروط قواعد استخدام تطبيق سوق حمد، ونشر الإعلانات، والتواصل بين المعلنين والمهتمين، ودور المساعد حمد."
       updatedAt={updatedAt}
       sections={sections}
+      path="/terms"
     />
   );
 }

@@ -6,7 +6,8 @@ import { LegalPolicyPage } from '@/components/legal-policy-page';
 export const metadata: Metadata = {
   title: 'سياسة الخصوصية | سوق حمد',
   description:
-    'توضيح طريقة تعامل سوق حمد مع بيانات الحساب والإعلانات والمحادثات والصور.',
+    'توضيح طريقة تعامل تطبيق سوق حمد مع بيانات الحساب والإعلانات والمحادثات والصور وحقوق المستخدم في حذف حسابه.',
+  alternates: { canonical: '/privacy' },
 };
 
 const { updatedAt, sections } = platformPolicies.privacy;
@@ -19,6 +20,7 @@ export default function PrivacyPage() {
       description="هذه السياسة توضّح كيف تتعامل سوق حمد مع بيانات الحساب والإعلانات والمحادثات والصور أثناء تشغيل السوق الذكي."
       updatedAt={updatedAt}
       sections={sections}
+      path="/privacy"
     />
   );
 }

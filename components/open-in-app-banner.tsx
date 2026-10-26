@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { isInsideNativeApp } from '@/lib/native/app-bridge';
+import { isPublicLegalPath } from '@/lib/platform/legal-routes';
 
 type MobilePlatform = 'android' | 'ios';
 
@@ -31,7 +32,7 @@ export function OpenInAppBanner() {
   const [isOpening, setIsOpening] = useState(false);
 
   useEffect(() => {
-    if (pathname === '/' || isInsideNativeApp()) {
+    if (pathname === '/' || isPublicLegalPath(pathname) || isInsideNativeApp()) {
       return;
     }
 
@@ -44,7 +45,7 @@ export function OpenInAppBanner() {
     setPlatform(mobilePlatform);
   }, [pathname]);
 
-  if (pathname === '/' || !platform) {
+  if (pathname === '/' || isPublicLegalPath(pathname) || !platform) {
     return null;
   }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { platformPolicies } from '@/lib/platform/policies';
 
-import { DeleteAccountAction } from '@/components/delete-account-action';
+import { AccountDeletionGuide } from '@/components/account-deletion-guide';
 import { LegalPolicyPage } from '@/components/legal-policy-page';
 
 export const metadata: Metadata = {
@@ -23,8 +23,8 @@ export default function DeleteAccountPage() {
       description="توضح هذه الصفحة طريقة طلب حذف حسابك في سوق حمد وما يحدث للبيانات المرتبطة بالحساب بعد تقديم الطلب."
       updatedAt={updatedAt}
       sections={sections}
-    >
-      <DeleteAccountAction />
-    </LegalPolicyPage>
+      path="/delete-account"
+      lead={<AccountDeletionGuide />}
+    />
   );
 }

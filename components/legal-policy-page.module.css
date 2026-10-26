@@ -1,0 +1,137 @@
+/* Legal pages have their own reading surface; admin and marketplace keep theirs. */
+:global(html):has(.page),
+:global(body):has(.page) {
+  background: #f7f9f8;
+  --mobile-web-app-banner-space: 0px;
+}
+
+:global(body):has(.page) {
+  background-image: none;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+:global(html.dark):has(.page),
+:global(html.dark) :global(body):has(.page) {
+  background: #18211e;
+}
+
+.page {
+  --legal-bg: #f7f9f8;
+  --legal-surface: #ffffff;
+  --legal-text: #243a33;
+  --legal-muted: #52655b;
+  --legal-line: #dce7df;
+  --legal-green: #23765e;
+  --legal-tint: #e8f4eb;
+  background: var(--legal-bg);
+  color: var(--legal-text);
+  min-height: 100dvh;
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.9;
+}
+
+:global(.dark) .page {
+  --legal-bg: #18211e;
+  --legal-surface: #222e28;
+  --legal-text: #eff5f1;
+  --legal-muted: #b0c5b7;
+  --legal-line: #2a4234;
+  --legal-green: #a8d8c3;
+  --legal-tint: #2a4035;
+}
+
+/* A legal document remains scrollable in the packaged Android web runtime. */
+:global(html[data-native-app='true'][data-platform='android']) .page {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.page a { text-underline-offset: 0.22em; }
+.page a:focus-visible { outline: 3px solid var(--legal-green); outline-offset: 4px; border-radius: 0.35rem; }
+.container { width: 100%; max-width: 76rem; margin-inline: auto; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--legal-line); }
+.brand { display: inline-flex; align-items: center; gap: 0.8rem; font-size: 1.15rem; font-weight: 800; text-decoration: none; }
+.brand img { border-radius: 0.85rem; }
+.brand small { display: block; color: var(--legal-muted); font-size: 0.75rem; font-weight: 400; }
+.gatewayLink { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 44px; font-size: 0.85rem; color: var(--legal-green); font-weight: 700; }
+.gatewayLink:hover { text-decoration: underline; }
+.layout { display: grid; gap: 1.5rem; padding-top: 1.5rem; }
+.sidebar { min-width: 0; }
+.policyNav { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.navLabel { width: 100%; margin: 0 0 0.25rem; font-size: 0.75rem; font-weight: 700; color: var(--legal-muted); }
+.policyLink { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 44px; border: 1px solid var(--legal-line); border-radius: 0.8rem; background: var(--legal-surface); padding: 0.5rem 0.8rem; font-size: 0.8rem; color: var(--legal-muted); text-decoration: none; }
+.policyLink:hover { color: var(--legal-green); border-color: var(--legal-green); }
+.policyLink[aria-current='page'] { background: var(--legal-tint); border-color: var(--legal-green); color: var(--legal-green); font-weight: 700; }
+.activeDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.sidebarNote { display: none; }
+.content { display: grid; min-width: 0; gap: 1.5rem; }
+.hero { padding-block: 0.5rem; }
+.eyebrow { color: var(--legal-green); font-size: 0.8rem; font-weight: 700; margin: 0 0 0.25rem; }
+.hero h1 { font-size: clamp(1.85rem, 5vw, 2.7rem); line-height: 1.5; font-weight: 800; margin: 0 0 0.8rem; letter-spacing: -0.025em; }
+.description { color: var(--legal-muted); max-width: 46rem; margin: 0; }
+.updatedAt { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; color: var(--legal-muted); font-size: 0.75rem; margin: 1rem 0 0; padding: 0.35rem 0.7rem; border: 1px solid var(--legal-line); border-radius: 0.65rem; }
+.updatedAt span { color: var(--legal-text); }
+.document { background: var(--legal-surface); border: 1px solid var(--legal-line); border-radius: 1.25rem; padding: 0.25rem 1.2rem; }
+.document:focus { outline: none; }
+.section { padding-block: 1.7rem; scroll-margin-top: 1.5rem; }
+.section + .section { border-top: 1px solid var(--legal-line); }
+.section h2 { display: flex; align-items: baseline; gap: 0.75rem; font-size: 1.1rem; font-weight: 800; line-height: 1.8; margin: 0 0 0.85rem; }
+.sectionNumber { color: var(--legal-green); font-size: 0.75rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.section p, .section ul { color: var(--legal-muted); margin: 0; }
+.section p + ul { margin-top: 0.75rem; }
+.section ul { display: grid; gap: 0.75rem; list-style: disc; padding-inline-start: 1.15rem; }
+.section li { padding-inline-start: 0.2rem; }
+.section li::marker { color: var(--legal-green); }
+.section a, .launchHint a { color: var(--legal-green); text-decoration: underline; overflow-wrap: anywhere; font-weight: 700; }
+.footer { display: flex; align-items: flex-start; flex-wrap: wrap; justify-content: space-between; gap: 0.7rem 1rem; padding: 0.7rem 0.25rem; font-size: 0.85rem; color: var(--legal-muted); }
+.footer h2 { color: var(--legal-text); font-size: 1rem; font-weight: 700; margin: 0; }
+.footer p { margin: 0; }
+.supportLink { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 44px; color: var(--legal-green); font-size: 0.85rem; font-weight: 700; text-decoration: underline; max-width: 100%; overflow-wrap: anywhere; }
+.supportLink span { min-width: 0; }
+.supportLink svg { flex-shrink: 0; }
+.updateNote { width: 100%; padding-top: 1rem; border-top: 1px solid var(--legal-line); font-size: 0.75rem; }
+.skipLink { position: absolute; top: 0.5rem; inset-inline-start: 1rem; z-index: 80; padding: 0.65rem 1rem; background: var(--legal-surface); color: var(--legal-green); border: 1px solid var(--legal-green); border-radius: 0.75rem; transform: translateY(-150%); }
+.skipLink:focus { transform: translateY(0); }
+.deletionGuide { border: 1px solid var(--legal-line); border-radius: 1.25rem; background: var(--legal-tint); padding: 1.25rem; }
+.guideHeading { display: flex; align-items: flex-start; gap: 0.8rem; }
+.guideIcon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--legal-line); border-radius: 0.85rem; color: var(--legal-green); background: var(--legal-surface); }
+.deletionGuide h2 { margin: 0 0 0.25rem; font-weight: 800; font-size: 1.15rem; }
+.deletionGuide p { color: var(--legal-muted); font-size: 0.9rem; margin: 0; }
+.deletionSteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; padding: 0; list-style: none; margin: 1.2rem 0; }
+.deletionSteps li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; border: 1px solid var(--legal-line); background: var(--legal-surface); border-radius: 0.75rem; padding: 0.65rem; font-size: 0.8rem; font-weight: 700; }
+.deletionSteps li span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--legal-tint); color: var(--legal-green); font-size: 0.7rem; }
+.appLaunch { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 48px; padding: 0.65rem 1.2rem; border-radius: 0.8rem; margin-block: 1rem 0.5rem; background: #23765e; color: white; font-size: 0.9rem; font-weight: 700; }
+.appLaunch:hover { background: #1b614c; }
+:global(.dark) .appLaunch { background: #a8d8c3; color: #18211e; }
+:global(.dark) .appLaunch:hover { background: #bce4d3; }
+.deletionGuide .launchHint { font-size: 0.8rem; }
+.deletionSupport { margin-top: 1.3rem; padding-top: 1.2rem; border-top: 1px solid var(--legal-line); }
+.deletionSupport h3 { font-size: 0.95rem; font-weight: 700; margin: 0 0 0.4rem; }
+.deletionSupport p:last-child { font-size: 0.8rem; }
+
+@media (min-width: 768px) {
+  .page { padding-inline: 2rem; padding-top: 2rem; }
+  .layout { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; gap: 3rem; padding-top: 2.5rem; }
+  .sidebar { position: sticky; top: 2rem; }
+  .policyNav { display: grid; gap: 0.4rem; }
+  .navLabel { margin-bottom: 0.6rem; }
+  .policyLink { font-size: 0.85rem; border-color: transparent; background: transparent; }
+  .sidebarNote { display: grid; justify-items: start; gap: 0.6rem; margin-top: 1.5rem; padding: 1rem; border-top: 1px solid var(--legal-line); color: var(--legal-muted); font-size: 0.8rem; }
+  .sidebarNote svg { color: var(--legal-green); }
+  .sidebarNote p { margin: 0; }
+  .content { gap: 2rem; }
+  .document { padding-inline: 2rem; }
+  .section { padding-block: 2rem; }
+  .deletionGuide { padding: 1.75rem; }
+}
+
+@media (max-width: 360px) {
+  .brand { gap: 0.5rem; font-size: 1rem; }
+  .gatewayLink { font-size: 0.75rem; gap: 0.25rem; }
+  .deletionSteps { grid-template-columns: 1fr; }
+}

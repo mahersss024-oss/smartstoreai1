@@ -12,6 +12,7 @@ import {
 
 import { useConversationMessageAlert } from '@/hooks/use-conversation-message-alert';
 import { bottomNavigationDestinations } from '@/lib/navigation/bottom-navigation';
+import { isPublicLegalPath } from '@/lib/platform/legal-routes';
 
 type NavItem = {
   href: string;
@@ -111,6 +112,7 @@ export function MobileBottomNavigation() {
 
   if (
     pathname === '/' ||
+    isPublicLegalPath(pathname) ||
     isAssistantChatViewOpen ||
     pathname === '/commission-agreement' ||
     pathname.startsWith('/conversations/') ||

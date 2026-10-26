@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'سياسة رسوم المنصة | سوق حمد',
   description:
     'سياسة رسوم منصة سوق حمد عند إتمام البيع من خلال المنصة.',
+  alternates: { canonical: '/commission-policy' },
 };
 
 const { updatedAt, sections } = platformPolicies.commissions;
@@ -19,6 +20,7 @@ export default function CommissionPolicyPage() {
       description="هذه السياسة توضّح متى تستحق رسوم 1%، وكيف يتم حسابها وإدارتها عند إتمام البيع عبر المنصة."
       updatedAt={updatedAt}
       sections={sections}
+      path="/commission-policy"
     />
   );
 }

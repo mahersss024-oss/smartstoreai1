@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-test('delete account page contains the final guarded delete action', () => {
-  const deletePage = readFileSync(join(process.cwd(), 'app', 'delete-account', 'page.tsx'), 'utf8');
+test('retained mobile web runtime keeps its guarded delete action', () => {
+  const deletePage = readFileSync(join(process.cwd(), 'mobile-web', 'runtime', 'policy-page.tsx'), 'utf8');
   const deleteAction = readFileSync(
     join(process.cwd(), 'components', 'delete-account-action.tsx'),
     'utf8',
