@@ -7,7 +7,7 @@
 | `pnpm test:inventory` | Discover source functions, pages, HTTP methods and JSX controls with the TypeScript parser. |
 | `pnpm test:coverage` | Run the Node suite with native runtime coverage and produce an explicit gap report. |
 | `pnpm test:routes` | Render discovered administrator pages as guest and customer on desktop/mobile Chromium. |
-| `pnpm test:e2e` | Run the explicit administrator browser projects and the independent request-only API project. |
+| `pnpm test:e2e` | Run public gateway/policy and administrator browser checks and the independent request-only API project. |
 | `pnpm test:e2e --project=api-contracts` | Check HTTP methods, unauthenticated/staff access boundaries and authenticated listing draft contracts without a browser. |
 | `pnpm test:db:integration` | Run database integration tests against an explicitly isolated test database. |
 | `pnpm verify` | Type check, lint, Node tests, production build and dependency audit. |
@@ -42,7 +42,7 @@ method, unauthenticated rejection, ordinary-user denial on staff endpoints, and
 authenticated draft creation without publication. Node route-access tests also
 verify forged and expired sessions. Administrator page checks exercise
 rendering/access as guests and customers for `/admin` and `/admin/*` only. Public
-listing/seller, account, policy and other customer web journeys are outside the
+listing/seller, account and other customer web journeys are outside the
 current browser CI scope. The administrator baselines do not certify successful
 administrator workflows or every state of each dynamic route.
 Expected final URLs are asserted. Guest administration redirects are verified with
@@ -57,8 +57,11 @@ exercise further UI journeys. Source-text assertions remain structural tests, no
 substitutes for executing a handler or clicking a control.
 
 Customer browser scenarios were previously part of the CI matrix. The remaining
-`e2e/account-actions.spec.ts` source checks the public deletion page with intercepted
-requests, but it is not selected by the administrator-only browser allowlist. The
+`e2e/account-actions.spec.ts` describes the retired public web deletion action with
+intercepted requests and is not selected by the browser allowlist. Current public
+policy coverage is `e2e/legal-pages.spec.ts`: five documents, navigation, responsive
+light/dark reading, app handoff, and the independent support-email deletion request.
+These public pages do not perform account deletion. The
 historical public-page runs do not establish current native-app account behavior
 or database deletion. Native UI verification belongs to the mobile repository;
 shared account handlers continue to have Node/API authorization checks.
@@ -71,7 +74,7 @@ Exercise guest, buyer, seller, moderator, administrator and owner separately.
 Test confirmation dialogs with both cancel and confirm using disposable fixtures.
 
 All inventory additions are discovered on subsequent runs; discovery does not
-enroll customer pages into the administrator-only browser allowlist. Unclassified endpoints
+enroll customer pages into the explicit browser allowlist. Unclassified endpoints
 and stale guest exceptions fail the Node inventory test. No baseline pass upgrades
 an item to `completeBehaviorVerified: true` automatically. Even 100% executed code
 coverage would not prove that every possible input or interaction is correct.

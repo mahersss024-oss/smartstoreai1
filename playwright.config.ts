@@ -12,7 +12,7 @@ const testDataDir = process.env.PLAYWRIGHT_BASE_URL
   ? undefined : mkdtempSync(join(tmpdir(), 'smartstore-e2e-'));
 
 // Customer journeys run in the native applications. Browser coverage is for
-// the app download gateway and administration UI; API contracts need no browser.
+// the app gateway, public policies and administration UI; API contracts need no browser.
 const adminBrowserSpecs = [
   '**/app-download-gateway.spec.ts',
   '**/legal-pages.spec.ts',

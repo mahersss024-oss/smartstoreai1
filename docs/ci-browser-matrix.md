@@ -1,6 +1,6 @@
-# Administrator Browser CI and Server API Contracts
+# Public Pages, Administrator Browser CI and Server API Contracts
 
-The Production Gate runs administrator browser checks and server API contracts
+The Production Gate runs public-page and administrator browser checks and server API contracts
 as separate jobs. Android/iPhone application binaries are built in the independent
 mobile repository; neither Playwright browser project runs an installed native app.
 
@@ -21,7 +21,12 @@ This does not establish native installation or actual store availability.
 The allowlist covers administrator presentation, users, workspace, evidence,
 listing categories/car models, performance, and page access/rendering contracts.
 The two inventory-driven specs select only `/admin` and paths beginning with
-`/admin/`. Customer account, market, listing-detail, seller, policy, offline and
+`/admin/`. Public policy documents are explicitly selected by `legal-pages.spec.ts`:
+terms, privacy, listing rules, fees and account-deletion instructions. It checks
+desktop/mobile light and dark reading, contrast, navigation, canonical URLs,
+narrow screens, manual app opening and the external support-email request path.
+It verifies that public deletion instructions send no account-delete request.
+Customer account, market, listing-detail, seller, offline and
 other public page journeys are outside the browser jobs' current scope.
 
 The administrator performance fixture intercepts telemetry rather than consuming
