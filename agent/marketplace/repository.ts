@@ -846,8 +846,6 @@ async function ensureUser(user: AuthSessionUser) {
     },
     update: {
       email: user.email,
-      name: user.name,
-      picture: user.picture,
     },
   });
 }

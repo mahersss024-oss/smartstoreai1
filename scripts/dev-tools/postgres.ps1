@@ -232,7 +232,8 @@ switch ($Action) {
             $preload = [Uri]::new((Join-Path $repoRoot 'scripts\testing\isolated-model-provider.mjs')).AbsoluteUri
             # Files share this disposable database and read global moderation queues.
             & node --import $preload 'node_modules/tsx/dist/cli.mjs' --test --test-concurrency=1 `
-                'tests/db-integration.test.ts' 'tests/evidence-db-integration.test.ts'
+                'tests/db-integration.test.ts' 'tests/evidence-db-integration.test.ts' `
+                'tests/repository-profile-preservation.db-integration.test.ts'
             if ($LASTEXITCODE -ne 0) { throw 'Database integration tests failed; see the test output.' }
         }
     }
