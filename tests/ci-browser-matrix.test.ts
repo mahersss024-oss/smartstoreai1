@@ -32,6 +32,7 @@ const browser = workflow.jobs.e2e;
 const apiContracts = workflow.jobs['api-contracts'];
 const browserProjects = playwrightConfig.projects!.filter(project => project.name !== 'api-contracts');
 const adminSpecs = [
+  'app-download-gateway.spec.ts',
   'admin-page-presentation.spec.ts', 'admin-users-loading.spec.ts', 'admin-workspace.spec.ts',
   'all-pages-vitals.spec.ts', 'customer-evidence.spec.ts', 'marketplace-car-models.spec.ts',
   'marketplace-categories.spec.ts', 'performance-stability.spec.ts', 'route-contracts.spec.ts',
@@ -64,7 +65,7 @@ test('CI browser matrix runs both administrator browser projects independently w
   assert.equal(webServer?.url, 'http://127.0.0.1:3102/api/health');
 });
 
-test('browser projects explicitly include administrator UI specs and exclude public customer journeys', () => {
+test('browser projects include the public app gateway and administrator UI without retired customer journeys', () => {
   for (const project of browserProjects) {
     assert.deepEqual(matchedSpecNames(project.testMatch), adminSpecs);
   }

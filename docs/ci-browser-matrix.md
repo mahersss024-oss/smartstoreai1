@@ -10,6 +10,14 @@ mobile repository; neither Playwright browser project runs an installed native a
 explicit allowlist of administrator UI specs. The mobile project emulates a
 mobile browser viewport. It does not run the Expo application.
 
+The public `/` app download gateway is also covered by the explicit
+`app-download-gateway.spec.ts` allowlist entry in both projects. It verifies the
+unpublished state, desktop QR, Android/iPhone selection, and a captured manual
+`smartstore://` handoff without launching an OS application. Store URLs are empty
+in the isolated web server fixture. The page never automatically redirects; its
+QR points to `https://souqhamad.com/`, and mobile visitors choose their action.
+This does not establish native installation or actual store availability.
+
 The allowlist covers administrator presentation, users, workspace, evidence,
 listing categories/car models, performance, and page access/rendering contracts.
 The two inventory-driven specs select only `/admin` and paths beginning with
@@ -45,6 +53,11 @@ Each CI runner prepares its own temporary file store and production build.
 Playwright probes `/api/health` for server readiness. The browser matrix is kept
 separate from the API project, and matrix fail-fast is disabled. A failure in
 either browser job does not cancel the other browser job or the API job.
+
+Server preparation has a five-minute budget because it includes fixture setup
+and a full production build on a cold machine. The previous two-minute budget
+timed out locally before the health endpoint became ready. Per-test and assertion
+limits remain unchanged; this does not hide a build failure or a test timeout.
 
 The one-worker setting, configured retry behavior, per-test limits and 30-minute
 Playwright deadline are unchanged. Each job has a 45-minute deadline, a
@@ -82,3 +95,13 @@ API cases passed with retries disabled (199 passed, zero failed, one skipped,
 project because it sets mobile/tablet viewports internally; it passed there and
 was skipped in the mobile project. All five workflow contract tests, TypeScript,
 and targeted ESLint passed. These are local results, not a remote CI result.
+
+Release validation on 2026-10-26 included the new app gateway and ran all three
+projects together against one isolated production build: 205 passed and one
+intentional mobile duplicate of the desktop performance audit was skipped
+(206 total, 10 minutes, no failing tests). The first startup attempt exceeded
+the former 120-second production-build budget; the rerun with the five-minute
+preparation budget passed. All five workflow contracts passed after that change.
+The full Node run passed 871 tests with 19 database cases skipped in that run;
+all 19 were then executed successfully against the dedicated local PostgreSQL
+test database. No production database was used or modified.

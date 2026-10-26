@@ -1,5 +1,7 @@
 # dependencies
 /node_modules
+# The native application is an independent Git repository.
+/AI/
 /.pnp
 .pnp.*
 .yarn/*

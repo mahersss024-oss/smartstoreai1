@@ -114,7 +114,8 @@ test('site message updates require owner-level admin access, transactional and a
   assert.match(banner, /role="status"/);
   assert.match(homeOnly, /usePathname/);
   assert.match(homeOnly, /pathname !== '\/'/);
-  assert.match(layout, /<SiteMessageHomeOnly>/);
+  assert.doesNotMatch(layout, /<SiteMessageHomeOnly>/, 'the app download gateway does not mount the retired market home message');
+  assert.doesNotMatch(layout, /<SiteMessageBanner/);
   assert.match(maintenance, /رسالة الموقع/);
   assert.doesNotMatch(maintenance, /localStorage/);
 });

@@ -1,5 +1,17 @@
 # سوق حمد
 
+The public `/` page is an Android/iPhone app gateway. It shows a mobile app-open
+action and a desktop QR for `https://souqhamad.com/`; it does not restore the
+retired web marketplace. Administration remains at `/admin` and the native app
+continues to use the server APIs independently.
+
+Leave `NEXT_PUBLIC_ANDROID_APP_STORE_URL` and `NEXT_PUBLIC_IOS_APP_STORE_URL`
+empty until official destinations exist. Android accepts HTTPS Google Play
+details links for `com.souqhamad.app`; iPhone accepts HTTPS App Store app listings
+or TestFlight join links. Missing or invalid values show “قريبًا” without invented
+download links. Configuring a link validates its form, not whether the store has
+published it. Public build variables should be set before building/deploying.
+
 سوق حمد is a chat-first Saudi smart marketplace inspired by classifieds apps. It helps buyers search listings and helps sellers create and manage listings through conversation, with internal buyer-seller chat, moderation, image checks, favorites, reports, and 1% commission tracking for site-completed sales.
 
 ## Setup

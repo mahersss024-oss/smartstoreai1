@@ -11,8 +11,6 @@ import {
   WELCOME_VISIBLE_MS,
 } from "@/lib/welcome/config";
 import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
-import { SiteMessageBanner } from "@/components/site-message-banner";
-import { SiteMessageHomeOnly } from "@/components/site-message-home-only";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
@@ -327,9 +325,6 @@ export default function RootLayout({
       </head>
       <body className="overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
         <AppWelcomeSplash />
-        <SiteMessageHomeOnly>
-          <SiteMessageBanner />
-        </SiteMessageHomeOnly>
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>

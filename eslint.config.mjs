@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // The native application maintains its own lint configuration.
+    "AI/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "**/.next/**",

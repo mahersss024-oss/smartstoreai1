@@ -110,6 +110,7 @@ export function MobileBottomNavigation() {
   }, [pathname]);
 
   if (
+    pathname === '/' ||
     isAssistantChatViewOpen ||
     pathname === '/commission-agreement' ||
     pathname.startsWith('/conversations/') ||

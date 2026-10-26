@@ -1,0 +1,5 @@
+/* The public gateway fills the page without the retired market navigation space. */
+body:has(main.app-download-gateway) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}

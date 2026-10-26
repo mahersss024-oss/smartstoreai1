@@ -12,8 +12,9 @@ const testDataDir = process.env.PLAYWRIGHT_BASE_URL
   ? undefined : mkdtempSync(join(tmpdir(), 'smartstore-e2e-'));
 
 // Customer journeys run in the native applications. Browser coverage is for
-// the remaining administration UI; server contracts run without a browser.
+// the app download gateway and administration UI; API contracts need no browser.
 const adminBrowserSpecs = [
+  '**/app-download-gateway.spec.ts',
   '**/admin-page-presentation.spec.ts',
   '**/admin-users-loading.spec.ts',
   '**/admin-workspace.spec.ts',
@@ -50,7 +51,9 @@ export default defineConfig({
         // Probe the health API so Playwright can detect the server after startup.
         url: serverReadyUrl,
         reuseExistingServer: false,
-        timeout: 120_000,
+        // This budget includes a complete production build on a cold machine.
+        // Individual test and assertion timeouts remain unchanged.
+        timeout: 300_000,
         env: {
           AUTH_SECRET:
             process.env.AUTH_SECRET ?? 'development-only-smartstore-auth-secret',
@@ -63,6 +66,9 @@ export default defineConfig({
           NODE_ENV: 'test',
           PORT: String(port),
           NEXT_PUBLIC_APP_URL: baseURL,
+          // Exercise the unpublished state without inheriting real store links.
+          NEXT_PUBLIC_ANDROID_APP_STORE_URL: '',
+          NEXT_PUBLIC_IOS_APP_STORE_URL: '',
           SMARTSTORE_DATA_DIR: testDataDir!,
           SMARTSTORE_IMAGE_STORAGE: process.env.SMARTSTORE_IMAGE_STORAGE ?? '',
           SMARTSTORE_MARKETPLACE_STORE:

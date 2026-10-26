@@ -40,7 +40,7 @@ function readRouteSet(source: string) {
   return [...routeSet[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
 }
 
-test('the mobile web host represents current app routes and keeps the retired root unavailable', () => {
+test('the legacy mobile web host keeps its market root retired while the public root offers the native app', () => {
   const appRoutes = collectPageRoutes(appRoot).sort();
   const dynamicRoutes = appRoutes.filter((route) => route.includes('['));
   const staticAppRoutes = appRoutes.filter((route) => !route.includes('['));
@@ -49,9 +49,12 @@ test('the mobile web host represents current app routes and keeps the retired ro
     .map((match) => match[1])
     .sort();
 
-  assert.ok(!staticAppRoutes.includes('/'), 'the public market homepage remains removed');
-  assert.deepEqual(localRoutes, [...staticAppRoutes, '/'].sort());
-  assert.deepEqual(hostedStaticRoutes, [...staticAppRoutes, '/'].sort());
+  assert.ok(staticAppRoutes.includes('/'), 'the public app gateway is a real route');
+  const gatewaySource = readFileSync(join(appRoot, 'page.tsx'), 'utf8');
+  assert.match(gatewaySource, /AppDownloadGateway/);
+  assert.doesNotMatch(gatewaySource, /MarketplaceFilterRows|MarketplaceListing/);
+  assert.deepEqual(localRoutes, staticAppRoutes);
+  assert.deepEqual(hostedStaticRoutes, staticAppRoutes);
   assert.ok(routeHostSource.includes("if (pathname === '/') return <MobileNotFoundPage />;"));
   assert.deepEqual(dynamicRoutes, [
     '/conversations/[conversationId]',
