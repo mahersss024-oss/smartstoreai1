@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { prisma } from '@/lib/db/prisma';
+import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
+import { ImageStorageResponseError, retryImageStorage } from './image-storage-retry';
 
 type StoreListingObjectInput = {
   data: Uint8Array;
@@ -32,9 +34,9 @@ type CloudflareCachePurgeConfig = {
   zoneId: string;
 };
 
-class CloudflareCachePurgeError extends Error {
-  constructor(readonly status: number, readonly codes: number[]) {
-    super('Cloudflare rejected the cache purge request.');
+class CloudflareCachePurgeError extends ImageStorageResponseError {
+  constructor(status: number, readonly codes: number[]) {
+    super(status);
     this.name = 'CloudflareCachePurgeError';
   }
 }
@@ -190,14 +192,6 @@ function formatErrorForLog(error: unknown) {
     .slice(0, 300);
 }
 
-async function getStorageResponseText(response: Response) {
-  try {
-    return (await response.text()).replace(/\s+/g, ' ').slice(0, 500);
-  } catch {
-    return '';
-  }
-}
-
 function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   if (!config.secretAccessKey) {
     throw new Error('Missing object storage secret access key.');
@@ -331,31 +325,21 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
     mediaType: input.mediaType,
     config,
   });
-  let response: Response;
-
   try {
-    response = await fetchWithTimeout(
-      request.uploadUrl,
-      {
-        method: 'PUT',
-        headers: request.headers,
-        body,
-      },
-      getObjectStorageTimeoutMs(),
-    );
+    await retryImageStorage(async remainingMs => {
+      const result = await fetchWithTimeout(request.uploadUrl, {
+        method: 'PUT', headers: request.headers, body,
+      }, remainingMs);
+      if (!result.ok) {
+        await result.body?.cancel();
+        throw new ImageStorageResponseError(result.status);
+      }
+      return result;
+    }, getObjectStorageTimeoutMs());
   } catch (error) {
+    incrementRuntimeCounter('image.storage.failed', { operation: 'upload' });
     throw new Error(
       `Object storage upload request failed for ${request.uploadUrl.host}${request.uploadUrl.pathname}: ${formatErrorForLog(error)}.`,
-    );
-  }
-
-  if (!response.ok) {
-    const responseText = await getStorageResponseText(response);
-
-    throw new Error(
-      `Object storage upload failed with status ${response.status}${
-        responseText ? `: ${responseText}` : ''
-      }.`,
     );
   }
 
@@ -492,30 +476,21 @@ async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string)
     key,
     config,
   });
-  let response: Response;
-
   try {
-    response = await fetchWithTimeout(
-      request.uploadUrl,
-      {
-        method: 'DELETE',
-        headers: request.headers,
-      },
-      getObjectStorageTimeoutMs(),
-    );
+    await retryImageStorage(async remainingMs => {
+      const result = await fetchWithTimeout(request.uploadUrl, {
+        method: 'DELETE', headers: request.headers,
+      }, remainingMs);
+      if (!result.ok && result.status !== 404) {
+        await result.body?.cancel();
+        throw new ImageStorageResponseError(result.status);
+      }
+      return result;
+    }, getObjectStorageTimeoutMs());
   } catch (error) {
+    incrementRuntimeCounter('image.storage.failed', { operation: 'delete' });
     throw new Error(
       `Object storage delete request failed for ${request.uploadUrl.host}${request.uploadUrl.pathname}: ${formatErrorForLog(error)}.`,
-    );
-  }
-
-  if (!response.ok && response.status !== 404) {
-    const responseText = await getStorageResponseText(response);
-
-    throw new Error(
-      `Object storage delete failed with status ${response.status}${
-        responseText ? `: ${responseText}` : ''
-      }.`,
     );
   }
 }
@@ -523,43 +498,66 @@ async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string)
 async function purgeCloudflareCacheByUrls(urls: string[]) {
   const config = getCloudflareCachePurgeConfig();
 
-  if (!config || urls.length === 0) {
+  if (urls.length === 0) {
+    return false;
+  }
+  if (!config) {
+    incrementRuntimeCounter('image.cache_purge.incomplete', { reason: 'missing_config' });
+    console.warn('[cloudflare_cache_purge] outcome=incomplete reason=missing_config');
     return false;
   }
 
-  const response = await fetchWithTimeout(
-    `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${config.apiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ files: urls }),
-    },
-    getCloudflareCachePurgeTimeoutMs(),
-  );
-
-  if (!response.ok) {
-    const payload: unknown = await response.json().catch(() => null);
-    const errors = payload && typeof payload === 'object' && 'errors' in payload
-      ? payload.errors : null;
-    // Log only numeric provider codes, never raw bodies, headers, URLs or tokens.
-    const codes = Array.isArray(errors) ? errors.flatMap((error: unknown) => {
-      if (!error || typeof error !== 'object' || !('code' in error)) return [];
-      return typeof error.code === 'number' && Number.isSafeInteger(error.code)
-        ? [error.code] : [];
-    }).slice(0, 10) : [];
-    throw new CloudflareCachePurgeError(response.status, codes);
-  }
-
-  return true;
+  return retryImageStorage(async remainingMs => {
+    // Keep this signal attached while reading JSON too. A headers-only timeout
+    // would leave a stalled provider response body outside the retry budget.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new DOMException('Request timed out.', 'TimeoutError')), remainingMs);
+    try {
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${config.apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ files: urls }),
+          signal: controller.signal,
+        },
+      );
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        if (error instanceof SyntaxError) payload = null;
+        else throw error;
+      }
+      if (response.ok && payload && typeof payload === 'object' &&
+        'success' in payload && payload.success === true) {
+        incrementRuntimeCounter('image.cache_purge.completed');
+        return true;
+      }
+      const errors = payload && typeof payload === 'object' && 'errors' in payload
+        ? payload.errors : null;
+      // Log only numeric provider codes, never raw bodies, headers, URLs or tokens.
+      const codes = Array.isArray(errors) ? errors.flatMap((error: unknown) => {
+        if (!error || typeof error !== 'object' || !('code' in error)) return [];
+        return typeof error.code === 'number' && Number.isSafeInteger(error.code)
+          ? [error.code] : [];
+      }).slice(0, 10) : [];
+      throw new CloudflareCachePurgeError(response.status, codes);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, getCloudflareCachePurgeTimeoutMs());
 }
 
 async function purgeCloudflareCacheBestEffort(urls: string[]) {
   try {
     await purgeCloudflareCacheByUrls(urls);
   } catch (error) {
+    incrementRuntimeCounter('image.cache_purge.incomplete', { reason: 'provider_failure' });
     if (error instanceof CloudflareCachePurgeError) {
       console.warn(`[cloudflare_cache_purge] failure=provider_rejected status=${error.status} codes=${error.codes.join(',') || 'none'}`);
     } else {
@@ -604,8 +602,11 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
     return false;
   }
 
-  await Promise.all([...keys].map((key) => deleteStoredObjectKey(config, key)));
+  // A failed sibling delete must not skip invalidating objects already removed.
+  const deletions = await Promise.allSettled([...keys].map((key) => deleteStoredObjectKey(config, key)));
   await purgeCloudflareCacheBestEffort([...purgeUrls]);
+  const failure = deletions.find(result => result.status === 'rejected');
+  if (failure?.status === 'rejected') throw failure.reason;
 
   return true;
 }

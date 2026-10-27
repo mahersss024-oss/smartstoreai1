@@ -24,3 +24,65 @@
 
 The service worker ignores cross-origin R2/Cloudflare image requests. It does not
 rewrite listing URLs. Existing original URLs remain valid and immutable.
+
+## Native delivery reliability (2026-10-27)
+
+The production image path remains API upload -> server validation and Sharp
+variants -> Cloudflare R2 -> `images.souqhamad.com` -> native image cache. No
+Cloudflare Images subscription, transformation URL, Worker, storage migration,
+or changed image URL format is required by these fixes.
+
+- Single-listing detail GET now reads current data and sends `no-store`, including
+  404 responses. This prevents fresh responses from advertising removed objects
+  or previously published listings. It trades the old 15-second JSON cache for a
+  database read; image CDN caching and the search endpoint are unchanged. Old
+  responses already held by an edge cache can remain until their existing TTL /
+  stale window expires after deployment.
+- A new listing image is attached only after original, display and thumbnail
+  uploads all succeed. The three writes run concurrently. Transient network
+  failures and HTTP 408/425/429/5xx receive at most three attempts with 200ms and
+  500ms backoff, sharing the existing per-operation timeout budget. Permanent
+  errors such as 403 are not retried. A terminal failure returns the existing 503
+  upload response and releases idempotency so the customer can retry. It no
+  longer creates a permanent original-sized alias for a failed small variant.
+- A failed new UUID upload cleans up acknowledged successful siblings. Shared
+  deterministic chat draft IDs are retained for a safe retry, since a concurrent
+  operation may attach those same objects. Successful uploads and approved-image
+  rules remain unchanged.
+- R2 DELETE and Cloudflare purge use the same bounded transient retry policy.
+  Purge requires both a successful HTTP response and `success: true`, and its
+  deadline includes reading the response body. A failed sibling R2 deletion no
+  longer prevents purging objects already removed. For compatibility,
+  `deleteListingObject` returning `true` means R2 deletion completed; it does not
+  promise that cache invalidation completed.
+
+Runtime counters expose terminal outcomes: `image.storage.failed` (operation),
+`image.delivery.incomplete`, `image.delivery.cleanup_incomplete`,
+`image.cache_purge.completed`, and `image.cache_purge.incomplete` (reason:
+`missing_config` or `provider_failure`). Structured purge warnings contain only
+numeric provider codes / safe error names; they omit provider messages and
+credentials. Runtime counters are per process and reset on restart, so production
+log monitoring remains necessary.
+
+Remaining operational limits:
+
+- Retries are request-bound, not a durable background queue. A terminal outage,
+  ambiguous provider acknowledgement, or interrupted process can leave objects
+  or edge copies requiring an operator's review. No new queue infrastructure or
+  database migration was added.
+- Existing legacy alias records are preserved. Inspect them with
+  `pnpm images:variants:dry-run` before any separately authorized repair; no
+  production backfill is performed by the application update.
+- Cloudflare purge requires the existing zone-scoped `CLOUDFLARE_API_TOKEN` and
+  `CLOUDFLARE_ZONE_ID`. Missing configuration is now observable; this update does
+  not set credentials or change the Cloudflare account. Purge cannot remove an
+  image already downloaded into a customer's local cache.
+- The multipart request cap still relies on `Content-Length` before parsing,
+  followed by a 12MB file check. A proxy body cap / bounded streaming parser is
+  separate hardening and was not changed as part of the viewer reliability fix.
+
+Regression coverage uses isolated marketplace fixtures and mocked providers:
+fresh detail after deletion/pause, strict variants, transient recovery, cleanup,
+same-key 503 -> 201 retry, shared chat IDs, partial deletion, purge rejection,
+missing configuration and response-body timeout. It does not establish live
+Cloudflare settings or Android/iPhone rendering performance.

@@ -6,8 +6,10 @@ import {
   getMissingObjectStorageConfig,
   storeListingObject,
 } from '@/agent/marketplace/object-storage';
+import { getRuntimeMetricsSnapshot, resetRuntimeMetrics } from '@/lib/observability/runtime-metrics';
 
 const objectStorageEnvKeys = [
+  'SMARTSTORE_MARKETPLACE_STORE',
   'SMARTSTORE_IMAGE_STORAGE',
   'SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS',
   'SMARTSTORE_OBJECT_STORAGE_ENDPOINT',
@@ -27,7 +29,9 @@ function withEnv(values: Record<string, string | undefined>) {
   for (const key of objectStorageEnvKeys) {
     previous.set(key, process.env[key]);
 
-    if (values[key] === undefined) {
+    if (key === 'SMARTSTORE_MARKETPLACE_STORE') {
+      process.env[key] = 'file';
+    } else if (values[key] === undefined) {
       delete process.env[key];
     } else {
       process.env[key] = values[key];
@@ -351,4 +355,104 @@ test('times out stalled S3-compatible uploads instead of waiting indefinitely', 
     globalThis.fetch = originalFetch;
     restoreEnv();
   }
+});
+
+const retryTestEnvironment = {
+  SMARTSTORE_IMAGE_STORAGE: 's3',
+  SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
+  SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+  SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+  SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+  SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+  SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.com',
+  CLOUDFLARE_API_TOKEN: 'cf-token', CLOUDFLARE_ZONE_ID: 'cf-zone',
+};
+
+test('transient R2 deletion and Cloudflare purge failures recover before completion', async t => {
+  const restore = withEnv(retryTestEnvironment); t.after(restore);
+  resetRuntimeMetrics();
+  let deletes = 0;
+  let purges = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    if (new URL(String(input)).host === 'api.cloudflare.com') {
+      if (++purges === 1) return Response.json({ success: false }, { status: 503 });
+      return Response.json({ success: true });
+    }
+    return new Response(null, { status: ++deletes === 1 ? 503 : 204 });
+  });
+  assert.equal(await deleteListingObject({ imageId: 'retry-delete', urls: ['https://images.example.com/listings/retry-delete.jpg'] }), true);
+  assert.equal(deletes, 2);
+  assert.equal(purges, 2);
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.cache_purge.completed'], 1);
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.storage.failed{operation:delete}'], undefined);
+});
+
+test('successful sibling deletion is purged even when another R2 object cannot be removed', async t => {
+  const restore = withEnv(retryTestEnvironment); t.after(restore);
+  let failedDeletes = 0;
+  let purgeFiles: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (url.host === 'api.cloudflare.com') {
+      purgeFiles = JSON.parse(String(init?.body)).files;
+      return Response.json({ success: true });
+    }
+    if (url.pathname.endsWith('denied.jpg')) { failedDeletes++; return new Response(null, { status: 403 }); }
+    return new Response(null, { status: 204 });
+  });
+  const urls = ['https://images.example.com/listings/removed.jpg', 'https://images.example.com/listings/denied.jpg'];
+  await assert.rejects(deleteListingObject({ imageId: 'partial-delete', urls }), /status 403/);
+  assert.equal(failedDeletes, 1, 'permanent authorization failure is not retried');
+  assert.deepEqual(purgeFiles, urls);
+});
+
+test('Cloudflare HTTP success with a rejected operation is observable and never counted as completed', async t => {
+  const restore = withEnv(retryTestEnvironment); t.after(restore);
+  resetRuntimeMetrics();
+  const warnings: string[] = [];
+  t.mock.method(console, 'warn', (message: unknown) => warnings.push(String(message)));
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) =>
+    new URL(String(input)).host === 'api.cloudflare.com'
+      ? Response.json({ success: false, errors: [{ code: 10000, message: 'cf-token secret' }] })
+      : new Response(null, { status: 204 }));
+  assert.equal(await deleteListingObject({ imageId: 'false-success', urls: ['https://images.example.com/listings/false-success.jpg'] }), true);
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.cache_purge.completed'], undefined);
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.cache_purge.incomplete{reason:provider_failure}'], 1);
+  assert.match(warnings.join(' '), /status=200 codes=10000/);
+  assert.doesNotMatch(warnings.join(' '), /cf-token|secret/);
+});
+
+test('missing Cloudflare purge configuration is recorded rather than silently skipped', async t => {
+  const restore = withEnv({ ...retryTestEnvironment, CLOUDFLARE_API_TOKEN: undefined }); t.after(restore);
+  resetRuntimeMetrics();
+  const warnings: string[] = [];
+  t.mock.method(console, 'warn', (message: unknown) => warnings.push(String(message)));
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }));
+  await deleteListingObject({ imageId: 'missing-purge-config', urls: ['https://images.example.com/listings/missing.jpg'] });
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.cache_purge.incomplete{reason:missing_config}'], 1);
+  assert.deepEqual(warnings, ['[cloudflare_cache_purge] outcome=incomplete reason=missing_config']);
+});
+
+test('Cloudflare response body remains abortable after headers arrive', async t => {
+  const restore = withEnv({ ...retryTestEnvironment, CLOUDFLARE_CACHE_PURGE_TIMEOUT_MS: '1' }); t.after(restore);
+  resetRuntimeMetrics();
+  const warnings: string[] = [];
+  t.mock.method(console, 'warn', (message: unknown) => warnings.push(String(message)));
+  let purges = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (new URL(String(input)).host !== 'api.cloudflare.com') return new Response(null, { status: 204 });
+    purges++;
+    const body = new ReadableStream({
+      start(controller) {
+        init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason), { once: true });
+      },
+    });
+    return new Response(body, { headers: { 'Content-Type': 'application/json' } });
+  });
+  const startedAt = Date.now();
+  assert.equal(await deleteListingObject({ imageId: 'body-stalled', urls: ['https://images.example.com/listings/stalled.jpg'] }), true);
+  assert.equal(purges, 1, 'the exhausted total budget cannot start another request');
+  assert.ok(Date.now() - startedAt < 2500);
+  assert.equal(getRuntimeMetricsSnapshot().counters['image.cache_purge.incomplete{reason:provider_failure}'], 1);
+  assert.deepEqual(warnings, ['[cloudflare_cache_purge] failure=TimeoutError']);
 });

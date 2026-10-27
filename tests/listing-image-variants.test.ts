@@ -93,8 +93,10 @@ test('chat and multipart uploads generate server variants when clients omit them
   assert.match(storage, /createListingImageVariants\(uploadedImage\)/);
   assert.match(route, /createListingImageVariants\(\{/);
   assert.match(route, /storeListingImageDelivery\(\{/);
-  assert.match(storage, /saveVariant\('display', originalUrl\)/);
-  assert.match(storage, /saveVariant\('thumbnail', displayUrl\)/);
+  // Storage success/failure behavior is exercised by listing-image-recovery.
+  // This boundary check only ensures uploads still generate both server variants.
+  assert.match(storage, /variants\.display, imageId, variant: 'display'/);
+  assert.match(storage, /variants\.thumbnail, imageId, variant: 'thumbnail'/);
 });
 
 test('backfill is batched, dry-run by default, idempotent by database state and preserves originals', async () => {

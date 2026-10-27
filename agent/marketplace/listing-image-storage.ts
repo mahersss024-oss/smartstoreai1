@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { ModelMessage } from 'ai';
+import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
 
 import { analyzeImageQuality } from './image-quality';
 import {
@@ -157,25 +158,38 @@ export async function storeListingImageDelivery({
   imageId,
   original,
   variants,
+  cleanupOnFailure = true,
 }: {
   imageId: string;
   original: UploadedListingImage;
   variants: Awaited<ReturnType<typeof createListingImageVariants>>;
+  /** Deterministic chat IDs may be shared by concurrent draft retries. */
+  cleanupOnFailure?: boolean;
 }) {
-  const originalUrl = await createPersistentListingImageUrl({ ...original, imageId, variant: 'original' });
-  if (!originalUrl) return null;
-
-  const saveVariant = async (variant: 'display' | 'thumbnail', fallback: string) => {
-    try {
-      return (await createPersistentListingImageUrl({ ...variants[variant], imageId, variant })) ?? fallback;
-    } catch (error) {
-      console.warn(`[listing_image_variant_storage] variant=${variant} failure=${error instanceof Error ? error.name : 'UnknownError'}`);
-      return fallback;
+  if (!supportedMimeTypes.has(original.mediaType)) return null;
+  const results = await Promise.allSettled([
+    createPersistentListingImageUrl({ ...original, imageId, variant: 'original' }),
+    createPersistentListingImageUrl({ ...variants.display, imageId, variant: 'display' }),
+    createPersistentListingImageUrl({ ...variants.thumbnail, imageId, variant: 'thumbnail' }),
+  ]);
+  if (results.some(result => result.status === 'rejected' || !result.value)) {
+    incrementRuntimeCounter('image.delivery.incomplete');
+    const storedUrls = results.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : []);
+    if (cleanupOnFailure && storedUrls.length) {
+      try {
+        await deleteListingObject({ imageId, urls: storedUrls });
+      } catch {
+        incrementRuntimeCounter('image.delivery.cleanup_incomplete');
+        console.warn('[listing_image_variant_storage] cleanup=incomplete');
+      }
     }
-  };
-  // Independent writes let a thumbnail succeed even when the display write fails.
-  const displayUrl = await saveVariant('display', originalUrl);
-  const thumbnailUrl = await saveVariant('thumbnail', displayUrl);
+    // Never persist an original-sized alias after a transient variant failure.
+    // Shared deterministic chat objects remain available for a safe later retry.
+    throw new Error('Listing image delivery variants could not be stored completely.');
+  }
+  const [originalUrl, displayUrl, thumbnailUrl] = results.map(result =>
+    result.status === 'fulfilled' ? result.value! : '',
+  );
   return createListingImageDeliveryUrls(originalUrl, { displayUrl, thumbnailUrl });
 }
 
@@ -245,7 +259,7 @@ export async function saveUploadedListingImagesForSeller({
 
     let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;
     try {
-      imageUrls = await storeListingImageDelivery({ imageId, original: sanitizedOriginal, variants: generatedVariants });
+      imageUrls = await storeListingImageDelivery({ imageId, original: sanitizedOriginal, variants: generatedVariants, cleanupOnFailure: !draftOnly });
     } catch (error) {
       console.warn(`[listing_image_storage] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
       storageFailure = error;

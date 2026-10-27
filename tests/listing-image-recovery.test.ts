@@ -37,41 +37,93 @@ async function sample() {
 }
 
 for (const failed of ['display', 'thumbnail'] as const) {
-  test(`keeps the best available variant after ${failed} storage fails`, async t => {
+  test(`rejects incomplete delivery and removes the saved siblings after ${failed} exhausts retries`, async t => {
     storageEnvironment(t);
     const writes: string[] = [];
-    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const deletes: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
+      if (init?.method === 'DELETE') { deletes.push(url); return new Response(null, { status: 204 }); }
       writes.push(url);
       return new Response(null, { status: url.includes(`-${failed}.webp`) ? 503 : 200 });
     });
     const { original, variants } = await sample();
-    const result = await storeListingImageDelivery({ imageId: 'recovery', original, variants });
-    assert.equal(writes.length, 3);
-    assert.ok(result);
-    if (failed === 'display') {
-      assert.equal(result.displayUrl, result.originalUrl);
-      assert.match(result.thumbnailUrl, /-thumbnail\.webp$/);
-    } else {
-      assert.match(result.displayUrl, /-display\.webp$/);
-      assert.equal(result.thumbnailUrl, result.displayUrl);
-    }
+    await assert.rejects(storeListingImageDelivery({ imageId: 'recovery', original, variants }), /could not be stored completely/);
+    assert.equal(writes.length, 5, 'only the failed variant is retried twice');
+    assert.equal(deletes.length, 2);
+    assert.ok(deletes.every(url => !url.includes(`-${failed}.webp`)));
   });
 }
 
-test('chat keeps uploading after an original fails, and saves images despite display failure', async t => {
+test('chat continues with later complete images after an original exhausts retries', async t => {
   storageEnvironment(t);
-  let originals = 0;
+  let firstOriginalPath: string | undefined;
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
     const path = new URL(String(input)).pathname;
-    if (path.endsWith('.jpg') && ++originals === 1) return new Response(null, { status: 503 });
-    return new Response(null, { status: path.endsWith('-display.webp') ? 503 : 200 });
+    if (path.endsWith('.jpg')) firstOriginalPath ??= path;
+    return new Response(null, { status: path === firstOriginalPath ? 503 : 200 });
   });
   const listing = createListingDraft({ sellerId: 'recovery-chat', category: 'other', title: 'Desk' });
   const { input } = await sample();
   const result = await saveUploadedListingImagesForSeller({ listingId: listing.id, sellerId: listing.sellerId, images: [input, input, input] });
   assert.equal(result?.images.length, 2);
   assert.ok(result?.images.every(image => image.thumbnailUrl.endsWith('-thumbnail.webp')));
+});
+
+test('transient variant failure recovers without storing original-sized aliases', async t => {
+  storageEnvironment(t);
+  let displayAttempts = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const display = new URL(String(input)).pathname.endsWith('-display.webp');
+    return new Response(null, { status: display && ++displayAttempts === 1 ? 503 : 200 });
+  });
+  const { original, variants } = await sample();
+  const result = await storeListingImageDelivery({ imageId: 'transient-variant', original, variants });
+  assert.equal(displayAttempts, 2);
+  assert.match(result!.displayUrl, /-display\.webp$/);
+  assert.match(result!.thumbnailUrl, /-thumbnail\.webp$/);
+  assert.notEqual(result!.originalUrl, result!.displayUrl);
+});
+
+test('failed shared chat delivery does not delete objects a concurrent retry may attach', async t => {
+  storageEnvironment(t);
+  let deletes = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (init?.method === 'DELETE') deletes++;
+    return new Response(null, { status: String(input).includes('-display.webp') ? 503 : 200 });
+  });
+  const listing = createListingDraft({ sellerId: 'shared-draft-recovery', category: 'other', title: 'Desk' });
+  const { input } = await sample();
+  await assert.rejects(saveUploadedListingImagesForSeller({ listingId: listing.id, sellerId: listing.sellerId, images: [input], draftOnly: true }));
+  assert.equal(getListing(listing.id)?.images.length, 0);
+  assert.equal(deletes, 0);
+});
+
+test('incomplete upload is not attached and the same idempotency key can retry successfully', async t => {
+  storageEnvironment(t);
+  mockImageContentReview(t, 'allow');
+  const providerFetch = globalThis.fetch;
+  let fail = true;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (!new URL(String(input)).hostname.endsWith('r2.cloudflarestorage.com')) return providerFetch(input, init);
+    return new Response(null, { status: init?.method === 'PUT' && fail && String(input).includes('-display.webp') ? 503 : 200 });
+  });
+  const listing = createListingDraft({ sellerId: 'incomplete-upload-owner', category: 'other', title: 'Desk' });
+  const cookie = createSessionCookie({ id: listing.sellerId, email: 'incomplete@example.test' });
+  const { input } = await sample();
+  const upload = () => {
+    const body = new FormData();
+    body.set('image', new File([input.data as Uint8Array<ArrayBuffer>], 'desk.png', { type: input.mediaType }));
+    return POST(new Request('https://smartstore.test/upload', {
+      method: 'POST', headers: { cookie, 'Idempotency-Key': 'recover-incomplete-delivery' }, body,
+    }), { params: Promise.resolve({ listingId: listing.id }) });
+  };
+  assert.equal((await upload()).status, 503);
+  assert.equal(getListing(listing.id)?.images.length, 0);
+  fail = false;
+  assert.equal((await upload()).status, 201);
+  assert.equal(getListing(listing.id)?.images.length, 1);
+  assert.match(getListing(listing.id)!.images[0].displayUrl, /-display\.webp$/);
 });
 
 test('missing or invalid public image URL fails before writing an object', async t => {
