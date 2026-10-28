@@ -11,6 +11,7 @@ export const guestContracts: Record<string, string> = {
   'POST /api/internal/image-uploads/[uploadId]/claim': 'Image Worker server credential; never accepts a customer session as authorization',
   'POST /api/internal/image-uploads/[uploadId]/complete': 'Image Worker server credential and bound processing lease',
   'POST /api/internal/image-uploads/cleanup': 'Image Worker server credential for bounded upload lifecycle cleanup',
+  'POST /api/internal/notifications/drain': 'Server Worker credential for bounded notification delivery; customer sessions never authorize this route',
   'GET /api/auth/session': 'Anonymous session discovery',
   'POST /api/auth/logout': 'Idempotent logout',
   'POST /api/auth/commission-agreement': 'Agreement before authentication',
