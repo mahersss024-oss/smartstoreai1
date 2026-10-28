@@ -44,6 +44,10 @@ run:
       value: "1"
     - name: SMARTSTORE_EVIDENCE_STORAGE_BUCKET
       value: souqhamad-evidence
+    - name: SMARTSTORE_DIRECT_IMAGE_UPLOADS
+      value: "false"
+    - name: SMARTSTORE_IMAGE_INTAKE_BUCKET
+      value: souqhamad-image-intake
   secrets:
     - name: DATABASE_URL
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/DATABASE_URL-fIsmZe:DATABASE_URL::"
@@ -95,6 +99,8 @@ run:
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_REGION::"
     - name: SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL::"
+    - name: SMARTSTORE_IMAGE_WORKER_SECRET
+      value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_IMAGE_WORKER_SECRET::"
 
     - name: SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME
       value-from: "arn:aws:secretsmanager:eu-central-1:102913100808:secret:smartstore/app-RLQXFC:SMARTSTORE_COMMISSION_ALRAJHI_ACCOUNT_NAME::"
