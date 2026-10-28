@@ -8,6 +8,8 @@ import {
   createSessionCookie,
   getOauthState,
   isOauthStateValid,
+  parseOauthState,
+  sanitizeAuthReturnTo,
   type AuthSessionUser,
 } from '@/lib/auth/session';
 import { persistGoogleUserRegistration } from '@/lib/auth/google';
@@ -34,8 +36,10 @@ type GoogleUserInfo = {
   picture?: string;
 };
 
-function redirectToHome(request: Request, cookie?: string) {
-  const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
+function redirectAfterGoogleAuth(request: Request, cookie?: string, returnTo = '/') {
+  const response = NextResponse.redirect(
+    new URL(sanitizeAuthReturnTo(returnTo), getAppBaseUrl(request)),
+  );
 
   if (cookie) {
     response.headers.append('Set-Cookie', cookie);
@@ -57,6 +61,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const mobileState = parseMobileAuthState(state);
+  const browserReturnTo = parseOauthState(state)?.returnTo ?? '/';
   const isMobileStateAttempt = state?.startsWith('mobile:') ?? false;
   const storedState = getOauthState(request);
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -70,7 +75,7 @@ export async function GET(request: Request) {
     }
 
     console.warn('[google_auth] invalid_state');
-    return redirectToHome(request);
+    return redirectAfterGoogleAuth(request);
   }
 
   const rateLimitResponse = await enforceApiRateLimit(request, {
@@ -113,7 +118,7 @@ export async function GET(request: Request) {
       return redirectToMobileAuthError('google_token_exchange_failed');
     }
 
-    return redirectToHome(request);
+    return redirectAfterGoogleAuth(request);
   }
 
   const tokenJson = (await tokenResponse.json().catch(() => null)) as
@@ -140,7 +145,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return redirectToHome(request);
+    return redirectAfterGoogleAuth(request);
   }
 
   let userInfoResponse: Response;
@@ -229,5 +234,5 @@ export async function GET(request: Request) {
   }
 
   const sessionCookie = createSessionCookie(registeredUser);
-  return redirectToHome(request, sessionCookie);
+  return redirectAfterGoogleAuth(request, sessionCookie, browserReturnTo);
 }

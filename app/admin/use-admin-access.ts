@@ -26,7 +26,7 @@ function hasRequiredRole(role: string | undefined, requiredRole: AdminAccessRole
   }
 
   // requiredRole === 'owner'
-  return role === 'owner' || role === 'admin';
+  return role === 'owner';
 }
 
 export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
@@ -53,9 +53,14 @@ export function useAdminAccess(requiredRole: AdminAccessRole = 'admin') {
         if (!signInRedirects.has(document)) {
           signInRedirects.add(document);
           try {
-            window.location.assign(
-              new URL('/api/auth/google/start', window.location.origin),
+            const target = new URL('/api/auth/google/start', window.location.origin);
+            target.searchParams.set(
+              'return_to',
+              window.location.pathname === '/admin/maintenance'
+                ? '/admin/maintenance'
+                : '/admin',
             );
+            window.location.assign(target);
           } catch (error) {
             signInRedirects.delete(document);
             throw error;

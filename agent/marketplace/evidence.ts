@@ -3,7 +3,7 @@ import { after } from 'next/server';
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db/prisma';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { hasVerifiedAdminAccess, isPlatformOwner } from '@/lib/auth/authorization';
 import type { AuthSession } from '@/lib/auth/session';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { createAdminAuditLog } from '@/lib/admin/audit';
@@ -152,6 +152,7 @@ export async function actOnCaseEvidence(sourceType: EvidenceSource, sourceId: st
   if (!payload || typeof payload !== 'object' || !('action' in payload) || typeof payload.action !== 'string' || !evidenceActions.has(payload.action)) return null;
   if (!evidenceEnabled()) return Response.json({ error: 'database_evidence_required' }, { status: 503 });
   const action = payload.action;
+  if (action === 'evidence_dispose' && !isPlatformOwner(session)) return Response.json({ error: 'owner_required' }, { status: 403, headers: noStoreHeaders });
   if (action !== 'evidence_retry' && !(await hasVerifiedAdminAccess(session))) return Response.json({ error: 'owner_required' }, { status: 403 });
   const reason = 'reason' in payload && typeof payload.reason === 'string' ? payload.reason.trim().slice(0, 500) : '';
   const days = 'days' in payload ? Number(payload.days) : 0;

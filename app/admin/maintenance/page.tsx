@@ -11,6 +11,7 @@ import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
+import { DatabaseExplorer } from '@/components/admin/database-explorer';
 
 type MaintenanceCounts = {
   deletedListings: number;
@@ -19,13 +20,28 @@ type MaintenanceCounts = {
   closedUserReports: number;
   searchStates: number;
   idempotencyKeys: number;
+  modelReviews: number;
 };
 
 type CleanupScope =
   | 'closed_reports'
   | 'closed_user_reports'
   | 'search_state'
-  | 'purge_deleted_listings';
+  | 'purge_deleted_listings'
+  | 'old_model_reviews';
+
+type CleanupPreview = {
+  scope: CleanupScope;
+  label: string;
+  total: number;
+  eligible: number;
+  protected: number;
+  reasonCounts: Record<string, number>;
+  batchCount: number;
+  affectedIds: Array<{ id: string; kind: string }>;
+  previewToken: string;
+  expiresAt: string;
+};
 
 type SiteMessageDraft = {
   message: string;
@@ -58,7 +74,12 @@ const cleanupScopes: Array<{
     value: 'purge_deleted_listings',
     label: 'حذف نهائي للإعلانات المحذوفة من العملاء',
     description:
-      'يحذف نهائيًا الإعلانات التي حالتها محذوفة فقط، مع صورها من التخزين وما يرتبط بها. لا يمس الإعلانات الحية.',
+      'يحذف الإعلانات المحذوفة الأقدم من 30 يومًا بعد استثناء القضايا والعمولات والبلاغات والمحادثات النشطة. تُدرج صورها في طابور حذف قابل لإعادة المحاولة.',
+  },
+  {
+    value: 'old_model_reviews',
+    label: 'تنظيف ملاحظات النماذج القديمة',
+    description: 'يحذف ملاحظات النماذج القديمة فقط، ولا يمس سجل إجراءات الإدارة.',
   },
 ];
 
@@ -66,33 +87,14 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ar-SA').format(value);
 }
 
-function getCleanupPreview(scope: CleanupScope, counts: MaintenanceCounts) {
-  const previews: Record<CleanupScope, Array<[string, number]>> = {
-    closed_reports: [
-      ['بلاغات الإعلانات المغلقة التي ستُحذف', counts.closedReports],
-    ],
-    closed_user_reports: [
-      ['بلاغات المحادثات المغلقة التي ستُحذف', counts.closedUserReports],
-    ],
-    search_state: [
-      ['سجلات البحث المؤقتة', counts.searchStates],
-      ['مفاتيح الطلبات القديمة', counts.idempotencyKeys],
-    ],
-    purge_deleted_listings: [
-      ['الإعلانات المحذوفة نهائيًا', counts.deletedListings],
-      ['الصور التي ستُراجع للحذف', counts.deletedListingImages],
-    ],
-  };
-
-  return previews[scope];
-}
-
 export default function AdminMaintenancePage() {
   const router = useRouter();
   const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('owner');
   const [counts, setCounts] = useState<MaintenanceCounts | null>(null);
+  const [preview, setPreview] = useState<CleanupPreview | null>(null);
   const [scope, setScope] = useState<CleanupScope>('closed_reports');
   const [confirmation, setConfirmation] = useState('');
+  const [reason, setReason] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
@@ -105,40 +107,47 @@ export default function AdminMaintenancePage() {
     () => cleanupScopes.find((option) => option.value === scope),
     [scope],
   );
-  const cleanupPreview = useMemo(
-    () => (counts ? getCleanupPreview(scope, counts) : []),
-    [counts, scope],
-  );
-
-  const loadCounts = useCallback(async () => {
+  const loadCounts = useCallback(async (selectedScope: CleanupScope) => {
     setIsLoading(true);
     setNotice('');
 
     try {
       if (!(await verifyAdminAccess())) {
         setCounts(null);
+        setPreview(null);
         return;
       }
 
-      const response = await fetch('/api/admin/maintenance', { cache: 'no-store' });
+      const response = await fetch(`/api/admin/maintenance?scope=${encodeURIComponent(selectedScope)}`, { cache: 'no-store' });
 
       if (response.status === 401) {
-        router.push('/api/auth/google/start');
+        setCounts(null);
+        setPreview(null);
+        router.push('/api/auth/google/start?return_to=%2Fadmin%2Fmaintenance');
         return;
       }
 
       if (response.status === 403) {
+        setCounts(null);
+        setPreview(null);
         setNotice('هذه الصفحة مخصصة للمالك فقط.');
         return;
       }
 
       if (!response.ok) {
+        setCounts(null);
+        setPreview(null);
         setNotice('تعذر تحميل أعداد الصيانة.');
         return;
       }
 
-      const payload = (await response.json()) as { counts: MaintenanceCounts };
+      const payload = (await response.json()) as { counts: MaintenanceCounts; scopes?: CleanupPreview[] };
       setCounts(payload.counts);
+      setPreview(payload.scopes?.[0] ?? null);
+    } catch {
+      setCounts(null);
+      setPreview(null);
+      setNotice('تعذر تحميل معاينة الصيانة.');
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +177,7 @@ export default function AdminMaintenancePage() {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
-        void loadCounts();
+        void loadCounts(scope);
         void loadSiteMessage();
       }
     });
@@ -176,7 +185,7 @@ export default function AdminMaintenancePage() {
     return () => {
       cancelled = true;
     };
-  }, [loadCounts, loadSiteMessage]);
+  }, [loadCounts, loadSiteMessage, scope]);
 
   const saveSiteMessage = useCallback(async () => {
     setIsSavingMessage(true);
@@ -214,7 +223,7 @@ export default function AdminMaintenancePage() {
       const response = await fetch('/api/admin/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope, confirmation }),
+        body: JSON.stringify({ scope, confirmation, reason, previewToken: preview?.previewToken }),
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -223,19 +232,18 @@ export default function AdminMaintenancePage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          router.push('/api/auth/google/start');
+          router.push('/api/auth/google/start?return_to=%2Fadmin%2Fmaintenance');
           return;
         }
 
-        if (payload?.error === 'maintenance_cleanup_disabled') {
-          setNotice(
-            'التنظيف معطل دائمًا في بيئة الإنتاج لحماية استقرار الخادم.',
-          );
+        if (payload?.error === 'preview_stale' || payload?.error === 'preview_invalid') {
+          setNotice('تغيّرت البيانات بعد المعاينة. حدّث المعاينة قبل التنفيذ.');
+          await loadCounts(scope);
           return;
         }
 
-        if (payload?.error === 'confirmation_required') {
-          setNotice('كلمة التأكيد غير صحيحة. اكتب بالضبط: تنظيف');
+        if (payload?.error === 'invalid_cleanup_request') {
+          setNotice('أدخل سببًا من 5 أحرف على الأقل، وتأكد من اختيار المعاينة الحالية.');
           return;
         }
 
@@ -256,15 +264,15 @@ export default function AdminMaintenancePage() {
         return;
       }
 
-      if (payload?.counts) {
-        setCounts(payload.counts);
-      }
       setConfirmation('');
-      setNotice('تم تنفيذ عملية التنظيف.');
+      setReason('');
+      const deletedTotal = Object.values((payload as { deleted?: Record<string, number> }).deleted ?? {}).reduce((sum, value) => sum + value, 0);
+      await loadCounts(scope);
+      setNotice(`تم تنفيذ التنظيف. العناصر المتأثرة: ${formatNumber(deletedTotal)}.`);
     } finally {
       setIsRunning(false);
     }
-  }, [confirmation, scope, router]);
+  }, [confirmation, loadCounts, preview?.previewToken, reason, scope, router]);
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -321,12 +329,14 @@ export default function AdminMaintenancePage() {
           </Button>
         </section>
 
+        <DatabaseExplorer />
+
         <section className="admin-section admin-danger-zone grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold">تنفيذ تنظيف</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                اختر العملية، ثم راجع أثرها واكتب كلمة التأكيد: تنظيف
+                المعاينة تعرض أول دفعة محددة. السجلات المحمية مستثناة. اكتب السبب وكلمة التأكيد قبل التنفيذ.
               </p>
             </div>
             <Button
@@ -334,7 +344,7 @@ export default function AdminMaintenancePage() {
               size="sm"
               className="rounded-md"
               disabled={isLoading}
-              onClick={() => void loadCounts()}
+              onClick={() => void loadCounts(scope)}
             >
               <RefreshCw className="size-4" />
               تحديث المعاينة
@@ -345,7 +355,13 @@ export default function AdminMaintenancePage() {
             className="h-10 rounded-md border bg-background px-3 text-sm"
             name="cleanupScope"
             value={scope}
-            onChange={(event) => setScope(event.target.value as CleanupScope)}
+            onChange={(event) => {
+              const nextScope = event.target.value as CleanupScope;
+              setScope(nextScope);
+              setConfirmation('');
+              setPreview(null);
+              void loadCounts(nextScope);
+            }}
           >
             {cleanupScopes.map((option) => (
               <option key={option.value} value={option.value}>
@@ -358,17 +374,30 @@ export default function AdminMaintenancePage() {
             <p className="text-muted-foreground">{selectedScope?.description}</p>
             {isLoading ? (
               <p className="text-xs text-muted-foreground">جار حساب أثر العملية...</p>
-            ) : counts ? (
+            ) : counts && preview ? (
               <div className="grid gap-1.5 border-r-2 border-red-500/40 pr-3">
-                {cleanupPreview.map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3">
-                    <span>{label}</span>
-                    <strong>{formatNumber(value)}</strong>
-                  </div>
-                ))}
+                <p>الإجمالي: <strong>{formatNumber(preview.total)}</strong></p>
+                <p>المؤهل للحذف: <strong>{formatNumber(preview.eligible)}</strong></p>
+                <p>المحمي أو الحديث: <strong>{formatNumber(preview.protected)}</strong></p>
+                <p>عدد العناصر في هذه الدفعة: <strong>{formatNumber(preview.batchCount)}</strong> من أصل حد 50.</p>
+                <p className="text-xs text-muted-foreground">تنتهي المعاينة: {new Date(preview.expiresAt).toLocaleString('ar-SA')}</p>
+                {Object.entries(preview.reasonCounts).length > 0 && (
+                  <p className="text-xs text-muted-foreground">أسباب الاستثناء: {Object.entries(preview.reasonCounts).map(([key, value]) => `${key}: ${formatNumber(value)}`).join('، ')}</p>
+                )}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold">عرض العناصر المحددة لهذه الدفعة ({formatNumber(preview.affectedIds.length)})</summary>
+                  <ul className="mt-2 max-h-44 overflow-auto rounded-md border p-2 text-xs" dir="ltr">
+                    {preview.affectedIds.map((item) => <li key={`${item.kind}:${item.id}`}>{item.kind}: {item.id}</li>)}
+                  </ul>
+                </details>
               </div>
             ) : null}
           </div>
+
+          <label className="grid gap-1 text-sm">
+            سبب التنظيف (يسجل في سجل الإدارة)
+            <Input value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={500} placeholder="اكتب سببًا واضحًا" />
+          </label>
 
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input
@@ -379,7 +408,7 @@ export default function AdminMaintenancePage() {
             />
             <Button
               className="rounded-md bg-red-600 hover:bg-red-700"
-              disabled={isRunning || confirmation.trim() !== 'تنظيف'}
+              disabled={isRunning || isLoading || confirmation !== 'تنظيف' || reason.trim().length < 5 || !preview?.previewToken || preview.batchCount === 0}
               onClick={() => void runCleanup()}
             >
               <Trash2 className="size-4" />

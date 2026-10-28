@@ -4,6 +4,7 @@ import {
   createOauthState,
   createOauthStateCookie,
   hasCommissionAgreement,
+  sanitizeAuthReturnTo,
 } from '@/lib/auth/session';
 import {
   createMobileAuthState,
@@ -15,6 +16,7 @@ import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const mobileFallback = url.searchParams.get('native_fallback') === '1';
+  const returnTo = sanitizeAuthReturnTo(url.searchParams.get('return_to'));
 
   const rateLimitResponse = await enforceApiRateLimit(request, {
     namespace: 'auth_google_start',
@@ -27,10 +29,9 @@ export async function GET(request: Request) {
   }
 
   if (!hasCommissionAgreement(request)) {
-    const agreementUrl = new URL(
-      '/commission-agreement?provider=google',
-      getAppBaseUrl(request),
-    );
+    const agreementUrl = new URL('/commission-agreement', getAppBaseUrl(request));
+    agreementUrl.searchParams.set('provider', 'google');
+    if (returnTo !== '/') agreementUrl.searchParams.set('return_to', returnTo);
     if (mobileFallback) {
       agreementUrl.searchParams.set('native_fallback', '1');
     }
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
   }
 
   const isMobileAuth = isMobileAppRequest(request) || mobileFallback;
-  const oauthState = isMobileAuth ? createMobileAuthState() : createOauthState();
+  const oauthState = isMobileAuth ? createMobileAuthState() : createOauthState(returnTo);
   const callbackUrl = new URL('/api/auth/google/callback', getAppBaseUrl(request));
   const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 

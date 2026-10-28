@@ -46,7 +46,7 @@ const sections = [
   { href: '/admin/users', label: 'العملاء', icon: Users },
   { href: '/admin/commissions', label: 'العمولات', icon: Percent },
   { href: '/admin/audit-log', label: 'سجل الإدارة', icon: ClipboardList },
-  { href: '/admin/maintenance', label: 'الصيانة', icon: Wrench },
+  { href: '/admin/maintenance', label: 'الصيانة', icon: Wrench, ownerOnly: true },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -163,7 +163,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </div>
             <nav className="grid gap-1 p-3" aria-label="أقسام الإدارة">
               {sections
-                .filter((section) => section.staff || canManage)
+                .filter((section) => ('ownerOnly' in section && section.ownerOnly)
+                  ? adminAccessRole === 'owner'
+                  : section.staff || canManage)
                 .map(({ href, label, icon: Icon }) => (
                   <Link
                     key={href}
@@ -264,7 +266,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <CommandList>
                   <CommandEmpty>لا توجد أقسام مطابقة.</CommandEmpty>
                   {sections
-                    .filter((section) => section.staff || canManage)
+                    .filter((section) => ('ownerOnly' in section && section.ownerOnly)
+                      ? adminAccessRole === 'owner'
+                      : section.staff || canManage)
                     .map(({ href, label, icon: Icon }) => (
                       <CommandItem
                         key={href}

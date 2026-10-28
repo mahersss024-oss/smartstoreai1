@@ -1,273 +1,88 @@
-import type { Prisma } from '@prisma/client';
+﻿import { z } from 'zod';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
-import { z } from 'zod';
-
-import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
-import { getAuthSession, type AuthSession } from '@/lib/auth/session';
-import { prisma } from '@/lib/db/prisma';
+import { noStoreHeaders } from '@/lib/api/no-store';
+import { isPlatformOwner } from '@/lib/auth/authorization';
+import { getAuthSession } from '@/lib/auth/session';
+import { executeMaintenanceCleanup, getMaintenancePreview, MaintenanceError, maintenanceScopes } from '@/lib/admin/maintenance';
+import { getDatabaseCompatibility, getDatabaseOverview, getDatabaseTablePage } from '@/lib/admin/database-inspection';
+import { schedulePendingImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 
-const maxMaintenanceCleanupRequestBytes = 4 * 1024;
-const searchStateCleanupMaxAgeMs = 24 * 60 * 60 * 1000;
-
-const cleanupSchema = z.object({
-  scope: z.enum([
-    'closed_reports',
-    'closed_user_reports',
-    'search_state',
-    'purge_deleted_listings',
-  ]),
-  confirmation: z.string(),
-});
-
-type StoredListingImage = {
-  id: string;
-  originalUrl: string;
-  displayUrl: string;
-  thumbnailUrl: string;
-};
-
-async function deleteStoredListingImagesBestEffort(images: StoredListingImage[]) {
-  await Promise.all(
-    images.map(async (image) => {
-      try {
-        await deleteListingObject({
-          imageId: image.id,
-          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
-        });
-      } catch (error) {
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        console.warn(`[admin_maintenance_listing_storage_delete] failure=${errorName}`);
-      }
-    }),
-  );
-}
-
-async function getMaintenanceCounts() {
-  const [
-    deletedListings,
-    deletedListingImages,
-    closedReports,
-    closedUserReports,
-    searchStates,
-    idempotencyKeys,
-  ] = await Promise.all([
-    prisma.listing.count({ where: { status: 'deleted' } }),
-    prisma.listingImage.count({
-      where: { listing: { status: 'deleted' } },
-    }),
-    prisma.report.count({ where: { status: { in: ['reviewed', 'dismissed'] } } }),
-    prisma.userReport.count({ where: { status: { in: ['reviewed', 'dismissed'] } } }),
-    prisma.marketplaceSearchState.count(),
-    prisma.apiIdempotencyKey.count(),
-  ]);
-
-  return {
-    deletedListings,
-    deletedListingImages,
-    closedReports,
-    closedUserReports,
-    searchStates,
-    idempotencyKeys,
-  };
-}
-
-async function runCleanup(
-  scope: z.infer<typeof cleanupSchema>['scope'],
-  database: Prisma.TransactionClient,
-) {
-  if (scope === 'closed_reports') {
-    const result = await database.report.deleteMany({
-      where: { status: { in: ['reviewed', 'dismissed'] } },
-    });
-    return { deleted: { closedReports: result.count }, images: [] };
-  }
-
-  if (scope === 'closed_user_reports') {
-    const result = await database.userReport.deleteMany({
-      where: { status: { in: ['reviewed', 'dismissed'] } },
-    });
-    return { deleted: { closedUserReports: result.count }, images: [] };
-  }
-
-  if (scope === 'search_state') {
-    const searchStates = await database.marketplaceSearchState.deleteMany({
-      where: {
-        updatedAt: {
-          lt: new Date(Date.now() - searchStateCleanupMaxAgeMs),
-        },
-      },
-    });
-
-    return {
-      deleted: {
-        searchStates: searchStates.count,
-        idempotencyKeys: 0,
-      },
-      images: [],
-    };
-  }
-
-  if (scope === 'purge_deleted_listings') {
-    const deletedListings = await database.listing.findMany({
-      where: { status: 'deleted' },
-      select: {
-        images: {
-          select: {
-            id: true,
-            originalUrl: true,
-            displayUrl: true,
-            thumbnailUrl: true,
-          },
-        },
-      },
-    });
-    const result = await database.listing.deleteMany({
-      where: { status: 'deleted' },
-    });
-
-    return {
-      deleted: { listings: result.count },
-      images: deletedListings.flatMap((listing) => listing.images),
-    };
-  }
-
-  throw new Error('unsupported_cleanup_scope');
-}
-
-async function requireAdmin(request: Request): Promise<{ response: Response } | { session: AuthSession }> {
+export const dynamic = 'force-dynamic';
+const cleanupSchema = z.object({ scope: z.enum(maintenanceScopes), confirmation: z.literal('تنظيف'), reason: z.string().trim().min(5).max(500), previewToken: z.string().min(1).max(2000) }).strict();
+type OwnerAccess = { session: NonNullable<ReturnType<typeof getAuthSession>> } | { response: Response };
+function access(request: Request): OwnerAccess {
   const session = getAuthSession(request);
-
-  if (!session) {
-    return { response: Response.json({ error: 'auth_required' }, { status: 401 }) };
-  }
-
-  if (!(await hasVerifiedAdminAccess(session))) {
-    return {
-      response: Response.json({ error: 'owner_required' }, { status: 403 }),
-    };
-  }
-
+  if (!session) return { response: Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders }) };
+  if (!isPlatformOwner(session)) return { response: Response.json({ error: 'owner_required' }, { status: 403, headers: noStoreHeaders }) };
+  if (process.env.SMARTSTORE_MARKETPLACE_STORE !== 'database') return { response: Response.json({ error: 'database_required' }, { status: 503, headers: noStoreHeaders }) };
   return { session };
 }
-
-function isDestructiveMaintenanceEnabled() {
-  return process.env.NODE_ENV !== 'production';
+function failed(error: unknown) {
+  if (error instanceof MaintenanceError) return Response.json({ error: error.code }, { status: error.status, headers: noStoreHeaders });
+  const code = typeof error === 'object' && error && 'code' in error ? error.code : '';
+  if (code === 'P2034' || code === 'P2028' || code === 'P2010') return Response.json({ error: 'preview_stale' }, { status: 409, headers: noStoreHeaders });
+  console.warn('[admin_maintenance] operation_failed');
+  return Response.json({ error: 'maintenance_unavailable' }, { status: 503, headers: noStoreHeaders });
 }
-
+function noStoreResponse(response: Response) {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(noStoreHeaders)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 export async function GET(request: Request) {
-  const admin = await requireAdmin(request);
-
-  if ('response' in admin) {
-    return admin.response;
-  }
-
-  return Response.json({ counts: await getMaintenanceCounts() });
-}
-
-export async function POST(request: Request) {
-  return withEvidenceProtection(cleanupMaintenance)(request);
-}
-
-async function cleanupMaintenance(request: Request) {
-  const admin = await requireAdmin(request);
-
-  if ('response' in admin) {
-    return admin.response;
-  }
-
-  const rateLimitResponse = await enforceApiRateLimit(request, {
-    namespace: 'admin_maintenance_cleanup',
-    actorId: admin.session.user.id,
-    maxRequests: 12,
+  const owner = access(request); if ('response' in owner) return owner.response;
+  const url = new URL(request.url);
+  const databaseRequest = url.searchParams.get('resource') === 'database';
+  const limited = await enforceApiRateLimit(request, {
+    namespace: databaseRequest ? 'owner_database_inspection' : 'owner_maintenance_preview',
+    actorId: owner.session.user.id,
+    maxRequests: databaseRequest ? 60 : 12,
     windowMs: 60_000,
   });
-
-  if (rateLimitResponse) {
-    return rateLimitResponse;
+  if (limited) return noStoreResponse(limited);
+  if (databaseRequest) {
+    try {
+      const model = url.searchParams.get('model');
+      const result = model
+        ? await getDatabaseTablePage(
+            model,
+            Math.max(1, Math.min(100_000, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1)),
+            Math.max(1, Math.min(100, Number.parseInt(url.searchParams.get('pageSize') ?? '25', 10) || 25)),
+            (url.searchParams.get('search') ?? '').trim().slice(0, 120),
+          )
+        : url.searchParams.get('view') === 'compatibility'
+          ? await getDatabaseCompatibility()
+          : await getDatabaseOverview();
+      if (!result) return Response.json({ error: 'model_not_found' }, { status: 404, headers: noStoreHeaders });
+      return Response.json(result, { headers: noStoreHeaders });
+    } catch {
+      console.warn('[owner_database_inspection] read_failed');
+      return Response.json({ error: 'database_inspection_unavailable' }, { status: 503, headers: noStoreHeaders });
+    }
   }
-
-  if (!isDestructiveMaintenanceEnabled()) {
-    return Response.json(
-      {
-        error: 'maintenance_cleanup_disabled',
-        message:
-          'Destructive maintenance cleanup is permanently disabled in production.',
-      },
-      { status: 403 },
-    );
-  }
-
-  const oversizedRequestResponse = rejectOversizedRequest(
-    request,
-    maxMaintenanceCleanupRequestBytes,
-  );
-
-  if (oversizedRequestResponse) {
-    return oversizedRequestResponse;
-  }
-
-  let payload: unknown;
-
+  const value = url.searchParams.get('scope');
+  const scope = value ? z.enum(maintenanceScopes).safeParse(value) : null;
+  if (scope && !scope.success) return Response.json({ error: 'invalid_scope' }, { status: 400, headers: noStoreHeaders });
+  try { return Response.json(await getMaintenancePreview(owner.session.user.id, scope?.success ? scope.data : undefined), { headers: noStoreHeaders }); } catch (error) { return failed(error); }
+}
+export async function POST(request: Request) { return withEvidenceProtection(cleanup)(request); }
+async function cleanup(request: Request): Promise<Response> {
+  const owner = access(request); if ('response' in owner) return owner.response;
+  const limited = await enforceApiRateLimit(request, { namespace: 'owner_maintenance_cleanup', actorId: owner.session.user.id, maxRequests: 6, windowMs: 60_000 });
+  if (limited) return noStoreResponse(limited);
+  const oversized = rejectOversizedRequest(request, 4096); if (oversized) return oversized;
+  const parsed = cleanupSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: 'invalid_cleanup_request' }, { status: 400, headers: noStoreHeaders });
   try {
-    payload = await request.json();
-  } catch {
-    return Response.json({ error: 'invalid_json' }, { status: 400 });
+    const result = await executeMaintenanceCleanup({ ...parsed.data, actorId: owner.session.user.id });
+    schedulePendingImageObjectCleanup();
+    try { publishRealtimeEvent({ type: 'maintenance_cleanup', payload: { scope: parsed.data.scope }, visibility: { includePublic: true, includeAdmins: true } }); } catch { /* Cleanup is already committed. */ }
+    return Response.json({ status: 'completed', ...result }, { headers: noStoreHeaders });
+  } catch (error) {
+    if (error instanceof Error && /evidence_protected|evidence_copy_pending/.test(error.message)) throw error;
+    return failed(error);
   }
-
-  const parsed = cleanupSchema.safeParse(payload);
-
-  if (!parsed.success) {
-    return Response.json(
-      { error: 'invalid_request', details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
-
-  if (parsed.data.confirmation.trim() !== 'تنظيف') {
-    return Response.json({ error: 'confirmation_required' }, { status: 400 });
-  }
-
-  const cleanup = await prisma.$transaction(async (tx) => {
-    const result = await runCleanup(parsed.data.scope, tx);
-    await tx.adminAuditLog.create({
-      data: {
-        adminId: admin.session.user.id,
-        action: 'maintenance_cleanup',
-        targetType: 'maintenance',
-        targetId: parsed.data.scope,
-        metadata: {
-          operation: 'admin_cleanup',
-          deleted: result.deleted,
-        },
-      },
-    });
-    return result;
-  });
-
-  await deleteStoredListingImagesBestEffort(cleanup.images);
-
-  try {
-    publishRealtimeEvent({
-      type: 'maintenance_cleanup',
-      payload: {
-        scope: parsed.data.scope,
-      },
-      visibility: {
-        includePublic: true,
-        includeAdmins: true,
-      },
-    });
-  } catch {
-    // Cleanup completion should not fail due to realtime publish.
-  }
-
-  return Response.json({
-    status: 'completed',
-    deleted: cleanup.deleted,
-    counts: await getMaintenanceCounts(),
-  });
 }

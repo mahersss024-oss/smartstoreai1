@@ -42,10 +42,13 @@ export default function CommissionAgreementPage() {
           : 'google';
       const nativeFallback =
         new URLSearchParams(window.location.search).get('native_fallback') === '1';
-
-      router.push(
-        `/api/auth/${provider}/start${nativeFallback ? '?native_fallback=1' : ''}`,
-      );
+      const returnTo = new URLSearchParams(window.location.search).get('return_to');
+      const params = new URLSearchParams();
+      if (nativeFallback) params.set('native_fallback', '1');
+      if (provider === 'google' && returnTo?.startsWith('/') && !returnTo.startsWith('//')) {
+        params.set('return_to', returnTo);
+      }
+      router.push(`/api/auth/${provider}/start${params.size ? `?${params}` : ''}`);
     } finally {
       setIsLoading(false);
     }

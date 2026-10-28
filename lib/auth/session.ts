@@ -291,12 +291,31 @@ export function isModeratorSession(session: AuthSession | null) {
   );
 }
 
-export function createOauthState() {
+export function sanitizeAuthReturnTo(value: string | null | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return '/';
+  }
+
+  try {
+    const url = new URL(value, 'https://souqhamad.invalid');
+    if (url.origin !== 'https://souqhamad.invalid' || url.pathname.startsWith('/api/auth/')) {
+      return '/';
+    }
+    return url.pathname === '/admin/maintenance' || url.pathname === '/admin'
+      ? url.pathname
+      : '/';
+  } catch {
+    return '/';
+  }
+}
+
+export function createOauthState(returnTo?: string) {
   const now = Math.floor(Date.now() / 1000);
   const state = {
     nonce: randomBytes(24).toString('base64url'),
     issuedAt: now,
     expiresAt: now + oauthStateMaxAgeSeconds,
+    returnTo: sanitizeAuthReturnTo(returnTo),
   };
   const payload = base64UrlEncode(JSON.stringify(state));
   const signature = signPayload(`oauth-state:${payload}`);
@@ -323,6 +342,7 @@ export function parseOauthState(value: string | null | undefined) {
     const parsed = JSON.parse(base64UrlDecode(payload)) as Partial<{
       nonce: string;
       expiresAt: number;
+      returnTo: string;
     }>;
 
     if (
@@ -333,7 +353,7 @@ export function parseOauthState(value: string | null | undefined) {
       return null;
     }
 
-    return parsed;
+    return { ...parsed, returnTo: sanitizeAuthReturnTo(parsed.returnTo) };
   } catch {
     return null;
   }

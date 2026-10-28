@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
+import { isPlatformOwner } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { primarySiteMessageId } from '@/lib/site-message';
@@ -17,17 +17,18 @@ const updateSchema = z.object({
   expiresAt: z.string().datetime({ offset: true }).nullable(),
 });
 
-async function requireOwner(request: Request) {
+function requireOwner(request: Request) {
   const session = getAuthSession(request);
-  if (!session) return { response: Response.json({ error: 'auth_required' }, { status: 401 }) };
-  if (!(await hasVerifiedAdminAccess(session))) {
-    return { response: Response.json({ error: 'owner_required' }, { status: 403 }) };
+  if (!session) return { response: Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders }) };
+  if (!isPlatformOwner(session)) {
+    return { response: Response.json({ error: 'owner_required' }, { status: 403, headers: noStoreHeaders }) };
   }
+  if (process.env.SMARTSTORE_MARKETPLACE_STORE !== 'database') return { response: Response.json({ error: 'database_required' }, { status: 503, headers: noStoreHeaders }) };
   return { session };
 }
 
 export async function GET(request: Request) {
-  const owner = await requireOwner(request);
+  const owner = requireOwner(request);
   if ('response' in owner) return owner.response;
 
   const siteMessage = await prisma.siteMessage.findUnique({
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const owner = await requireOwner(request);
+  const owner = requireOwner(request);
   if ('response' in owner) return owner.response;
 
   const rateLimited = await enforceApiRateLimit(request, {
