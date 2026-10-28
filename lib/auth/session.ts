@@ -343,15 +343,9 @@ export function isOauthStateValid(
   state: string | null | undefined,
   storedState: string | undefined,
 ) {
-  if (!state) {
-    return false;
-  }
-
-  if (storedState && state === storedState) {
-    return true;
-  }
-
-  return Boolean(parseOauthState(state));
+  // The signature proves the state came from this server, not that the browser
+  // presenting it initiated this login. Require both halves of the browser flow.
+  return Boolean(state && storedState && safeEqual(state, storedState) && parseOauthState(state));
 }
 
 export function createOauthStateCookie(

@@ -323,6 +323,9 @@ function analyzeImage(
 
 async function main() {
   const config = getObjectStorageConfig();
+  // Storage listing and DB pagination are not an atomic snapshot. Do not
+  // classify an image committed during this scan as missing from an older list.
+  const snapshotAt = new Date();
   const existingKeys = await listR2ListingObjectKeys(config);
   const totals = {
     scanned: 0,
@@ -340,6 +343,7 @@ async function main() {
 
   for (;;) {
     const records = await prisma.listingImage.findMany({
+      where: { createdAt: { lte: snapshotAt } },
       orderBy: { id: 'asc' },
       take: batchSize,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -370,14 +374,18 @@ async function main() {
           totals.deleted += 1;
 
           if (apply) {
-            await prisma.listingImage.delete({ where: { id: image.id } });
+            await prisma.listingImage.delete({ where: {
+              id: image.id, originalUrl: image.originalUrl,
+              displayUrl: image.displayUrl, thumbnailUrl: image.thumbnailUrl,
+            } });
           }
         } else {
           totals.repairable += 1;
 
           if (apply) {
             await prisma.listingImage.update({
-              where: { id: image.id },
+              where: { id: image.id, originalUrl: image.originalUrl,
+                displayUrl: image.displayUrl, thumbnailUrl: image.thumbnailUrl },
               data: plan.data,
             });
           }

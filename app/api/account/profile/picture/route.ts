@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { deleteListingObject } from '@/agent/marketplace/object-storage';
+import { enqueueImageObjectCleanup, processImageObjectCleanup, profileImageCleanupInput } from '@/agent/marketplace/image-object-cleanup';
 import {
   canUseProfileImageDataUrlFallback,
   createPersistentProfileImageUrl,
@@ -37,15 +37,12 @@ async function deletePreviousProfilePictureBestEffort(
   userId: string,
   picture: string | null | undefined,
 ) {
-  if (!picture) {
-    return;
-  }
+  const cleanup = profileImageCleanupInput(userId, picture);
+  if (!cleanup) return;
 
   try {
-    await deleteListingObject({
-      imageId: `profile:${userId}`,
-      urls: [picture],
-    });
+    await enqueueImageObjectCleanup(prisma, cleanup);
+    await processImageObjectCleanup(cleanup.imageId);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[profile_picture_storage_delete] failure=${errorName}`);
@@ -149,6 +146,10 @@ export async function POST(request: Request) {
   }
 
   let picture: string | null;
+  const existingUserByEmail = await prisma.user.findUnique({
+    where: { email: session.user.email },
+  });
+  const ownerId = existingUserByEmail?.id ?? session.user.id;
 
   try {
     const originalData = new Uint8Array(await file.arrayBuffer());
@@ -161,6 +162,7 @@ export async function POST(request: Request) {
       data: sanitizedProfileImage.data,
       mediaType: sanitizedProfileImage.mediaType,
       imageId: randomUUID(),
+      ownerId,
       fileName: sanitizedProfileImage.fileName,
     });
   } catch (error) {
@@ -197,7 +199,7 @@ export async function POST(request: Request) {
   }
 
   if (!(await verifyProfilePictureDelivery(picture))) {
-    await deletePreviousProfilePictureBestEffort(session.user.id, picture);
+    await deletePreviousProfilePictureBestEffort(ownerId, picture);
 
     return Response.json(
       {
@@ -208,17 +210,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const existingUserByEmail = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
-  const previousPicture = existingUserByEmail?.picture;
-  const user =
-    existingUserByEmail && existingUserByEmail.id !== session.user.id
-      ? await prisma.user.update({
+  let previousPicture: string | null | undefined;
+  let user;
+  try {
+    user = await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+      const current = await tx.user.findUnique({ where: { email: session.user.email } });
+      previousPicture = current?.picture;
+      const saved = current && current.id !== session.user.id
+      ? await tx.user.update({
           where: { email: session.user.email },
           data: { picture },
         })
-      : await prisma.user.upsert({
+      : await tx.user.upsert({
           where: { id: session.user.id },
           create: {
             id: session.user.id,
@@ -231,6 +235,14 @@ export async function POST(request: Request) {
           },
           update: { picture },
         });
+      const cleanup = profileImageCleanupInput(saved.id, previousPicture);
+      if (cleanup && previousPicture !== picture) await enqueueImageObjectCleanup(tx, cleanup);
+      return saved;
+    });
+  } catch (error) {
+    await deletePreviousProfilePictureBestEffort(ownerId, picture);
+    throw error;
+  }
 
   if (previousPicture && previousPicture !== picture) {
     await deletePreviousProfilePictureBestEffort(user.id, previousPicture);
@@ -298,10 +310,14 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const previousPicture = existingUser.picture;
-  const user = await prisma.user.update({
-    where: { id: existingUser.id },
-    data: { picture: null },
+  let previousPicture: string | null | undefined;
+  const user = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${existingUser.id} FOR UPDATE`;
+    const current = await tx.user.findUnique({ where: { id: existingUser.id } });
+    previousPicture = current?.picture;
+    const cleanup = profileImageCleanupInput(existingUser.id, previousPicture);
+    if (cleanup) await enqueueImageObjectCleanup(tx, cleanup);
+    return tx.user.update({ where: { id: existingUser.id }, data: { picture: null } });
   });
 
   await deletePreviousProfilePictureBestEffort(user.id, previousPicture);

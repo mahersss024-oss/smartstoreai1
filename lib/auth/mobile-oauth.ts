@@ -112,6 +112,11 @@ export function parseMobileAuthState(state: string | null | undefined) {
   }
 }
 
+/** Browser-based native handoffs retain their own state format and browser binding. */
+export function isMobileAuthStateValid(state: string | null | undefined, storedState: string | undefined) {
+  return Boolean(state && storedState && safeEqual(state, storedState) && parseMobileAuthState(state));
+}
+
 export function createMobileAuthTicket(user: AuthSessionUser) {
   const now = Math.floor(Date.now() / 1000);
   const ticket: MobileAuthTicket = {

@@ -12,6 +12,7 @@ import {
   getConfiguredRoleForEmail,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { isConfiguredImageObjectUrl, isOwnedProfileImageUrl } from '@/agent/marketplace/object-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,15 +152,24 @@ export async function PATCH(request: Request) {
   }
 
   const now = new Date();
+  const existingUserByEmail = await prisma.user.findUnique({
+    where: { email: session.user.email },
+  });
+  const ownerId = existingUserByEmail?.id ?? session.user.id;
+  // PATCH may keep a provider/legacy image or clear it. First-party images
+  // selected as a new reference must belong to this account's upload namespace.
+  if (typeof picture === 'string' && picture !== existingUserByEmail?.picture &&
+      isConfiguredImageObjectUrl(picture) && !isOwnedProfileImageUrl(ownerId, picture)) {
+    return NextResponse.json({ error: 'invalid_profile_picture',
+      message: 'Upload an account picture through the account picture endpoint.' },
+    { status: 400, headers: noStoreHeaders });
+  }
   const profileData = {
     phoneNumber: phoneValidation.phoneNumber,
     phoneUpdatedAt: phoneValidation.phoneNumber ? now : null,
     ...(displayName !== undefined ? { name: displayName } : {}),
     ...(picture !== undefined ? { picture } : {}),
   };
-  const existingUserByEmail = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
   const user =
     existingUserByEmail && existingUserByEmail.id !== session.user.id
       ? await prisma.user.update({

@@ -63,9 +63,7 @@ export async function GET(request: Request) {
     Location: authorizationUrl.toString(),
   });
 
-  if (!isMobileAuth) {
-    headers.set('Set-Cookie', createOauthStateCookie(oauthState));
-  }
+  headers.set('Set-Cookie', createOauthStateCookie(oauthState));
 
   return new NextResponse(null, {
     status: 302,

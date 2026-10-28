@@ -80,6 +80,31 @@ test('does not enable legacy Cloudinary image storage', async () => {
   }
 });
 
+test('durable cleanup retains an incomplete result until Cloudflare cache deletion succeeds', async () => {
+  const restore = withEnv({
+    SMARTSTORE_IMAGE_STORAGE: 's3',
+    SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'listing-images',
+    SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.example.test',
+    CLOUDFLARE_API_TOKEN: 'test-token', CLOUDFLARE_ZONE_ID: 'test-zone',
+  });
+  const originalFetch = globalThis.fetch;
+  let succeeds = false;
+  globalThis.fetch = async (input, init) => {
+    if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+    assert.equal(new URL(String(input)).hostname, 'api.cloudflare.com');
+    return Response.json({ success: succeeds }, { status: succeeds ? 200 : 400 });
+  };
+  const input = { imageId: 'durable-cleanup', urls: ['https://images.example.test/listings/2026/10/durable-cleanup.jpg'], requireCachePurge: true };
+  try {
+    assert.equal(await deleteListingObject(input), false);
+    succeeds = true;
+    assert.equal(await deleteListingObject(input), true);
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
 test('uploads listing images to S3-compatible storage with SigV4 query signing', async () => {
   const restoreEnv = withEnv({
     SMARTSTORE_IMAGE_STORAGE: 's3',

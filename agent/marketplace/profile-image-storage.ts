@@ -26,11 +26,13 @@ export async function createPersistentProfileImageUrl({
   mediaType,
   imageId,
   fileName,
+  ownerId,
 }: {
   data: Uint8Array;
   mediaType: string;
   imageId: string;
   fileName?: string;
+  ownerId?: string;
 }) {
   if (!supportedMimeTypes.has(mediaType)) {
     return null;
@@ -42,6 +44,7 @@ export async function createPersistentProfileImageUrl({
     imageId,
     fileName,
     objectPrefix: 'profiles',
+    profileOwnerId: ownerId,
     variant: 'original',
   });
 

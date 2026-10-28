@@ -9,6 +9,7 @@ import { noStoreHeaders } from '@/lib/api/no-store';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { isPushConfigured, getVapidConfig } from '@/lib/push/web-push';
+import { isAllowedWebPushEndpoint } from '@/lib/push/endpoint';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -82,6 +83,13 @@ export async function POST(request: Request) {
     return Response.json(
       { error: 'invalid_request', details: parsed.error.flatten() },
       { status: 400 },
+    );
+  }
+
+  if (!isAllowedWebPushEndpoint(parsed.data.endpoint)) {
+    return Response.json(
+      { error: 'invalid_push_endpoint' },
+      { status: 400, headers: noStoreHeaders },
     );
   }
 

@@ -93,7 +93,9 @@ test('account profile picture replacement removes the previous stored profile im
 
   assert.match(route, /previousPicture/);
   assert.match(route, /deletePreviousProfilePictureBestEffort/);
-  assert.match(route, /deleteListingObject/);
+  assert.match(route, /profileImageCleanupInput/);
+  assert.match(route, /enqueueImageObjectCleanup/);
+  assert.match(route, /processImageObjectCleanup/);
   assert.match(route, /profile_picture_storage_delete/);
 });
 

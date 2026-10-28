@@ -5,6 +5,7 @@ import { hardMaxListingImages } from '@/agent/marketplace/listing-image-limits';
 import type { ListingImage } from '@/agent/marketplace/types';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { textAnalysis } from './helpers/text-understanding';
+import { randomUUID } from 'node:crypto';
 
 function shouldRunDatabaseIntegration() {
   return (
@@ -13,6 +14,279 @@ function shouldRunDatabaseIntegration() {
       process.env.npm_lifecycle_event === 'test:db:integration')
   );
 }
+
+function isolatedImageStorage() {
+  const changes = {
+    SMARTSTORE_IMAGE_STORAGE: 's3', SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://test-only.r2.cloudflarestorage.com',
+    SMARTSTORE_OBJECT_STORAGE_BUCKET: 'isolated-fixtures', SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'fake-key',
+    SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'fake-secret', SMARTSTORE_OBJECT_STORAGE_REGION: 'auto',
+    SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://test-images.example.invalid',
+    CLOUDFLARE_API_TOKEN: 'fake-token', CLOUDFLARE_ZONE_ID: 'fake-zone',
+    SMARTSTORE_RATE_LIMIT_BACKEND: 'memory', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
+  };
+  const previous = Object.fromEntries(Object.keys(changes).map(key => [key, process.env[key]]));
+  Object.assign(process.env, changes);
+  return () => { for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  } };
+}
+
+test('database profile routes reject another account image and never delete unproven legacy objects', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const restoreStorage = isolatedImageStorage();
+  const { prisma } = await import('@/lib/db/prisma');
+  const { createSignedSession } = await import('@/lib/auth/session');
+  const profile = await import('@/app/api/account/profile/route');
+  const pictures = await import('@/app/api/account/profile/picture/route');
+  const { createPersistentProfileImageUrl } = await import('@/agent/marketplace/profile-image-storage');
+  const { isOwnedProfileImageUrl } = await import('@/agent/marketplace/object-storage');
+  const { processImageObjectCleanup } = await import('@/agent/marketplace/image-object-cleanup');
+  const suffix = randomUUID();
+  const owner = { id: `picture-owner-${suffix}`, email: `picture-owner-${suffix}@example.test` };
+  const other = { id: `picture-other-${suffix}`, email: `picture-other-${suffix}@example.test` };
+  const originalFetch = globalThis.fetch;
+  const deletions: string[] = [];
+  const purges: string[][] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'test-only.r2.cloudflarestorage.com' && init?.method === 'PUT') return new Response(null, { status: 200 });
+    if (url.hostname === 'test-only.r2.cloudflarestorage.com' && init?.method === 'DELETE') { deletions.push(url.pathname); return new Response(null, { status: 204 }); }
+    if (url.hostname === 'api.cloudflare.com') { purges.push(JSON.parse(String(init?.body)).files); return Response.json({ success: true }); }
+    throw new Error('Unexpected network refused in image ownership integration test');
+  };
+  try {
+    await prisma.user.createMany({ data: [owner, other] });
+    const image = await createPersistentProfileImageUrl({ ownerId: owner.id, imageId: randomUUID(), mediaType: 'image/jpeg', data: new Uint8Array([255,216,255,217]) });
+    assert.ok(image);
+    assert.equal(isOwnedProfileImageUrl(owner.id, image), true);
+    assert.equal(isOwnedProfileImageUrl(other.id, image), false);
+    await prisma.user.update({ where: { id: owner.id }, data: { picture: image } });
+    const token = createSignedSession(other);
+    const patched = await profile.PATCH(new Request('http://localhost/api/account/profile', { method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ picture: image, phoneNumber: '' }) }));
+    assert.equal(patched.status, 400);
+    assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: other.id } })).picture, null);
+    // References left by an older version must be safe to clear too.
+    await prisma.user.update({ where: { id: other.id }, data: { picture: image } });
+    const clear = await pictures.DELETE(new Request('http://localhost/api/account/profile/picture', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }));
+    assert.equal(clear.status, 200);
+    assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: other.id } })).picture, null);
+    assert.equal(deletions.length, 0);
+    const legacyJob = await prisma.imageObjectCleanup.findFirstOrThrow({ where: { ownerId: other.id, cleanupAt: null } });
+    assert.equal(await processImageObjectCleanup(legacyJob.imageId), true);
+    assert.equal(deletions.length, 0);
+    const ownerClear = await pictures.DELETE(new Request('http://localhost/api/account/profile/picture', { method: 'DELETE', headers: { Authorization: `Bearer ${createSignedSession(owner)}` } }));
+    assert.equal(ownerClear.status, 200);
+    assert.ok(deletions.some(value => value.endsWith(new URL(image).pathname)));
+    assert.ok(purges.some(urls => urls.includes(image)));
+  } finally {
+    globalThis.fetch = originalFetch;
+    await prisma.user.deleteMany({ where: { id: { in: [owner.id, other.id] } } });
+    await prisma.imageObjectCleanup.deleteMany({ where: { ownerId: { in: [owner.id, other.id] } } });
+    await prisma.$disconnect();
+    restoreStorage();
+  }
+});
+
+test('database image cleanup survives Cloudflare refusal, restarts and cascading listing deletion', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const restoreStorage = isolatedImageStorage();
+  const { prisma } = await import('@/lib/db/prisma');
+  const { deleteListingImageForSeller } = await import('@/agent/marketplace/repository');
+  const { processImageObjectCleanup } = await import('@/agent/marketplace/image-object-cleanup');
+  const sellerId = `cleanup-seller-${randomUUID()}`;
+  const imageId = `cleanup-image-${randomUUID()}`;
+  const cascadeId = `cleanup-image-${randomUUID()}`;
+  const originalFetch = globalThis.fetch;
+  let purgeAvailable = false;
+  let deleteCalls = 0;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'test-only.r2.cloudflarestorage.com' && init?.method === 'DELETE') { deleteCalls++; return new Response(null, { status: 204 }); }
+    if (url.hostname === 'api.cloudflare.com') return Response.json({ success: purgeAvailable });
+    throw new Error('Unexpected network refused in durable cleanup integration test');
+  };
+  try {
+    await prisma.user.create({ data: { id: sellerId, email: `${sellerId}@example.test` } });
+    const listing = await prisma.listing.create({ data: { sellerId, category: 'furniture', title: 'Cleanup fixture', compliance: {} } });
+    const url = `https://test-images.example.invalid/listings/2026/10/${imageId}.jpg`;
+    await prisma.listingImage.create({ data: { id: imageId, listingId: listing.id, originalUrl: url, displayUrl: url, thumbnailUrl: url, qualityScore: 100, status: 'approved', isPrimary: true } });
+    const removed = await deleteListingImageForSeller(listing.id, sellerId, imageId);
+    assert.ok(removed);
+    assert.equal(await prisma.listingImage.count({ where: { id: imageId } }), 0);
+    const waiting = await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } });
+    assert.equal(waiting.cleanupAt, null);
+    assert.deepEqual(waiting.urls, [url]);
+    assert.equal(waiting.leaseToken, null);
+    assert.ok(waiting.attempts > 0);
+    purgeAvailable = true;
+    await prisma.imageObjectCleanup.update({ where: { imageId }, data: { nextAttemptAt: new Date(0) } });
+    assert.equal(await processImageObjectCleanup(imageId), true);
+    const done = await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } });
+    assert.ok(done.cleanupAt);
+    assert.deepEqual(done.urls, []);
+    const before = deleteCalls;
+    assert.equal(await processImageObjectCleanup(imageId), true);
+    assert.equal(deleteCalls, before);
+    const cascadeUrl = `https://test-images.example.invalid/listings/2026/10/${cascadeId}.jpg`;
+    await prisma.listingImage.create({ data: { id: cascadeId, listingId: listing.id, originalUrl: cascadeUrl, displayUrl: cascadeUrl, thumbnailUrl: cascadeUrl, qualityScore: 100, status: 'approved' } });
+    await prisma.listing.delete({ where: { id: listing.id } });
+    const cascade = await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId: cascadeId } });
+    assert.ok(cascade.urls.includes(cascadeUrl));
+    assert.equal(await processImageObjectCleanup(cascadeId), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await prisma.listing.deleteMany({ where: { sellerId } });
+    await prisma.user.deleteMany({ where: { id: sellerId } });
+    await prisma.imageObjectCleanup.deleteMany({ where: { imageId: { in: [imageId, cascadeId] } } });
+    await prisma.$disconnect();
+    restoreStorage();
+  }
+});
+
+test('database permanent administration deletion cannot remove another user image through a legacy profile reference', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const restoreStorage = isolatedImageStorage();
+  const { prisma } = await import('@/lib/db/prisma');
+  const { createSignedSession } = await import('@/lib/auth/session');
+  const { DELETE } = await import('@/app/api/admin/users/[userId]/route');
+  const { processImageObjectCleanup } = await import('@/agent/marketplace/image-object-cleanup');
+  const suffix = randomUUID();
+  const adminId = `legacy-delete-admin-${suffix}`;
+  const userId = `legacy-delete-target-${suffix}`;
+  const victimUrl = `https://test-images.example.invalid/listings/2026/10/${randomUUID()}.jpg`;
+  const originalFetch = globalThis.fetch;
+  let networkCalls = 0;
+  globalThis.fetch = async () => { networkCalls++; throw new Error('No storage request is allowed for a foreign profile reference'); };
+  try {
+    await prisma.user.createMany({ data: [
+      { id: adminId, email: `${adminId}@example.test`, role: 'admin' },
+      { id: userId, email: `${userId}@example.test`, picture: victimUrl, deletedAt: new Date() },
+    ] });
+    const token = createSignedSession({ id: adminId, email: `${adminId}@example.test`, role: 'admin' });
+    const response = await DELETE(new Request(`http://localhost/api/admin/users/${userId}?mode=permanent`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }), { params: Promise.resolve({ userId }) });
+    assert.equal(response.status, 200);
+    assert.equal(await prisma.user.findUnique({ where: { id: userId } }), null);
+    assert.equal(networkCalls, 0);
+    const jobs = await prisma.imageObjectCleanup.findMany({ where: { ownerId: userId } });
+    assert.ok(jobs.length);
+    for (const job of jobs) assert.equal(await processImageObjectCleanup(job.imageId), true);
+    assert.equal(networkCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await prisma.adminAuditLog.deleteMany({ where: { adminId } });
+    await prisma.user.deleteMany({ where: { id: { in: [adminId, userId] } } });
+    await prisma.imageObjectCleanup.deleteMany({ where: { ownerId: userId } });
+    await prisma.$disconnect();
+    restoreStorage();
+  }
+});
+
+test('database seller amount writes cannot reverse concurrent paid or waived admin decisions', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const sellerId = `commission-lock-${crypto.randomUUID()}`;
+  const savedUpdate = prisma.commission.update;
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  try {
+    await prisma.user.create({ data: { id: sellerId, email: `${sellerId}@example.test` } });
+    const listing = await prisma.listing.create({ data: { sellerId, category: 'furniture', title: 'Synthetic sale', status: 'sold', compliance: {} } });
+    const commission = await prisma.commission.create({ data: { sellerId, listingId: listing.id, productValue: 100, commissionAmount: 1, status: 'due' } });
+    for (const decision of ['paid', 'waived'] as const) {
+      await prisma.commission.update({ where: { id: commission.id }, data: { status: 'due', productValue: 100, commissionAmount: 1, paidAt: null } });
+      const originalUpdate = prisma.commission.update.bind(prisma.commission);
+      let notifyWaiting!: () => void;
+      let releaseWrite!: () => void;
+      const waiting = new Promise<void>(resolve => { notifyWaiting = resolve; });
+      const released = new Promise<void>(resolve => { releaseWrite = resolve; });
+      prisma.commission.update = (async (args: Parameters<typeof prisma.commission.update>[0]) => {
+        if (args.data.productValue !== undefined) { notifyWaiting(); await released; }
+        return originalUpdate(args);
+      }) as unknown as typeof prisma.commission.update;
+      const pending = repository.updateCommissionSaleAmountForSeller(commission.id, sellerId, 200);
+      try {
+        await waiting;
+        assert.equal((await repository.setCommissionStatusForAdmin(commission.id, decision)).status, decision);
+      } finally { releaseWrite(); }
+      const result = await pending;
+      prisma.commission.update = savedUpdate;
+      assert.equal(result.status, 'locked');
+      const saved = await prisma.commission.findUniqueOrThrow({ where: { id: commission.id } });
+      assert.equal(saved.status, decision);
+      assert.equal(Number(saved.productValue), 100);
+      assert.equal(Number(saved.commissionAmount), 1);
+      assert.equal(saved.paidAt !== null, decision === 'paid');
+    }
+    assert.equal((await repository.updateCommissionSaleAmountForSeller(commission.id, 'another-seller', 300)).status, 'not_found');
+  } finally {
+    prisma.commission.update = savedUpdate;
+    await prisma.listing.deleteMany({ where: { sellerId } });
+    await prisma.user.deleteMany({ where: { id: sellerId } });
+    await prisma.$disconnect();
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  }
+});
+
+test('database admin marking sold creates one pending commission and preserves an existing settlement', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const { prisma } = await import('@/lib/db/prisma');
+  const { createSessionCookie } = await import('@/lib/auth/session');
+  const { PATCH } = await import('@/app/api/admin/listings/[listingId]/route');
+  const suffix = crypto.randomUUID();
+  const sellerId = `admin-sale-seller-${suffix}`;
+  const adminId = `admin-sale-moderator-${suffix}`;
+  try {
+    await prisma.user.createMany({ data: [
+      { id: sellerId, email: `${sellerId}@example.test` },
+      { id: adminId, email: `${adminId}@example.test`, role: 'moderator' },
+    ] });
+    const listing = await prisma.listing.create({ data: { sellerId, category: 'furniture', title: 'Synthetic admin sale', status: 'published', compliance: {} } });
+    const cookie = createSessionCookie({ id: adminId, email: `${adminId}@example.test`, role: 'moderator' }).split(';')[0];
+    const sell = () => PATCH(new Request('http://localhost/api/admin/listings/' + listing.id, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'sold' }) }), { params: Promise.resolve({ listingId: listing.id }) });
+    assert.equal((await sell()).status, 200);
+    const commission = await prisma.commission.findUniqueOrThrow({ where: { listingId: listing.id } });
+    assert.equal(commission.sellerId, sellerId);
+    assert.equal(commission.status, 'pending_amount');
+    assert.equal(commission.productValue, null);
+    assert.equal(commission.commissionAmount, null);
+    await prisma.commission.update({ where: { id: commission.id }, data: { status: 'paid', productValue: 500, commissionAmount: 5, paidAt: new Date() } });
+    assert.equal((await sell()).status, 200);
+    assert.equal(await prisma.commission.count({ where: { listingId: listing.id } }), 1);
+    const settled = await prisma.commission.findUniqueOrThrow({ where: { listingId: listing.id } });
+    assert.equal(settled.status, 'paid');
+    assert.equal(Number(settled.commissionAmount), 5);
+  } finally {
+    await prisma.adminAuditLog.deleteMany({ where: { adminId } });
+    await prisma.listing.deleteMany({ where: { sellerId } });
+    await prisma.user.deleteMany({ where: { id: { in: [sellerId, adminId] } } });
+    await prisma.$disconnect();
+  }
+});
+
+test('database seller cannot restore a deleted listing through pause, sale or content changes', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const { prisma } = await import('@/lib/db/prisma');
+  const repository = await import('@/agent/marketplace/repository');
+  const sellerId = `deleted-state-${randomUUID()}`;
+  try {
+    await prisma.user.create({ data: { id: sellerId, email: `${sellerId}@example.test` } });
+    const listing = await prisma.listing.create({ data: { sellerId, category: 'furniture', title: 'Terminal deletion fixture', status: 'published', compliance: { decision: 'allow' } } });
+    assert.equal((await repository.setListingStatusForSeller(listing.id, sellerId, 'deleted'))?.status, 'deleted');
+    assert.equal(await repository.setListingStatusForSeller(listing.id, sellerId, 'paused'), null);
+    assert.equal(await repository.setListingStatusForSeller(listing.id, sellerId, 'sold'), null);
+    assert.notEqual((await repository.setListingStatusForSeller(listing.id, sellerId, 'published'))?.status, 'published');
+    assert.equal(await repository.updateListingForSeller(listing.id, sellerId, { description: 'Changed after deletion' }), null);
+    assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status, 'deleted');
+    assert.equal(await prisma.commission.count({ where: { listingId: listing.id } }), 0);
+  } finally {
+    await prisma.listing.deleteMany({ where: { sellerId } });
+    await prisma.user.deleteMany({ where: { id: sellerId } });
+    await prisma.$disconnect();
+  }
+});
 
 test('database public title search normalizes Arabic, filters before pagination and never invokes models', async t => {
   if (!shouldRunDatabaseIntegration()) {

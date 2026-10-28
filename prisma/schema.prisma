@@ -280,6 +280,64 @@ model ListingImage {
   @@index([listingId, status, isPrimary])
 }
 
+enum ListingImageUploadStatus {
+  pending
+  processing
+  ready
+  failed
+  cancelled
+  expired
+}
+
+model ListingImageUpload {
+  id                 String @id
+  listingId          String
+  sellerId           String
+  idempotencyKey     String @db.VarChar(200)
+  requestFingerprint String @db.Char(64)
+  fileName           String @db.VarChar(200)
+  mediaType          String @default("image/jpeg")
+  sizeBytes          Int
+  sha256             String @db.Char(64)
+  sourceKey          String
+  originalKey        String
+  displayKey         String
+  thumbnailKey       String
+  status             ListingImageUploadStatus @default(pending)
+  errorCode          String? @db.VarChar(80)
+  attempts           Int @default(0)
+  expiresAt          DateTime
+  leaseToken         String?
+  leaseUntil         DateTime?
+  readyAt            DateTime?
+  cleanupAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([sellerId, listingId, idempotencyKey])
+  @@index([listingId, status, expiresAt])
+  @@index([status, expiresAt])
+  @@index([status, cleanupAt])
+}
+
+// Storage cleanup survives image/listing/account deletion and process restarts.
+// URLs enter only from a server-authorized image deletion, never request bodies.
+model ImageObjectCleanup {
+  id            String   @id @default(cuid())
+  imageId       String   @unique
+  ownerId       String?
+  urls          String[]
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
+  leaseToken    String?
+  leaseUntil    DateTime?
+  cleanupAt     DateTime?
+  createdAt     DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
+  updatedAt     DateTime @updatedAt
+
+  @@index([cleanupAt, nextAttemptAt])
+}
+
 model Conversation {
   id        String             @id @default(cuid())
   listingId String

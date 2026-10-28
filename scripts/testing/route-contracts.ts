@@ -4,9 +4,13 @@ import type { InventoryItem } from './inventory';
 // Any new endpoint outside the protected families must be classified explicitly.
 export const guestContracts: Record<string, string> = {
   'GET /splash': 'Public splash document',
+  'GET /.well-known/apple-app-site-association': 'Public iOS application association, configured with the actual signing team',
   'POST /api/analytics/visit': 'Anonymous visit analytics',
   'GET /api/health': 'Hosting health probe',
   'GET /api/mobile/bootstrap': 'Public native application data and policies',
+  'POST /api/internal/image-uploads/[uploadId]/claim': 'Image Worker server credential; never accepts a customer session as authorization',
+  'POST /api/internal/image-uploads/[uploadId]/complete': 'Image Worker server credential and bound processing lease',
+  'POST /api/internal/image-uploads/cleanup': 'Image Worker server credential for bounded upload lifecycle cleanup',
   'GET /api/auth/session': 'Anonymous session discovery',
   'POST /api/auth/logout': 'Idempotent logout',
   'POST /api/auth/commission-agreement': 'Agreement before authentication',

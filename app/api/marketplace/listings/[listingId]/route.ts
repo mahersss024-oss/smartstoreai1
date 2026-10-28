@@ -12,6 +12,7 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
+import { DirectImageUploadError } from '@/agent/marketplace/direct-image-upload-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,11 +128,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       return idempotency.response;
     }
 
-    const listing = await setListingStatusForSeller(
-      listingId,
-      session.user.id,
-      getActionStatus(action.data.action),
-    );
+    let listing;
+    try {
+      listing = await setListingStatusForSeller(listingId, session.user.id, getActionStatus(action.data.action));
+    } catch (error) {
+      await idempotency?.abandon();
+      if (error instanceof DirectImageUploadError) {
+        return Response.json({ error: error.code, message: 'انتظر اكتمال تجهيز الصور ثم انشر الإعلان.' }, { status: error.status, headers: noStoreHeaders });
+      }
+      throw error;
+    }
 
     if (!listing) {
       const responseBody = { error: 'listing_not_found' };

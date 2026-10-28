@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
-import { deleteListingObject } from '@/agent/marketplace/object-storage';
+import { deleteListingObject, isOwnedProfileImageUrl } from '@/agent/marketplace/object-storage';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -35,7 +35,7 @@ async function deleteUserImagesBestEffort(
   listingImages: StoredUserImage[],
 ) {
   const objects = [
-    ...(profilePicture
+    ...(profilePicture && isOwnedProfileImageUrl(userId, profilePicture)
       ? [{ imageId: `profile:${userId}`, urls: [profilePicture] }]
       : []),
     ...listingImages.map((image) => ({

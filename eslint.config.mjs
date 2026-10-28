@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     "**/.next-mobile/**",
     // Runtime data and downloaded browser/tool caches are not project source.
     ".data/**",
+    "cloudflare/image-pipeline/.data/**",
+    "cloudflare/image-pipeline/.wrangler/**",
     ".patch-work/**",
     "out/**",
     "build/**",

@@ -42,6 +42,9 @@ jobs:
       - name: Unit and integration-safe tests
         run: pnpm test
 
+      - name: Image processing Worker contracts
+        run: pnpm test:images:worker
+
       - name: Production build
         run: pnpm build
         env:

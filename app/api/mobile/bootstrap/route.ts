@@ -1,4 +1,5 @@
 import { getMaxListingImagesPerListing } from '@/agent/marketplace/listing-image-limits';
+import { getDirectImageUploadCapability } from '@/agent/marketplace/direct-image-objects';
 import { getMaxListingsPerSeller } from '@/agent/marketplace/listing-limits';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -17,6 +18,7 @@ import { marketplaceCarModelAttribute, marketplaceCarModelsByBrand } from '@/lib
 import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
 import { platformPolicies } from '@/lib/platform/policies';
 import { getActiveSiteMessage } from '@/lib/site-message';
+import { schedulePendingImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ export async function GET(request: Request) {
     namespace: 'mobile_bootstrap', maxRequests: 120, windowMs: 60_000,
   });
   if (limited) return limited;
+  schedulePendingImageObjectCleanup();
 
   return Response.json({
     categories: marketplaceCategoryDefinitions.map(category => ({
@@ -48,6 +51,7 @@ export async function GET(request: Request) {
     },
     auth: { google: Boolean(getGoogleNativeClientId()), apple: isAppleNativeAuthConfigured() },
     assistant: { capabilities: ['listing_drafts', 'platform_help'], requiresSignIn: true },
+    imageUploads: getDirectImageUploadCapability(),
     siteMessage: await getActiveSiteMessage(),
   }, { headers: noStoreHeaders });
 }

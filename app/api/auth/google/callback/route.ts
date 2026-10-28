@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createHash } from 'node:crypto';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -16,6 +15,7 @@ import {
   createMobileAuthBridgeUrl,
   createMobileAuthErrorCallbackUrl,
   createMobileAuthTicket,
+  isMobileAuthStateValid,
   parseMobileAuthState,
 } from '@/lib/auth/mobile-oauth';
 import { getAppBaseUrl } from '@/lib/app-url';
@@ -33,48 +33,6 @@ type GoogleUserInfo = {
   name?: string;
   picture?: string;
 };
-
-const recentGoogleAuthCodeMaxAgeMs = 5 * 60 * 1000;
-const recentGoogleAuthCodeSessions = new Map<
-  string,
-  { expiresAt: number; sessionCookie: string }
->();
-
-function getGoogleAuthCodeFingerprint(code: string) {
-  return createHash('sha256').update(code).digest('base64url');
-}
-
-function pruneRecentGoogleAuthCodes() {
-  const now = Date.now();
-
-  for (const [fingerprint, cached] of recentGoogleAuthCodeSessions) {
-    if (cached.expiresAt <= now) {
-      recentGoogleAuthCodeSessions.delete(fingerprint);
-    }
-  }
-}
-
-function rememberGoogleAuthCodeSession(code: string, sessionCookie: string) {
-  pruneRecentGoogleAuthCodes();
-  recentGoogleAuthCodeSessions.set(getGoogleAuthCodeFingerprint(code), {
-    expiresAt: Date.now() + recentGoogleAuthCodeMaxAgeMs,
-    sessionCookie,
-  });
-}
-
-function getRememberedGoogleAuthCodeSession(code: string) {
-  pruneRecentGoogleAuthCodes();
-
-  const cached = recentGoogleAuthCodeSessions.get(
-    getGoogleAuthCodeFingerprint(code),
-  );
-
-  if (!cached) {
-    return null;
-  }
-
-  return cached.sessionCookie;
-}
 
 function redirectToHome(request: Request, cookie?: string) {
   const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
@@ -104,7 +62,9 @@ export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
-  if (!code || !state || (!mobileState && !isOauthStateValid(state, storedState))) {
+  if (!code || !state || (mobileState
+      ? !isMobileAuthStateValid(state, storedState)
+      : !isOauthStateValid(state, storedState))) {
     if (isMobileStateAttempt) {
       return redirectToMobileAuthError('google_invalid_state');
     }
@@ -171,15 +131,6 @@ export async function GET(request: Request) {
     console.warn(
       `[google_auth] token_exchange_failed status=${tokenResponse.status} error=${providerError} description=${providerDescription}`,
     );
-
-    if (providerError === 'invalid_grant') {
-      const rememberedSessionCookie = getRememberedGoogleAuthCodeSession(code);
-
-      if (rememberedSessionCookie && !mobileState) {
-        console.warn('[google_auth] duplicate_callback_recovered=true');
-        return redirectToHome(request, rememberedSessionCookie);
-      }
-    }
 
     if (mobileState) {
       return redirectToMobileAuthError(
@@ -278,7 +229,5 @@ export async function GET(request: Request) {
   }
 
   const sessionCookie = createSessionCookie(registeredUser);
-  rememberGoogleAuthCodeSession(code, sessionCookie);
-
   return redirectToHome(request, sessionCookie);
 }

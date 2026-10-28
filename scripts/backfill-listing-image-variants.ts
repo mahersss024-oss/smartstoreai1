@@ -67,10 +67,18 @@ async function main() {
             storeListingObject({ ...variants.thumbnail, imageId: variantImageId, variant: 'thumbnail' }),
           ]);
           if (!display?.url || !thumbnail?.url) throw new Error('object_storage_unavailable');
-          await prisma.listingImage.update({
-            where: { id: image.id },
+          // Respect a newer repair/finalization rather than overwriting URLs
+          // that changed while this maintenance process generated the variants.
+          const updated = await prisma.listingImage.updateMany({
+            where: { id: image.id, originalUrl: image.originalUrl,
+              displayUrl: image.displayUrl, thumbnailUrl: image.thumbnailUrl },
             data: { displayUrl: display.url, thumbnailUrl: thumbnail.url },
           });
+          if (!updated.count) {
+            totals.skipped += 1;
+            console.log(JSON.stringify({ id: image.id, status: 'skipped', reason: 'image_changed_during_processing' }));
+            continue;
+          }
         }
 
         totals.converted += 1;

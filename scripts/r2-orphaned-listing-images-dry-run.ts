@@ -255,9 +255,30 @@ async function getReferencedListingImageKeys(config: ObjectStorageConfig) {
     }
   }
 
+  // Promotion deliberately precedes the final database commit. An in-flight
+  // job's immutable delivery keys are not orphaned images during that window.
+  // This remains read-only and also protects jobs finishing during rollback.
+  let uploads: Array<{ id: string; createdAt: Date }> = [];
+  try {
+    uploads = await prisma.listingImageUpload.findMany({
+      where: { status: { in: ['pending', 'processing'] }, expiresAt: { gt: new Date() } },
+      select: { id: true, createdAt: true },
+    });
+  } catch (error) {
+    if (!(error && typeof error === 'object' && 'code' in error && error.code === 'P2021') ||
+      process.env.SMARTSTORE_DIRECT_IMAGE_UPLOADS === 'true') throw error;
+  }
+  for (const upload of uploads) {
+    const prefix = `listings/${upload.createdAt.getUTCFullYear()}/${String(upload.createdAt.getUTCMonth() + 1).padStart(2, '0')}/${upload.id}`;
+    keys.add(`${prefix}.jpg`);
+    keys.add(`${prefix}-display.webp`);
+    keys.add(`${prefix}-thumbnail.webp`);
+  }
+
   return {
     keys,
     imageRecordCount: images.length,
+    activeUploadCount: uploads.length,
   };
 }
 
@@ -277,6 +298,7 @@ async function main() {
 
   console.log('R2 listing images dry-run only. No objects were deleted.');
   console.log(`Database image records: ${referenced.imageRecordCount}`);
+  console.log(`Active image upload reservations protected: ${referenced.activeUploadCount}`);
   console.log(`Referenced object keys: ${referenced.keys.size}`);
   console.log(`R2 objects under listings/: ${r2Objects.length}`);
   console.log(`Potential orphaned objects: ${orphanedObjects.length}`);

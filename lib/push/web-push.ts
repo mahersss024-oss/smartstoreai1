@@ -11,6 +11,7 @@ import {
   isPushConfigured,
 } from './vapid';
 import { fetchWithTimeout } from '../api/fetch-timeout';
+import { isAllowedWebPushEndpoint } from './endpoint';
 
 // Minimal Web Push (RFC 8291 aes128gcm) sender built on node:crypto only.
 
@@ -135,6 +136,12 @@ export async function sendWebPush(
     return { ok: false, reason: 'push_not_configured' };
   }
 
+  // Revalidate persisted subscriptions as well as new registrations. Unsafe old
+  // records are deactivated by the dispatcher without sending their payload.
+  if (!isAllowedWebPushEndpoint(subscription.endpoint)) {
+    return { ok: false, reason: 'invalid_push_endpoint', expired: true };
+  }
+
   try {
     const payload = Buffer.from(
       JSON.stringify({
@@ -152,6 +159,7 @@ export async function sendWebPush(
       subscription.endpoint,
       {
         method: 'POST',
+        redirect: 'error',
         headers: {
           'Content-Type': 'application/octet-stream',
           'Content-Encoding': 'aes128gcm',

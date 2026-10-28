@@ -279,7 +279,9 @@ test('database evidence verifies private image copies and original image deletio
   process.env.SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID = 'test-only';
   process.env.SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY = 'test-only';
   const objects = new Map<string, Uint8Array>();
-  let failDelete = true;
+  // A transient failure now retries within the storage operation. Exhaust that
+  // budget to exercise durable disposal recovery on the next explicit action.
+  let failedDeletesRemaining = 3;
   t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
     const key = new URL(String(url)).pathname;
     assert.ok(key.startsWith('/private-evidence/'));
@@ -289,7 +291,7 @@ test('database evidence verifies private image copies and original image deletio
       return new Response(null, { status: 200 });
     }
     if (init?.method === 'DELETE') {
-      if (failDelete) { failDelete = false; return new Response(null, { status: 503 }); }
+      if (failedDeletesRemaining-- > 0) return new Response(null, { status: 503 });
       objects.delete(key); return new Response(null, { status: 204 });
     }
     const value = objects.get(key);

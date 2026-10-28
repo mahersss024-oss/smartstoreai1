@@ -15,6 +15,7 @@ import { persistUserRegistration } from '@/lib/auth/registration';
 import {
   createMobileAuthCallbackUrl,
   createMobileAuthTicket,
+  isMobileAuthStateValid,
   parseMobileAuthState,
 } from '@/lib/auth/mobile-oauth';
 import {
@@ -41,7 +42,9 @@ type AppleUserPayload = {
 const maxAppleCallbackRequestBytes = 16 * 1024;
 
 function redirectToHome(request: Request, cookie?: string) {
-  const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)));
+  // Apple's form_post must become a GET when leaving the callback; preserving
+  // POST would send its credentials to a page that only handles GET.
+  const response = NextResponse.redirect(new URL('/', getAppBaseUrl(request)), request.method === 'POST' ? 303 : 307);
 
   if (cookie) {
     response.headers.append('Set-Cookie', cookie);
@@ -114,7 +117,9 @@ async function handleAppleCallback(request: Request) {
   const mobileState = parseMobileAuthState(state);
   const storedState = getOauthState(request);
 
-  if (!code || !idToken || !state || (!mobileState && !isOauthStateValid(state, storedState))) {
+  if (!code || !idToken || !state || (mobileState
+      ? !isMobileAuthStateValid(state, storedState)
+      : !isOauthStateValid(state, storedState))) {
     return new Response('Invalid Apple sign-in state.', { status: 400 });
   }
 
@@ -206,6 +211,7 @@ async function handleAppleCallback(request: Request) {
   if (mobileState) {
     const response = NextResponse.redirect(
       createMobileAuthCallbackUrl(createMobileAuthTicket(registeredUser)),
+      request.method === 'POST' ? 303 : 307,
     );
 
     response.headers.append('Set-Cookie', clearOauthStateCookie());

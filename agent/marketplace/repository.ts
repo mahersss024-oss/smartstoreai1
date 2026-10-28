@@ -62,8 +62,11 @@ import {
 import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
 import { deleteListingObject } from './object-storage';
 import { recordDatabaseFirstPublication } from './listing-publication';
+import { ensureDatabaseSaleCommission } from './listing-commission';
+import { enqueueImageObjectCleanup, processImageObjectCleanup } from './image-object-cleanup';
 import { runOptionalTask } from '@/lib/optional-task';
 import { scheduleEvidenceCopy, scheduleListingEvidenceCopy } from './evidence';
+import { activeImageUploadStatuses, directImageUploadsEnabled, DirectImageUploadError, retryDirectImageTransaction } from './direct-image-upload-policy';
 
 type DatabaseListingRecord = {
   firstPublicationTracked?: boolean;
@@ -2283,7 +2286,11 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
     return deletedDrafts.length;
   }
 
-  const deletedDrafts = await prisma.$transaction(async (tx) => {
+  const deletedDrafts = await retryDirectImageTransaction(() => prisma.$transaction(async (tx) => {
+    const waitingListingIds = directImageUploadsEnabled() ? await tx.listingImageUpload.findMany({
+      where: { sellerId, status: { in: [...activeImageUploadStatuses] }, expiresAt: { gt: new Date() } },
+      select: { listingId: true }, distinct: ['listingId'],
+    }) : [];
     const drafts = await tx.listing.findMany({
       where: {
         sellerId,
@@ -2294,6 +2301,7 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
         images: {
           none: {},
         },
+        ...(waitingListingIds.length ? { id: { notIn: waitingListingIds.map(job => job.listingId) } } : {}),
       },
       include: {
         images: true,
@@ -2317,7 +2325,7 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
     }
 
     return updatedDrafts;
-  });
+  }, directImageUploadsEnabled() ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined));
 
   const mappedDrafts = deletedDrafts.map(toListingRecord);
 
@@ -2470,7 +2478,7 @@ export async function updateListingForSeller(
   options: { draftOnly?: boolean } = {},
 ) {
   const current = await getListing(listingId);
-  if (!current || current.sellerId !== sellerId || (options.draftOnly && current.status !== 'draft')) return null;
+  if (!current || current.sellerId !== sellerId || current.status === 'deleted' || (options.draftOnly && current.status !== 'draft')) return null;
   mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current);
   await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } }));
   if (!shouldUseDatabaseStore()) {
@@ -2500,7 +2508,7 @@ export async function updateListingForSeller(
 
   const existing = await getListing(listingId);
 
-  if (!existing || existing.sellerId !== sellerId || (options.draftOnly && existing.status !== 'draft')) {
+  if (!existing || existing.sellerId !== sellerId || existing.status === 'deleted' || (options.draftOnly && existing.status !== 'draft')) {
     return null;
   }
 
@@ -2625,39 +2633,35 @@ export async function setListingStatusForSeller(
   }
 
   if (status === 'published' && (existing.compliance.humanDecision === 'block' || existing.status === 'deleted' || existing.status === 'rejected')) return existing;
+  if (existing.status === 'deleted' && status !== 'deleted') return null;
   const nextStatus =
     status === 'published' && existing.compliance.decision !== 'allow'
       ? existing.compliance.decision === 'block'
         ? 'rejected'
         : 'pending'
       : status;
-  const listing = await prisma.$transaction(async (tx) => {
+  const listing = await retryDirectImageTransaction(() => prisma.$transaction(async (tx) => {
+    if (directImageUploadsEnabled() && status === 'published' && await tx.listingImageUpload.count({
+      where: { listingId, status: { in: [...activeImageUploadStatuses] }, expiresAt: { gt: new Date() } },
+    })) throw new DirectImageUploadError('image_uploads_pending', 409);
     await recordDatabaseFirstPublication(tx, listingId, nextStatus);
     const updatedListing = await tx.listing.update({
-      where: { id: listingId, sellerId, ...(status === 'published' ? { status: existing.status, compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } } : {}) },
+      where: { id: listingId, sellerId, status: existing.status, ...(status === 'published' ? { compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } } : {}) },
       data: { status: nextStatus },
       include: { images: true },
     });
 
-    if (updatedListing.status !== 'sold') {
-      return updatedListing;
+    if (directImageUploadsEnabled() && status === 'deleted') {
+      await tx.listingImageUpload.updateMany({
+        where: { listingId, status: { in: [...activeImageUploadStatuses] } },
+        data: { status: 'cancelled', errorCode: 'listing_deleted', leaseToken: null, leaseUntil: null },
+      });
     }
 
-    await tx.commission.upsert({
-      where: { listingId },
-      create: {
-        listingId,
-        sellerId,
-        productValue: null,
-        commissionRatePercent: 1,
-        commissionAmount: null,
-        status: 'pending_amount',
-      },
-      update: {},
-    });
+    await ensureDatabaseSaleCommission(tx, updatedListing);
 
     return updatedListing;
-  }).catch((error: unknown) => {
+  }, directImageUploadsEnabled() ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined)).catch((error: unknown) => {
     if (isPrismaKnownRequestError(error, 'P2025')) return null;
     throw error;
   });
@@ -2781,6 +2785,12 @@ export async function addListingImageForSeller(
           if (hasReachedListingImageLimit(existing.images)) {
             return existing;
           }
+          if (directImageUploadsEnabled()) {
+            const reserved = await tx.listingImageUpload.count({
+              where: { listingId, status: { in: [...activeImageUploadStatuses] }, expiresAt: { gt: new Date() } },
+            });
+            if (existing.images.length + reserved >= getMaxListingImagesPerListing()) return existing;
+          }
 
           const isFirstApprovedImage = !existing.images.some(
             (currentImage) => currentImage.status === 'approved',
@@ -2895,9 +2905,16 @@ export async function deleteListingImageForSeller(
   }
 
   const listing = await prisma.$transaction(async (tx) => {
+    await enqueueImageObjectCleanup(tx, { imageId, urls: [
+      imageToDelete.originalUrl, imageToDelete.displayUrl, imageToDelete.thumbnailUrl,
+    ] });
     await tx.listingImage.delete({
       where: { id: imageId },
     });
+    if (directImageUploadsEnabled()) {
+      await tx.listingImageUpload.updateMany({ where: { id: imageId, listingId },
+        data: { status: 'cancelled', errorCode: 'image_deleted', leaseToken: null, leaseUntil: null } });
+    }
 
     if (imageToDelete.isPrimary) {
       const nextPrimaryImage = await tx.listingImage.findFirst({
@@ -2929,14 +2946,7 @@ export async function deleteListingImageForSeller(
   });
 
   try {
-    await deleteListingObject({
-      imageId,
-      urls: [
-        imageToDelete.originalUrl,
-        imageToDelete.displayUrl,
-        imageToDelete.thumbnailUrl,
-      ],
-    });
+    await processImageObjectCleanup(imageId);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[listing_image_storage_delete] failure=${errorName}`);
@@ -5406,7 +5416,9 @@ export async function updateCommissionSaleAmountForSeller(
   }
 
   const updated = await prisma.commission.update({
-    where: { id: commissionId },
+    // The database must recheck the lock at the write, including after waiting
+    // for an administrator's concurrently committed paid/waived decision.
+    where: { id: commissionId, sellerId, status: { notIn: ['paid', 'waived'] } },
     data: {
       productValue,
       commissionAmount: calculateCommissionAmount(productValue),
@@ -5421,7 +5433,20 @@ export async function updateCommissionSaleAmountForSeller(
         },
       },
     },
+  }).catch((error: unknown) => {
+    if (isPrismaKnownRequestError(error, 'P2025')) return null;
+    throw error;
   });
+
+  if (!updated) {
+    const current = await prisma.commission.findFirst({
+      where: { id: commissionId, sellerId },
+      include: { listing: { include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } } } },
+    });
+    return current
+      ? { status: 'locked' as const, commission: toCommissionRecord(current) }
+      : { status: 'not_found' as const, commission: null };
+  }
 
   const mappedCommission = toCommissionRecord(updated);
 

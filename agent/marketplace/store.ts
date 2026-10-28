@@ -501,7 +501,7 @@ export function updateListingForSeller(
 
   const listing = listings.get(listingId);
 
-  if (!listing || listing.sellerId !== sellerId) {
+  if (!listing || listing.sellerId !== sellerId || listing.status === 'deleted') {
     return null;
   }
 
@@ -546,6 +546,7 @@ export function setListingStatusForSeller(
   }
 
   if (status === 'published' && (listing.compliance.humanDecision === 'block' || listing.status === 'deleted' || listing.status === 'rejected')) return listing;
+  if (listing.status === 'deleted' && status !== 'deleted') return null;
   if (status === 'published' && listing.compliance.decision !== 'allow') {
     listing.status =
       listing.compliance.decision === 'block' ? 'rejected' : 'pending';

@@ -12,15 +12,18 @@ type StoreListingObjectInput = {
   imageId: string;
   fileName?: string;
   objectPrefix?: 'listings' | 'profiles';
+  profileOwnerId?: string;
   variant?: 'original' | 'display' | 'thumbnail';
 };
 
 type DeleteListingObjectInput = {
   imageId: string;
   urls?: string[];
+  requireCachePurge?: boolean;
+  deadline?: number;
 };
 
-type S3ObjectStorageConfig = {
+export type S3ObjectStorageConfig = {
   endpoint: string;
   bucket: string;
   accessKeyId: string;
@@ -62,7 +65,7 @@ function getObjectStorageTimeoutMs() {
   return Math.min(Math.max(parsedValue, 1_000), 60_000);
 }
 
-function getS3ObjectStorageConfig(): S3ObjectStorageConfig {
+export function getS3ObjectStorageConfig(): S3ObjectStorageConfig {
   return {
     endpoint: process.env.SMARTSTORE_OBJECT_STORAGE_ENDPOINT?.trim() ?? '',
     bucket: process.env.SMARTSTORE_OBJECT_STORAGE_BUCKET?.trim() ?? '',
@@ -131,10 +134,33 @@ function createObjectKey(input: StoreListingObjectInput) {
   const variantSuffix =
     input.variant && input.variant !== 'original' ? `-${input.variant}` : '';
 
-  return `${input.objectPrefix ?? 'listings'}/${year}/${month}/${input.imageId}${variantSuffix}.${getExtension(
+  const prefix = input.objectPrefix === 'profiles' && input.profileOwnerId
+    ? ownedProfileObjectPrefix(input.profileOwnerId) : input.objectPrefix ?? 'listings';
+  return `${prefix}/${year}/${month}/${input.imageId}${variantSuffix}.${getExtension(
     input.mediaType,
     input.fileName,
   )}`;
+}
+
+function ownedProfileObjectPrefix(userId: string) {
+  return `profiles/owners/${sha256Hex(`profile:${userId}`)}`;
+}
+
+/** Only server-generated, account-scoped profile objects grant deletion rights.
+ * Legacy profile URLs and OAuth/provider pictures may still be displayed, but a
+ * user-editable URL never proves who owns its stored bytes. */
+export function isOwnedProfileImageUrl(userId: string, url: string) {
+  try {
+    const key = getStoredObjectKeyFromUrl(getS3ObjectStorageConfig(), url);
+    if (!key) return false;
+    const prefix = ownedProfileObjectPrefix(userId);
+    return key.startsWith(`${prefix}/`) && /^\d{4}\/\d{2}\/[a-f0-9-]{36}\.(?:jpg|jpeg|png|webp)$/.test(key.slice(prefix.length + 1));
+  } catch { return false; }
+}
+
+export function isConfiguredImageObjectUrl(url: string) {
+  try { return Boolean(getStoredObjectKeyFromUrl(getS3ObjectStorageConfig(), url)); }
+  catch { return false; }
 }
 
 function awsEncode(value: string) {
@@ -204,18 +230,22 @@ function getSigningKey(config: S3ObjectStorageConfig, dateStamp: string) {
   return hmac(serviceKey, 'aws4_request');
 }
 
-function createPresignedRequest({
+export function createPresignedRequest({
   method,
   key,
   mediaType,
   config,
   cacheControl = listingObjectCacheControl,
+  additionalHeaders = {},
+  expiresSeconds = 300,
 }: {
-  method: 'PUT' | 'DELETE' | 'GET';
+  method: 'PUT' | 'DELETE' | 'GET' | 'HEAD';
   key: string;
   mediaType?: string;
   config: S3ObjectStorageConfig;
   cacheControl?: string;
+  additionalHeaders?: Record<string, string>;
+  expiresSeconds?: number;
 }) {
   if (!config.endpoint || !config.bucket || !config.accessKeyId) {
     throw new Error('Missing object storage configuration.');
@@ -230,13 +260,15 @@ function createPresignedRequest({
   const dateStamp = getDateStamp(amzDate);
   const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
   const credential = `${config.accessKeyId}/${credentialScope}`;
-  const requestHeaders: Record<string, string> =
-    method === 'PUT'
+  const requestHeaders: Record<string, string> = {
+    ...(method === 'PUT'
       ? {
           'Cache-Control': cacheControl,
           'Content-Type': mediaType ?? 'application/octet-stream',
         }
-      : {};
+      : {}),
+    ...additionalHeaders,
+  };
   const canonicalHeaderEntries = [
     ['host', uploadUrl.host],
     ...Object.entries(requestHeaders).map(([key, value]) => [
@@ -253,7 +285,7 @@ function createPresignedRequest({
     ['X-Amz-Content-Sha256', payloadHash],
     ['X-Amz-Credential', credential],
     ['X-Amz-Date', amzDate],
-    ['X-Amz-Expires', '300'],
+    ['X-Amz-Expires', String(Math.min(300, Math.max(1, Math.floor(expiresSeconds))))],
     ['X-Amz-SignedHeaders', signedHeaders],
   ];
   const canonicalQuery = buildCanonicalQuery(queryParams);
@@ -470,7 +502,13 @@ function getStoredObjectKeyFromUrl(config: S3ObjectStorageConfig, urlValue: stri
   return null;
 }
 
-async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string) {
+function deletionBudget(maximum: number, deadline?: number) {
+  const remaining = deadline === undefined ? maximum : Math.min(maximum, deadline - Date.now());
+  if (remaining <= 0) throw new DOMException('Image cleanup deadline reached.', 'TimeoutError');
+  return remaining;
+}
+
+async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string, deadline?: number) {
   const request = createPresignedRequest({
     method: 'DELETE',
     key,
@@ -486,7 +524,7 @@ async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string)
         throw new ImageStorageResponseError(result.status);
       }
       return result;
-    }, getObjectStorageTimeoutMs());
+    }, deletionBudget(getObjectStorageTimeoutMs(), deadline));
   } catch (error) {
     incrementRuntimeCounter('image.storage.failed', { operation: 'delete' });
     throw new Error(
@@ -495,7 +533,7 @@ async function deleteStoredObjectKey(config: S3ObjectStorageConfig, key: string)
   }
 }
 
-async function purgeCloudflareCacheByUrls(urls: string[]) {
+async function purgeCloudflareCacheByUrls(urls: string[], deadline?: number) {
   const config = getCloudflareCachePurgeConfig();
 
   if (urls.length === 0) {
@@ -550,12 +588,12 @@ async function purgeCloudflareCacheByUrls(urls: string[]) {
     } finally {
       clearTimeout(timeout);
     }
-  }, getCloudflareCachePurgeTimeoutMs());
+  }, deletionBudget(getCloudflareCachePurgeTimeoutMs(), deadline));
 }
 
-async function purgeCloudflareCacheBestEffort(urls: string[]) {
+async function purgeCloudflareCacheBestEffort(urls: string[], deadline?: number) {
   try {
-    await purgeCloudflareCacheByUrls(urls);
+    return await purgeCloudflareCacheByUrls(urls, deadline);
   } catch (error) {
     incrementRuntimeCounter('image.cache_purge.incomplete', { reason: 'provider_failure' });
     if (error instanceof CloudflareCachePurgeError) {
@@ -566,6 +604,7 @@ async function purgeCloudflareCacheBestEffort(urls: string[]) {
         ? error.name : 'UnknownError';
       console.warn(`[cloudflare_cache_purge] failure=${errorName}`);
     }
+    return false;
   }
 }
 
@@ -603,10 +642,11 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
   }
 
   // A failed sibling delete must not skip invalidating objects already removed.
-  const deletions = await Promise.allSettled([...keys].map((key) => deleteStoredObjectKey(config, key)));
-  await purgeCloudflareCacheBestEffort([...purgeUrls]);
+  const deletions = await Promise.allSettled([...keys].map((key) => deleteStoredObjectKey(config, key, input.deadline)));
+  const purged = await purgeCloudflareCacheBestEffort([...purgeUrls], input.deadline);
   const failure = deletions.find(result => result.status === 'rejected');
   if (failure?.status === 'rejected') throw failure.reason;
+  if (input.requireCachePurge && !purged) return false;
 
   return true;
 }

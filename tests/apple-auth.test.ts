@@ -130,8 +130,7 @@ test('google auth callback uses bounded external provider calls', () => {
   assert.match(callbackRoute, /tokenResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /userInfoResponse\.json\(\)\.catch/);
   assert.match(callbackRoute, /isOauthStateValid\(state, storedState\)/);
-  assert.match(callbackRoute, /duplicate_callback_recovered=true/);
-  assert.match(callbackRoute, /rememberGoogleAuthCodeSession\(code, sessionCookie\)/);
+  assert.doesNotMatch(callbackRoute, /rememberGoogleAuthCodeSession|duplicate_callback_recovered/);
   assert.doesNotMatch(callbackRoute, /new Response\('Google token exchange failed\.'/);
 });
 
@@ -171,13 +170,15 @@ test('google native auth verifies id tokens and issues the existing session cook
   assert.doesNotMatch(googleAuth, /GOOGLE_CLIENT_SECRET/);
 });
 
-test('oauth state can be verified without relying on callback cookies', () => {
+test('oauth state requires its signed value and the matching callback cookie', () => {
   const state = createOauthState();
 
   assert.match(state, /^state:[^.]+\.[^.]+$/);
   assert.ok(parseOauthState(state));
-  assert.equal(isOauthStateValid(state, undefined), true);
-  assert.equal(isOauthStateValid(state, 'different-cookie-state'), true);
+  assert.equal(isOauthStateValid(state, state), true);
+  assert.equal(isOauthStateValid(state, undefined), false);
+  assert.equal(isOauthStateValid(state, 'different-cookie-state'), false);
+  assert.equal(isOauthStateValid('unsigned-state', 'unsigned-state'), false);
   assert.equal(isOauthStateValid(`${state}tampered`, undefined), false);
 });
 
@@ -233,7 +234,7 @@ test('google auth start uses mobile state inside the native wrapper', async () =
 
     assert.ok(location);
     assert.match(new URL(location).searchParams.get('state') ?? '', /^mobile:/);
-    assert.equal(response.headers.get('set-cookie'), null);
+    assert.match(response.headers.get('set-cookie') ?? '', /^smartstore_oauth_state=mobile%3A/);
   } finally {
     restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
     restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);
@@ -260,7 +261,7 @@ test('google auth start uses mobile state for the wrapper browser fallback', asy
 
     assert.ok(location);
     assert.match(new URL(location).searchParams.get('state') ?? '', /^mobile:/);
-    assert.equal(response.headers.get('set-cookie'), null);
+    assert.match(response.headers.get('set-cookie') ?? '', /^smartstore_oauth_state=mobile%3A/);
   } finally {
     restoreEnv('GOOGLE_CLIENT_ID', previous.clientId);
     restoreEnv('NEXT_PUBLIC_APP_URL', previous.publicAppUrl);

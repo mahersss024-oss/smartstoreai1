@@ -7,6 +7,7 @@ import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
+import { ensureDatabaseSaleCommission } from '@/agent/marketplace/listing-commission';
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
 import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
@@ -256,6 +257,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
+    await ensureDatabaseSaleCommission(tx, listing);
     if (compliance?.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listingId, listingId, userId: existing.sellerId, text: listingSemanticText(nextListing), assessment: compliance.modelAssessment }, tx);
     await tx.adminAuditLog.create({
       data: {
