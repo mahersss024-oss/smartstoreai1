@@ -214,7 +214,7 @@ const discardClaim = (job?: ListingImageUpload | null) => ({
   ...(job ? { source: { key: job.sourceKey }, targets: { original: job.originalKey, display: job.displayKey, thumbnail: job.thumbnailKey } } : {}),
 });
 
-export async function claimDirectImageUpload(uploadId: string, outputFormats: readonly string[] = []) {
+export async function claimDirectImageUpload(uploadId: string) {
   const result = await serializable(async tx => {
     const job = await tx.listingImageUpload.findUnique({ where: { id: uploadId } });
     if (!job) return discardClaim();
@@ -229,13 +229,10 @@ export async function claimDirectImageUpload(uploadId: string, outputFormats: re
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { status, errorCode: status === 'failed' ? 'image_processing_attempts_exhausted' : null, leaseToken: null, leaseUntil: null } });
       return discardClaim(job);
     }
-    const outputFormat = job.attempts > 0
-      ? (job.originalKey?.endsWith('/original.webp') ? 'webp' : 'jpeg')
-      : (outputFormats.includes('webp-v1') ? 'webp' : 'jpeg');
     const leaseToken = randomUUID();
     const updated = await tx.listingImageUpload.update({ where: { id: job.id }, data: {
       status: 'processing', leaseToken, leaseUntil: new Date(now.getTime() + directImageUploadLeaseMs),
-      attempts: { increment: 1 }, ...imageUploadObjectKeys(job.id, leaseToken, outputFormat), errorCode: null,
+      attempts: { increment: 1 }, ...imageUploadObjectKeys(job.id, leaseToken), errorCode: null,
     } });
     return { action: 'process' as const, leaseToken,
       source: { key: updated.sourceKey, sha256: updated.sha256, sizeBytes: updated.sizeBytes },
@@ -300,7 +297,9 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     return { action: 'discard' as const };
   }
   try {
-    const variants = await Promise.all((['original', 'display', 'thumbnail'] as const).map(async variant => {
+    const noOriginal = job.originalKey === job.displayKey;
+    const variantNames = noOriginal ? ['display', 'thumbnail'] as const : ['original', 'display', 'thumbnail'] as const;
+    const variants = await Promise.all(variantNames.map(async variant => {
       const image = await directImageUploadEffects.readImage(job, variant);
       await validateProcessedImage(image, variant, getDirectImageVariantMediaType(job, variant));
       return image;

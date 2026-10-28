@@ -27,6 +27,7 @@ export type DirectImageObjectJob = {
 const maxImageBytes = 12 * 1024 * 1024;
 const finalCacheControl = 'public, max-age=31536000, immutable';
 export function getDirectImageVariantMediaType(job: DirectImageObjectJob, variant: DirectImageVariant): 'image/jpeg' | 'image/webp' {
+  if (job.originalKey === job.displayKey) return 'image/webp';
   // The output choice is durable in the server-generated original target.
   // Legacy jobs keep their JPEG destination across retries and deployments.
   return variant === 'original' && !job.originalKey?.endsWith('/original.webp') ? 'image/jpeg' : 'image/webp';
@@ -88,6 +89,7 @@ function assertJob(job: DirectImageObjectJob) {
 
 function stagedKey(job: DirectImageObjectJob, variant: DirectImageVariant) {
   assertJob(job);
+  if (variant === 'original' && job.originalKey === job.displayKey) return stagedKey(job, 'display');
   const key = job[`${variant}Key`];
   const extension = getDirectImageVariantMediaType(job, variant) === 'image/jpeg' ? 'jpg' : 'webp';
   const prefix = `staged/v1/${job.id}/`;
@@ -105,15 +107,17 @@ function publicKey(job: DirectImageObjectJob, variant: DirectImageVariant) {
   const year = job.createdAt.getUTCFullYear();
   const month = String(job.createdAt.getUTCMonth() + 1).padStart(2, '0');
   const extension = getDirectImageVariantMediaType(job, variant) === 'image/jpeg' ? 'jpg' : 'webp';
-  return `listings/${year}/${month}/${job.id}${variant === 'original' ? '' : `-${variant}`}.${extension}`;
+  const deliveryVariant = variant === 'original' && job.originalKey === job.displayKey ? 'display' : variant;
+  return `listings/${year}/${month}/${job.id}${deliveryVariant === 'original' ? '' : `-${deliveryVariant}`}.${extension}`;
 }
 
 export function getDirectImagePublicUrls(job: DirectImageObjectJob) {
   const { storage } = requireConfiguration();
   const base = storage.publicUrl!.replace(/\/+$/, '');
+  const displayUrl = `${base}/${publicKey(job, 'display')}`;
   return {
-    originalUrl: `${base}/${publicKey(job, 'original')}`,
-    displayUrl: `${base}/${publicKey(job, 'display')}`,
+    originalUrl: job.originalKey === job.displayKey ? displayUrl : `${base}/${publicKey(job, 'original')}`,
+    displayUrl,
     thumbnailUrl: `${base}/${publicKey(job, 'thumbnail')}`,
   };
 }
@@ -191,7 +195,10 @@ export async function promoteProcessedImages(job: DirectImageObjectJob) {
   // The database transaction has a 120s limit. Keep all copy/head operations
   // within one 90s I/O budget, including ambiguous-response verification.
   const deadline = Date.now() + 90_000;
-  for (const variant of ['original', 'display', 'thumbnail'] as const) {
+  const variants: DirectImageVariant[] = job.originalKey === job.displayKey
+    ? ['display', 'thumbnail']
+    : ['original', 'display', 'thumbnail'];
+  for (const variant of variants) {
     const source = stagedKey(job, variant);
     const etag = await objectRequest(intakeStorage, 'HEAD', source, {}, async response => {
       if (!response.ok) throw new ImageStorageResponseError(response.status);
@@ -239,7 +246,7 @@ export async function discardDirectImageObjects(job: DirectImageObjectJob, optio
   for (const variant of ['original', 'display', 'thumbnail'] as const) {
     if (job[`${variant}Key`]) keys.push(stagedKey(job, variant));
   }
-  const pending = keys.map(key => objectRequest(intakeStorage, 'DELETE', key, {}, async response => {
+  const pending = [...new Set(keys)].map(key => objectRequest(intakeStorage, 'DELETE', key, {}, async response => {
     if (!response.ok && response.status !== 404) throw new ImageStorageResponseError(response.status);
   }));
   if (options.includePublic) {

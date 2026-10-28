@@ -146,13 +146,18 @@ test("complete path generates three private correctly sized files, awaits server
   assert.equal(f.records.size, 0);
 });
 
-test("Worker advertises WebP capability and new jobs retain only processed WebP outputs", async () => {
+test("new jobs stage only display and thumbnail WebP outputs", async () => {
   const f = await fixture();
+  const displayKey = `staged/v1/${ID}/${LEASE}/display.webp`;
+  const targets = { original: displayKey, display: displayKey, thumbnail: `staged/v1/${ID}/${LEASE}/thumbnail.webp` };
+  f.setClaim({ action: "process", leaseToken: LEASE,
+    source: { key: SOURCE, sha256: hash(f.source), sizeBytes: f.source.length }, targets });
   const originalFetch = f.effects.fetch;
   f.effects.fetch = async (url, init) => {
     if (url.endsWith("/complete")) {
       assert.ok(f.records.has(SOURCE), "raw source remains private until server confirms commit");
-      assert.equal(f.writes.length, 3);
+      assert.equal(f.writes.length, 2);
+      assert.deepEqual(f.writes.map(({ key }) => key.split("/").at(-1)).sort(), ["display.webp", "thumbnail.webp"]);
       for (const { key } of f.writes) {
         assert.ok(key.endsWith(".webp"));
         assert.equal((await sharp(f.records.get(key).data).metadata()).format, "webp");
@@ -163,6 +168,7 @@ test("Worker advertises WebP capability and new jobs retain only processed WebP 
   await f.run();
   assert.deepEqual(f.callbacks[0].body, { outputFormats: ["webp-v1", "jpeg-v1"] });
   assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.deleted.sort(), [SOURCE, ...new Set(Object.values(targets))].sort());
   assert.equal(f.records.size, 0, "source and private stages are deleted only after final acknowledgement");
 });
 

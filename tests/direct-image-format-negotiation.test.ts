@@ -7,10 +7,8 @@ import { imageUploadObjectKeys } from '@/agent/marketplace/direct-image-upload-p
 import { POST as claim } from '@/app/api/internal/image-uploads/[uploadId]/claim/route';
 
 for (const scenario of [
-  { name: 'old Worker claims a new job using the legacy format', attempts: 0, existing: 'jpeg', advertised: [], expected: 'jpg' },
-  { name: 'new Worker negotiates processed WebP for a new job', attempts: 0, existing: 'jpeg', advertised: ['webp-v1', 'jpeg-v1'], expected: 'webp' },
-  { name: 'legacy JPEG retry retains its immutable keys after Worker upgrade', attempts: 1, existing: 'jpeg', advertised: ['webp-v1', 'jpeg-v1'], expected: 'jpg' },
-  { name: 'WebP retry retains its immutable keys across capability changes', attempts: 1, existing: 'webp', advertised: [], expected: 'webp' },
+  { name: 'new uploads retain WebP display derivatives only', attempts: 0, existing: 'jpeg' },
+  { name: 'retries replace stale targets with the no-original WebP contract', attempts: 1, existing: 'webp' },
 ] as const) {
   test(scenario.name, async t => {
     const previousFlag = process.env.SMARTSTORE_DIRECT_IMAGE_UPLOADS;
@@ -26,7 +24,7 @@ for (const scenario of [
     let job = { id: 'format-job', sellerId: 'owner', listingId: 'listing', status: 'pending',
       attempts: scenario.attempts as number, expiresAt: new Date(Date.now() + 60_000),
       leaseUntil: null, sha256: 'a'.repeat(64), sizeBytes: 123,
-      ...imageUploadObjectKeys('format-job', 'previous-lease', scenario.existing) };
+      ...imageUploadObjectKeys('format-job', 'previous-lease') };
     const tx = {
       listingImageUpload: {
         async findUnique() { return job; },
@@ -42,10 +40,11 @@ for (const scenario of [
       if (typeof operation !== 'function') throw new Error('unexpected_transaction');
       return operation(tx);
     });
-    const result = await claimDirectImageUpload(job.id, scenario.advertised);
+    const result = await claimDirectImageUpload(job.id);
     assert.equal(result.action, 'process');
     if (result.action !== 'process') throw new Error('processing_claim_expected');
-    assert.ok(result.targets.original.endsWith(`/original.${scenario.expected}`));
+    assert.ok(result.targets.display.endsWith('/display.webp'));
+    assert.equal(result.targets.original, result.targets.display, 'legacy original target aliases the display derivative');
     assert.equal(result.source.key, 'intake/v1/format-job.jpg', 'source upload protocol stays compatible');
     assert.equal(job.attempts, scenario.attempts + 1);
     assert.equal(job.originalKey, result.targets.original, 'format is durably recorded before returning targets');
@@ -66,8 +65,8 @@ test('unsupported worker format metadata is rejected before claiming a job', asy
   assert.equal((await response.json()).error, 'invalid_request');
 });
 
-for (const useWrongOriginal of [false, true]) {
-  test(useWrongOriginal ? 'WebP finalization refuses JPEG bytes in its negotiated full-size slot' : 'WebP finalization validates all real derivatives and attaches only processed WebP URLs', async t => {
+for (const useWrongDisplay of [false, true]) {
+  test(useWrongDisplay ? 'WebP finalization refuses non-WebP display bytes' : 'WebP finalization validates the two retained derivatives and aliases the legacy original URL', async t => {
     const flags = { SMARTSTORE_DIRECT_IMAGE_UPLOADS: 'true', SMARTSTORE_MARKETPLACE_STORE: 'database' };
     const previous = new Map(Object.keys(flags).map(key => [key, process.env[key]]));
     Object.assign(process.env, flags);
@@ -75,7 +74,7 @@ for (const useWrongOriginal of [false, true]) {
     let job = { id: 'ready-webp', sellerId: 'owner', listingId: 'listing', status: 'processing', attempts: 1,
       leaseToken: 'lease', leaseUntil: new Date(Date.now() + 60_000), expiresAt: new Date(Date.now() + 60_000),
       createdAt: new Date(), fileName: 'phone.jpg', sha256: 'a'.repeat(64), sizeBytes: 123,
-      ...imageUploadObjectKeys('ready-webp', 'lease', 'webp') };
+      ...imageUploadObjectKeys('ready-webp', 'lease') };
     const source = sharp({ create: { width: 64, height: 48, channels: 3, background: '#39846a' } });
     const webp = new Uint8Array(await source.clone().webp().toBuffer());
     const jpeg = new Uint8Array(await source.clone().jpeg().toBuffer());
@@ -104,17 +103,17 @@ for (const useWrongOriginal of [false, true]) {
     replaceDelegate(prisma.listingImage, 'findUnique', async () => attached);
     replaceDelegate(prisma.listing, 'findUnique', async () => ({ sellerId: 'owner', status: 'draft' }));
     t.mock.method(directImageUploadEffects, 'readImage', async (_job: unknown, variant: string) => ({
-      data: variant === 'original' && useWrongOriginal ? jpeg : webp,
-      mediaType: variant === 'original' && useWrongOriginal ? 'image/jpeg' : 'image/webp', etag: '"test"',
+      data: variant === 'display' && useWrongDisplay ? jpeg : webp,
+      mediaType: variant === 'display' && useWrongDisplay ? 'image/jpeg' : 'image/webp', etag: '"test"',
     }));
     t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('finalization_must_not_request_model_review'); });
     t.mock.method(directImageUploadEffects, 'promote', async () => { promotions++; return {
-      originalUrl: 'https://images.test/listings/ready-webp.webp',
+      originalUrl: 'https://images.test/listings/ready-webp-display.webp',
       displayUrl: 'https://images.test/listings/ready-webp-display.webp', thumbnailUrl: 'https://images.test/listings/ready-webp-thumbnail.webp',
     }; });
     t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
     const result = await completeDirectImageUpload(job.id, { leaseToken: 'lease' });
-    if (useWrongOriginal) {
+    if (useWrongDisplay) {
       assert.equal(result.action, 'discard');
       assert.equal(job.status, 'failed');
       assert.equal(attached, null);
@@ -126,6 +125,7 @@ for (const useWrongOriginal of [false, true]) {
       assert.ok(attached);
       const saved = attached as Record<string, unknown>;
       for (const field of ['originalUrl', 'displayUrl', 'thumbnailUrl']) assert.ok(String(saved[field]).endsWith('.webp'));
+      assert.equal(saved.originalUrl, saved.displayUrl);
       assert.equal(saved.contentReviewStatus, 'not_checked');
       assert.equal(saved.createdAt, job.createdAt);
     }

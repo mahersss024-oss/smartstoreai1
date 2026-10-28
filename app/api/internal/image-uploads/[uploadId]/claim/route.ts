@@ -11,9 +11,10 @@ const claimInput = z.object({ outputFormats: z.array(z.enum(['webp-v1', 'jpeg-v1
 export async function POST(request: Request, context: { params: Promise<{ uploadId: string }> }) {
   if (!imageUploadWorkerAuthorized(request)) return Response.json({ error: 'worker_auth_required' }, { status: 401, headers: noStoreHeaders });
   return directImageRoute(async () => {
-    // Existing Workers submit {} and keep the previous JPEG contract.
+    // Accept the capability field during Worker rollout; lease targets define
+    // the exact outputs, and new leases retain only display and thumbnail.
     const parsed = claimInput.safeParse(await readDirectImageJson(request));
     if (!parsed.success) throw new DirectImageUploadError('invalid_request', 400);
-    return claimDirectImageUpload((await context.params).uploadId, parsed.data.outputFormats);
+    return claimDirectImageUpload((await context.params).uploadId);
   });
 }

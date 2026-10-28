@@ -49,19 +49,19 @@ for (const failed of ['display', 'thumbnail'] as const) {
     });
     const { original, variants } = await sample();
     await assert.rejects(storeListingImageDelivery({ imageId: 'recovery', original, variants }), /could not be stored completely/);
-    assert.equal(writes.length, 5, 'only the failed variant is retried twice');
-    assert.equal(deletes.length, 2);
+    assert.equal(writes.length, 4, 'only the failed variant is retried twice');
+    assert.equal(deletes.length, 1);
     assert.ok(deletes.every(url => !url.includes(`-${failed}.webp`)));
   });
 }
 
-test('chat continues with later complete images after an original exhausts retries', async t => {
+test('chat continues with later complete images after a display derivative exhausts retries', async t => {
   storageEnvironment(t);
-  let firstOriginalPath: string | undefined;
+  let firstDisplayPath: string | undefined;
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
     const path = new URL(String(input)).pathname;
-    if (path.endsWith('.webp') && !/-(?:display|thumbnail)\.webp$/.test(path)) firstOriginalPath ??= path;
-    return new Response(null, { status: path === firstOriginalPath ? 503 : 200 });
+    if (path.endsWith('-display.webp')) firstDisplayPath ??= path;
+    return new Response(null, { status: path === firstDisplayPath ? 503 : 200 });
   });
   const listing = createListingDraft({ sellerId: 'recovery-chat', category: 'other', title: 'Desk' });
   const { input } = await sample();
@@ -82,7 +82,7 @@ test('transient variant failure recovers without storing original-sized aliases'
   assert.equal(displayAttempts, 2);
   assert.match(result!.displayUrl, /-display\.webp$/);
   assert.match(result!.thumbnailUrl, /-thumbnail\.webp$/);
-  assert.notEqual(result!.originalUrl, result!.displayUrl);
+  assert.equal(result!.originalUrl, result!.displayUrl);
 });
 
 test('failed shared chat delivery does not delete objects a concurrent retry may attach', async t => {
@@ -203,7 +203,7 @@ test('concurrent uploads report the actual saved image and clean up the rejected
   const responses = await Promise.all([upload(), upload()]);
   assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
   assert.equal(getListing(listing.id)?.images.length, 8);
-  assert.equal(deleted.length, 3);
+  assert.equal(deleted.length, 2);
   const savedResponse = responses.find(response => response.status === 201)!;
   const payload = await savedResponse.json();
   assert.ok(getListing(listing.id)?.images.some(image => image.id === payload.image.id));
@@ -247,7 +247,7 @@ test('replays the final allowed upload after a lost response without adding anot
   assert.equal(replay.status, 201);
   assert.equal((await replay.json()).image.id, saved.image.id);
   assert.equal(getListing(listing.id)?.images.length, 8);
-  assert.equal(objectWrites, 3, 'replay must not upload any additional variants');
+  assert.equal(objectWrites, 2, 'replay must not upload any additional variants');
 
   const additional = await upload('another-image-new-key');
   assert.equal(additional.status, 409);

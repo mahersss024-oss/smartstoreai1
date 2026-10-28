@@ -95,11 +95,10 @@ test('listing image selectors enforce surface-specific fallback order', () => {
 test('chat and multipart uploads generate server variants when clients omit them', async () => {
   const storage = await readFile(new URL('../agent/marketplace/listing-image-storage.ts', import.meta.url), 'utf8');
   const route = await readFile(new URL('../app/api/marketplace/listings/[listingId]/images/route.ts', import.meta.url), 'utf8');
-  assert.match(storage, /createListingImageVariants\(uploadedImage\)/);
-  assert.match(route, /createListingImageVariants\(\{/);
+  assert.match(storage, /createListingImageVariants\(sanitizedOriginal\)/);
+  assert.match(route, /createListingImageVariants\(sanitizedOriginal\)/);
   assert.match(route, /storeListingImageDelivery\(\{/);
-  // Storage success/failure behavior is exercised by listing-image-recovery.
-  // This boundary check only ensures uploads still generate both server variants.
+  // The high-resolution WebP master is transient; delivery stores only these two variants.
   assert.match(storage, /variants\.display, imageId, variant: 'display'/);
   assert.match(storage, /variants\.thumbnail, imageId, variant: 'thumbnail'/);
 });

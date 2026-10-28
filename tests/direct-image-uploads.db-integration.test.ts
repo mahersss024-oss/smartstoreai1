@@ -41,7 +41,7 @@ async function fixture(t: TestContext) {
   const oldEffects = { ...directImageUploadEffects };
   t.mock.method(directImageUploadEffects, 'createTransfer', (job: DirectImageObjectJob) => ({ url: `https://isolated.r2.cloudflarestorage.com/isolated-intake/${job.sourceKey}`, method: 'PUT' as const, headers: { 'Content-Type': 'image/jpeg', 'If-None-Match': '*' } }));
   t.mock.method(directImageUploadEffects, 'readImage', async (_job: DirectImageObjectJob, variant: DirectImageVariant) => ({ data: variant === 'original' ? original : variant === 'display' ? display : thumbnail, mediaType: variant === 'original' ? 'image/jpeg' : 'image/webp', etag: '"isolated-etag"' }));
-  t.mock.method(directImageUploadEffects, 'promote', async (job: DirectImageObjectJob) => ({ originalUrl: `https://images.isolated.test/listings/2026/10/${job.id}.jpg`, displayUrl: `https://images.isolated.test/listings/2026/10/${job.id}-display.webp`, thumbnailUrl: `https://images.isolated.test/listings/2026/10/${job.id}-thumbnail.webp` }));
+  t.mock.method(directImageUploadEffects, 'promote', async (job: DirectImageObjectJob) => ({ originalUrl: `https://images.isolated.test/listings/2026/10/${job.id}-display.webp`, displayUrl: `https://images.isolated.test/listings/2026/10/${job.id}-display.webp`, thumbnailUrl: `https://images.isolated.test/listings/2026/10/${job.id}-thumbnail.webp` }));
   t.mock.method(directImageUploadEffects, 'discard', async (job: DirectImageObjectJob, options?: { includePublic?: boolean }) => { cleanups.push({ id: job.id, ...options }); return true; });
   t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('manual_upload_must_not_invoke_a_model'); });
   // Any unexpected service effect must fail locally rather than contact a cloud.
@@ -105,7 +105,7 @@ test('database claims reject duplicate and stale leases without deleting a newer
   const first = await claimed(f);
   await assert.rejects(claimDirectImageUpload(first.id), { code: 'image_upload_processing' });
   await prisma.listingImageUpload.update({ where: { id: first.id }, data: { leaseUntil: new Date(0) } });
-  const next = await claimDirectImageUpload(first.id);
+    const next = await claimDirectImageUpload(first.id);
   assert.equal(next.action, 'process');
   if (next.action !== 'process') throw new Error('claim_expected');
   assert.notEqual(next.leaseToken, first.claim.leaseToken);
@@ -154,7 +154,7 @@ test('database finalization rechecks cancellation that occurs during processed-i
   const pause = new Promise<void>(resolve => { release = resolve; });
   const read = directImageUploadEffects.readImage;
   t.mock.method(directImageUploadEffects, 'readImage', async (job: DirectImageObjectJob, variant: DirectImageVariant) => {
-    if (variant === 'original') { entered(); await pause; }
+    if (variant === 'display') { entered(); await pause; }
     return read(job, variant);
   });
   const pending = completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
@@ -236,7 +236,7 @@ test('database a lease replaced during processed-image validation cannot clean a
   const pause = new Promise<void>(resolve => { release = resolve; });
   const read = directImageUploadEffects.readImage;
   t.mock.method(directImageUploadEffects, 'readImage', async (job: DirectImageObjectJob, variant: DirectImageVariant) => {
-    if (variant === 'original') { entered(); await pause; }
+    if (variant === 'display') { entered(); await pause; }
     return read(job, variant);
   });
   const pending = completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });

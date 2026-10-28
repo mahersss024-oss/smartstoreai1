@@ -156,19 +156,16 @@ export function extractLatestUploadedListingImages(
 
 export async function storeListingImageDelivery({
   imageId,
-  original,
   variants,
   cleanupOnFailure = true,
 }: {
   imageId: string;
-  original: UploadedListingImage;
+  original?: UploadedListingImage;
   variants: Awaited<ReturnType<typeof createListingImageVariants>>;
   /** Deterministic chat IDs may be shared by concurrent draft retries. */
   cleanupOnFailure?: boolean;
 }) {
-  if (!supportedMimeTypes.has(original.mediaType)) return null;
   const results = await Promise.allSettled([
-    createPersistentListingImageUrl({ ...original, imageId, variant: 'original' }),
     createPersistentListingImageUrl({ ...variants.display, imageId, variant: 'display' }),
     createPersistentListingImageUrl({ ...variants.thumbnail, imageId, variant: 'thumbnail' }),
   ]);
@@ -183,14 +180,16 @@ export async function storeListingImageDelivery({
         console.warn('[listing_image_variant_storage] cleanup=incomplete');
       }
     }
-    // Never persist an original-sized alias after a transient variant failure.
     // Shared deterministic chat objects remain available for a safe later retry.
     throw new Error('Listing image delivery variants could not be stored completely.');
   }
-  const [originalUrl, displayUrl, thumbnailUrl] = results.map(result =>
+  const [displayUrl, thumbnailUrl] = results.map(result =>
     result.status === 'fulfilled' ? result.value! : '',
   );
-  return createListingImageDeliveryUrls(originalUrl, { displayUrl, thumbnailUrl });
+  // The database still exposes originalUrl for backwards compatibility. It
+  // aliases the largest retained WebP derivative; uploaded/master bytes are
+  // never written to public object storage.
+  return createListingImageDeliveryUrls(displayUrl, { displayUrl, thumbnailUrl });
 }
 
 export async function discardUnattachedListingImage(image: Pick<ListingImage, 'id' | 'listingId' | 'originalUrl' | 'displayUrl' | 'thumbnailUrl'>) {
@@ -250,7 +249,9 @@ export async function saveUploadedListingImagesForSeller({
       sanitizedOriginal = await createSanitizedListingImageOriginal(
         uploadedImage,
       );
-      generatedVariants = await createListingImageVariants(uploadedImage);
+      // Derive both delivery sizes from the sanitized WebP held in memory.
+      // Only display and thumbnail are persisted; the master is discarded.
+      generatedVariants = await createListingImageVariants(sanitizedOriginal);
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       console.warn(`[listing_image_security] failure=${errorName}`);

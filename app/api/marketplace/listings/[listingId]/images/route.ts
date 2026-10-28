@@ -173,11 +173,9 @@ export async function POST(request: Request, context: RouteContext) {
         mediaType: file.type,
         fileName: file.name,
       });
-      generatedVariants = await createListingImageVariants({
-        data: new Uint8Array(fileBuffer),
-        mediaType: file.type,
-        fileName: file.name,
-      });
+      // Generate derivatives from the sanitized WebP in memory. The uploaded
+      // image/master is not retained as a third public object.
+      generatedVariants = await createListingImageVariants(sanitizedOriginal);
     } catch (error) {
       incrementRuntimeCounter('listing.image_upload.rejected', {
         reason:

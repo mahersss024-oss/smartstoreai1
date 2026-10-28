@@ -8,11 +8,14 @@ export const VARIANTS = Object.freeze([
   { name: "display", dimension: 900, quality: 78, format: "image/webp", file: "display.webp" },
   { name: "thumbnail", dimension: 360, quality: 68, format: "image/webp", file: "thumbnail.webp" },
 ]);
-// Keep old leases and either server/Worker deployment order compatible. The
-// server persists the negotiated choice in its lease targets before processing.
+export const DELIVERY_VARIANTS = Object.freeze(VARIANTS.filter(variant => variant.name !== "original"));
+// Keep leases issued by older server deployments processable. New no-original
+// leases alias `original` to `display`; this Worker then stages only two files.
 export const LEGACY_VARIANTS = Object.freeze(VARIANTS.map(variant => variant.name === "original"
   ? { ...variant, quality: 88, format: "image/jpeg", file: "original.jpg" } : variant));
-const variantsForTargets = targets => typeof targets?.original === "string" && targets.original.endsWith("/original.webp") ? VARIANTS : LEGACY_VARIANTS;
+const variantsForTargets = targets => targets?.original === targets?.display
+  ? DELIVERY_VARIANTS
+  : typeof targets?.original === "string" && targets.original.endsWith("/original.webp") ? VARIANTS : LEGACY_VARIANTS;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOURCE_KEY = /^intake\/v1\/([A-Za-z0-9_-]{1,128})\.jpg$/;
 const CREATE_ACTIONS = new Set(["PutObject", "CopyObject", "CompleteMultipartUpload"]);
@@ -258,8 +261,8 @@ async function processImage(env, uploadId, claim) {
 
 async function cleanPrivate(env, upload, targets) {
   const keys = [upload.key];
-  if (targets) keys.push(...VARIANTS.map(variant => targets[variant.name]));
-  await env.INTAKE.delete(keys);
+  if (targets) keys.push(...variantsForTargets(targets).map(variant => targets[variant.name]));
+  await env.INTAKE.delete([...new Set(keys)]);
 }
 
 async function finish(fetcher, origin, env, upload, claim, body) {
