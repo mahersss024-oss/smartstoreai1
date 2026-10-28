@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { getActiveMigrationTriggers, isPrismaTableType } from './database-compatibility-utils';
 
 type DmmfModel = (typeof Prisma.dmmf.datamodel.models)[number];
 type DmmfField = DmmfModel['fields'][number];
@@ -156,7 +157,12 @@ export async function getDatabaseCompatibility() {
       WHERE table_schema = current_schema()
       ORDER BY table_name, ordinal_position
     `;
-    const actualTables = new Set(actualColumns.map((column) => column.table_name));
+    const actualRelations = await tx.$queryRaw<Array<{ table_name: string; table_type: string }>>`
+      SELECT table_name, table_type
+      FROM information_schema.tables
+      WHERE table_schema = current_schema()
+    `;
+    const actualTables = new Set(actualRelations.filter((relation) => isPrismaTableType(relation.table_type)).map((relation) => relation.table_name));
     const expectedTableNames = new Set(expectedColumns.keys());
     const actualByTable = new Map<string, Set<string>>();
     for (const column of actualColumns) {
@@ -189,8 +195,8 @@ export async function getDatabaseCompatibility() {
       SELECT p.proname AS name FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = current_schema() AND p.prokind IN ('f', 'p')
     `;
-    const actualTriggers = await tx.$queryRaw<Array<{ name: string }>>`
-      SELECT t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+    const actualTriggers = await tx.$queryRaw<Array<{ name: string; table_name: string }>>`
+      SELECT t.tgname AS name, c.relname AS table_name FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = current_schema() AND NOT t.tgisinternal
     `;
@@ -198,15 +204,14 @@ export async function getDatabaseCompatibility() {
       SELECT e.extname AS name FROM pg_extension e ORDER BY e.extname
     `;
     const expectedFunctions = new Set<string>();
-    const expectedTriggers = new Set<string>();
+    const expectedTriggers = getActiveMigrationTriggers(migrations.sql);
     const expectedExtensions = new Set<string>();
     for (const sql of migrations.sql) {
       migrationObjectNames(sql, /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w$]*)"?/gi).forEach((name) => expectedFunctions.add(name));
-      migrationObjectNames(sql, /CREATE\s+(?:CONSTRAINT\s+)?TRIGGER\s+"?([a-zA-Z_][\w$]*)"?/gi).forEach((name) => expectedTriggers.add(name));
       migrationObjectNames(sql, /CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-zA-Z_][\w$]*)"?/gi).forEach((name) => expectedExtensions.add(name));
     }
     const presentFunctions = new Set(actualFunctions.map((row) => row.name));
-    const presentTriggers = new Set(actualTriggers.map((row) => row.name));
+    const presentTriggers = new Set(actualTriggers.map((row) => `${row.table_name}.${row.name}`));
     const presentExtensions = new Set(actualExtensions.map((row) => row.name));
     const missingFunctions = [...expectedFunctions].filter((name) => !presentFunctions.has(name));
     const missingTriggers = [...expectedTriggers].filter((name) => !presentTriggers.has(name));
