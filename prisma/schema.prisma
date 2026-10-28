@@ -625,3 +625,22 @@ model SiteMessage {
 
   @@index([isEnabled, expiresAt])
 }
+
+// Durable delivery metadata only; customer text is read from its owned source.
+model NotificationDeliveryJob {
+  id            String   @id
+  kind          String   @db.VarChar(32)
+  payload       Json
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken    String?
+  leaseUntil    DateTime?
+  completedAt   DateTime?
+  failedAt      DateTime?
+  lastError     String?  @db.VarChar(80)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([completedAt, failedAt, nextAttemptAt])
+  @@index([leaseUntil])
+}

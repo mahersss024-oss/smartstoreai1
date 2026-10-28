@@ -108,11 +108,11 @@ test('model categories retain older broad listings without rewriting or widening
   assert.deepEqual(getMarketplaceCategorySearchIds('legacy-custom-category'), ['legacy-custom-category']);
 });
 
-test('category classification preserves model concerns for human review without rejecting content', t => {
+test('manual category selection does not attach unrelated model concerns', t => {
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({ category: 'food', compliance: { decision: 'block', reasons: ['prohibited_product'], shariaSensitive: true } }));
   const listing = createListingDraft({ sellerId: 'catalog-policy', category: 'food', title: 'مشروب كحولي للبيع' });
   assert.equal(listing.status, 'draft');
-  assert.equal(listing.compliance.modelAssessment?.decision, 'block');
+  assert.equal(listing.compliance.modelAssessment, undefined);
 });
 
 test('database searches use the same legacy category expansion and keep explicit filters exact', async t => {

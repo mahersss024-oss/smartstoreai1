@@ -40,6 +40,11 @@ export function classifyMarketplaceIntent(text: string): MarketplaceIntentDecisi
   };
 }
 
+/** Marketplace writes do not run content models; Hamad opts into its own assessment. */
+export function createUnassessedMarketplaceCompliance(): ComplianceDecision {
+  return { decision: 'allow', reasons: [], jurisdiction: 'SA', shariaSensitive: false };
+}
+
 export function evaluateSaudiMarketplaceCompliance(text: string): ComplianceDecision {
   const result = marketplaceTextAnalyzer.peek(text);
   return result

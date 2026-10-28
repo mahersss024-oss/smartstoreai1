@@ -6,6 +6,7 @@ import { createListingId } from '@/lib/marketplace/listing-id';
 import { getMarketplaceTitleTerms, publicListingFiltersSql, titleSearchNumberSql, titleSearchConditionSql, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { createAdminAuditLog } from '@/lib/admin/audit';
 import { recordModelReview } from '@/lib/admin/model-review';
+import { enqueueFollowDeliveries, enqueueNotificationDelivery, scheduleNotificationDelivery } from '@/lib/push/delivery-jobs';
 import {
   type PaginationInput,
   normalizePagination,
@@ -22,12 +23,12 @@ import {
 } from '@/lib/push/follow-notifications';
 import { Prisma, type AdminAuditAction } from '@prisma/client';
 
-import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
+import { createUnassessedMarketplaceCompliance, evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
 import { resolveListingCategoryWithModel } from './listing-category-model';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { getComparableListings } from './market-intelligence';
-import { listingSemanticText, marketplaceTextAnalyzer, prepareListingUnderstanding } from './text-understanding';
+import { listingSemanticText, marketplaceTextAnalyzer } from './text-understanding';
 import {
   getMarketplaceSearchTermVariants,
   getMarketplaceCitySearchVariants,
@@ -610,11 +611,6 @@ async function listSimilarListingFollowerIds(
   listing: memoryStore.ListingRecord,
 ): Promise<string[]> {
   if (!shouldUseDatabaseStore()) {
-    const references = [...memorySimilarListingFollows.values()]
-      .filter(follow => follow.userId !== listing.sellerId && follow.category === listing.category)
-      .map(follow => memoryStore.getListing(follow.listingId))
-      .filter((value): value is memoryStore.ListingRecord => Boolean(value && value.status === 'published'));
-    if (references.length) await prepareListingUnderstanding([listing, ...references]);
     return [...memorySimilarListingFollows.values()]
       .filter((follow) => follow.userId !== listing.sellerId)
       .filter((follow) => follow.category === listing.category)
@@ -643,10 +639,6 @@ async function listSimilarListingFollowerIds(
   });
 
   const followerIds: string[] = [];
-
-  if (follows.length) await prepareListingUnderstanding([listing, ...follows
-    .filter(follow => follow.userId !== listing.sellerId && follow.listing?.status === 'published')
-    .map(follow => toListingRecord(follow.listing))]);
 
   for (const follow of follows) {
     if (
@@ -694,7 +686,9 @@ async function notifyFollowersWhenListingIsPublished(
   });
 
   try {
-    await notifySellerFollowersOfPublishedListing({ listing, followerIds });
+    if (shouldUseDatabaseStore()) {
+      await enqueueFollowDeliveries(listing.id, followerIds, 'seller');
+    } else await notifySellerFollowersOfPublishedListing({ listing, followerIds });
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[follow_listing_push] failure=${errorName}`);
@@ -735,14 +729,27 @@ async function notifySimilarFollowersWhenListingIsPublished(
   });
 
   try {
-    await notifySimilarListingFollowersOfPublishedListing({ listing, followerIds });
+    if (shouldUseDatabaseStore()) {
+      await enqueueFollowDeliveries(listing.id, followerIds, 'similar');
+    } else await notifySimilarListingFollowersOfPublishedListing({ listing, followerIds });
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[similar_listing_push] failure=${errorName}`);
+    if (shouldUseDatabaseStore()) throw error;
   }
 }
 
+export async function deliverPublishedListingNotifications(listingId: string) {
+  const listing = await getListing(listingId);
+  if (!listing || listing.status !== 'published') return;
+  const seller = await prisma.user.findUnique({ where: { id: listing.sellerId }, select: { deletedAt: true } });
+  if (!seller || seller.deletedAt) return;
+  await notifyFollowersWhenListingIsPublished(listing, 'draft');
+  await notifySimilarFollowersWhenListingIsPublished(listing, 'draft');
+}
+
 async function notifyPublishedListingBestEffort(listing: memoryStore.ListingRecord, previousStatus: ListingStatus) {
+  if (shouldUseDatabaseStore()) { scheduleNotificationDelivery(true); return; }
   await runOptionalTask('listing_follower_notifications', () => notifyFollowersWhenListingIsPublished(listing, previousStatus));
   await runOptionalTask('listing_similar_notifications', () => notifySimilarFollowersWhenListingIsPublished(listing, previousStatus));
 }
@@ -1039,12 +1046,6 @@ export async function listPublicMarketplaceListings(filters: PublicMarketplaceLi
 export async function listMarketplaceListings(
   filters: MarketplaceListingFilters = {},
 ) {
-  if (filters.query?.trim()) {
-    const analysis = await marketplaceTextAnalyzer.analyze(filters.query);
-    filters = { ...filters, condition: filters.condition ?? analysis?.search.condition,
-      excludedTerms: filters.excludedTerms ?? [...(analysis?.search.excludedFeatures ?? []), ...(analysis?.search.excludedColors ?? [])]
-        .flatMap(term => getMarketplaceSearchTermVariants(term, filters.query)) };
-  }
   if (!shouldUseDatabaseStore()) {
     return memoryStore.listMarketplaceListings(filters);
   }
@@ -1210,6 +1211,7 @@ export async function getListing(listingId: string) {
 
 export async function getPublicSellerProfile(
   sellerId: string,
+  options: { includeListings?: boolean } = {},
 ): Promise<PublicSellerProfile | null> {
   if (!shouldUseDatabaseStore()) {
     const publishedListings = memoryStore
@@ -1231,7 +1233,7 @@ export async function getPublicSellerProfile(
       ratingAverage: ratingStats.ratingAverage,
       ratingCount: ratingStats.ratingCount,
       followerCount: getMemorySellerFollowerCount(sellerId),
-      listings: publishedListings,
+      listings: options.includeListings === false ? [] : publishedListings,
     };
   }
 
@@ -1254,7 +1256,7 @@ export async function getPublicSellerProfile(
         deletedAt: true,
       },
     }),
-    prisma.listing.findMany({
+    options.includeListings === false ? Promise.resolve([]) : prisma.listing.findMany({
       where: {
         sellerId,
         status: 'published',
@@ -2341,7 +2343,7 @@ export async function resetIncompleteSellerDrafts(sellerId: string) {
 export async function createListingDraft(
   user: AuthSessionUser,
   input: CreateListingInput,
-  options: { idempotencyKey?: string } = {},
+  options: { idempotencyKey?: string; modelReview?: boolean } = {},
 ) {
   const id = createListingId(user.id, options.idempotencyKey);
   const replayIds = options.idempotencyKey ? [`chat-draft-${options.idempotencyKey}`, id] : [];
@@ -2352,9 +2354,14 @@ export async function createListingDraft(
       return saved;
     }
   }
-  await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
-  input = { ...input, category: await resolveListingCategoryWithModel(input) };
+  if (options.modelReview) {
+    await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
+    input = { ...input, category: await resolveListingCategoryWithModel(input) };
+  }
   input = { ...input, attributes: mergeMarketplaceCategoryAttributes(input.category, input.attributes) };
+  const compliance = options.modelReview
+    ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }))
+    : createUnassessedMarketplaceCompliance();
   if (!shouldUseDatabaseStore()) {
     for (const replayId of replayIds) {
       const saved = memoryStore.getListing(replayId);
@@ -2367,7 +2374,7 @@ export async function createListingDraft(
       ...input,
       id,
       sellerId: user.id,
-    });
+    }, { compliance });
     if (listing.compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listing.id, listingId: listing.id, userId: user.id, text: listingSemanticText(listing), assessment: listing.compliance.modelAssessment });
 
     safelyPublishRealtimeEvent({
@@ -2385,7 +2392,6 @@ export async function createListingDraft(
 
   await ensureUser(user);
 
-  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
   let listing: DatabaseListingRecord | null = null;
 
   for (let attempt = 0; attempt < maxSerializableWriteAttempts; attempt += 1) {
@@ -2475,18 +2481,22 @@ export async function updateListingForSeller(
   listingId: string,
   sellerId: string,
   updates: Partial<CreateListingInput>,
-  options: { draftOnly?: boolean } = {},
+  options: { draftOnly?: boolean; modelReview?: boolean } = {},
 ) {
   const current = await getListing(listingId);
   if (!current || current.sellerId !== sellerId || current.status === 'deleted' || (options.draftOnly && current.status !== 'draft')) return null;
   mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current);
-  await marketplaceTextAnalyzer.analyze(listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } }));
+  const assessmentText = listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } });
+  if (options.modelReview) await marketplaceTextAnalyzer.analyze(assessmentText);
   if (!shouldUseDatabaseStore()) {
     if (options.draftOnly && memoryStore.getListing(listingId)?.status !== 'draft') return null;
     const listing = memoryStore.updateListingForSeller(
       listingId,
       sellerId,
       updates,
+      { compliance: options.modelReview
+        ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...current, ...updates, attributes: mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current) }))
+        : createUnassessedMarketplaceCompliance() },
     );
 
     if (listing) {
@@ -2521,7 +2531,9 @@ export async function updateListingForSeller(
     condition: updates.condition ?? existing.condition,
     attributes: mergeMarketplaceCategoryAttributes(updates.category ?? existing.category, updates.attributes, existing),
   };
-  const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }));
+  const assessedCompliance = options.modelReview
+    ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }))
+    : createUnassessedMarketplaceCompliance();
   const compliance = existing.compliance.humanDecision === 'block'
     ? { ...assessedCompliance, humanDecision: 'block' as const, decision: existing.compliance.decision }
     : assessedCompliance;
@@ -2659,6 +2671,9 @@ export async function setListingStatusForSeller(
     }
 
     await ensureDatabaseSaleCommission(tx, updatedListing);
+    if (updatedListing.status === 'published' && existing.status !== 'published') {
+      await enqueueNotificationDelivery(tx, 'listing-published', updatedListing.id, { listingId: updatedListing.id });
+    }
 
     return updatedListing;
   }, directImageUploadsEnabled() ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined)).catch((error: unknown) => {
@@ -4077,17 +4092,11 @@ export async function addConversationMessage(
   const senderId = getActorId(sender);
 
   if (!shouldUseDatabaseStore()) {
-    const ownedConversation = memoryStore.getConversationForUser(conversationId, senderId);
-    if (ownedConversation?.status === 'open') await marketplaceTextAnalyzer.analyze(body.trim());
     const result = memoryStore.addConversationMessage(
       conversationId,
       senderId,
       body,
     );
-    if (result.message && ownedConversation) {
-      const assessment = evaluateSaudiMarketplaceCompliance(body.trim()).modelAssessment;
-      if (assessment) await recordModelReview({ subject: 'message', subjectId: conversationId, listingId: ownedConversation.listingId, userId: senderId, text: body.trim(), assessment });
-    }
 
     if (result.conversation && result.message) {
       safelyPublishRealtimeEvent({
@@ -4158,7 +4167,6 @@ export async function addConversationMessage(
   await ensureActorUser(sender);
 
   const trimmedBody = body.trim();
-  await marketplaceTextAnalyzer.analyze(trimmedBody);
   const safety = evaluateConversationMessageSafety(trimmedBody);
 
   if (safety.decision !== 'allow') {
@@ -4182,10 +4190,10 @@ export async function addConversationMessage(
       metadata: toPrismaJsonObject({}),
     },
     });
-    const assessment = evaluateSaudiMarketplaceCompliance(trimmedBody).modelAssessment;
-    if (assessment) await recordModelReview({ subject: 'message', subjectId: conversationId, listingId: conversation.listingId, userId: senderId, text: trimmedBody, assessment }, tx);
+    await enqueueNotificationDelivery(tx, 'conversation-message', created.id, { messageId: created.id });
     return created;
   });
+  scheduleNotificationDelivery(true);
 
   await prisma.conversation.update({
     where: { id: conversationId },

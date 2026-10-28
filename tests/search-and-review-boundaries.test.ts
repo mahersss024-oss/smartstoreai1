@@ -55,13 +55,13 @@ test('market search uses title matches and independent explicit filters even whe
   }
 });
 
-test('model concerns permit content and create separate administration alerts, never forged customer reports', async t => {
+test('Hamad retains advisory model reviews while buyer messages create no model assessments', async t => {
   const flagged = textAnalysis({ compliance: { decision: 'block', reasons: ['review_fixture'], shariaSensitive: false } });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => flagged);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => flagged);
   const before = getLocalModelReviews().length;
   const owner = { id: 'advisory-owner', email: 'advisory@example.test' };
-  const draft = await repository.createListingDraft(owner, { title: 'advisory-content', category: 'other' });
+  const draft = await repository.createListingDraft(owner, { title: 'advisory-content', category: 'other' }, { modelReview: true });
   assert.equal(draft.status, 'draft');
   assert.equal(draft.compliance.modelAssessment?.decision, 'block');
   assert.equal(store.setListingStatusForSeller(draft.id, owner.id, 'published')?.status, 'published');
@@ -70,7 +70,7 @@ test('model concerns permit content and create separate administration alerts, n
   assert.equal(sent.message?.status, 'sent');
   const reviews = getLocalModelReviews().slice(before);
   assert.ok(reviews.some(item => item.subject === 'listing' && item.subjectId === draft.id));
-  assert.ok(reviews.some(item => item.subject === 'message' && item.subjectId === conversation.id));
+  assert.ok(!reviews.some(item => item.subject === 'message' && item.subjectId === conversation.id));
   assert.ok(!store.listModerationQueue().reports.some(report => report.listingId === draft.id));
 });
 

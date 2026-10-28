@@ -185,7 +185,8 @@ test('APNs delivery errors keep valid device registrations unless APNs identifie
       child.mock.method(http2, 'connect', fakeApnsConnection(status, reason));
       try {
         await saveMobilePushToken({ userId: 'user-ios-error', token: 'ios-error-token-fixture', platform: 'ios' });
-        await sendNativePushToUser('user-ios-error', { title: 'رسالة', body: 'أهلًا' });
+        const delivery = sendNativePushToUser('user-ios-error', { title: 'رسالة', body: 'أهلًا' });
+        if (remains) await assert.rejects(delivery, /native_push_delivery_failed/); else await delivery;
         assert.equal((await listActiveMobilePushTokensForUser('user-ios-error')).length, remains ? 1 : 0);
       } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
     });
@@ -221,7 +222,8 @@ test('FCM only deactivates registrations for token-specific failures, not generi
       });
       try {
         await saveMobilePushToken({ userId: 'user-android-error', token: 'android-error-token-fixture', platform: 'android' });
-        await sendNativePushToUser('user-android-error', { title: 'رسالة', body: 'أهلًا' });
+        const delivery = sendNativePushToUser('user-android-error', { title: 'رسالة', body: 'أهلًا' });
+        if (fixture.remains) await assert.rejects(delivery, /native_push_delivery_failed/); else await delivery;
         assert.equal((await listActiveMobilePushTokensForUser('user-android-error')).length, fixture.remains ? 1 : 0);
       } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
     });
@@ -248,7 +250,7 @@ test('FCM rejection parsing is aborted by the delivery deadline and preserves th
   });
   try {
     await saveMobilePushToken({ userId: 'android-stalled', token: 'android-stalled-token-fixture', platform: 'android' });
-    await sendNativePushToUser('android-stalled', { title: 'رسالة', body: 'أهلًا' });
+    await assert.rejects(sendNativePushToUser('android-stalled', { title: 'رسالة', body: 'أهلًا' }), /native_push_delivery_failed/);
     assert.equal(aborted, true);
     assert.equal((await listActiveMobilePushTokensForUser('android-stalled')).length, 1);
   } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }

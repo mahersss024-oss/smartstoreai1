@@ -62,6 +62,8 @@ export async function notifySellerFollowersOfPublishedListing({
 
         if (!result.ok && result.expired) {
           await deactivateSubscriptionById(subscription.id);
+        } else if (!result.ok && result.reason !== 'push_not_configured') {
+          throw new Error('web_push_delivery_failed');
         }
       }),
       sendNativePushToUser(userId, pushMessage),
@@ -101,6 +103,8 @@ export async function notifySimilarListingFollowersOfPublishedListing({
 
         if (!result.ok && result.expired) {
           await deactivateSubscriptionById(subscription.id);
+        } else if (!result.ok && result.reason !== 'push_not_configured') {
+          throw new Error('web_push_delivery_failed');
         }
       }),
       sendNativePushToUser(userId, pushMessage),

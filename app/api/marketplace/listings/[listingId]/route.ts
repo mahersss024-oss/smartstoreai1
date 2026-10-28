@@ -67,7 +67,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   return Response.json(
-    { listing },
+    { listing: { ...listing, images: listing.images.filter(image => image.status === 'approved') } },
     {
       headers: noStoreHeaders,
     },

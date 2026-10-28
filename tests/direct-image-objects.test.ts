@@ -4,6 +4,7 @@ import {
   createDirectImageTransfer,
   discardDirectImageObjects,
   getDirectImagePublicUrls,
+  getDirectImageVariantMediaType,
   getDirectImageUploadCapability,
   getDirectImageUploadConfiguration,
   promoteProcessedImages,
@@ -100,6 +101,34 @@ test('delivery URLs retain the existing listings path and creation month across 
       thumbnailUrl: 'https://images.example.test/listings/2026/10/upload-one-thumbnail.webp',
     });
   } finally { restore(); }
+});
+
+test('new WebP leases use WebP delivery and MIME without rewriting legacy JPEG URLs', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const job = { ...fixture(), originalKey: 'staged/v1/upload-one/lease-one/original.webp' };
+  const requests: Array<{ url: URL; method: string; headers: Headers }> = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: new URL(String(input)), method: init?.method ?? 'GET', headers: new Headers(init?.headers) });
+    if (init?.method === 'HEAD') return new Response(null, { headers: { 'Content-Length': '3', 'Content-Type': 'image/webp', ETag: '"webp-etag"' } });
+    if (init?.method === 'PUT') return new Response('<CopyObjectResult><ETag>"webp-etag"</ETag></CopyObjectResult>');
+    return new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/webp' } });
+  };
+  try {
+    assert.equal(getDirectImageVariantMediaType(job, 'original'), 'image/webp');
+    assert.equal(getDirectImageVariantMediaType(fixture(), 'original'), 'image/jpeg');
+    assert.equal(getDirectImagePublicUrls(job).originalUrl, 'https://images.example.test/listings/2026/10/upload-one.webp');
+    assert.equal(getDirectImagePublicUrls(fixture()).originalUrl, 'https://images.example.test/listings/2026/10/upload-one.jpg');
+    assert.equal((await readProcessedImage(job, 'original')).mediaType, 'image/webp');
+    await promoteProcessedImages(job);
+    assert.equal(requests.filter(request => request.method === 'PUT').length, 3);
+    for (const request of requests.filter(request => request.method === 'PUT')) {
+      assert.ok(request.url.pathname.endsWith('.webp'));
+      assert.equal(request.headers.get('Content-Type'), 'image/webp');
+      assert.equal(request.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+    }
+    assert.ok(requests.every(request => !request.url.pathname.endsWith('.jpg')), 'input is not fetched or copied to public delivery');
+  } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
 test('staged reads reject keys from another job and mismatched image types', async () => {

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
-import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
 import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
@@ -202,7 +201,8 @@ export async function POST(request: Request, context: RouteContext) {
       return idempotency ? await idempotency.complete(responseBody, status) : Response.json(responseBody, { status });
     }
 
-    const contentReview = await reviewListingImageContent([sanitizedOriginal], existingListing.images, { listingId, userId: session.user.id });
+    // Image understanding belongs to Hamad chat. Manual uploads retain only
+    // authoritative ownership, limits, decoder and storage validation.
 
     const imageId = randomUUID();
     let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;
@@ -253,7 +253,7 @@ export async function POST(request: Request, context: RouteContext) {
       sizeBytes: file.size,
     });
     const image: ListingImage = {
-      contentReviewStatus: contentReview.imageReviewStatuses[0],
+      contentReviewStatus: 'not_checked',
       id: imageId,
       listingId,
       ...imageUrls,
@@ -277,8 +277,8 @@ export async function POST(request: Request, context: RouteContext) {
     const responseBody = {
       image,
       quality,
-      compliance: contentReview.compliance,
-      contentCheck: contentReview.status,
+      compliance: null,
+      contentCheck: 'not_checked',
       listing,
     };
     const responseStatus = 201;

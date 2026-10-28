@@ -1,4 +1,3 @@
-import { listingSemanticText, marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { z } from 'zod';
 import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
@@ -9,7 +8,7 @@ import { createFollowNotificationsForListing } from '@/agent/marketplace/reposit
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
 import { ensureDatabaseSaleCommission } from '@/agent/marketplace/listing-commission';
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
-import { evaluateSaudiMarketplaceCompliance } from '@/agent/marketplace/policy';
+import { createUnassessedMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -17,7 +16,6 @@ import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
-import { recordModelReview } from '@/lib/admin/model-review';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import { runOptionalTask } from '@/lib/optional-task';
 
@@ -220,9 +218,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   const contentChanged = ['category', 'categoryOption', 'carModel', 'title', 'description', 'city', 'condition'].some(
     (key) => key in parsed.data,
   );
-  if (contentChanged) await marketplaceTextAnalyzer.analyze(listingSemanticText(nextListing));
   const compliance = contentChanged
-    ? evaluateSaudiMarketplaceCompliance(listingSemanticText(nextListing))
+    ? createUnassessedMarketplaceCompliance()
     : null;
   const priceMode =
     'priceMode' in parsed.data ? parsed.data.priceMode : existing.priceMode;
@@ -258,7 +255,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     await ensureDatabaseSaleCommission(tx, listing);
-    if (compliance?.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listingId, listingId, userId: existing.sellerId, text: listingSemanticText(nextListing), assessment: compliance.modelAssessment }, tx);
     await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,

@@ -6,6 +6,7 @@ beforeEach(mockAllowedTextAnalysis);
 import test from 'node:test';
 
 import { POST } from '@/app/api/marketplace/listings/route';
+import { POST as suggestCategory } from '@/app/api/marketplace/listing-category/route';
 import { PATCH } from '@/app/api/marketplace/listings/[listingId]/route';
 import { createSessionCookie } from '@/lib/auth/session';
 import { listingCategoryClassifier } from '@/agent/marketplace/listing-category-model';
@@ -13,8 +14,8 @@ import { getListing } from '@/agent/marketplace/store';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { textAnalysis } from './helpers/text-understanding';
 
-test('existing routes support photo-free publication, model category and unchanged ownership', async t => {
-  t.mock.method(listingCategoryClassifier, 'suggest', async () => ({ category: 'mobile_phones', status: 'suggested' }));
+test('manual category suggestion precedes photo-free save and preserves ownership without reclassification', async t => {
+  const classify = t.mock.method(listingCategoryClassifier, 'suggest', async () => ({ category: 'mobile_phones', status: 'suggested' }));
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
   try {
@@ -22,13 +23,17 @@ test('existing routes support photo-free publication, model category and unchang
       Cookie: createSessionCookie({ id: 'photo-free-seller', email: 'photo-free@example.test' }).split(';')[0],
       'Content-Type': 'application/json',
     };
+    const suggestion = await suggestCategory(new Request('http://localhost/api/marketplace/listing-category', { method: 'POST', headers, body: JSON.stringify({ title: 'iPhone 15' }) }));
+    assert.equal(suggestion.status, 200);
+    const suggested = await suggestion.json();
     const created = await POST(new Request('http://localhost/api/marketplace/listings', {
       method: 'POST', headers,
-      body: JSON.stringify({ category: 'other', autoCategory: true, title: 'iPhone 15' }),
+      body: JSON.stringify({ category: suggested.category, autoCategory: false, title: 'iPhone 15' }),
     }));
     assert.equal(created.status, 201);
     const { listing } = await created.json();
     assert.equal(listing.category, 'mobile_phones');
+    assert.equal(classify.mock.callCount(), 1, 'saving reuses the accepted suggestion without a second model call');
     assert.deepEqual(listing.images, []);
     const context = { params: Promise.resolve({ listingId: listing.id }) };
     const url = `http://localhost/api/marketplace/listings/${listing.id}`;
@@ -104,5 +109,5 @@ test('accepted manual title category survives conflicting description analysis a
   assert.equal(listing.attributes.marketplaceCategoryOption, 'eyewear');
   assert.equal(listing.status, 'draft');
   assert.equal(classify.mock.callCount(), 0);
-  assert.equal(analyze.mock.callCount(), 1);
+  assert.equal(analyze.mock.callCount(), 0);
 });

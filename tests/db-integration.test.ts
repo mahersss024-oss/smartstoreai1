@@ -360,7 +360,7 @@ test('database manual title category and option survive save, description edits 
     assert.equal(saved.category, 'watches_accessories');
     assert.equal((saved.attributes as Record<string, unknown>).marketplaceCategoryOption, 'eyewear');
     assert.equal(saved.status, 'draft');
-    assert.ok(analyzed.some(text => JSON.parse(text).description === listing.description));
+    assert.equal(analyzed.length, 0, 'manual save does not analyze text');
     await repository.updateListingForSeller(listing.id, seller.id, { description: 'وصف معدل للنظارة، وليس للحاسب.' });
     const reopened = await repository.getListing(listing.id);
     assert.equal(reopened?.category, 'watches_accessories');
@@ -444,14 +444,14 @@ test('database concurrent chat draft replays create one draft and one advisory a
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
   try {
     const input = { category: 'other', title: 'Concurrent draft' };
-    const results = await Promise.all(Array.from({ length: 4 }, () => repository.createListingDraft(seller, input, { idempotencyKey: suffix })));
+    const results = await Promise.all(Array.from({ length: 4 }, () => repository.createListingDraft(seller, input, { idempotencyKey: suffix, modelReview: true })));
     assert.equal(new Set(results.map(item => item.id)).size, 1);
     assert.ok(results.every(item => item.status === 'draft' && item.compliance.decision === 'allow'));
     assert.equal(await prisma.listing.count({ where: { sellerId: seller.id } }), 1);
     const listingId = results[0].id;
     assert.equal(await prisma.adminAuditLog.count({ where: { targetType: 'ModelReview', targetId: listingId } }), 1);
     assert.equal(await prisma.report.count({ where: { listingId } }), 0);
-    const replay = await repository.createListingDraft(seller, { ...input, title: 'Different model wording' }, { idempotencyKey: suffix });
+    const replay = await repository.createListingDraft(seller, { ...input, title: 'Different model wording' }, { idempotencyKey: suffix, modelReview: true });
     assert.equal(replay.id, listingId);
     assert.equal(replay.title, input.title);
   } finally {

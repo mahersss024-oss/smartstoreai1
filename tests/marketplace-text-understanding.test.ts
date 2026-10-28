@@ -48,7 +48,7 @@ test('unavailable analysis raises an advisory review signal without deciding pub
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => null);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
   const draft = await createListingDraft({ id: 'semantic-outage-owner', email: 'outage@example.test' },
-    { category: 'other', title: 'Policy inspection unavailable', attributes: {} });
+    { category: 'other', title: 'Policy inspection unavailable', attributes: {} }, { modelReview: true });
   assert.equal(draft.status, 'draft');
   assert.equal(draft.compliance.checkStatus, 'unavailable');
   assert.equal(draft.compliance.modelAssessment?.unavailable, true);
@@ -123,17 +123,13 @@ function listing(id: string, title: string, price: number): ListingRecord {
     compliance: { decision: 'allow', reasons: [], jurisdiction: 'SA', shariaSensitive: false } };
 }
 
-test('comparables use model identity and offer kind while price arithmetic stays deterministic', async t => {
+test('comparables use explicit identity and strong words without models while price arithmetic stays deterministic', async t => {
   const target = listing('target', 'writing desk', 100);
-  const equivalent = listing('same', 'bureau', 120);
+  const equivalent = listing('same', 'writing desk', 120);
   const part = listing('part', 'desk leg', 5);
+  target.attributes.offerKind = 'product'; equivalent.attributes.offerKind = 'product'; part.attributes.offerKind = 'part';
   const unknown = listing('unknown', 'unrecognized', 500);
-  const outputs = new Map([
-    [listingSemanticText(target), textAnalysis({ product: 'desk' })],
-    [listingSemanticText(equivalent), textAnalysis({ product: 'desk' })],
-    [listingSemanticText(part), textAnalysis({ product: 'desk', offerKind: 'part' })],
-  ]);
-  t.mock.method(marketplaceTextAnalyzer, 'peek', (text: string) => outputs.get(text) ?? null);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => { throw new Error('similarity must not read model results'); });
   const comparables = getComparableListings(target, [part, unknown, equivalent]);
   assert.deepEqual(comparables.map(item => item.id), ['same']);
   const market = analyzeListingMarket(target, comparables);

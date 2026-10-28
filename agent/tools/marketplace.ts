@@ -209,7 +209,7 @@ export function createMarketplaceTools(
             ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
           if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
           const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
-          listing = await createListingDraft(session.user, listingInput, { idempotencyKey });
+          listing = await createListingDraft(session.user, listingInput, { idempotencyKey, modelReview: true });
           if (listing.status === 'draft' || listing.status === 'pending') options.onDraftSaved?.(listing.id);
         } catch (error) {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
@@ -322,7 +322,7 @@ export function createMarketplaceTools(
           targetListing.id,
           session.user.id,
           normalizeListingDetailsInput(updates),
-          { draftOnly: true },
+          { draftOnly: true, modelReview: true },
         ).catch((error: unknown) => {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return error;
           throw error;

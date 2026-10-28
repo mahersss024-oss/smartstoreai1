@@ -139,3 +139,22 @@ test('missing and deleted database sellers return 404 without exposing their pro
     });
   }
 });
+
+
+test('summary profile skips listing payload queries and still returns accurate public counts', async t => {
+  useStore(t, 'database');
+  const fixture = sellerFixture(`profile-summary-${randomUUID()}`);
+  mockDatabaseSellerReads(t, fixture);
+  let listingReads = 0;
+  prisma.listing.findMany = (async () => { listingReads++; throw new Error('Summary must not load seller listings'); }) as unknown as typeof prisma.listing.findMany;
+  prisma.listing.count = (async () => 37) as unknown as typeof prisma.listing.count;
+  const response = await GET(new Request(`http://localhost/api/marketplace/users/${fixture.id}/profile?summary=1`), {
+    params: Promise.resolve({ userId: fixture.id }),
+  });
+  assert.equal(response.status, 200);
+  const { seller } = await response.json();
+  assert.equal(seller.publishedListingCount, 37);
+  assert.deepEqual(seller.listings, []);
+  assert.equal(Object.hasOwn(seller, 'phoneNumber'), false);
+  assert.equal(listingReads, 0);
+});

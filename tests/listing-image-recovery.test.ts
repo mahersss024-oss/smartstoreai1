@@ -60,7 +60,7 @@ test('chat continues with later complete images after an original exhausts retri
   let firstOriginalPath: string | undefined;
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
     const path = new URL(String(input)).pathname;
-    if (path.endsWith('.jpg')) firstOriginalPath ??= path;
+    if (path.endsWith('.webp') && !/-(?:display|thumbnail)\.webp$/.test(path)) firstOriginalPath ??= path;
     return new Response(null, { status: path === firstOriginalPath ? 503 : 200 });
   });
   const listing = createListingDraft({ sellerId: 'recovery-chat', category: 'other', title: 'Desk' });
@@ -187,7 +187,7 @@ test('concurrent uploads report the actual saved image and clean up the rejected
     const url = new URL(String(input));
     if (!url.hostname.endsWith('r2.cloudflarestorage.com')) return previousFetch(input, init);
     if (init?.method === 'DELETE') deleted.push(url.pathname);
-    if (init?.method === 'PUT' && url.pathname.endsWith('.jpg')) {
+    if (init?.method === 'PUT' && url.pathname.endsWith('.webp') && !/-(?:display|thumbnail)\.webp$/.test(url.pathname)) {
       if (++started === 2) release();
       await bothStarted;
     }

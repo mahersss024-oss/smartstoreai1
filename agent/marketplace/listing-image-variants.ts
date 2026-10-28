@@ -158,13 +158,13 @@ export async function createSanitizedListingImageOriginal(input: {
       withoutEnlargement: true,
     })
     .flatten({ background: '#ffffff' })
-    .jpeg({ quality: 88, mozjpeg: true })
+    .webp({ quality: 84, smartSubsample: true })
     .toBuffer({ resolveWithObject: true });
 
   return {
     data: new Uint8Array(data),
-    mediaType: 'image/jpeg',
-    fileName: `${baseName}-original.jpg`,
+    mediaType: 'image/webp',
+    fileName: `${baseName}-original.webp`,
     width: info.width,
     height: info.height,
     detectedMediaType: metadata.detectedMediaType,

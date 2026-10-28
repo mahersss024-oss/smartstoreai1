@@ -13,7 +13,7 @@ import { getMaxListingImagesPerListing } from './listing-image-limits';
 import { scheduleListingEvidenceCopy } from './evidence';
 import {
   createDirectImageTransfer, discardDirectImageObjects, getDirectImageUploadConfiguration,
-  promoteProcessedImages, readProcessedImage,
+  promoteProcessedImages, readProcessedImage, getDirectImageVariantMediaType,
 } from './direct-image-objects';
 import {
   activeImageUploadStatuses, DirectImageUploadError, directImageUploadsEnabled,
@@ -214,7 +214,7 @@ const discardClaim = (job?: ListingImageUpload | null) => ({
   ...(job ? { source: { key: job.sourceKey }, targets: { original: job.originalKey, display: job.displayKey, thumbnail: job.thumbnailKey } } : {}),
 });
 
-export async function claimDirectImageUpload(uploadId: string) {
+export async function claimDirectImageUpload(uploadId: string, outputFormats: readonly string[] = []) {
   const result = await serializable(async tx => {
     const job = await tx.listingImageUpload.findUnique({ where: { id: uploadId } });
     if (!job) return discardClaim();
@@ -229,10 +229,13 @@ export async function claimDirectImageUpload(uploadId: string) {
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { status, errorCode: status === 'failed' ? 'image_processing_attempts_exhausted' : null, leaseToken: null, leaseUntil: null } });
       return discardClaim(job);
     }
+    const outputFormat = job.attempts > 0
+      ? (job.originalKey?.endsWith('/original.webp') ? 'webp' : 'jpeg')
+      : (outputFormats.includes('webp-v1') ? 'webp' : 'jpeg');
     const leaseToken = randomUUID();
     const updated = await tx.listingImageUpload.update({ where: { id: job.id }, data: {
       status: 'processing', leaseToken, leaseUntil: new Date(now.getTime() + directImageUploadLeaseMs),
-      attempts: { increment: 1 }, ...imageUploadObjectKeys(job.id, leaseToken), errorCode: null,
+      attempts: { increment: 1 }, ...imageUploadObjectKeys(job.id, leaseToken, outputFormat), errorCode: null,
     } });
     return { action: 'process' as const, leaseToken,
       source: { key: updated.sourceKey, sha256: updated.sha256, sizeBytes: updated.sizeBytes },
@@ -246,8 +249,8 @@ export async function claimDirectImageUpload(uploadId: string) {
   return result;
 }
 
-async function validateProcessedImage(image: { data: Uint8Array; mediaType: string }, variant: 'original' | 'display' | 'thumbnail') {
-  const format = variant === 'original' ? 'jpeg' : 'webp';
+async function validateProcessedImage(image: { data: Uint8Array; mediaType: string }, variant: 'original' | 'display' | 'thumbnail', mediaType: string) {
+  const format = mediaType === 'image/jpeg' ? 'jpeg' : 'webp';
   if (image.mediaType.split(';')[0] !== `image/${format}` || image.data.byteLength === 0 || image.data.byteLength > 12 * 1024 * 1024) {
     throw new DirectImageUploadError('invalid_processed_image', 422);
   }
@@ -299,11 +302,12 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
   try {
     const variants = await Promise.all((['original', 'display', 'thumbnail'] as const).map(async variant => {
       const image = await directImageUploadEffects.readImage(job, variant);
-      await validateProcessedImage(image, variant);
+      await validateProcessedImage(image, variant, getDirectImageVariantMediaType(job, variant));
       return image;
     }));
     const [original] = variants;
-    const review = await directImageUploadEffects.review([original], [], { listingId: job.listingId, userId: job.sellerId });
+    // The direct/manual upload path performs technical checks only. Hamad
+    // retains its independent image understanding and review within chat.
     const quality = analyzeImageQuality({ fileName: job.fileName, mimeType: original.mediaType, sizeBytes: original.data.byteLength });
     const finalized = await serializable(async tx => {
       const current = await tx.listingImageUpload.findUnique({ where: { id: job.id } });
@@ -322,11 +326,16 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
       await tx.listing.update({ where: { id: listing.id }, data: { updatedAt: listing.updatedAt } });
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { updatedAt: new Date() } });
       const urls = await directImageUploadEffects.promote(current);
+      const approved = listing.images.filter(image => image.status === 'approved');
+      const firstBySelection = !approved.some(image => image.createdAt <= job.createdAt);
+      if (firstBySelection && approved.length) {
+        await tx.listingImage.updateMany({ where: { listingId: job.listingId, isPrimary: true }, data: { isPrimary: false } });
+      }
       await tx.listingImage.create({ data: {
         id: job.id, listingId: job.listingId, ...urls, status: 'approved',
-        isPrimary: !listing.images.some(image => image.status === 'approved'),
+        isPrimary: firstBySelection,
         qualityScore: quality.qualityScore, enhancements: quality.enhancements,
-        contentReviewStatus: review.imageReviewStatuses[0],
+        contentReviewStatus: 'not_checked', createdAt: job.createdAt,
       } });
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { status: 'ready', readyAt: new Date(), leaseToken: null, leaseUntil: null, errorCode: null } });
       return 'finalized' as const;

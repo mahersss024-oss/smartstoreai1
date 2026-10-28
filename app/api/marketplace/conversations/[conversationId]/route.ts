@@ -366,7 +366,7 @@ export async function POST(request: Request, context: RouteContext) {
     result.conversation &&
     result.message
   ) {
-    await notifyConversationMessage({
+    if (process.env.SMARTSTORE_MARKETPLACE_STORE !== 'database') await notifyConversationMessage({
       conversation: result.conversation,
       message: result.message,
       senderName: session.user.name,

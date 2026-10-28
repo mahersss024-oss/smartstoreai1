@@ -4,10 +4,15 @@
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 45_000_000;
 export const VARIANTS = Object.freeze([
-  { name: "original", dimension: 1800, quality: 88, format: "image/jpeg", file: "original.jpg" },
+  { name: "original", dimension: 1800, quality: 84, format: "image/webp", file: "original.webp" },
   { name: "display", dimension: 900, quality: 78, format: "image/webp", file: "display.webp" },
   { name: "thumbnail", dimension: 360, quality: 68, format: "image/webp", file: "thumbnail.webp" },
 ]);
+// Keep old leases and either server/Worker deployment order compatible. The
+// server persists the negotiated choice in its lease targets before processing.
+export const LEGACY_VARIANTS = Object.freeze(VARIANTS.map(variant => variant.name === "original"
+  ? { ...variant, quality: 88, format: "image/jpeg", file: "original.jpg" } : variant));
+const variantsForTargets = targets => typeof targets?.original === "string" && targets.original.endsWith("/original.webp") ? VARIANTS : LEGACY_VARIANTS;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOURCE_KEY = /^intake\/v1\/([A-Za-z0-9_-]{1,128})\.jpg$/;
 const CREATE_ACTIONS = new Set(["PutObject", "CopyObject", "CompleteMultipartUpload"]);
@@ -132,9 +137,9 @@ function validateConfiguration(env) {
 function validateTargets(targets, uploadId, leaseToken) {
   if (!targets || typeof targets !== "object") throw new PipelineError("worker_contract_invalid");
   let prefix;
-  for (const variant of VARIANTS) {
+  for (const variant of variantsForTargets(targets)) {
     const key = targets[variant.name];
-    const match = typeof key === "string" && key.match(/^staged\/v1\/([A-Za-z0-9_-]{1,128})\/([A-Za-z0-9_-]{1,128})\/(original\.jpg|display\.webp|thumbnail\.webp)$/);
+    const match = typeof key === "string" && key.match(/^staged\/v1\/([A-Za-z0-9_-]{1,128})\/([A-Za-z0-9_-]{1,128})\/(original\.(?:jpg|webp)|display\.webp|thumbnail\.webp)$/);
     if (!match || match[1] !== uploadId || match[3] !== variant.file || (leaseToken && match[2] !== leaseToken)) throw new PipelineError("worker_contract_invalid");
     if (prefix && prefix !== match[2]) throw new PipelineError("worker_contract_invalid");
     prefix = match[2];
@@ -233,7 +238,7 @@ async function storeStage(env, uploadId, claim, variant, bytes) {
 async function processImage(env, uploadId, claim) {
   const { bytes, info: sourceInfo } = await readSource(env, claim);
   // Sequential transforms bound per-invocation memory and service concurrency.
-  for (const variant of VARIANTS) {
+  for (const variant of variantsForTargets(claim.targets)) {
     const output = await env.IMAGES.input(bytesStream(bytes))
       .transform({ width: variant.dimension, height: variant.dimension, fit: "scale-down" })
       .output({ format: variant.format, quality: variant.quality, anim: false });
@@ -274,7 +279,7 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
     const origin = validateConfiguration(env);
     upload = parseUploadEvent(message.body, env.INTAKE_BUCKET_NAME);
     if (!upload) { message.ack(); return; }
-    const claim = await callback(fetcher, origin, env, upload.uploadId, "claim", {});
+    const claim = await callback(fetcher, origin, env, upload.uploadId, "claim", { outputFormats: ["webp-v1", "jpeg-v1"] });
     validateClaim(claim, upload);
     if (claim.action === "discard") {
       await cleanPrivate(env, upload, claim.targets);

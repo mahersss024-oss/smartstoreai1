@@ -130,7 +130,7 @@ test('listing details renders compact similar ads from existing comparable logic
   assert.match(listingPage, /getComparableListings/);
   assert.match(listingPage, /getDetailSimilarListings/);
   assert.match(listingPage, /async function SimilarListingsSection/);
-  assert.match(listingPage, /await prepareListingUnderstanding\(\[listing, \.\.\.candidateSimilarListings\]\)/);
+  assert.doesNotMatch(listingPage, /prepareListingUnderstanding|marketplaceTextAnalyzer/);
   assert.match(listingPage, /<Suspense fallback=\{null\}>[\s\S]*<SimilarListingsSection listing=\{listing\} \/>/);
   assert.doesNotMatch(listingPage.slice(listingPage.indexOf('export default async function ListingDetailsPage')), /prepareListingUnderstanding|listMarketplaceListings/);
   assert.match(listingPage, /strictMatches = getComparableListings/);

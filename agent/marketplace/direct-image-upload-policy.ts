@@ -29,10 +29,10 @@ export function isImageUploadActive(job: { status: string; expiresAt: Date }, no
   return activeImageUploadStatuses.some(status => status === job.status) && job.expiresAt > now;
 }
 
-export function imageUploadObjectKeys(id: string, leaseToken = 'unclaimed') {
+export function imageUploadObjectKeys(id: string, leaseToken = 'unclaimed', outputFormat: 'jpeg' | 'webp' = 'jpeg') {
   return {
     sourceKey: `intake/v1/${id}.jpg`,
-    originalKey: `staged/v1/${id}/${leaseToken}/original.jpg`,
+    originalKey: `staged/v1/${id}/${leaseToken}/original.${outputFormat === 'webp' ? 'webp' : 'jpg'}`,
     displayKey: `staged/v1/${id}/${leaseToken}/display.webp`,
     thumbnailKey: `staged/v1/${id}/${leaseToken}/thumbnail.webp`,
   };

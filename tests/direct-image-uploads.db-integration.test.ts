@@ -43,7 +43,7 @@ async function fixture(t: TestContext) {
   t.mock.method(directImageUploadEffects, 'readImage', async (_job: DirectImageObjectJob, variant: DirectImageVariant) => ({ data: variant === 'original' ? original : variant === 'display' ? display : thumbnail, mediaType: variant === 'original' ? 'image/jpeg' : 'image/webp', etag: '"isolated-etag"' }));
   t.mock.method(directImageUploadEffects, 'promote', async (job: DirectImageObjectJob) => ({ originalUrl: `https://images.isolated.test/listings/2026/10/${job.id}.jpg`, displayUrl: `https://images.isolated.test/listings/2026/10/${job.id}-display.webp`, thumbnailUrl: `https://images.isolated.test/listings/2026/10/${job.id}-thumbnail.webp` }));
   t.mock.method(directImageUploadEffects, 'discard', async (job: DirectImageObjectJob, options?: { includePublic?: boolean }) => { cleanups.push({ id: job.id, ...options }); return true; });
-  t.mock.method(directImageUploadEffects, 'review', async () => ({ status: 'allowed' as const, message: undefined, compliance: null, imageReviewStatuses: ['clear' as const] }));
+  t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('manual_upload_must_not_invoke_a_model'); });
   // Any unexpected service effect must fail locally rather than contact a cloud.
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_cloud_io_forbidden_in_direct_image_test'); });
   t.after(async () => {
@@ -145,14 +145,18 @@ test('database cancellation, deletion and account deactivation reject late compl
   assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 0);
 });
 
-test('database finalization rechecks cancellation that occurs during advisory model review', { skip: !enabled }, async t => {
+test('database finalization rechecks cancellation that occurs during processed-image validation', { skip: !enabled }, async t => {
   const f = await fixture(t);
   const item = await claimed(f);
   let release!: () => void;
   let entered!: () => void;
   const reviewing = new Promise<void>(resolve => { entered = resolve; });
   const pause = new Promise<void>(resolve => { release = resolve; });
-  t.mock.method(directImageUploadEffects, 'review', async () => { entered(); await pause; return { status: 'allowed' as const, message: undefined, compliance: null, imageReviewStatuses: ['clear' as const] }; });
+  const read = directImageUploadEffects.readImage;
+  t.mock.method(directImageUploadEffects, 'readImage', async (job: DirectImageObjectJob, variant: DirectImageVariant) => {
+    if (variant === 'original') { entered(); await pause; }
+    return read(job, variant);
+  });
   const pending = completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
   await reviewing;
   await cancelOwnedDirectImageUpload(f.listing.id, f.seller.id, item.id);
@@ -223,14 +227,18 @@ test('database expiration cleanup retries failures and durable manifests survive
   assert.equal((await completeDirectImageUpload(ready.id, { leaseToken: ready.claim.leaseToken })).action, 'discard');
 });
 
-test('database a lease replaced during review cannot clean another worker source or final files', { skip: !enabled }, async t => {
+test('database a lease replaced during processed-image validation cannot clean another worker source or final files', { skip: !enabled }, async t => {
   const f = await fixture(t);
   const item = await claimed(f);
   let release!: () => void;
   let entered!: () => void;
   const reviewing = new Promise<void>(resolve => { entered = resolve; });
   const pause = new Promise<void>(resolve => { release = resolve; });
-  t.mock.method(directImageUploadEffects, 'review', async () => { entered(); await pause; return { status: 'allowed' as const, message: undefined, compliance: null, imageReviewStatuses: ['clear' as const] }; });
+  const read = directImageUploadEffects.readImage;
+  t.mock.method(directImageUploadEffects, 'readImage', async (job: DirectImageObjectJob, variant: DirectImageVariant) => {
+    if (variant === 'original') { entered(); await pause; }
+    return read(job, variant);
+  });
   const pending = completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
   await reviewing;
   await prisma.listingImageUpload.update({ where: { id: item.id }, data: { leaseUntil: new Date(0) } });
@@ -271,15 +279,15 @@ test('database cleanup prunes old finished metadata while keeping attached image
   assert.ok(await prisma.listingImageUpload.findUnique({ where: { id: attached.id } }));
 });
 
-test('database valid image edits preserve human rejection and model concerns stay advisory', { skip: !enabled }, async t => {
+test('database technical image edits preserve human rejection without invoking model assessment', { skip: !enabled }, async t => {
   const f = await fixture(t);
   const item = await claimed(f);
   await prisma.listing.update({ where: { id: f.listing.id }, data: { status: 'rejected', compliance: { decision: 'allow', reasons: [], humanDecision: 'block' } } });
-  t.mock.method(directImageUploadEffects, 'review', async () => ({ status: 'allowed' as const, message: undefined, compliance: null, imageReviewStatuses: ['unclear' as const] }));
+  t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('manual_upload_must_not_invoke_a_model'); });
   assert.equal((await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken })).action, 'ready');
   const image = await prisma.listingImage.findUniqueOrThrow({ where: { id: item.id } });
   assert.equal(image.status, 'approved');
-  assert.equal(image.contentReviewStatus, 'unclear');
+  assert.equal(image.contentReviewStatus, 'not_checked');
   const moderated = await prisma.listing.findUniqueOrThrow({ where: { id: f.listing.id } });
   assert.deepEqual(moderated.compliance, { decision: 'allow', reasons: [], humanDecision: 'block' });
   assert.equal(moderated.status, 'rejected');

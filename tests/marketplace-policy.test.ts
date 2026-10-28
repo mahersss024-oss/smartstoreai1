@@ -53,7 +53,7 @@ test('model concerns and inspection outages cannot block conversation messages',
       compliance: { decision, reasons: ['policy'], shariaSensitive: false },
     }));
     assert.equal(evaluateConversationMessageSafety('message').decision, 'allow');
-    assert.ok(evaluateConversationMessageSafety('message').reasons.length > 0);
+    assert.deepEqual(evaluateConversationMessageSafety('message').reasons, []);
   }
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => null);
   assert.equal(evaluateConversationMessageSafety('message').decision, 'allow');

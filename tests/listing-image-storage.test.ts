@@ -164,7 +164,7 @@ test('returns a controlled error for malformed listing image uploads', async () 
 });
 
 for (const reviewDecision of ['allow', 'needs_review', 'unavailable'] as const) {
-test(`accepts eight images when content review is ${reviewDecision} and rejects the ninth`, async (t) => {
+test(`manual upload ignores ${reviewDecision} model availability, accepts eight images and rejects the ninth`, async (t) => {
   const listing = createListingDraft({
     sellerId: `seller:unconditional-images-${reviewDecision}`, category: 'cars', title: 'Car listing',
   });
@@ -183,8 +183,9 @@ test(`accepts eight images when content review is ${reviewDecision} and rejects 
     const body = await response.json();
     assert.equal(response.status, 201);
     assert.equal(body.image.status, 'approved');
-    assert.equal(body.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
-    if (reviewDecision === 'unavailable') assert.equal(body.compliance, null);
+    assert.equal(body.contentCheck, 'not_checked');
+    assert.equal(body.compliance, null);
+    assert.equal(body.image.contentReviewStatus, 'not_checked');
     assert.ok(body.image.thumbnailUrl);
     assert.ok(body.image.displayUrl);
   }
@@ -194,13 +195,13 @@ test(`accepts eight images when content review is ${reviewDecision} and rejects 
   ), { params: Promise.resolve({ listingId: listing.id }) });
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, 'listing_image_limit_reached');
-  assert.equal(networkCalls(), 1, 'identical image bytes reuse one content assessment');
+  assert.equal(networkCalls(), 0, 'manual image upload never requests model assessment');
   assert.equal(listSellerListings(listing.sellerId)[0].images.length, defaultMaxListingImages);
 });
 }
 
-test('model concern permits image storage with an administration review signal', async (t) => {
-  mockImageContentReview(t, 'block');
+test('manual image upload never requests a content model even when provider would reject', async (t) => {
+  const networkCalls = mockImageContentReview(t, 'block');
   const listing = createListingDraft({ sellerId: 'seller:blocked-image', category: 'other', title: 'Desk' });
   addListingImageForSeller(listing.id, listing.sellerId, {
     id: 'approved-before-block', listingId: listing.id,
@@ -216,8 +217,10 @@ test('model concern permits image storage with an administration review signal',
   ), { params: Promise.resolve({ listingId: listing.id }) });
   assert.equal(response.status, 201);
   const payload = await response.json();
-  assert.equal(payload.compliance.decision, 'block');
-  assert.equal(payload.image.contentReviewStatus, 'unclear');
+  assert.equal(payload.compliance, null);
+  assert.equal(payload.contentCheck, 'not_checked');
+  assert.equal(payload.image.contentReviewStatus, 'not_checked');
+  assert.equal(networkCalls(), 0);
   assert.equal(listSellerListings(listing.sellerId)[0].images.length, 2);
 });
 
@@ -375,7 +378,7 @@ test('saves only the remaining available image slots for chat uploads', async ()
     assert.equal(updated?.images.length, defaultMaxListingImages);
     assert.equal(
       updated?.images.some(
-        (image) => image.originalUrl.startsWith('data:image/jpeg;base64,'),
+        (image) => image.originalUrl.startsWith('data:image/webp;base64,'),
       ),
       true,
     );

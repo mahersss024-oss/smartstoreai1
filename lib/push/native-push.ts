@@ -364,6 +364,8 @@ export async function sendNativePushToUser(
 
       if (!result.ok && result.expired) {
         await deactivateMobilePushToken(record.token, userId);
+      } else if (!result.ok) {
+        throw new Error('native_push_delivery_failed');
       }
     }),
   );

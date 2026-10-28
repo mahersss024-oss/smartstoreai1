@@ -26,7 +26,11 @@ export type DirectImageObjectJob = {
 
 const maxImageBytes = 12 * 1024 * 1024;
 const finalCacheControl = 'public, max-age=31536000, immutable';
-const variantMediaTypes = { original: 'image/jpeg', display: 'image/webp', thumbnail: 'image/webp' } as const;
+export function getDirectImageVariantMediaType(job: DirectImageObjectJob, variant: DirectImageVariant): 'image/jpeg' | 'image/webp' {
+  // The output choice is durable in the server-generated original target.
+  // Legacy jobs keep their JPEG destination across retries and deployments.
+  return variant === 'original' && !job.originalKey?.endsWith('/original.webp') ? 'image/jpeg' : 'image/webp';
+}
 
 /** Server-only configuration. Never serialize storage credentials in bootstrap. */
 export function getDirectImageUploadConfiguration(options: { ignoreEnabled?: boolean } = {}) {
@@ -85,7 +89,7 @@ function assertJob(job: DirectImageObjectJob) {
 function stagedKey(job: DirectImageObjectJob, variant: DirectImageVariant) {
   assertJob(job);
   const key = job[`${variant}Key`];
-  const extension = variant === 'original' ? 'jpg' : 'webp';
+  const extension = getDirectImageVariantMediaType(job, variant) === 'image/jpeg' ? 'jpg' : 'webp';
   const prefix = `staged/v1/${job.id}/`;
   const suffix = `/${variant}.${extension}`;
   if (!key?.startsWith(prefix) || !key.endsWith(suffix) ||
@@ -100,7 +104,8 @@ function publicKey(job: DirectImageObjectJob, variant: DirectImageVariant) {
   if (!Number.isFinite(job.createdAt.getTime())) throw new Error('invalid_image_upload_date');
   const year = job.createdAt.getUTCFullYear();
   const month = String(job.createdAt.getUTCMonth() + 1).padStart(2, '0');
-  return `listings/${year}/${month}/${job.id}${variant === 'original' ? '.jpg' : `-${variant}.webp`}`;
+  const extension = getDirectImageVariantMediaType(job, variant) === 'image/jpeg' ? 'jpg' : 'webp';
+  return `listings/${year}/${month}/${job.id}${variant === 'original' ? '' : `-${variant}`}.${extension}`;
 }
 
 export function getDirectImagePublicUrls(job: DirectImageObjectJob) {
@@ -173,7 +178,7 @@ export async function readProcessedImage(job: DirectImageObjectJob, variant: Dir
   return objectRequest(intakeStorage, 'GET', stagedKey(job, variant), {}, async response => {
     if (!response.ok) throw new ImageStorageResponseError(response.status);
     const mediaType = response.headers.get('content-type')?.split(';')[0].trim();
-    if (mediaType !== variantMediaTypes[variant]) throw new Error('image_type_mismatch');
+    if (mediaType !== getDirectImageVariantMediaType(job, variant)) throw new Error('image_type_mismatch');
     const data = await boundedBody(response, maxImageBytes);
     if (!data.length) throw new Error('image_upload_empty_response');
     return { data, mediaType, etag: response.headers.get('etag') };
@@ -192,7 +197,7 @@ export async function promoteProcessedImages(job: DirectImageObjectJob) {
       if (!response.ok) throw new ImageStorageResponseError(response.status);
       const contentLength = Number(response.headers.get('content-length'));
       if (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > maxImageBytes ||
-        response.headers.get('content-type')?.split(';')[0].trim() !== variantMediaTypes[variant]) {
+        response.headers.get('content-type')?.split(';')[0].trim() !== getDirectImageVariantMediaType(job, variant)) {
         throw new Error('invalid_processed_image');
       }
       const value = response.headers.get('etag');
@@ -200,7 +205,7 @@ export async function promoteProcessedImages(job: DirectImageObjectJob) {
       return value;
     }, deadline);
     await objectRequest(storage, 'PUT', publicKey(job, variant), {
-      'Content-Type': variantMediaTypes[variant],
+      'Content-Type': getDirectImageVariantMediaType(job, variant),
       'Cache-Control': finalCacheControl,
       'x-amz-copy-source': `/${intakeStorage.bucket}/${source}`,
       'x-amz-copy-source-if-match': etag,

@@ -44,8 +44,13 @@ test('sanitizes uploaded listing originals before storage', async () => {
   });
 
   assert.equal(detectListingImageMimeType(new Uint8Array(source)), 'image/png');
-  assert.equal(original.mediaType, 'image/jpeg');
-  assert.equal(original.fileName, 'unsafe-upload-original.jpg');
+  assert.equal(original.mediaType, 'image/webp');
+  assert.equal(original.fileName, 'unsafe-upload-original.webp');
+  const metadata = await sharp(original.data).metadata();
+  assert.equal(metadata.format, 'webp');
+  assert.equal(metadata.exif, undefined);
+  assert.equal(metadata.iptc, undefined);
+  assert.equal(metadata.xmp, undefined);
   assert.equal(original.width, listingOriginalMaxDimension);
   assert.ok(original.data.byteLength < source.byteLength);
 });

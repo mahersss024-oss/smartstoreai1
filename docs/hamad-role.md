@@ -1,3 +1,9 @@
+> Current behavior update (2026-10-28): model calls are limited to Hamad chat
+> and manual category suggestions. Manual marketplace writes, photo uploads,
+> buyer/seller messages and similarity use no model assessments. See
+> [implementation and deployment notes](mobile-image-performance-2026-10-28.md).
+> Earlier assessment and search descriptions below are historical context.
+
 # Hamad: Drafts And Platform Help
 
 Hamad has exactly two customer-facing roles: preparing owned unpublished listing

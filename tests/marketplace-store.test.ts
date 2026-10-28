@@ -72,7 +72,7 @@ test('creates an allowed marketplace listing draft', () => {
   assert.equal(listing.sellerId, 'seller:test-1');
 });
 
-test('model-blocked assessments are advisory and cannot reject listing drafts', (t) => {
+test('manual drafts ignore cached model assessments and create no automatic review', (t) => {
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => textAnalysis({
     compliance: { decision: 'block', reasons: ['prohibited_content'], shariaSensitive: false },
   }));
@@ -84,7 +84,7 @@ test('model-blocked assessments are advisory and cannot reject listing drafts', 
 
   assert.equal(listing.status, 'draft');
   assert.equal(listing.compliance.decision, 'allow');
-  assert.equal(listing.compliance.modelAssessment?.decision, 'block');
+  assert.equal(listing.compliance.modelAssessment, undefined);
 });
 
 test('publishes only compliant listings', () => {

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { startNotificationDeliveryPump } from './notification-delivery-pump.mjs';
 
 const minimumSupportedNodeMajor = 22;
 const maximumSupportedNodeMajor = 24;
@@ -107,6 +108,11 @@ const child = spawn(
 );
 
 let shuttingDown = false;
+const stopNotificationPump = startNotificationDeliveryPump({ port,
+  secret: process.env.SMARTSTORE_IMAGE_WORKER_SECRET,
+  enabled: getMarketplaceStoreMode() === 'database',
+});
+child.once('exit', stopNotificationPump);
 
 function forwardSignal(signal) {
   if (shuttingDown) {
@@ -114,6 +120,7 @@ function forwardSignal(signal) {
   }
 
   shuttingDown = true;
+  stopNotificationPump();
   console.log(`[startup] received ${signal}, shutting down gracefully...`);
 
   const forceExitTimer = setTimeout(() => {

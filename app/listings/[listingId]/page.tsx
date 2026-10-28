@@ -24,7 +24,6 @@ import {
   listMarketplaceListings,
 } from '@/agent/marketplace/repository';
 import { getComparableListings } from '@/agent/marketplace/market-intelligence';
-import { prepareListingUnderstanding } from '@/agent/marketplace/text-understanding';
 import type { ListingRecord } from '@/agent/marketplace/store';
 import { getAuthSession } from '@/lib/auth/session';
 import { Button } from '@ui/button';
@@ -169,7 +168,6 @@ async function SimilarListingsSection({ listing }: { listing: ListingRecord }) {
     city: listing.city,
     limit: 48,
   });
-  await prepareListingUnderstanding([listing, ...candidateSimilarListings]);
   let similarListings = getDetailSimilarListings(listing, candidateSimilarListings);
 
   if (similarListings.length < 3) {
@@ -178,7 +176,6 @@ async function SimilarListingsSection({ listing }: { listing: ListingRecord }) {
       limit: 48,
     });
 
-    await prepareListingUnderstanding(widerSimilarListings);
     similarListings = getDetailSimilarListings(
       listing,
       [...candidateSimilarListings, ...widerSimilarListings],

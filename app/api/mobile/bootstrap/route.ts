@@ -1,3 +1,4 @@
+import { scheduleNotificationDelivery } from '@/lib/push/delivery-jobs';
 import { getMaxListingImagesPerListing } from '@/agent/marketplace/listing-image-limits';
 import { getDirectImageUploadCapability } from '@/agent/marketplace/direct-image-objects';
 import { getMaxListingsPerSeller } from '@/agent/marketplace/listing-limits';
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
   });
   if (limited) return limited;
   schedulePendingImageObjectCleanup();
+  scheduleNotificationDelivery();
 
   return Response.json({
     categories: marketplaceCategoryDefinitions.map(category => ({

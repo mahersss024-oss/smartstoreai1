@@ -5,7 +5,7 @@ import {
 } from './ranking-engine';
 import { normalizeMarketplaceSearchText } from './search';
 import type { ListingRecord } from './store';
-import { listingSemanticText, marketplaceTextAnalyzer } from './text-understanding';
+import { getListingSimilarityScore } from './listing-similarity';
 
 export type ListingMarketIntelligence = {
   listingId: string;
@@ -151,17 +151,7 @@ function confidence(similarListingCount: number) {
 }
 
 function productSimilarityScore(target: ListingRecord, candidate: ListingRecord) {
-  if (candidate.id === target.id || candidate.category !== target.category) return 0;
-  const left = marketplaceTextAnalyzer.peek(listingSemanticText(target));
-  const right = marketplaceTextAnalyzer.peek(listingSemanticText(candidate));
-  if (!left || !right || left.confidence < 0.8 || right.confidence < 0.8) return 0;
-  if (!left.product || !right.product || left.product !== right.product) return 0;
-  if (left.offerKind === 'unknown' || left.offerKind !== right.offerKind) return 0;
-  if (left.configuration && right.configuration && left.configuration !== right.configuration) return 0;
-  if (left.brand && right.brand && left.brand !== right.brand) return 0;
-  if (left.model && right.model && left.model !== right.model) return 0;
-  return 8 + (left.brand && left.brand === right.brand ? 5 : 0) + (left.model && left.model === right.model ? 8 : 0)
-    + (target.city && target.city === candidate.city ? 3 : 0);
+  return getListingSimilarityScore(target, candidate);
 }
 
 function buildInsights(input: {

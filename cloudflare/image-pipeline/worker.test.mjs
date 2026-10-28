@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import sharp from "sharp";
-import worker, { handleUploadMessage, MAX_IMAGE_BYTES, parseUploadEvent, runScheduledCleanup, stripJpegMetadata, VARIANTS } from "./worker.mjs";
+import worker, { handleUploadMessage, MAX_IMAGE_BYTES, parseUploadEvent, runScheduledCleanup, stripJpegMetadata, VARIANTS, LEGACY_VARIANTS } from "./worker.mjs";
 
 const ID = "9f301dbb-29f3-4ec2-a260-80fdded8977b";
 const LEASE = "8641a850-87cb-4051-b496-2f58f5973848";
@@ -144,6 +144,49 @@ test("complete path generates three private correctly sized files, awaits server
   assert.deepEqual(f.callbacks[1].body, { leaseToken: LEASE });
   assert.deepEqual(f.deleted.sort(), [SOURCE, ...Object.values(TARGETS)].sort());
   assert.equal(f.records.size, 0);
+});
+
+test("Worker advertises WebP capability and new jobs retain only processed WebP outputs", async () => {
+  const f = await fixture();
+  const originalFetch = f.effects.fetch;
+  f.effects.fetch = async (url, init) => {
+    if (url.endsWith("/complete")) {
+      assert.ok(f.records.has(SOURCE), "raw source remains private until server confirms commit");
+      assert.equal(f.writes.length, 3);
+      for (const { key } of f.writes) {
+        assert.ok(key.endsWith(".webp"));
+        assert.equal((await sharp(f.records.get(key).data).metadata()).format, "webp");
+      }
+    }
+    return originalFetch(url, init);
+  };
+  await f.run();
+  assert.deepEqual(f.callbacks[0].body, { outputFormats: ["webp-v1", "jpeg-v1"] });
+  assert.equal(f.message.acknowledgements, 1);
+  assert.equal(f.records.size, 0, "source and private stages are deleted only after final acknowledgement");
+});
+
+test("new Worker honors an existing JPEG lease from an old server without changing immutable output keys", async () => {
+  const f = await fixture();
+  const targets = Object.fromEntries(LEGACY_VARIANTS.map(variant => [variant.name, `staged/v1/${ID}/${LEASE}/${variant.file}`]));
+  f.setClaim({ action: "process", leaseToken: LEASE,
+    source: { key: SOURCE, sha256: hash(f.source), sizeBytes: f.source.length }, targets });
+  let sawLegacyOriginal = false;
+  const originalFetch = f.effects.fetch;
+  f.effects.fetch = async (url, init) => {
+    if (url.endsWith("/complete")) {
+      const original = f.records.get(targets.original);
+      sawLegacyOriginal = true;
+      assert.equal((await sharp(original.data).metadata()).format, "jpeg");
+      assert.equal(original.httpMetadata.contentType, "image/jpeg");
+      assert.equal(f.records.has(TARGETS.original), false);
+    }
+    return originalFetch(url, init);
+  };
+  await f.run();
+  assert.ok(sawLegacyOriginal);
+  assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.deleted.sort(), [SOURCE, ...Object.values(targets)].sort());
 });
 
 test("small images preserve their dimensions without enlargement or cropping", async () => {

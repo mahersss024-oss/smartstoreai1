@@ -1,5 +1,3 @@
-import { evaluateSaudiMarketplaceCompliance } from './policy';
-
 export type ConversationMessageSafetyDecision = {
   decision: 'allow' | 'block';
   reasons: string[];
@@ -46,17 +44,8 @@ export function containsDirectContactDetails(body: string) {
 export function evaluateConversationMessageSafety(
   body: string,
 ): ConversationMessageSafetyDecision {
-  const reasons = new Set<string>();
-  const forbiddenTermsDecision = evaluateSaudiMarketplaceCompliance(body);
-
-  if (forbiddenTermsDecision.modelAssessment?.decision !== 'allow') {
-    reasons.add('forbidden_or_regulated_marketplace_terms');
-  }
-
-  const resolvedReasons = [...reasons];
-
-  return {
-    decision: 'allow',
-    reasons: resolvedReasons,
-  };
+  // Ownership, conversation blocks and content limits are enforced by the caller.
+  // Buyer/seller messages do not wait for Hamad's advisory models.
+  void body;
+  return { decision: 'allow', reasons: [] };
 }

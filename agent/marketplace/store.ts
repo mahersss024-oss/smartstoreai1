@@ -1,4 +1,3 @@
-import { listingSemanticText } from './text-understanding';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -18,7 +17,7 @@ import {
   getMaxListingImagesPerListing,
   hasReachedListingImageLimit,
 } from './listing-image-limits';
-import { evaluateListingComplianceBestEffort as evaluateSaudiMarketplaceCompliance } from './policy';
+import { createUnassessedMarketplaceCompliance } from './policy';
 import { resolveListingCategory } from './listing-category';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
@@ -409,7 +408,7 @@ function getUserReportPriority(report: UserReportRecord) {
   return (report.status === 'open' ? 1000 : 0) + openReportsOnTarget;
 }
 
-export function createListingDraft(input: CreateListingDraftInput): ListingRecord {
+export function createListingDraft(input: CreateListingDraftInput, options: { compliance?: ComplianceDecision } = {}): ListingRecord {
   loadStore();
   input = { ...input, category: resolveListingCategory(input) };
   input = { ...input, attributes: mergeMarketplaceCategoryAttributes(input.category, input.attributes) };
@@ -423,7 +422,7 @@ export function createListingDraft(input: CreateListingDraftInput): ListingRecor
     throw new ListingLimitReachedError();
   }
 
-  const compliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...input, attributes: input.attributes ?? {} }));
+  const compliance = options.compliance ?? createUnassessedMarketplaceCompliance();
   const timestamp = nowIso();
   const listing: ListingRecord = {
     id: input.id ?? createListingId(input.sellerId),
@@ -496,6 +495,7 @@ export function updateListingForSeller(
   > & {
     attributes?: Record<string, unknown>;
   },
+  options: { compliance?: ComplianceDecision } = {},
 ) {
   loadStore();
 
@@ -506,9 +506,7 @@ export function updateListingForSeller(
   }
 
   const attributes = mergeMarketplaceCategoryAttributes(updates.category ?? listing.category, updates.attributes, listing);
-  const assessedCompliance = evaluateSaudiMarketplaceCompliance(listingSemanticText({
-    ...listing, ...updates, attributes,
-  }));
+  const assessedCompliance = options.compliance ?? createUnassessedMarketplaceCompliance();
   const compliance = listing.compliance.humanDecision === 'block'
     ? { ...assessedCompliance, humanDecision: 'block' as const, decision: listing.compliance.decision }
     : assessedCompliance;
