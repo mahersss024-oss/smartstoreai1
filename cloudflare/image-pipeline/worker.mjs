@@ -17,11 +17,13 @@ const COMPLETE_TIMEOUT_MS = 180_000;
 const CLEANUP_TIMEOUT_MS = 120_000;
 
 class PipelineError extends Error {
-  constructor(code, retryable = true) {
+  constructor(code, retryable = true, upstreamStatus = undefined, upstreamError = undefined) {
     super(code);
     this.name = "PipelineError";
     this.code = code;
     this.retryable = retryable;
+    this.upstreamStatus = upstreamStatus;
+    this.upstreamError = upstreamError;
   }
 }
 
@@ -156,7 +158,9 @@ async function serverCall(fetcher, origin, env, path, body, timeoutMs = CLAIM_TI
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetcher(`${origin}${path}`, {
-      method: "POST", redirect: "error", signal: controller.signal,
+      // Cloudflare Workers support only `follow` and `manual`; manual keeps
+      // this internal callback from following any origin redirect.
+      method: "POST", redirect: "manual", signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.IMAGE_WORKER_SECRET}` },
       body: JSON.stringify(body),
     });
@@ -164,7 +168,7 @@ async function serverCall(fetcher, origin, env, path, body, timeoutMs = CLAIM_TI
       await response.body?.cancel();
       // 409 also means a different lease is live. Never interpret it as a
       // cancellation or delete any private objects on behalf of an old lease.
-      throw new PipelineError(response.status === 409 ? "lease_busy" : "server_callback_unavailable");
+      throw new PipelineError(response.status === 409 ? "lease_busy" : "server_callback_unavailable", true, response.status);
     }
     let payload;
     try { payload = JSON.parse(new TextDecoder().decode(await limitedBytes(response.body, 64 * 1024))); }
@@ -173,7 +177,9 @@ async function serverCall(fetcher, origin, env, path, body, timeoutMs = CLAIM_TI
     return payload;
   } catch (error) {
     if (error instanceof PipelineError) throw error;
-    throw new PipelineError(controller.signal.aborted ? "server_callback_timeout" : "server_callback_unavailable");
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : "unknown fetch error";
+    const safeMessage = message.replaceAll(env.IMAGE_WORKER_SECRET, "[redacted]").replaceAll(origin, "[origin]").slice(0, 160);
+    throw new PipelineError(controller.signal.aborted ? "server_callback_timeout" : "server_callback_unavailable", true, undefined, safeMessage);
   } finally { clearTimeout(timeout); }
 }
 
@@ -286,7 +292,9 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
     message.ack();
   } catch (error) {
     const code = error instanceof PipelineError ? error.code : "image_pipeline_unavailable";
-    logger.warn(JSON.stringify({ event: "image_pipeline_retry", ...(upload ? { uploadId: upload.uploadId } : {}), code }));
+    logger.warn(JSON.stringify({ event: "image_pipeline_retry", ...(upload ? { uploadId: upload.uploadId } : {}), code,
+      ...(error instanceof PipelineError && error.upstreamStatus ? { upstreamStatus: error.upstreamStatus } : {}),
+      ...(error instanceof PipelineError && error.upstreamError ? { upstreamError: error.upstreamError } : {}) }));
     const delaySeconds = Math.min(300, 15 * 2 ** Math.min(Math.max(0, (message.attempts ?? 1) - 1), 5));
     message.retry({ delaySeconds });
   }

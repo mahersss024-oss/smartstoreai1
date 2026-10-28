@@ -84,7 +84,7 @@ async function fixture(options = {}) {
       const body = JSON.parse(init.body);
       callbacks.push({ url, action, body, init });
       assert.equal(new Headers(init.headers).get("Authorization"), `Bearer ${env.IMAGE_WORKER_SECRET}`);
-      assert.equal(init.redirect, "error");
+      assert.equal(init.redirect, "manual");
       return Response.json(action === "claim" ? claimResult : completionResult);
     },
   };
@@ -387,7 +387,8 @@ test("retry logging excludes bearer credentials and response bodies", async () =
   assert.deepEqual(f.message.retries, [{ delaySeconds: 300 }]);
   const serialized = JSON.stringify(f.logs);
   assert.ok(!serialized.includes(f.env.IMAGE_WORKER_SECRET));
-  assert.deepEqual(f.logs[0], { event: "image_pipeline_retry", uploadId: ID, code: "server_callback_unavailable" });
+  assert.deepEqual(f.logs[0], { event: "image_pipeline_retry", uploadId: ID, code: "server_callback_unavailable",
+    upstreamError: "Error: provider failure containing [redacted]" });
 });
 
 test("queue-only Worker exposes no public upload, image or administration HTTP route", async () => {
@@ -408,7 +409,7 @@ test("scheduled cleanup calls only the protected server janitor with its Worker 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "https://server.example.test/api/internal/image-uploads/cleanup");
   assert.equal(calls[0].init.method, "POST");
-  assert.equal(calls[0].init.redirect, "error");
+  assert.equal(calls[0].init.redirect, "manual");
   assert.equal(new Headers(calls[0].init.headers).get("Authorization"), `Bearer ${f.env.IMAGE_WORKER_SECRET}`);
   assert.equal(f.deleted.length, 0, "the server decides deletions, not the cron Worker");
 });
