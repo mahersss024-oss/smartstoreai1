@@ -177,11 +177,146 @@ test('promotion copies verified private objects server-side without uploading by
   } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
+function copyGate() {
+  let release = () => {};
+  const promise = new Promise<void>(resolve => { release = resolve; });
+  return { promise, release };
+}
+const settleStorage = () => new Promise<void>(resolve => setImmediate(resolve));
+
+function copiedVariant(input: string | URL | Request) {
+  const path = new URL(String(input)).pathname;
+  return path.includes('thumbnail') ? 'thumbnail' : path.includes('display') ? 'display' : 'original';
+}
+
+test('display and thumbnail promotion overlap without creating an original delivery object', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const base = fixture();
+  const job = { ...base, originalKey: base.displayKey };
+  const gates = { display: copyGate(), thumbnail: copyGate() };
+  const copies: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    if (init?.method === 'HEAD') return new Response(null, { headers: {
+      'Content-Length': '3', 'Content-Type': 'image/webp', ETag: '"verified-etag"',
+    } });
+    const variant = copiedVariant(input);
+    if (variant === 'original') throw new Error('unexpected_original_copy');
+    copies.push(variant);
+    await gates[variant].promise;
+    return new Response('<CopyObjectResult><ETag>"verified-etag"</ETag></CopyObjectResult>');
+  };
+  const completion = promoteProcessedImages(job).then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
+  try {
+    await settleStorage();
+    assert.deepEqual([...copies].sort(), ['display', 'thumbnail'], 'both copies must start before either completes');
+    gates.display.release();
+    gates.thumbnail.release();
+    const result = await completion;
+    assert.equal(result.error, undefined);
+    assert.equal(result.value?.originalUrl, result.value?.displayUrl);
+    assert.equal(copies.length, 2);
+  } finally {
+    gates.display.release(); gates.thumbnail.release();
+    await completion;
+    globalThis.fetch = originalFetch; restore();
+  }
+});
+
+test('legacy three-variant promotion starts the third chain only after one of two active chains finishes', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const gates = { original: copyGate(), display: copyGate(), thumbnail: copyGate() };
+  const started: string[] = [];
+  let active = 0;
+  let maximum = 0;
+  globalThis.fetch = async (input, init) => {
+    const variant = copiedVariant(input);
+    if (init?.method === 'HEAD') {
+      started.push(variant);
+      return new Response(null, { headers: {
+        'Content-Length': '3', 'Content-Type': variant === 'original' ? 'image/jpeg' : 'image/webp', ETag: '"verified-etag"',
+      } });
+    }
+    maximum = Math.max(maximum, ++active);
+    await gates[variant].promise;
+    active--;
+    return new Response('<CopyObjectResult><ETag>"verified-etag"</ETag></CopyObjectResult>');
+  };
+  const completion = promoteProcessedImages(fixture()).then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
+  try {
+    await settleStorage();
+    assert.deepEqual(started, ['original', 'display']);
+    assert.equal(active, 2);
+    gates.original.release();
+    await settleStorage();
+    assert.deepEqual(started, ['original', 'display', 'thumbnail']);
+    assert.equal(active, 2);
+    gates.display.release(); gates.thumbnail.release();
+    assert.equal((await completion).error, undefined);
+    assert.equal(active, 0);
+    assert.equal(maximum, 2);
+  } finally {
+    for (const gate of Object.values(gates)) gate.release();
+    await completion;
+    globalThis.fetch = originalFetch; restore();
+  }
+});
+
+test('a failed promotion drains its already-started companion and never launches the queued variant', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const failedCopy = copyGate();
+  const companionCopy = copyGate();
+  const started: string[] = [];
+  const copies: string[] = [];
+  let settled = false;
+  globalThis.fetch = async (input, init) => {
+    const variant = copiedVariant(input);
+    if (init?.method === 'HEAD') {
+      started.push(variant);
+      return new Response(null, { headers: {
+        'Content-Length': '3', 'Content-Type': variant === 'original' ? 'image/jpeg' : 'image/webp', ETag: '"verified-etag"',
+      } });
+    }
+    copies.push(variant);
+    if (variant === 'original') {
+      await failedCopy.promise;
+      return new Response(null, { status: 404 });
+    }
+    await companionCopy.promise;
+    return new Response('<CopyObjectResult><ETag>"verified-etag"</ETag></CopyObjectResult>');
+  };
+  const completion = promoteProcessedImages(fixture()).then(
+    value => { settled = true; return { value, error: undefined }; },
+    error => { settled = true; return { value: undefined, error }; },
+  );
+  try {
+    await settleStorage();
+    assert.deepEqual(copies, ['original', 'display']);
+    failedCopy.release();
+    await settleStorage();
+    assert.equal(settled, false, 'the transaction must not exit while the companion copy is pending');
+    assert.deepEqual(started, ['original', 'display']);
+    companionCopy.release();
+    const result = await completion;
+    assert.ok(result.error instanceof Error);
+    assert.match(result.error.message, /status 404/);
+    await settleStorage();
+    assert.deepEqual(started, ['original', 'display']);
+    assert.deepEqual(copies, ['original', 'display']);
+  } finally {
+    failedCopy.release(); companionCopy.release();
+    await completion;
+    globalThis.fetch = originalFetch; restore();
+  }
+});
+
 test('a successful HTTP status containing an S3 copy error is not accepted as a ready image', async () => {
   const restore = environment();
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_input, init) => init?.method === 'HEAD'
-    ? new Response(null, { headers: { 'Content-Length': '3', 'Content-Type': 'image/jpeg', ETag: '"etag"' } })
+  globalThis.fetch = async (input, init) => init?.method === 'HEAD'
+    ? new Response(null, { headers: { 'Content-Length': '3', 'Content-Type': new URL(String(input)).pathname.endsWith('.jpg') ? 'image/jpeg' : 'image/webp', ETag: '"etag"' } })
     : new Response('<Error><Code>InternalError</Code></Error>', { status: 200 });
   try { await assert.rejects(promoteProcessedImages(fixture()), /status 503/); }
   finally { globalThis.fetch = originalFetch; restore(); }

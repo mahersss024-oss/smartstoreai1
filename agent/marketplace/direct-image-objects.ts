@@ -198,7 +198,7 @@ export async function promoteProcessedImages(job: DirectImageObjectJob) {
   const variants: DirectImageVariant[] = job.originalKey === job.displayKey
     ? ['display', 'thumbnail']
     : ['original', 'display', 'thumbnail'];
-  for (const variant of variants) {
+  const promoteVariant = async (variant: DirectImageVariant) => {
     const source = stagedKey(job, variant);
     const etag = await objectRequest(intakeStorage, 'HEAD', source, {}, async response => {
       if (!response.ok) throw new ImageStorageResponseError(response.status);
@@ -234,7 +234,21 @@ export async function promoteProcessedImages(job: DirectImageObjectJob) {
         throw new ImageStorageResponseError(503);
       }
     }, deadline);
-  }
+  };
+  // Bound independent HEAD -> conditional-copy chains to two. Once any chain
+  // fails, do not start queued variants, and drain every started chain before
+  // allowing the caller's transaction/cancellation cleanup to continue.
+  let nextVariant = 0;
+  const failures: unknown[] = [];
+  const run = async () => {
+    while (!failures.length && nextVariant < variants.length) {
+      const variant = variants[nextVariant++];
+      try { await promoteVariant(variant); }
+      catch (error) { failures.push(error); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(2, variants.length) }, () => run()));
+  if (failures.length) throw failures[0];
   return getDirectImagePublicUrls(job);
 }
 
