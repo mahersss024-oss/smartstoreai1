@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { buildInventory } from '@/scripts/testing/inventory';
 import { concretePath } from '@/scripts/testing/route-contracts';
-import { prepare, listing, customer, pagination, now } from './helpers/admin-presentation-fixture';
+import { prepare, listing, customer, pagination, now, ownerFixtureEmail } from './helpers/admin-presentation-fixture';
 import { observePageVitals, readPageVitals } from './helpers/page-vitals';
 
 // Trace screencasting adds presentation latency to the timing being measured.
@@ -38,7 +38,7 @@ for (const entry of pages) {
       });
       await page.route('**/api/auth/session', route => route.fulfill({ json: {
         authenticated: true, commissionAgreementAccepted: true, commissionAgreement: null,
-        user: { id: 'presentation-admin', name: 'Performance account', email: 'performance@example.test', role },
+        user: { id: 'presentation-admin', name: 'Performance account', email: role === 'owner' ? ownerFixtureEmail : 'performance@example.test', role },
       } }));
       await page.route('**/api/realtime/stream**', route => route.fulfill({
         contentType: 'text/event-stream', body: 'retry: 60000\nevent: heartbeat\ndata: {}\n\n',

@@ -56,6 +56,8 @@ export default defineConfig({
         // Individual test and assertion timeouts remain unchanged.
         timeout: 300_000,
         env: {
+          // A real configured owner is required by the server-rendered maintenance layout.
+          SMARTSTORE_ADMIN_EMAILS: 'browser-owner@example.test',
           AUTH_SECRET:
             process.env.AUTH_SECRET ?? 'development-only-smartstore-auth-secret',
           // Keep Next's env loader and the provider's local-env preference away from real credentials.

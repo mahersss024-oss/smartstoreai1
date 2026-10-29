@@ -3,9 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-const { getActiveMigrationTriggers, isPrismaTableType } = await import(
-  new URL('../lib/admin/database-compatibility-utils.ts', import.meta.url).href,
-);
+import { getActiveMigrationTriggers, isPrismaTableType } from '@/lib/admin/database-compatibility-utils';
 
 const projectRoot = process.cwd();
 

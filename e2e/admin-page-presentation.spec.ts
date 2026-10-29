@@ -7,7 +7,8 @@ test('changed administration pages fit mobile tablet and desktop without duplica
   baseURL,
 }, testInfo) => {
   test.setTimeout(180_000);
-  await prepare(page, baseURL!);
+  // This matrix includes owner-only commissions and maintenance.
+  await prepare(page, baseURL!, 'owner');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   for (const width of [360, 768, 1440]) {

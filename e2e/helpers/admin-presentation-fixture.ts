@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createSessionCookie } from '@/lib/auth/session';
 
+// Keep this synthetic identity aligned with playwright.config.ts webServer.env.
+export const ownerFixtureEmail = 'browser-owner@example.test';
+
 export const now = '2026-10-17T10:00:00.000Z';
 export const customer = {
   id: 'google:' + '1'.repeat(40),
@@ -62,7 +65,7 @@ export const pagination = {
 export async function prepare(page: Page, baseURL: string, role = 'admin') {
   const user = {
     id: 'presentation-admin',
-    email: 'presentation-admin@example.test',
+    email: role === 'owner' ? ownerFixtureEmail : 'presentation-admin@example.test',
     role,
   };
   const [name, value] = createSessionCookie(user).split(';')[0].split('=');
@@ -85,6 +88,23 @@ export async function prepare(page: Page, baseURL: string, role = 'admin') {
       return route.fulfill({
         json: { notifications: [], page: 1, hasMore: false },
       });
+    if (url.pathname.endsWith('/maintenance') && url.searchParams.get('resource') === 'database') {
+      const columns = [
+        { name: 'id', type: 'String', redacted: false },
+        { name: 'name', type: 'String', redacted: false },
+      ];
+      const json = url.searchParams.get('view') === 'compatibility'
+        ? {
+            checkedAt: now,
+            migrations: { historyAvailable: true, filesAvailable: true, expected: 1, applied: 1, pending: [], failed: [], unknownApplied: [] },
+            schema: { tablesChecked: 1, missingTables: [], missingColumns: [], extraColumns: [], extraTables: [] },
+            databaseObjects: { expectedFunctions: [], missingFunctions: [], expectedTriggers: [], missingTriggers: [], expectedExtensions: [], missingExtensions: [] },
+          }
+        : url.searchParams.has('model')
+          ? { label: 'User', columns, page: 1, pageSize: 25, total: 1, rows: [{ id: customer.id, name: customer.name }] }
+          : { models: [{ name: 'User', table: 'User', label: 'User', estimatedRows: 1, fields: columns }] };
+      return route.fulfill({ json });
+    }
     if (url.searchParams.has('asset'))
       return route.fulfill({
         contentType: 'image/webp',
@@ -191,6 +211,7 @@ export async function prepare(page: Page, baseURL: string, role = 'admin') {
                       closedUserReports: 1,
                       searchStates: 0,
                       idempotencyKeys: 0,
+                      modelReviews: 0,
                     },
                   }
                 : url.pathname.endsWith('/site-message')

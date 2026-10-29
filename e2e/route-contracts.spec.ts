@@ -19,7 +19,8 @@ for (const entry of pages) {
     test(`page renders without client crashes: ${role} ${entry.path}`, async ({ page, baseURL }, info) => {
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(error.message));
-      const guestAdmin = role === 'guest' && entry.path!.startsWith('/admin');
+      const ownerOnlyPage = entry.path === '/admin/maintenance';
+      const guestAdmin = role === 'guest' && entry.path!.startsWith('/admin') && !ownerOnlyPage;
       let authStarts = 0;
       if (guestAdmin) {
         // Verify the real auth redirect without contacting a live identity provider.
@@ -37,18 +38,37 @@ for (const entry of pages) {
         listingId: `e2e-report-${info.project.name}`,
         sellerId: 'e2e-report-seller',
       });
+      if (ownerOnlyPage && role === 'guest') {
+        // The server layout redirects before hydration. Verify that contract
+        // directly; a browser route mock cannot replace a later redirect hop.
+        const denied = await page.request.get(path, { maxRedirects: 0 });
+        expect(denied.status()).toBe(307);
+        const authUrl = new URL(denied.headers().location, baseURL!);
+        expect(authUrl.pathname).toBe('/api/auth/google/start');
+        expect(authUrl.searchParams.get('return_to')).toBe(path);
+      }
       const response = await page.goto(path);
-      expect(response?.status()).toBe(200);
+      const ownerDenied = ownerOnlyPage && role === 'customer';
+      expect(response?.status()).toBe(ownerDenied ? 404 : 200);
       await expect(page.locator('body')).toBeVisible();
       await expect.poll(() => page.locator('body').innerText()).not.toBe('');
-      await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
-      const expectedPath = guestAdmin
+      // A server notFound response intentionally has no hydrated app shell.
+      if (!ownerDenied) await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
+      if (ownerDenied) await expect(page.locator('.admin-page')).toHaveCount(0);
+      const expectedPath = ownerOnlyPage && role === 'guest'
+        ? '/commission-agreement'
+        : guestAdmin
         ? '/privacy'
         : role === 'guest' && entry.path === '/conversations/[conversationId]'
           ? '/commission-agreement'
           : path;
       await expect(page).toHaveURL(url => url.pathname === expectedPath);
       if (guestAdmin) await expect.poll(() => authStarts).toBe(1);
+      if (ownerOnlyPage && role === 'guest') {
+        const agreementUrl = new URL(page.url());
+        expect(agreementUrl.searchParams.get('provider')).toBe('google');
+        expect(agreementUrl.searchParams.get('return_to')).toBe(path);
+      }
       await page.waitForTimeout(300);
       expect(errors).toEqual([]);
       await expect(page.locator('body')).not.toContainText('Application error:');

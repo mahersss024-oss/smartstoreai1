@@ -97,14 +97,16 @@ test('site message visibility honors activation and expiration', () => {
   assert.equal(isSiteMessageVisible({ isEnabled: true, expiresAt: new Date('2026-09-27T12:00:01.000Z') }, now), true);
 });
 
-test('site message updates require owner-level admin access, transactional and audited', async () => {
+test('site message updates require the configured owner, are transactional and audited', async () => {
   const route = await source('app/api/admin/site-message/route.ts');
   const banner = await source('components/site-message-banner.tsx');
   const homeOnly = await source('components/site-message-home-only.tsx');
   const layout = await source('app/layout.tsx');
   const maintenance = await source('app/admin/maintenance/page.tsx');
 
-  assert.match(route, /hasVerifiedAdminAccess/);
+  assert.match(route, /isPlatformOwner/);
+  assert.match(route, /auth_required/);
+  assert.match(route, /owner_required/);
   assert.match(route, /prisma\.\$transaction/);
   assert.match(route, /action: 'update_site_message'/);
   assert.match(route, /previous:/);
