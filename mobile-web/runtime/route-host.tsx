@@ -1,11 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 import { useMobileRouter } from './router';
-import { MobileListingDetails } from './listing-details';
 import { MobileOfflinePage } from './offline-page';
 import { MobilePolicyPage } from './policy-page';
-import { MobileSellerProfile } from './seller-profile';
+import { AppDownloadGateway } from '../../components/app-download-gateway';
+import { detectMobileAppPlatform, getMobileAppStoreUrl, type MobileAppPlatform } from '../../lib/mobile/app-store-links';
 
 
 
@@ -33,11 +34,14 @@ const AdminMaintenancePage = dynamic(() => import('../../app/admin/maintenance/p
 const AdminModerationPage = dynamic(() => import('../../app/admin/moderation/page'), { loading: LoadingPage, ssr: false });
 const AdminUsersPage = dynamic(() => import('../../app/admin/users/page'), { loading: LoadingPage, ssr: false });
 const CommissionAgreementPage = dynamic(() => import('../../app/commission-agreement/page'), { loading: LoadingPage, ssr: false });
-const CommissionsPage = dynamic(() => import('../../app/commissions/page'), { loading: LoadingPage, ssr: false });
-const ConversationsPage = dynamic(() => import('../../app/conversations/page'), { loading: LoadingPage, ssr: false });
-const ConversationPage = dynamic(() => import('../../app/conversations/[conversationId]/page'), { loading: LoadingPage, ssr: false });
-const FavoritesPage = dynamic(() => import('../../app/favorites/page'), { loading: LoadingPage, ssr: false });
-const NotificationsPage = dynamic(() => import('../../app/notifications/page'), { loading: LoadingPage, ssr: false });
+
+function CustomerGateway({ path }: { path: string }) {
+  const [platform, setPlatform] = useState<MobileAppPlatform | null>(null);
+  useEffect(() => setPlatform(detectMobileAppPlatform(navigator.userAgent)), []);
+  return <AppDownloadGateway targetPath={path} platform={platform}
+    androidStoreUrl={getMobileAppStoreUrl('android', { NEXT_PUBLIC_ANDROID_APP_STORE_URL: process.env.NEXT_PUBLIC_ANDROID_APP_STORE_URL })}
+    iosStoreUrl={getMobileAppStoreUrl('ios', { NEXT_PUBLIC_IOS_APP_STORE_URL: process.env.NEXT_PUBLIC_IOS_APP_STORE_URL })} />;
+}
 
 export function MobileRouteHost() {
   const { pathname } = useMobileRouter();
@@ -46,11 +50,11 @@ export function MobileRouteHost() {
   const conversationMatch = pathname.match(/^\/conversations\/([^/]+)\/?$/);
 
   if (listingMatch) {
-    return <MobileListingDetails listingId={decodeURIComponent(listingMatch[1])} />;
+    return <CustomerGateway path={pathname} />;
   }
 
-  if (sellerMatch) return <MobileSellerProfile />;
-  if (conversationMatch) return <ConversationPage />;
+  if (sellerMatch) return <CustomerGateway path={pathname} />;
+  if (conversationMatch) return <CustomerGateway path={pathname} />;
   if (pathname === '/') return <MobileNotFoundPage />;
   if (pathname === '/admin') return <AdminHomePage />;
   if (pathname === '/admin/audit-log') return <AdminAuditLogPage />;
@@ -61,12 +65,12 @@ export function MobileRouteHost() {
   if (pathname === '/admin/users') return <AdminUsersPage />;
   if (pathname === '/commission-agreement') return <CommissionAgreementPage />;
   if (pathname === '/commission-policy') return <MobilePolicyPage kind="commissions" />;
-  if (pathname === '/commissions') return <CommissionsPage />;
-  if (pathname === '/conversations') return <ConversationsPage />;
+  if (pathname === '/commissions') return <CustomerGateway path={pathname} />;
+  if (pathname === '/conversations') return <CustomerGateway path={pathname} />;
   if (pathname === '/delete-account') return <MobilePolicyPage kind="deletion" />;
-  if (pathname === '/favorites') return <FavoritesPage />;
+  if (pathname === '/favorites') return <CustomerGateway path={pathname} />;
   if (pathname === '/listing-policy') return <MobilePolicyPage kind="listings" />;
-  if (pathname === '/notifications') return <NotificationsPage />;
+  if (pathname === '/notifications') return <CustomerGateway path={pathname} />;
   if (pathname === '/offline') return <MobileOfflinePage />;
   if (pathname === '/privacy') return <MobilePolicyPage kind="privacy" />;
   if (pathname === '/terms') return <MobilePolicyPage kind="terms" />;

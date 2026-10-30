@@ -34,6 +34,7 @@ export type AuthSessionPayload = {
 type AuthSessionContextValue = {
   isSessionLoading: boolean;
   refreshSession: () => Promise<AuthSessionPayload>;
+  verifySession: () => Promise<AuthSessionPayload>;
   session: AuthSessionPayload;
   setSession: Dispatch<SetStateAction<AuthSessionPayload>>;
 };
@@ -103,6 +104,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSession = useCallback(() => syncSession(true), [syncSession]);
+  const verifySession = useCallback(() => syncSession(), [syncSession]);
 
   useEffect(() => {
     void syncSession();
@@ -114,14 +116,18 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void syncSession();
     };
+    const onPageHide = () => setIsSessionLoading(true);
+    const onPageShow = () => void syncSession(true);
     window.addEventListener('focus', onVisible);
-    window.addEventListener('pageshow', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       invalidateSessionRequests();
       unsubscribe();
       window.removeEventListener('focus', onVisible);
-      window.removeEventListener('pageshow', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [invalidateSessionRequests, syncSession]);
@@ -130,10 +136,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     () => ({
       isSessionLoading,
       refreshSession,
+      verifySession,
       session,
       setSession,
     }),
-    [isSessionLoading, refreshSession, session, setSession],
+    [isSessionLoading, refreshSession, verifySession, session, setSession],
   );
 
   return (

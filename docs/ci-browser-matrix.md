@@ -18,6 +18,12 @@ in the isolated web server fixture. The page never automatically redirects; its
 QR points to `https://souqhamad.com/`, and mobile visitors choose their action.
 This does not establish native installation or actual store availability.
 
+The same gateway spec covers the existing customer resource URLs, safe native
+handoffs, published sharing metadata and privileged read-only admin previews.
+`admin-session.spec.ts` verifies the explicit admin entry, preserved auth return
+destination, actual local cookie removal on logout, failed logout, revoked
+sessions and browser back navigation. It never contacts a live identity provider.
+
 The allowlist covers administrator presentation, users, workspace, evidence,
 listing categories/car models, performance, and page access/rendering contracts.
 The two inventory-driven specs select only `/admin` and paths beginning with
@@ -26,8 +32,9 @@ terms, privacy, listing rules, fees and account-deletion instructions. It checks
 desktop/mobile light and dark reading, contrast, navigation, canonical URLs,
 narrow screens, manual app opening and the external support-email request path.
 It verifies that public deletion instructions send no account-delete request.
-Customer account, market, listing-detail, seller, offline and
-other public page journeys are outside the browser jobs' current scope.
+Native customer workflows and the retired full customer web interfaces are
+outside these browser jobs. Their surviving URL gateways are covered above.
+Offline and other public page journeys remain outside the current browser scope.
 
 The administrator performance fixture intercepts telemetry rather than consuming
 the shared test server's per-IP visit quota. It still verifies that the browser

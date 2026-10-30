@@ -10,12 +10,9 @@ import {
   WELCOME_STANDALONE_VISIBLE_MS,
   WELCOME_VISIBLE_MS,
 } from "@/lib/welcome/config";
-import { MobileBottomNavigation } from "@/components/mobile-bottom-navigation";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { SiteVisitTracker } from "@/components/site-visit-tracker";
-import { NativeAppBridge } from "@/components/native-app-bridge";
-import { OpenInAppBanner } from "@/components/open-in-app-banner";
 import { AuthSessionProvider } from "@/hooks/use-auth-session";
 import { PageTransition } from "@/components/page-transition";
 
@@ -323,18 +320,15 @@ export default function RootLayout({
           media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
         />
       </head>
-      <body className="overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] antialiased lg:pb-0">
+      <body className="overflow-x-hidden antialiased">
         <AppWelcomeSplash />
         <Suspense fallback={null}>
           <SiteVisitTracker />
         </Suspense>
         <ServiceWorkerRegistrar />
-        <NativeAppBridge />
         <AuthSessionProvider>
-          <OpenInAppBanner />
           <PageTransition>{children}</PageTransition>
           <PullToRefresh />
-          <MobileBottomNavigation />
         </AuthSessionProvider>
       </body>
     </html>

@@ -9,153 +9,33 @@ function readSource(path: string) {
   return readFileSync(join(repoRoot, path), 'utf8');
 }
 
-test('listing details links to the public seller profile without exposing private contact data', () => {
-  const page = readSource('app/listings/[listingId]/page.tsx');
-  const gallery = readSource('app/listings/[listingId]/listing-image-gallery.tsx');
-  const sellerLabelIndex = page.indexOf('المعلن');
-  const galleryIndex = page.indexOf('<ListingImageGallery');
-
-  assert.match(page, /getPublicSellerProfile/);
-  assert.match(page, /export const dynamic = 'force-dynamic'/);
-  assert.match(page, /getSellerProfileHref\(listing\.sellerId, listing\.id\)/);
-  assert.match(page, /href=\{sellerProfileHref\}/);
-  assert.match(page, /\u0627\u0644\u0645\u0639\u0644\u0646/u);
-  assert.ok(sellerLabelIndex !== -1 && galleryIndex !== -1);
-  assert.ok(sellerLabelIndex < galleryIndex);
-  assert.doesNotMatch(page, />\u0639\u0631\u0636 \u0627\u0644\u062d\u0633\u0627\u0628</u);
-  assert.doesNotMatch(page, /sellerProfile\?\.email/);
-  assert.doesNotMatch(page, /\u0627\u0644\u062b\u0642\u0629 \u0648\u0627\u0644\u0633\u0644\u0627\u0645\u0629/u);
-  assert.doesNotMatch(page, /\u0627\u0644\u0625\u0639\u0644\u0627\u0646 \u0645\u0646\u0634\u0648\u0631 \u0628\u0639\u062f \u0641\u062d\u0635 \u0627\u0644\u0633\u064a\u0627\u0633\u0629/u);
-  assert.doesNotMatch(page, /\u0627\u0644\u0635\u0648\u0631 \u0627\u0644\u0623\u0635\u0644\u064a\u0629/u);
-
-  const contactActions = readSource('app/listings/[listingId]/contact-actions.tsx');
-  assert.doesNotMatch(contactActions, /ShieldCheck/);
-  assert.doesNotMatch(contactActions, /\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629 \u062a\u062a\u0645 \u062f\u0627\u062e\u0644 \u0633\u0648\u0642 \u062d\u0645\u062f/u);
-  assert.doesNotMatch(page, /rounded-md border bg-white p-4 shadow-sm/);
-  assert.doesNotMatch(page, /rounded-md border p-3/);
-  assert.doesNotMatch(gallery, /rounded-md border bg-white shadow-sm/);
+test('customer detail links preserve resources through the native gateway', () => {
+  for (const path of ['app/listings/[listingId]/page.tsx', 'app/sellers/[sellerId]/page.tsx']) {
+    const page = readSource(path);
+    assert.match(page, /CustomerAppGateway/);
+    assert.match(page, /encodeURIComponent/);
+    assert.match(page, /generateMetadata/);
+    assert.match(page, /notFound\(\)/);
+    assert.doesNotMatch(page, /ListingContactActions|SellerProfileActions|SimilarListingsSection/);
+  }
 });
 
-test('public seller profile renders safe public data and published listing links', () => {
-  const page = readSource('app/sellers/[sellerId]/page.tsx');
-
-  assert.match(page, /getPublicSellerProfile/);
-  assert.match(page, /export const dynamic = 'force-dynamic'/);
-  assert.match(page, /decodeURIComponent\(rawSellerId\)/);
-  assert.match(page, /source === 'admin-users'/);
-  assert.match(page, /getSellerReturnHref/);
-  assert.match(page, /source === 'conversation'/);
-  assert.match(page, /source === 'listing'/);
-
-  assert.doesNotMatch(page, /returnUrl/);
-  assert.doesNotMatch(page, /العودة لإدارة المستخدمين/);
-  assert.doesNotMatch(page, /العودة للسوق/);
-  assert.match(page, /notFound\(\)/);
-  assert.match(page, /getSellerListingHref\(listing\.id, seller\.id, resolvedSearchParams\)/);
-  assert.match(page, /SellerProfileActions/);
-  assert.match(page, /SellerProfileIdentity/);
-  assert.match(page, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(page, /marketplace-panel flex min-h-0 flex-col overflow-hidden/);
-  assert.match(page, /marketplace-home-controls shrink-0/);
-  assert.match(page, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
-  assert.match(page, /sellerId=\{seller\.id\}/);
-  assert.match(page, /initialFollowerCount=\{seller\.followerCount\}/);
-  assert.match(page, /initialRatingAverage=\{seller\.ratingAverage\}/);
-  assert.match(page, /initialRatingCount=\{seller\.ratingCount\}/);
-  assert.match(page, /grid-cols-\[auto_minmax\(0,1fr\)\] gap-2 p-2\.5/);
-  assert.match(page, /grid size-12 place-items-center/);
-  assert.match(page, /<SellerProfileIdentity compact sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
-  assert.match(page, /col-span-2 flex min-w-0 flex-wrap items-center justify-between/);
-  assert.doesNotMatch(page, /h-28 bg-\[linear-gradient/);
-  assert.doesNotMatch(page, /-mt-12 grid gap-4/);
-  assert.doesNotMatch(page, /grid size-24 place-items-center/);
-  assert.doesNotMatch(page, /معلن موثق داخل سوق حمد/);
-  assert.match(page, /grid-cols-\[clamp\(6\.25rem,28vw,7\.25rem\)_minmax\(0,1fr\)\]/);
-  assert.match(page, /formatListingRelativeTime/);
-  assert.match(page, /formatListingRelativeTime\(listing\.createdAt \?\? listing\.updatedAt\)/);
-  assert.match(page, /className="aspect-square shrink-0 overflow-hidden/);
-  assert.match(page, /maxWidth: '100%'/);
-  assert.match(page, /width: '100%'/);
-  assert.match(page, /objectFit: 'cover'/);
-  assert.match(page, /line-clamp-2 text-\[13px\] font-bold/);
-  assert.match(page, /إعلانات المعلن/);
-  assert.doesNotMatch(page, /سيتم تفعيل التقييم في مرحلة لاحقة/);
-  assert.doesNotMatch(page, /seller\.email/);
+test('browser previews remain privileged and read-only on existing resource paths', () => {
+  const listing = readSource('app/listings/[listingId]/page.tsx');
+  const seller = readSource('app/sellers/[sellerId]/page.tsx');
+  const preview = readSource('components/admin/customer-record-preview.tsx');
+  assert.match(listing, /hasVerifiedModeratorAccess\(session\)/);
+  assert.match(seller, /hasVerifiedAdminAccess\(session\)/);
+  assert.match(preview, /data-admin-record-preview/);
+  assert.match(preview, /ListingImageGallery/);
+  assert.doesNotMatch(preview, /ListingContactActions|SellerProfileActions|fetch\(|onClick=|phoneNumber|\.email/);
+  assert.match(preview, /href=\{back\}/);
 });
 
-test('public seller profile shows a copyable seller identifier', () => {
-  const page = readSource('app/sellers/[sellerId]/page.tsx');
-  const identity = readSource('app/sellers/[sellerId]/seller-profile-identity.tsx');
-
-  assert.match(page, /<SellerProfileIdentity compact sellerId=\{seller\.id\} sellerName=\{seller\.name\}/);
-  assert.match(identity, /sellerHandle = useMemo\(\(\) => `@\$\{sellerId\}`/);
-  assert.match(identity, /compact = false/);
-  assert.match(identity, /!compact && \(/);
-  assert.match(identity, /getPublicSellerUrl\(sellerId\)/);
-  assert.match(identity, /value=\{profileUrl\}/);
-  assert.doesNotMatch(identity, /window\.location\.href/);
-  assert.match(identity, /navigator\.clipboard\.writeText\(value\)/);
-  assert.match(identity, /aria-label="نسخ معرف المستخدم"/);
-  assert.match(identity, /QRCodeSVG/);
-  assert.match(identity, /aria-label="باركود ملف المعلن"/);
-  assert.match(identity, /DialogContent/);
-  assert.match(identity, /navigator\.share/);
-  assert.match(identity, /postToNative/);
-  assert.match(identity, /<span className="sr-only">\{copied \? 'تم النسخ' : 'نسخ'\}<\/span>/);
-});test('listing and seller pages keep return navigation on surviving sources only', () => {
-  const listingPage = readSource('app/listings/[listingId]/page.tsx');
-  const sellerPage = readSource('app/sellers/[sellerId]/page.tsx');
-  const conversationPage = readSource('app/conversations/[conversationId]/page.tsx');
-  const favoritesPage = readSource('app/favorites/page.tsx');
-  assert.match(listingPage, /getListingReturnHref/);
-  assert.match(listingPage, /source === 'conversation'/);
-  assert.match(listingPage, /source === 'seller'/);
-  assert.match(listingPage, /source === 'favorites'/);
-  assert.match(listingPage, /getSellerProfileHref\(listing\.sellerId, listing\.id\)/);
-  assert.doesNotMatch(listingPage, /returnUrl|account-listings/);
-  assert.doesNotMatch(sellerPage, /returnUrl|source === 'follows'/);
-  assert.match(conversationPage, /source=conversation&conversationId=/);
-  assert.match(conversationPage, /conversationListingHref/);
-  assert.match(favoritesPage, /source=favorites/);
-});
-
-test('listing details renders compact similar ads from existing comparable logic', () => {
-  const listingPage = readSource('app/listings/[listingId]/page.tsx');
-  const gallery = readSource('app/listings/[listingId]/listing-image-gallery.tsx');
-  const activityIndex = listingPage.indexOf('\u0646\u0634\u0627\u0637 \u0627\u0644\u0625\u0639\u0644\u0627\u0646');
-  const latestUpdateIndex = listingPage.indexOf('\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b');
-  const similarSectionRenderIndex = listingPage.indexOf('<SimilarListingsSection listing={listing} />');
-
-  assert.match(listingPage, /listMarketplaceListings/);
-  assert.match(listingPage, /getComparableListings/);
-  assert.match(listingPage, /getDetailSimilarListings/);
-  assert.match(listingPage, /async function SimilarListingsSection/);
-  assert.doesNotMatch(listingPage, /prepareListingUnderstanding|marketplaceTextAnalyzer/);
-  assert.match(listingPage, /<Suspense fallback=\{null\}>[\s\S]*<SimilarListingsSection listing=\{listing\} \/>/);
-  assert.doesNotMatch(listingPage.slice(listingPage.indexOf('export default async function ListingDetailsPage')), /prepareListingUnderstanding|listMarketplaceListings/);
-  assert.match(listingPage, /strictMatches = getComparableListings/);
-  assert.match(listingPage, /similarListings\.length < 3/);
-  assert.match(listingPage, /slice\(0, 20\)/);
-  assert.match(listingPage, /getSimilarListingHref\(similarListing\.id, listing\.id\)/);
-  assert.match(listingPage, /source === 'listing'/);
-  assert.match(listingPage, /sourceListingId/);
-  assert.match(listingPage, /summaryAttributeKeys = new Set/);
-  assert.match(listingPage, /!summaryAttributeKeys\.has\(key\)/);
-  assert.match(listingPage, /grid grid-cols-2 gap-2 border-t/);
-  assert.match(listingPage, /flex min-w-0 items-center justify-between gap-2 rounded-md/);
-  assert.match(listingPage, /grid grid-cols-1 gap-2 sm:grid-cols-2/);
-  assert.match(listingPage, /flex min-w-0 items-center justify-between gap-3 rounded-md/);
-  assert.match(listingPage, /grid grid-cols-2 gap-2 text-xs/);
-  assert.match(listingPage, /rounded-md border border-border\/60 bg-background\/45 px-3 py-2/);
-  assert.match(listingPage, /grid-cols-\[5\.5rem_minmax\(0,1fr\)\]/);
-  assert.match(listingPage, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(listingPage, /marketplace-home-controls shrink-0/);
-  assert.match(listingPage, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
-  assert.doesNotMatch(listingPage, /relaxedMatches/);
-  assert.ok(activityIndex !== -1 && latestUpdateIndex !== -1 && similarSectionRenderIndex !== -1);
-  assert.ok(activityIndex < latestUpdateIndex);
-  assert.ok(latestUpdateIndex < similarSectionRenderIndex);
-  assert.doesNotMatch(gallery, /similarListings|listMarketplaceListings|getComparableListings/);
+test('private customer gateways never query or embed conversation contents', () => {
+  const page = readSource('app/conversations/[conversationId]/page.tsx');
+  assert.match(page, /CustomerAppGateway/);
+  assert.doesNotMatch(page, /getConversation|listConversations|messages|buyerId|sellerId|fetch\(/);
 });
 
 test('public seller profile exposes real trust actions without private seller APIs', () => {

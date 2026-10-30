@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   getListing,
+  listSimilarMarketplaceListings,
   setListingStatusForSeller,
   updateListingForSeller,
 } from '@/agent/marketplace/repository';
@@ -56,7 +57,7 @@ function getActionStatus(action: z.infer<typeof actionSchema>['action']) {
   return 'deleted';
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { listingId } = await context.params;
   // Image URLs can be removed immediately. A cached listing snapshot must not
   // keep advertising deleted objects or a listing that is no longer public.
@@ -64,6 +65,17 @@ export async function GET(_request: Request, context: RouteContext) {
 
   if (!listing || listing.status !== 'published') {
     return Response.json({ error: 'listing_not_found' }, { status: 404, headers: noStoreHeaders });
+  }
+
+  if (new URL(request.url).searchParams.get('view') === 'similar') {
+    const limited = await enforceApiRateLimit(request, {
+      namespace: 'listing_similar_read', maxRequests: 30, windowMs: 60_000,
+    });
+    if (limited) {
+      for (const [name, value] of Object.entries(noStoreHeaders)) limited.headers.set(name, value);
+      return limited;
+    }
+    return Response.json({ listings: await listSimilarMarketplaceListings(listing) }, { headers: noStoreHeaders });
   }
 
   return Response.json(

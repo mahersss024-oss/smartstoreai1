@@ -51,13 +51,13 @@ test('service worker registration bypasses browser cache and checks for updates'
   assert.match(settings, /\/api\/push\/subscribe/);
   assert.match(settings, /variant\?: 'panel' \| 'icon'/);
   assert.match(settings, /const toggleNotifications = useCallback/);
-  assert.match(notificationsPage, /<PushNotificationSettings \/>/);
+  assert.match(notificationsPage, /CustomerAppGateway/);
 });test('mobile navigation exposes notifications while the page keeps push settings', () => {
   const navigation = readFileSync(join(process.cwd(), 'components', 'mobile-bottom-navigation.tsx'), 'utf8');
   const notificationsPage = readFileSync(join(process.cwd(), 'app', 'notifications', 'page.tsx'), 'utf8');
   const settings = readFileSync(join(process.cwd(), 'components', 'push-notification-settings.tsx'), 'utf8');
   assert.match(navigation, /'\/notifications': Bell/);
-  assert.match(notificationsPage, /<PushNotificationSettings \/>/);
+  assert.match(notificationsPage, /CustomerAppGateway/);
   assert.match(settings, /const toggleNotifications = useCallback/);
   assert.match(settings, /const iconStatusRefreshDelayMs = 45_000/);
   assert.match(settings, /const iconUnreadRefreshDelayMs = 60_000/);
@@ -138,8 +138,5 @@ test('followed sellers notify followers only when listings become published', ()
   assert.match(repository, /markAccountFollowNotificationsRead/);
   assert.match(route, /listAccountFollowNotifications/);
   assert.match(route, /markAccountFollowNotificationsRead/);
-  assert.match(page, /fetch\('\/api\/notifications'/);
-  assert.match(page, /<PushNotificationSettings \/>/);
-  assert.match(page, /markAllRead/);
-  assert.match(page, /follow_listing_published/);
+  assert.match(page, /CustomerAppGateway/);
 });

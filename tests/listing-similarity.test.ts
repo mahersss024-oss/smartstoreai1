@@ -79,3 +79,38 @@ test('publishing notifies only followers of strongly matching products without m
   assert.equal(analyze.mock.callCount(), 0);
   assert.equal(peek.mock.callCount(), 0);
 });
+
+test('saved classification and product identity rank above title-only matches without weaker eligibility', () => {
+  const attributes = { marketplaceCategoryOption: 'tables' };
+  const reference = product('reference', 'oak dining table chairs', attributes);
+  const classified = product('classified', 'oak dining table', attributes);
+  const titleOnly = product('title-only', 'oak dining table chairs');
+  const structuredScore = getListingSimilarityScore(reference, classified);
+  const titleScore = getListingSimilarityScore(reference, titleOnly);
+  assert.ok(structuredScore >= 90 && structuredScore <= 94);
+  assert.ok(titleScore >= strongListingSimilarityThreshold && titleScore <= 89);
+  assert.ok(structuredScore > titleScore);
+  const preciseModel = { marketplaceCategoryOption: 'toyota', marketplaceCarModel: 'camry' };
+  assert.ok(getListingSimilarityScore(product('car-a', 'clean car', preciseModel, 'cars'),
+    product('car-b', 'family vehicle', preciseModel, 'cars')) > structuredScore);
+  assert.equal(getListingSimilarityScore(reference, product('unrelated', 'steel office desk', attributes)), 0);
+  assert.equal(getListingSimilarityScore(reference, product('weak', 'oak cabinet', attributes)), 0);
+});
+
+test('missing identity fields give no positive points and brand-only matches keep the title threshold', () => {
+  const base = product('reference', 'apple phone compact device', { brand: 'apple' }, 'mobile_phones');
+  const unknown = product('missing', 'apple phone compact device', {}, 'mobile_phones');
+  const confirmed = product('confirmed', 'apple phone compact device', { brand: 'apple' }, 'mobile_phones');
+  assert.ok(getListingSimilarityScore(base, confirmed) > getListingSimilarityScore(base, unknown));
+  assert.equal(getListingSimilarityScore(base, product('brand-only', 'apple television', { brand: 'apple' }, 'mobile_phones')), 0);
+  const withoutData = getListingSimilarityScore(product('a', 'oak table'), product('b', 'oak table'));
+  const unknownData = getListingSimilarityScore(product('a', 'oak table', { brand: null, model: '', marketplaceCategoryOption: 'other' }), product('b', 'oak table', { brand: null, model: '', marketplaceCategoryOption: 'other' }));
+  assert.equal(withoutData, unknownData);
+});
+
+test('structured ranking preserves the previous rounded 85 percent title threshold', () => {
+  const common = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda';
+  const left = product('a', common + ' left one');
+  const right = product('b', common + ' right two');
+  assert.equal(getListingSimilarityScore(left, right), strongListingSimilarityThreshold);
+});

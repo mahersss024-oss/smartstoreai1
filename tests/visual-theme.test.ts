@@ -9,7 +9,6 @@ function readProjectFile(...segments: string[]) {
 
 test('market listing indicator uses the megaphone icon instead of the store glyph', () => {
   const files = [
-    readProjectFile('app', 'conversations', '[conversationId]', 'page.tsx'),
     readProjectFile('app', 'admin', 'page.tsx'),
     readProjectFile('app', 'admin', 'listings', 'page.tsx'),
     readProjectFile('app', 'admin', 'users', 'page.tsx'),
@@ -22,7 +21,7 @@ test('market listing indicator uses the megaphone icon instead of the store glyp
   }
 
   const favoritesPage = readProjectFile('app', 'favorites', 'page.tsx');
-  assert.match(favoritesPage, /marketplace-listing-card/);
+  assert.match(favoritesPage, /CustomerAppGateway/);
   assert.doesNotMatch(favoritesPage, /\bStore\b/);
   assert.doesNotMatch(favoritesPage, /<Store/);
 });

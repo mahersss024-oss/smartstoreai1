@@ -291,6 +291,11 @@ export function isModeratorSession(session: AuthSession | null) {
   );
 }
 
+const adminAuthDestinations = new Set([
+  '/admin', '/admin/audit-log', '/admin/commissions', '/admin/listings',
+  '/admin/maintenance', '/admin/moderation', '/admin/users',
+]);
+
 export function sanitizeAuthReturnTo(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
     return '/';
@@ -301,7 +306,7 @@ export function sanitizeAuthReturnTo(value: string | null | undefined) {
     if (url.origin !== 'https://souqhamad.invalid' || url.pathname.startsWith('/api/auth/')) {
       return '/';
     }
-    return url.pathname === '/admin/maintenance' || url.pathname === '/admin'
+    return adminAuthDestinations.has(url.pathname)
       ? url.pathname
       : '/';
   } catch {

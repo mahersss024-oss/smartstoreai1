@@ -86,31 +86,12 @@ test('listing details keeps all full-width images and opens a full-screen lightb
   assert.doesNotMatch(source, /md:grid-cols-\[minmax\(0,1fr\)_4\.75rem\]/);
 });
 
-test('listing details passes display, thumbnail, and original image variants to the gallery', async () => {
-  const source = await readFile(
-    new URL('../app/listings/[listingId]/page.tsx', import.meta.url),
-    'utf8',
-  );
-
-  assert.match(source, /type ListingGalleryImage/);
-  assert.match(source, /originalUrl: missingListingImageDataUrl/);
-  assert.match(source, /displayUrl: missingListingImageDataUrl/);
-  assert.match(source, /thumbnailUrl: missingListingImageDataUrl/);
-  assert.match(source, /image\.originalUrl,[\s\S]*image\.displayUrl,[\s\S]*image\.thumbnailUrl/);
-  assert.match(source, /image\.displayUrl,[\s\S]*image\.originalUrl,[\s\S]*image\.thumbnailUrl/);
-  assert.match(source, /image\.thumbnailUrl,[\s\S]*image\.displayUrl,[\s\S]*image\.originalUrl/);
-});test('remaining listing cards keep thumbnail-first loading behavior', async () => {
-  const cardImage = await readFile(new URL('../components/listing-card-image.tsx', import.meta.url), 'utf8');
-  const favoritesPage = await readFile(new URL('../app/favorites/page.tsx', import.meta.url), 'utf8');
-  const sellerPage = await readFile(new URL('../app/sellers/[sellerId]/page.tsx', import.meta.url), 'utf8');
-  const listingDetailsPage = await readFile(new URL('../app/listings/[listingId]/page.tsx', import.meta.url), 'utf8');
-  assert.match(cardImage, /export function ListingCardImage/);
-  assert.match(cardImage, /fetchPriority=\{priority \? 'high' : 'auto'\}/);
-  assert.match(cardImage, /loading=\{priority \|\| eager \? 'eager' : 'lazy'\}/);
-  assert.match(cardImage, /decoding="async"/);
-  assert.match(favoritesPage, /<ListingCardImage/);
-  assert.match(sellerPage, /loading="lazy"/);
-  assert.match(listingDetailsPage, /<ListingCardImage/);
+test('administration previews keep approved display variants and the existing gallery', async () => {
+  const preview = await readFile(new URL('../components/admin/customer-record-preview.tsx', import.meta.url), 'utf8');
+  assert.match(preview, /image.status === 'approved'/);
+  assert.match(preview, /ListingImageGallery/);
+  assert.match(preview, /displayUrl/);
+  assert.match(preview, /thumbnailUrl/);
 });
 
 test('R2 orphan image audit is dry-run only', async () => {
@@ -150,15 +131,12 @@ test('missing listing image repair is dry-run by default and scoped to listing i
   assert.doesNotMatch(source, /prisma\.listing\.delete/);
 });test('listing details keep a compact scrolling layout', async () => {
   const listingDetails = await readFile(new URL('../app/listings/[listingId]/page.tsx', import.meta.url), 'utf8');
-  assert.match(listingDetails, /marketplace-shell h-dvh min-h-dvh overflow-hidden/);
-  assert.match(listingDetails, /marketplace-home-controls shrink-0/);
-  assert.match(listingDetails, /marketplace-listings-scroll min-h-0 flex-1 overflow-y-auto/);
+  assert.match(listingDetails, /CustomerAppGateway/);
+  assert.match(listingDetails, /hasVerifiedModeratorAccess/);
+  assert.match(listingDetails, /AdminListingPreview/);
   assert.doesNotMatch(listingDetails, /rounded-md border bg-white\/60 px-3 py-3/);
 });test('remaining infinite-scroll screens use a stable end sentinel', async () => {
   const pagePaths = [
-    '../app/favorites/page.tsx',
-    '../app/conversations/page.tsx',
-    '../app/commissions/page.tsx',
     '../app/admin/users/page.tsx',
     '../app/admin/listings/page.tsx',
     '../app/admin/moderation/page.tsx',
@@ -187,5 +165,5 @@ test('missing listing image repair is dry-run by default and scoped to listing i
     readFile(new URL('../app/sellers/[sellerId]/page.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/listings/[listingId]/page.tsx', import.meta.url), 'utf8'),
   ]);
-  for (const source of sources) assert.match(source, /prefetch=\{false\}/);
+  for (const source of sources) assert.match(source, /CustomerAppGateway/, 'customer browser routes are app gateways rather than prefetching old detail UIs');
 });

@@ -80,6 +80,17 @@ export function getListingSimilarityScore(left: SimilarityListing, right: Simila
   if (exactModel) return Math.round(95 + titleScore * 0.05);
   const group = marketplaceCategoryOptionGroups[left.category as keyof typeof marketplaceCategoryOptionGroups];
   const preciseType = Boolean(group?.kind === 'type' && branchLeft && branchLeft === branchRight);
-  const score = Math.min(100, Math.round(titleScore + (preciseType && titleScore >= 75 ? 10 : 0)));
-  return score >= strongListingSimilarityThreshold ? score : 0;
+  // Preserve the existing match threshold: type branches still require at
+  // least 75% title overlap; title-only matches retain the original rounding.
+  // A brand alone never relaxes title eligibility.
+  // Score bands put verified structured identity above title-only matches.
+  const roundedTitleScore = Math.round(titleScore);
+  const sameBrand = Boolean(brandLeft && brandLeft === brandRight);
+  if ((preciseType && titleScore >= 75) || (sameBrand && roundedTitleScore >= strongListingSimilarityThreshold)) {
+    const minimumTitleScore = preciseType ? 75 : strongListingSimilarityThreshold;
+    return Math.min(94, Math.round(90 + (titleScore - minimumTitleScore) * 4 / (100 - minimumTitleScore)));
+  }
+  return roundedTitleScore >= strongListingSimilarityThreshold
+    ? Math.min(89, Math.round(strongListingSimilarityThreshold + (titleScore - strongListingSimilarityThreshold) * 4 / 15))
+    : 0;
 }

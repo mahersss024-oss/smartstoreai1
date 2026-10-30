@@ -253,7 +253,9 @@ export function getComparableListings(
 
       return true;
     })
-    .sort((left, right) => right.productScore - left.productScore)
+    .sort((left, right) => right.productScore - left.productScore
+      || right.listing.updatedAt.localeCompare(left.listing.updatedAt)
+      || right.listing.id.localeCompare(left.listing.id))
     .map(({ listing }) => listing);
 }
 

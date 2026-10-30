@@ -368,16 +368,16 @@ html[data-theme-switching] *::after {
     --safe-area-top: var(--native-status-bar-inset);
   }
 
-  html[data-native-app="false"][data-platform="android"],
-  html[data-native-app="false"][data-platform="ios"] {
+  html[data-native-app="false"][data-platform="android"]:has(.open-in-app-banner),
+  html[data-native-app="false"][data-platform="ios"]:has(.open-in-app-banner) {
     --mobile-web-app-banner-space: 3.5625rem;
     --safe-area-top: calc(
       var(--mobile-web-app-banner-space) + env(safe-area-inset-top, 0px)
     );
   }
 
-  html[data-native-app="false"][data-platform="android"] body,
-  html[data-native-app="false"][data-platform="ios"] body {
+  html[data-native-app="false"][data-platform="android"]:has(.open-in-app-banner) body,
+  html[data-native-app="false"][data-platform="ios"]:has(.open-in-app-banner) body {
     padding-top: var(--mobile-web-app-banner-space);
   }
 

@@ -1,9 +1,62 @@
 import { expect, test } from '@playwright/test';
+import { createSessionCookie } from '@/lib/auth/session';
 
 test.beforeEach(async ({ page, baseURL }) => {
   expect(['127.0.0.1', 'localhost', '[::1]']).toContain(new URL(baseURL!).hostname);
   await page.addInitScript(() => sessionStorage.setItem('smartstore_welcome_seen', '1'));
   await page.route('**/api/analytics/visit', route => route.fulfill({ status: 204 }));
+});
+
+test('customer resource URLs hand off the same resource without old web customer actions', async ({ page, isMobile }, info) => {
+  const listingId = `e2e-report-${info.project.name}`;
+  for (const [path, native] of [
+    [`/listings/${listingId}`, `/listings/${listingId}`], ['/sellers/e2e-report-seller', '/sellers/e2e-report-seller'],
+    ['/favorites', '/favorites'], ['/conversations', '/messages'],
+    ['/conversations/private-conversation?ticket=never-forward', '/conversations/private-conversation'],
+    ['/commissions', '/commissions'], ['/notifications', '/notifications'],
+  ]) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('[data-customer-gateway-target]')).toHaveAttribute('data-customer-gateway-target', native);
+    await expect(page.locator('.marketplace-bottom-nav, .open-in-app-banner, [data-admin-record-preview], form, textarea')).toHaveCount(0);
+    await expect(page.locator('a[href*="ticket="], a[href*="/api/auth/mobile/open"]')).toHaveCount(0);
+    if (isMobile) {
+      await expect(page.locator('[data-app-launch]')).toHaveAttribute('href', `smartstore://${native.slice(1)}`);
+    } else {
+      const webPath = path.split('?')[0];
+      await expect(page.getByRole('link', { name: 'رابط سوق حمد للجوال' })).toHaveAttribute('href', `https://souqhamad.com${webPath}`);
+    }
+  }
+  await page.goto(`/listings/${listingId}`);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Desk | سوق حمد');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `https://souqhamad.com/listings/${listingId}`);
+});
+
+test('administrative previews remain browser-accessible and private drafts stay out of public metadata', async ({ page, baseURL }, info) => {
+  const id = `e2e-private-draft-${info.project.name}`;
+  await page.goto(`/listings/${id}`);
+  await expect(page.locator('[data-admin-record-preview]')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('Private draft fixture');
+  const [name, value] = createSessionCookie({ id: 'preview-admin', email: 'preview-admin@example.test', role: 'admin' }).split(';')[0].split('=');
+  await page.context().addCookies([{ name, value, url: baseURL! }]);
+  await page.goto(`/listings/${id}`);
+  await expect(page.locator('[data-admin-record-preview]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Private draft fixture' })).toBeVisible();
+  await expect(page.locator('meta[property="og:title"]')).not.toHaveAttribute('content', /Private draft/);
+  await expect(page.getByRole('link', { name: 'العودة إلى الإدارة' })).toHaveAttribute('href', '/admin/listings');
+  await page.context().clearCookies();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('[data-admin-record-preview]')).toHaveCount(0);
+  await expect(page.locator('[data-admin-record-denied]')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('Private draft fixture');
+  await page.context().addCookies([{ name, value, url: baseURL! }]);
+  await page.goto('/sellers/e2e-report-seller');
+  await expect(page.locator('[data-admin-record-preview]')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'العودة إلى الإدارة' })).toHaveAttribute('href', '/admin/users');
+  await page.context().clearCookies();
+  await page.reload();
+  await expect(page.locator('[data-customer-gateway-target]')).toHaveAttribute('data-customer-gateway-target', '/sellers/e2e-report-seller');
+  await expect(page.locator('[data-admin-record-preview]')).toHaveCount(0);
 });
 
 test('public root is an honest app gateway without market navigation or redirects', async ({ page, isMobile }, testInfo) => {

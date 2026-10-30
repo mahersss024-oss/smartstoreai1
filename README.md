@@ -5,6 +5,19 @@ action and a desktop QR for `https://souqhamad.com/`; it does not restore the
 retired web marketplace. Administration remains at `/admin` and the native app
 continues to use the server APIs independently.
 
+Customer listing, seller, favorites, conversations, fees and notification URLs
+now show the app gateway, retaining resource IDs in app handoffs and QR links.
+Verified staff retain read-only listing/seller previews at the same URLs.
+`/admin` has an explicit administrative sign-in entry and logout returns there;
+it does not depend on customer navigation or the download page. The existing
+Google authentication, agreement, session and server-side role checks remain.
+
+Native listing details request up to 20 similar cards through the existing
+`GET /api/marketplace/listings/[listingId]?view=similar` view. The shared
+deterministic matcher ranks structured category/identity matches above title
+matches; no similarity model or new API path is introduced. Applying the native
+UI requires rebuilding the mobile app as well as deploying the server.
+
 Leave `NEXT_PUBLIC_ANDROID_APP_STORE_URL` and `NEXT_PUBLIC_IOS_APP_STORE_URL`
 empty until official destinations exist. Android accepts HTTPS Google Play
 details links for `com.souqhamad.app`; iPhone accepts HTTPS App Store app listings

@@ -60,17 +60,6 @@ test('static auth policy and scope replies remain Arabic for all accepted langua
     assert.equal(getSafeScopeResponse(decision, 'en'), getSafeScopeResponse(decision, 'ar'));
     assert.ok(isArabicCustomerText(getSafeScopeResponse(decision, 'en')));
   }
-});
-
-test('missing-photo illustrations contain Arabic rather than embedded English text', () => {
-  for (const path of ['app/favorites/page.tsx', 'app/conversations/[conversationId]/page.tsx', 'app/listings/[listingId]/page.tsx']) {
-    const source = readFileSync(path, 'utf8');
-    const image = source.match(/'data:image\/svg\+xml,([^']+)'/);
-    assert.ok(image, path);
-    const svg = decodeURIComponent(image[1]);
-    assert.match(svg, />لا توجد صورة<\/text>/);
-    assert.doesNotMatch(svg, /No real photo/);
-  }
 });test('server and client guard generated replies without page-specific rendering checks', () => {
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
   const agent = readFileSync('agent/chat-agent.ts', 'utf8');

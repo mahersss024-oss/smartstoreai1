@@ -1218,6 +1218,76 @@ export async function getListing(listingId: string) {
   return listing ? toListingRecord(listing) : null;
 }
 
+const similarListingLimit = 20;
+const similarListingBatchSize = 128;
+
+/**
+ * Reuse the same deterministic product matcher used by market analysis and
+ * similar-listing follows. Scan eligible records in keyset batches rather
+ * than ranking only the first feed page. Cost is O(published category size);
+ * memory is bounded by one batch plus the best 20. Media is read only for
+ * the final cards, with fresh public/seller checks instead of cached URLs.
+ */
+export async function listSimilarMarketplaceListings(target: memoryStore.ListingRecord) {
+  if (target.status !== 'published') return [];
+
+  if (!shouldUseDatabaseStore()) {
+    const currentTarget = memoryStore.getListing(target.id);
+    if (!currentTarget || currentTarget.status !== 'published') return [];
+    return getComparableListings(currentTarget, memoryStore.listMarketplaceListings({
+      category: currentTarget.category, take: Number.MAX_SAFE_INTEGER,
+    })).slice(0, similarListingLimit).map(listing => ({
+      ...listing,
+      images: listing.images.filter(image => image.status === 'approved')
+        .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary)).slice(0, 1),
+    }));
+  }
+
+  const publicWhere = {
+    status: 'published', category: target.category, seller: { deletedAt: null },
+  } satisfies Prisma.ListingWhereInput;
+  const availableTarget = await prisma.listing.findFirst({
+    where: { ...publicWhere, id: target.id }, select: { id: true },
+  });
+  if (!availableTarget) return [];
+
+  let cursor: string | undefined;
+  let best: memoryStore.ListingRecord[] = [];
+  while (true) {
+    const batch = await prisma.listing.findMany({
+      where: { ...publicWhere, id: { not: target.id, ...(cursor ? { gt: cursor } : {}) } },
+      orderBy: { id: 'asc' },
+      take: similarListingBatchSize,
+      select: {
+        id: true, sellerId: true, category: true, title: true, description: true,
+        attributes: true, city: true, createdAt: true, updatedAt: true,
+      },
+    });
+    const candidates = batch.map(row => toListingRecord({
+      ...row, price: null, priceMode: null, condition: null,
+      status: 'published', views: 0, messageCount: 0, favoriteCount: 0, compliance: null,
+    }));
+    best = getComparableListings(target, [...best, ...candidates]).slice(0, similarListingLimit);
+    if (batch.length < similarListingBatchSize) break;
+    cursor = batch[batch.length - 1].id;
+  }
+  if (!best.length) return [];
+
+  // Re-read after ranking: a concurrent pause/deletion or rejected image must
+  // not leak through a stale candidate snapshot. Include at most one image.
+  const listings = await prisma.listing.findMany({
+    where: { ...publicWhere, id: { in: best.map(listing => listing.id) } },
+    include: {
+      images: {
+        where: { status: 'approved' },
+        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        take: 1,
+      },
+    },
+  });
+  return getComparableListings(target, listings.map(toListingRecord)).slice(0, similarListingLimit);
+}
+
 export async function getPublicSellerProfile(
   sellerId: string,
   options: { includeListings?: boolean } = {},

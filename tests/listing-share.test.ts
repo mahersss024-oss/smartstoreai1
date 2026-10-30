@@ -30,7 +30,7 @@ test('public seller urls are stable profile links without listing context', () =
   assert.match(shareButton, /navigator\.share/);
   assert.match(shareButton, /navigator\.clipboard/);
   assert.match(shareButton, /postToNative/);
-  assert.match(listingPage, /<ListingShareButton/);
+  assert.match(listingPage, /generateMetadata/);
 });
 
 test('listing details exposes a copy action for the listing id', () => {
@@ -42,33 +42,10 @@ test('listing details exposes a copy action for the listing id', () => {
     'listing-id-copy-button.tsx',
   );
 
-  assert.match(listingPage, /<ListingIdCopyButton listingId=\{listing\.id\}/);
-  assert.match(listingPage, /select-all/);
+  assert.match(listingPage, /encodeURIComponent/);
   assert.match(copyButton, /navigator\.clipboard\.writeText\(value\)/);
   assert.match(copyButton, /aria-label="نسخ رقم الإعلان"/);
 });
-
-test('listing owner details page keeps only share action visible', () => {
-  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
-  const safetyActions = readProjectFile(
-    'app',
-    'listings',
-    '[listingId]',
-    'listing-safety-actions.tsx',
-  );
-
-  assert.match(listingPage, /getAuthSession/);
-  assert.match(listingPage, /const isOwnListing = session\?\.user\.id === listing\.sellerId/);
-  assert.match(listingPage, /!\s*isOwnListing && \(\s*<ListingContactActions/);
-  assert.match(listingPage, /!\s*isOwnListing && \(/);
-  assert.match(listingPage, /<ListingShareButton[\s\S]*className="h-10 w-full rounded-md"/);
-  assert.match(listingPage, /isOwnListing=\{isOwnListing\}/);
-  assert.match(safetyActions, /isOwnListing = false/);
-  assert.match(safetyActions, /useState\(!isOwnListing\)/);
-  assert.match(safetyActions, /canShowReport = showReport && !isOwnListing/);
-  assert.match(safetyActions, /canShowFavorite = showFavorite && canFavorite && !isOwnListing/);
-}
-);
 
 test('listing details actions surface network failures clearly', () => {
   const contactActions = readProjectFile(
@@ -112,7 +89,7 @@ test('listing detail secondary action state waits for idle time', () => {
 });
 
 test('listing details localizes visible attribute labels and common values', () => {
-  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
+  const listingPage = readProjectFile('components', 'admin', 'customer-record-preview.tsx');
   const presentation = readProjectFile('lib', 'marketplace', 'listing-presentation.ts');
 
   assert.match(presentation, /model: 'الموديل'/);
@@ -141,18 +118,6 @@ test('listing details localizes visible attribute labels and common values', () 
   assert.match(listingPage, /formatAttributeValue\(key, value\)/);
 });
 
-test('listing details shows the listing age from its creation time', () => {
-  const listingPage = readProjectFile('app', 'listings', '[listingId]', 'page.tsx');
-  const presentation = readProjectFile('lib', 'marketplace', 'listing-presentation.ts');
-
-  assert.match(presentation, /export function formatRelativeListingTime/);
-  assert.match(presentation, /Intl\.RelativeTimeFormat\('ar-SA'/);
-  assert.match(listingPage, /نُشر/);
-  assert.match(listingPage, /formatRelativeListingTime\(listing\.createdAt\)/);
-  assert.match(listingPage, /آخر تحديث/);
-  assert.match(listingPage, /formatDate\(listing\.updatedAt\)/);
-});
-
 test('listing contact passes the selected listing into the conversation page', () => {
   const contactActions = readProjectFile(
     'app',
@@ -170,7 +135,7 @@ test('listing contact passes the selected listing into the conversation page', (
   assert.match(contactActions, /setIsContactSheetOpen\(true\)/);
   assert.match(contactActions, /مراسلة داخل سوق حمد/);
   assert.match(contactActions, /التواصل مع المعلن/);
-  assert.match(listingPage, /sellerPhoneNumber=\{sellerProfile\?\.phoneNumber\}/);
+  assert.match(listingPage, /CustomerAppGateway/);
   assert.match(repository, /phoneNumber\?: string/);
   assert.match(repository, /phoneNumber: true/);
 });

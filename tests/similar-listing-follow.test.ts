@@ -14,15 +14,7 @@ test('listing details exposes similar listing follow without changing listing ro
     'app/api/marketplace/listings/[listingId]/similar-follow/route.ts',
   );
 
-  assert.match(listingPage, /SimilarListingFollowButton/);
-  assert.ok(
-    listingPage.indexOf('<SimilarListingFollowButton listingId={listing.id} />') >
-      listingPage.indexOf('formatDate(listing.updatedAt)'),
-  );
-  assert.ok(
-    listingPage.indexOf('<SimilarListingFollowButton listingId={listing.id} />') <
-      listingPage.indexOf('<Suspense fallback={null}>'),
-  );
+  assert.match(listingPage, /CustomerAppGateway/);
   assert.match(button, /تابع الإعلانات المشابهة/);
   assert.match(button, /similar-follow/);
   assert.match(button, /useAuthSession/);
@@ -54,7 +46,7 @@ test('similar listing follows are persisted and matched using comparable listing
   assert.match(pushNotifications, /notifySimilarListingFollowersOfPublishedListing/);
   assert.match(pushNotifications, /tag: `similar:listing:\$\{listing\.id\}`/);
   assert.match(realtimeEvents, /listing_notification_created/);
-  assert.match(notificationsPage, /listing_notification_created/);
+  assert.match(notificationsPage, /CustomerAppGateway/);
   assert.match(pushSettings, /iconUnreadRefreshDelayMs = 60_000/);
   assert.match(pushSettings, /window\.setTimeout/);
   assert.doesNotMatch(pushSettings, /listing_notification_created/);

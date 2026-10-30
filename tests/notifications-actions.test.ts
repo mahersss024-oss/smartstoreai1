@@ -26,12 +26,7 @@ test('notifications can be deleted from the server and remain scoped to the acco
     repository,
     /deleteMany\(\{[\s\S]*where: \{[\s\S]*userId/,
   );
-  assert.match(notificationsPage, /method: 'DELETE'/);
-  assert.match(notificationsPage, /encodeURIComponent\(notificationId\)/);
-  assert.match(notificationsPage, /isDeleteAllConfirmOpen/);
-  assert.match(notificationsPage, /deletingNotificationRef/);
-  assert.match(notificationsPage, /isDeletingAllRef/);
-  assert.match(notificationsPage, /notificationsChangedEventName/);
+  assert.match(notificationsPage, /CustomerAppGateway/);
   assert.match(pushSettings, /notificationsChangedEventName/);
   assert.match(pushSettings, /refreshUnreadCount/);
 });

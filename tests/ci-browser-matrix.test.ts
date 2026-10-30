@@ -32,7 +32,7 @@ const browser = workflow.jobs.e2e;
 const apiContracts = workflow.jobs['api-contracts'];
 const browserProjects = playwrightConfig.projects!.filter(project => project.name !== 'api-contracts');
 const adminSpecs = [
-  'app-download-gateway.spec.ts',
+  'app-download-gateway.spec.ts', 'admin-session.spec.ts',
   'legal-pages.spec.ts',
   'admin-page-presentation.spec.ts', 'admin-users-loading.spec.ts', 'admin-workspace.spec.ts',
   'all-pages-vitals.spec.ts', 'customer-evidence.spec.ts', 'marketplace-car-models.spec.ts',

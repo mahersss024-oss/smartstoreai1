@@ -91,6 +91,24 @@ test('Google browser start/callback succeeds once and does not recover a session
   } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
+test('Google administrative sign-in returns to the signed administration destination', async () => {
+  const restore = testEnvironment();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => String(input) === 'https://oauth2.googleapis.com/token'
+    ? Response.json({ access_token: 'synthetic-admin-return-access' })
+    : Response.json({ sub: 'admin-return-fixture', email: 'admin-return@example.invalid', email_verified: true });
+  try {
+    const agreement = cookiePair(createCommissionAgreementCookie());
+    const started = await startGoogle(new Request('https://souqhamad.com/api/auth/google/start?return_to=%2Fadmin%2Fusers', { headers: { cookie: agreement } }));
+    const state = new URL(started.headers.get('location')!).searchParams.get('state')!;
+    const cookie = `${agreement}; ${cookiePair(createOauthStateCookie(state))}`;
+    const response = await callbackGoogle(new Request(`https://souqhamad.com/api/auth/google/callback?code=admin-return-fixture&state=${encodeURIComponent(state)}`, { headers: { cookie } }));
+    assert.equal(response.status, 307);
+    assert.equal(new URL(response.headers.get('location')!).pathname, '/admin/users');
+    assert.ok(sessionCookie(response));
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
 test('Apple form_post rejects an absent browser binding before external token exchange', async () => {
   const restore = testEnvironment();
   const originalFetch = globalThis.fetch;

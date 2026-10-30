@@ -15,6 +15,7 @@ const testDataDir = process.env.PLAYWRIGHT_BASE_URL
 // the app gateway, public policies and administration UI; API contracts need no browser.
 const adminBrowserSpecs = [
   '**/app-download-gateway.spec.ts',
+  '**/admin-session.spec.ts',
   '**/legal-pages.spec.ts',
   '**/admin-page-presentation.spec.ts',
   '**/admin-users-loading.spec.ts',

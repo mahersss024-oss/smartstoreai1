@@ -20,7 +20,7 @@ test('open in app banner is mobile-only and persistent', () => {
   assert.match(component, /aria-label="فتح سوق حمد في التطبيق"/);
   assert.match(component, /\/api\/auth\/mobile\/open/);
   assert.doesNotMatch(component, /className="[^"]*(?:fixed|sticky)[^"]*"/);
-  assert.match(layout, /<OpenInAppBanner \/>/);
+  assert.doesNotMatch(layout, /<OpenInAppBanner \/>/, 'administration and app gateways must not mount customer banners');
   assert.doesNotMatch(layout, /PwaInstallPrompt/);
 });
 

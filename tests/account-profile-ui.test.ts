@@ -182,56 +182,11 @@ test('floating action notices use premium theme-aware styling', () => {
   assert.doesNotMatch(notice, /bg-white text-slate-900/);
 });
 
-test('signed-in customer pages hide sign-in controls until session check finishes', () => {
-  const protectedPages = [
-    ['app', 'conversations', 'page.tsx'],
-    ['app', 'favorites', 'page.tsx'],
-    ['app', 'commissions', 'page.tsx'],
-  ];
 
-  for (const segments of protectedPages) {
-    const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
-
-    assert.match(page, /useAuthSession/);
-    assert.match(page, /isSessionLoading/);
-    assert.match(page, /!session\.authenticated/);
+test('retired customer browser pages cannot fetch or mutate private account records', () => {
+  for (const path of ['app/conversations/page.tsx', 'app/favorites/page.tsx', 'app/commissions/page.tsx', 'app/notifications/page.tsx', 'app/conversations/[conversationId]/page.tsx']) {
+    const page = readFileSync(join(process.cwd(), path), 'utf8');
+    assert.match(page, /CustomerAppGateway/);
+    assert.doesNotMatch(page, /fetch\(|getConversation|listCommissions|useAuthSession|CommissionAgreementDialog/);
   }
-});
-
-test('signed-in customer pages do not fetch protected account data before session is known', () => {
-  const protectedPages = [
-    ['app', 'conversations', 'page.tsx'],
-    ['app', 'favorites', 'page.tsx'],
-    ['app', 'commissions', 'page.tsx'],
-    ['app', 'conversations', '[conversationId]', 'page.tsx'],
-  ];
-
-  for (const segments of protectedPages) {
-    const page = readFileSync(join(process.cwd(), ...segments), 'utf8');
-
-    assert.match(page, /useAuthSession/);
-    assert.match(page, /if \(isSessionLoading\)/);
-    assert.doesNotMatch(
-      page,
-      /fetch\('\/api\/auth\/session'/,
-    );
-  }
-});
-
-test('platform fees page can focus the sold listing fee from the account link', () => {
-  const page = readFileSync(join(process.cwd(), 'app', 'commissions', 'page.tsx'), 'utf8');
-
-  assert.match(page, /window\.location\.href/);
-  assert.match(page, /targetListingId/);
-  assert.match(page, /orderedCommissions/);
-  assert.match(page, /targetCommission\?\.status === 'pending_amount'/);
-});
-
-test('platform fees summary highlights due fees and labels transactions clearly', () => {
-  const page = readFileSync(join(process.cwd(), 'app', 'commissions', 'page.tsx'), 'utf8');
-
-  assert.match(page, /الرسوم المستحقة/);
-  assert.match(page, /عدد المعاملات/);
-  assert.match(page, /rounded-md bg-blue-600/);
-  assert.doesNotMatch(page, /عدد السجلات/);
 });

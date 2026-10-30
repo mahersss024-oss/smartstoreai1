@@ -97,7 +97,9 @@ test('admin access revalidation keeps the verified role stable while loading', (
   const beforeRequest = accessHook.slice(verificationStart, requestStart);
 
   assert.doesNotMatch(beforeRequest, /setRole\(null\)/);
-  assert.match(accessHook, /if \(!response\.ok\) \{\s*setRole\(null\)/);
+  assert.match(accessHook, /useAuthSession/);
+  assert.match(accessHook, /next\.authenticated && hasRequiredRole/);
+  assert.doesNotMatch(accessHook, /window\.location\.assign/, 'the admin entry owns explicit sign-in');
 });
 
 test('admin dashboard stays focused on required statistics and administrative navigation', () => {

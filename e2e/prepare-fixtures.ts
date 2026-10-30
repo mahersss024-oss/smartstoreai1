@@ -6,6 +6,7 @@ if (!process.env.SMARTSTORE_DATA_DIR || process.env.SMARTSTORE_MARKETPLACE_STORE
 }
 
 for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
+  createListingDraft({ id: `e2e-private-draft-${project}`, sellerId: 'e2e-report-seller', category: 'other', title: 'Private draft fixture', description: 'Unpublished fixture, never public' });
   const listing = createListingDraft({
     id: `e2e-report-${project}`,
     sellerId: 'e2e-report-seller',

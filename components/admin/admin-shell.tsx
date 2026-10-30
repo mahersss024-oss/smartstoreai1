@@ -19,6 +19,7 @@ import {
   X,
   Megaphone,
   Search,
+  LogOut,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@ui/dialog';
 import {
@@ -32,6 +33,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@ui/button';
 import { useAdminAccess } from '@/app/admin/use-admin-access';
 import { AdminReportNotifications } from './report-notifications';
+import { useAuthSession } from '@/hooks/use-auth-session';
+import { announceAuthSessionChange } from '@/lib/auth/session-sync';
 
 // Adapted from TailAdmin's sidebar/header layout; see docs/licenses/tailadmin.txt.
 const sections = [
@@ -56,9 +59,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [previousPath, setPreviousPath] = useState(pathname);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutNotice, setSignOutNotice] = useState('');
+  const { session, setSession } = useAuthSession();
   const menuButton = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLElement>(null);
-  const { adminAccessRole, isAdminAccessAllowed, verifyAdminAccess } =
+  const { adminAccessRole, isAdminAccessAllowed, isAdminAccessChecking, verifyAdminAccess } =
     useAdminAccess('moderator');
   useEffect(() => {
     void verifyAdminAccess();
@@ -105,6 +111,37 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const title =
     sections.find((section) => section.href === pathname)?.label ?? 'الإدارة';
   const canManage = adminAccessRole === 'admin' || adminAccessRole === 'owner';
+  const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutNotice('');
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+      if (!response.ok) throw new Error('logout_failed');
+      setSession({ authenticated: false, user: null, commissionAgreementAccepted: false });
+      announceAuthSessionChange();
+      window.location.replace('/admin');
+    } catch {
+      setSignOutNotice('تعذر تسجيل الخروج. حاول مرة أخرى.');
+      setSigningOut(false);
+    }
+  };
+  if (!isAdminAccessAllowed || signingOut) {
+    const returnTo = pathname === '/admin' || pathname.startsWith('/admin/') ? pathname : '/admin';
+    return <main dir="rtl" className="grid min-h-dvh place-items-center bg-background p-6 text-foreground" data-admin-entry>
+      <section className="grid w-full max-w-sm justify-items-center gap-5 rounded-2xl border bg-card p-7 text-center shadow-sm">
+        <Image src="/hamad-market-logo.webp" alt="سوق حمد" width={64} height={64} className="rounded-2xl" priority />
+        <h1 className="text-xl font-bold">لوحة إدارة سوق حمد</h1>
+        {isAdminAccessChecking || signingOut ? <p role="status" className="text-sm text-muted-foreground">{signingOut ? 'جارٍ تسجيل الخروج…' : 'جارٍ التحقق من الدخول…'}</p> : <>
+          <p role="status" className="text-sm text-muted-foreground">{session.authenticated ? 'هذا الحساب لا يملك صلاحية الإدارة.' : 'سجّل الدخول بحساب الإدارة.'}</p>
+          <a className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground" href={`/api/auth/google/start?return_to=${encodeURIComponent(returnTo)}`}>{session.authenticated ? 'الدخول بحساب آخر' : 'تسجيل الدخول باستخدام Google'}</a>
+          {session.authenticated && <Button variant="outline" className="w-full" onClick={() => void signOut()}><LogOut className="size-4" />تسجيل الخروج</Button>}
+          <Button variant="ghost" onClick={() => void verifyAdminAccess()}>إعادة التحقق</Button>
+        </>}
+        {signOutNotice && <p role="alert" className="text-sm text-destructive">{signOutNotice}</p>}
+      </section>
+    </main>;
+  }
   return (
     <div
       className="admin-workspace"
@@ -112,7 +149,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       data-expanded={expanded}
       data-mobile-open={mobileOpen}
     >
-      {!isAdminAccessAllowed && <div className="admin-topbar" aria-hidden="true" />}
       {isAdminAccessAllowed && (
         <>
           {mobileOpen && (
@@ -248,6 +284,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </span>
             <ThemeToggle language="ar" />
             <AdminReportNotifications canManage={canManage} />
+            <Button variant="outline" size="icon" aria-label="تسجيل الخروج" title="تسجيل الخروج" onClick={() => void signOut()}><LogOut className="size-4" /></Button>
           </header>
           <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
             <DialogContent
@@ -304,6 +341,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         className="admin-content"
         inert={mobileOpen || undefined}
       >
+        {signOutNotice && <p role="alert" className="admin-notice">{signOutNotice}</p>}
         {children}
       </div>
     </div>

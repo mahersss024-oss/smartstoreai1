@@ -28,23 +28,6 @@ test('pull to refresh is touch scoped and avoids global touch blocking', () => {
   assert.doesNotMatch(source, /preventDefault\(/);
 });
 
-test('main client data pages subscribe to pull refresh events', () => {
-  const files = [
-    ['app', 'conversations', 'page.tsx'],
-    ['app', 'conversations', '[conversationId]', 'page.tsx'],
-    ['app', 'favorites', 'page.tsx'],
-    ['app', 'commissions', 'page.tsx'],
-  ];
-
-  for (const file of files) {
-    const source = readProjectFile(...file);
-
-    assert.match(source, /smartstore:pull-refresh/, file.join('/'));
-    assert.match(source, /addEventListener/, file.join('/'));
-    assert.match(source, /removeEventListener/, file.join('/'));
-  }
-});
-
 test('root layout mounts pull to refresh without duplicating viewport meta', () => {
   const source = readProjectFile('app', 'layout.tsx');
 
