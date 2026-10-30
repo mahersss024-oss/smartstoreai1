@@ -234,6 +234,8 @@ switch ($Action) {
             & node --import $preload 'node_modules/tsx/dist/cli.mjs' --test --test-concurrency=1 `
                 'tests/db-integration.test.ts' 'tests/evidence-db-integration.test.ts' `
                 'tests/repository-profile-preservation.db-integration.test.ts' `
+                'tests/account-integrity.db-integration.test.ts' `
+                'tests/listing-partial-edits.db-integration.test.ts' `
                 'tests/direct-image-uploads.db-integration.test.ts' `
                 'tests/notification-delivery.db-integration.test.ts'
             if ($LASTEXITCODE -ne 0) { throw 'Database integration tests failed; see the test output.' }

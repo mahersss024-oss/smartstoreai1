@@ -37,7 +37,7 @@ function mockCustomerDatabase(t: TestContext, existing?: Account) {
     return account;
   };
   const original = {
-    user: { findUnique: prisma.user.findUnique, findFirst: prisma.user.findFirst, upsert: prisma.user.upsert },
+    user: { findUnique: prisma.user.findUnique, findFirst: prisma.user.findFirst, upsert: prisma.user.upsert, update: prisma.user.update },
     follow: { findUnique: prisma.sellerFollow.findUnique, create: prisma.sellerFollow.create, count: prisma.sellerFollow.count },
     rating: { upsert: prisma.sellerRating.upsert, aggregate: prisma.sellerRating.aggregate },
     transaction: prisma.$transaction,
@@ -51,6 +51,11 @@ function mockCustomerDatabase(t: TestContext, existing?: Account) {
   prisma.user.findUnique = (async () => account ?? null) as never;
   prisma.user.findFirst = (async () => ({ id: 'profile-preservation-seller' })) as never;
   prisma.user.upsert = upsert as never;
+  prisma.user.update = (async ({ data }: { data: Partial<Account> }) => {
+    assert.ok(account, 'Profile updates require an existing account.');
+    account = { ...account, ...mergeDefined(data) };
+    return account;
+  }) as never;
   prisma.sellerFollow.findUnique = (async () => null) as never;
   prisma.sellerFollow.create = (async () => ({ id: 'profile-follow' })) as never;
   prisma.sellerFollow.count = (async () => 1) as never;
@@ -61,6 +66,8 @@ function mockCustomerDatabase(t: TestContext, existing?: Account) {
     _avg: { rating: 5 }, _count: { rating: 1 },
   })) as never;
   const transaction = {
+    $executeRaw: async () => 1,
+    user: prisma.user,
     listing: {
       count: async () => 0,
       create: async ({ data }: { data: Record<string, unknown> }) => ({

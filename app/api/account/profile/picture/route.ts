@@ -14,9 +14,9 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import {
   getAuthSession,
-  getConfiguredRoleForEmail,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { lockActiveProfileUser } from '@/lib/auth/profile-account';
 
 export const dynamic = 'force-dynamic';
 
@@ -146,10 +146,11 @@ export async function POST(request: Request) {
   }
 
   let picture: string | null;
-  const existingUserByEmail = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
-  const ownerId = existingUserByEmail?.id ?? session.user.id;
+  const ownerId = session.user.id;
+  const existingUser = await prisma.user.findUnique({ where: { id: ownerId } });
+  if (!existingUser || existingUser.deletedAt) {
+    return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
+  }
 
   try {
     const originalData = new Uint8Array(await file.arrayBuffer());
@@ -214,27 +215,10 @@ export async function POST(request: Request) {
   let user;
   try {
     user = await prisma.$transaction(async tx => {
-      await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
-      const current = await tx.user.findUnique({ where: { email: session.user.email } });
-      previousPicture = current?.picture;
-      const saved = current && current.id !== session.user.id
-      ? await tx.user.update({
-          where: { email: session.user.email },
-          data: { picture },
-        })
-      : await tx.user.upsert({
-          where: { id: session.user.id },
-          create: {
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.name,
-            picture,
-            role:
-              session.user.role ??
-              getConfiguredRoleForEmail(session.user.email),
-          },
-          update: { picture },
-        });
+      const current = await lockActiveProfileUser(tx, ownerId);
+      if (!current) return null;
+      previousPicture = current.picture;
+      const saved = await tx.user.update({ where: { id: ownerId }, data: { picture } });
       const cleanup = profileImageCleanupInput(saved.id, previousPicture);
       if (cleanup && previousPicture !== picture) await enqueueImageObjectCleanup(tx, cleanup);
       return saved;
@@ -242,6 +226,11 @@ export async function POST(request: Request) {
   } catch (error) {
     await deletePreviousProfilePictureBestEffort(ownerId, picture);
     throw error;
+  }
+
+  if (!user) {
+    await deletePreviousProfilePictureBestEffort(ownerId, picture);
+    return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
   }
 
   if (previousPicture && previousPicture !== picture) {
@@ -297,28 +286,18 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ id: session.user.id }, { email: session.user.email }],
-    },
-  });
-
-  if (!existingUser) {
-    return Response.json(
-      { error: 'account_not_found' },
-      { status: 404, headers: noStoreHeaders },
-    );
-  }
-
   let previousPicture: string | null | undefined;
   const user = await prisma.$transaction(async tx => {
-    await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${existingUser.id} FOR UPDATE`;
-    const current = await tx.user.findUnique({ where: { id: existingUser.id } });
-    previousPicture = current?.picture;
-    const cleanup = profileImageCleanupInput(existingUser.id, previousPicture);
+    const current = await lockActiveProfileUser(tx, session.user.id);
+    if (!current) return null;
+    previousPicture = current.picture;
+    const cleanup = profileImageCleanupInput(current.id, previousPicture);
     if (cleanup) await enqueueImageObjectCleanup(tx, cleanup);
-    return tx.user.update({ where: { id: existingUser.id }, data: { picture: null } });
+    return tx.user.update({ where: { id: current.id }, data: { picture: null } });
   });
+  if (!user) {
+    return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
+  }
 
   await deletePreviousProfilePictureBestEffort(user.id, previousPicture);
 

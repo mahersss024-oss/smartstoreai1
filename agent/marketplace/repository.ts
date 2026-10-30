@@ -846,6 +846,12 @@ function getPublicSellerName(seller: { id: string; name?: string | null }) {
 }
 
 async function ensureUser(user: AuthSessionUser) {
+  // Production identities are created only by the verified registration flow.
+  // A request that passed the proxy before deletion must not recreate the old
+  // account or replace canonical fields with its stale session snapshot.
+  if (process.env.NODE_ENV === 'production') {
+    return prisma.user.update({ where: { id: user.id, deletedAt: null }, data: {} });
+  }
   return prisma.user.upsert({
     where: { id: user.id },
     create: {
@@ -865,6 +871,9 @@ async function ensureActorUser(actor: Actor) {
     return ensureUser(actor);
   }
 
+  if (process.env.NODE_ENV === 'production') {
+    return prisma.user.update({ where: { id: actor, deletedAt: null }, data: {} });
+  }
   return prisma.user.upsert({
     where: { id: actor },
     create: {
@@ -2477,6 +2486,19 @@ export async function createListingDraft(
   return mappedListing;
 }
 
+async function lockSellerListingEvidenceEntities(
+  tx: Prisma.TransactionClient,
+  listingId: string,
+  sellerId: string,
+) {
+  // Evidence triggers acquire these keys on writes. Take the same ordered keys
+  // before a row lock so an account deletion cannot hold a key while waiting
+  // for this listing row, with its editor waiting for that key in the trigger.
+  for (const key of [`listing:${listingId}`, `user:${sellerId}`].sort()) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
+  }
+}
+
 export async function updateListingForSeller(
   listingId: string,
   sellerId: string,
@@ -2516,56 +2538,63 @@ export async function updateListingForSeller(
     return listing;
   }
 
-  const existing = await getListing(listingId);
-
-  if (!existing || existing.sellerId !== sellerId || existing.status === 'deleted' || (options.draftOnly && existing.status !== 'draft')) {
-    return null;
-  }
-
-  const nextInput: CreateListingInput = {
-    category: updates.category ?? existing.category,
-    title: updates.title ?? existing.title,
-    description: updates.description ?? existing.description,
-    price: updates.price ?? existing.price,
-    city: updates.city ?? existing.city,
-    condition: updates.condition ?? existing.condition,
-    attributes: mergeMarketplaceCategoryAttributes(updates.category ?? existing.category, updates.attributes, existing),
-  };
-  const assessedCompliance = options.modelReview
-    ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }))
-    : createUnassessedMarketplaceCompliance();
-  const compliance = existing.compliance.humanDecision === 'block'
-    ? { ...assessedCompliance, humanDecision: 'block' as const, decision: existing.compliance.decision }
-    : assessedCompliance;
   const listing = await prisma.$transaction(async tx => {
+    // Serialize partial edits before reading the fields used to merge attributes
+    // and rebuild search text. A snapshot read outside this lock can overwrite
+    // another accepted edit even when the two requests change different fields.
+    await lockSellerListingEvidenceEntities(tx, listingId, sellerId);
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const record = await tx.listing.findUnique({
+      where: { id: listingId },
+      include: { images: true },
+    });
+    const existing = record ? toListingRecord(record) : null;
+    if (!existing || existing.sellerId !== sellerId || existing.status === 'deleted' ||
+        (options.draftOnly && existing.status !== 'draft')) return null;
+
+    const nextInput: CreateListingInput = {
+      category: updates.category ?? existing.category,
+      title: updates.title ?? existing.title,
+      description: updates.description ?? existing.description,
+      price: updates.price ?? existing.price,
+      city: updates.city ?? existing.city,
+      condition: updates.condition ?? existing.condition,
+      attributes: mergeMarketplaceCategoryAttributes(updates.category ?? existing.category, updates.attributes, existing),
+    };
+    const assessedCompliance = options.modelReview
+      ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }))
+      : createUnassessedMarketplaceCompliance();
+    const compliance = existing.compliance.humanDecision === 'block'
+      ? { ...assessedCompliance, humanDecision: 'block' as const, decision: existing.compliance.decision }
+      : assessedCompliance;
     const updated = await tx.listing.update({
-    where: { id: listingId, sellerId, ...(options.draftOnly ? { status: 'draft' } : { status: existing.status, compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } }) },
-    data: {
-      category: updates.category,
-      title: updates.title,
-      description: updates.description,
-      price:
-        'price' in updates ? toNumericPrice(updates.price) : undefined,
-      priceMode: 'price' in updates ? toPriceMode(updates.price) : undefined,
-      city: updates.city,
-      condition: updates.condition,
-      attributes: toPrismaJsonObject(nextInput.attributes ?? {}),
-      searchText: toNormalizedListingSearchText(nextInput),
-      compliance: toPrismaJsonObject(
-        compliance as unknown as Record<string, unknown>,
-      ),
-      status:
-        compliance.decision === 'block'
-          ? 'rejected'
-          : compliance.decision === 'needs_review'
-            ? 'pending'
-            : undefined,
-    },
-    include: { images: true },
+      where: { id: listingId, sellerId, ...(options.draftOnly ? { status: 'draft' } : { status: existing.status, compliance: { equals: toPrismaJsonObject(existing.compliance as unknown as Record<string, unknown>) } }) },
+      data: {
+        category: updates.category,
+        title: updates.title,
+        description: updates.description,
+        price:
+          'price' in updates ? toNumericPrice(updates.price) : undefined,
+        priceMode: 'price' in updates ? toPriceMode(updates.price) : undefined,
+        city: updates.city,
+        condition: updates.condition,
+        attributes: toPrismaJsonObject(nextInput.attributes ?? {}),
+        searchText: toNormalizedListingSearchText(nextInput),
+        compliance: toPrismaJsonObject(
+          compliance as unknown as Record<string, unknown>,
+        ),
+        status:
+          compliance.decision === 'block'
+            ? 'rejected'
+            : compliance.decision === 'needs_review'
+              ? 'pending'
+              : undefined,
+      },
+      include: { images: true },
     });
     if (compliance.modelAssessment) await recordModelReview({ subject: 'listing', subjectId: listingId, listingId, userId: sellerId, text: listingSemanticText({ ...nextInput, attributes: nextInput.attributes ?? {} }), assessment: compliance.modelAssessment }, tx);
     return updated;
-  }).catch((error: unknown) => {
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }).catch((error: unknown) => {
     if (isPrismaKnownRequestError(error, 'P2025')) return null;
     throw error;
   });
@@ -2653,6 +2682,7 @@ export async function setListingStatusForSeller(
         : 'pending'
       : status;
   const listing = await retryDirectImageTransaction(() => prisma.$transaction(async (tx) => {
+    await lockSellerListingEvidenceEntities(tx, listingId, sellerId);
     if (directImageUploadsEnabled() && status === 'published' && await tx.listingImageUpload.count({
       where: { listingId, status: { in: [...activeImageUploadStatuses] }, expiresAt: { gt: new Date() } },
     })) throw new DirectImageUploadError('image_uploads_pending', 409);

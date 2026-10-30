@@ -64,7 +64,7 @@ test('draft content writes constrain status and owner atomically if the seller p
   const delegate = prisma.listing;
   const original = { findUnique: delegate.findUnique, update: delegate.update };
   const originalTransaction = prisma.$transaction;
-  prisma.$transaction = (async (run: (tx: unknown) => Promise<unknown>) => run({ listing: delegate })) as unknown as typeof prisma.$transaction;
+  prisma.$transaction = (async (run: (tx: unknown) => Promise<unknown>) => run({ $executeRaw: async () => 1, listing: delegate })) as unknown as typeof prisma.$transaction;
   let writes = 0;
   Object.assign(delegate, {
     findUnique: async () => databaseRecord(),

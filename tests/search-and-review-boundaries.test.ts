@@ -111,7 +111,8 @@ test('a concurrent human moderation decision cannot be overwritten by a seller c
   prisma.listing.findUnique = (async () => humanDecisionChanged
     ? { ...record, status: 'rejected', compliance: { ...compliance, humanDecision: 'block' } }
     : record) as unknown as typeof prisma.listing.findUnique;
-  prisma.$transaction = (async (run: (tx: unknown) => Promise<unknown>) => run({ listing: {
+  prisma.$transaction = (async (run: (tx: unknown) => Promise<unknown>) => run({ $executeRaw: async () => 1, listing: {
+    findUnique: (...args: Parameters<typeof prisma.listing.findUnique>) => prisma.listing.findUnique(...args),
     updateMany: async () => ({ count: 0 }),
     update: async (args: { where: { id: string; sellerId: string; status: string; compliance: { equals: unknown } } }) => {
       writes++;

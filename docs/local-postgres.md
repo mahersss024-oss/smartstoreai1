@@ -31,7 +31,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-tools\post
 # Run the application against the dedicated development database.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-tools\postgres.ps1 -Action Dev
 
-# Run the two existing integration files against the dedicated test database.
+# Run integration files, including account integrity and concurrent listing edits,
+# against the dedicated test database.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-tools\postgres.ps1 -Action Test
 ```
 
@@ -46,7 +47,9 @@ temporary file directory, disables live model requests through the existing test
 provider, and removes inherited cloud-storage/push/OAuth settings for its child.
 It restores the calling process environment afterward. Test files run
 sequentially because they read shared moderation queues; their internal
-concurrency assertions remain enabled.
+concurrency assertions remain enabled. Account integrity tests verify retained
+financial records, late profile requests and concurrent sales/deletion. Listing
+edit tests verify PostgreSQL row locks preserve independent partial updates.
 
 `Migrate` applies committed migrations to both databases. `Env -Database dev`
 or `Env -Database test` sets the current PowerShell process environment without

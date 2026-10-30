@@ -76,7 +76,8 @@ test('deletion policy provides the native action and independent support path wi
   assert.match(deletion, /دون إعادة تنزيل التطبيق/);
   assert.ok(deletion.includes(platformSupportEmail));
   assert.match(deletion, /لا تنفذ حذف الحساب من الموقع/);
-  assert.match(deletion, /عند وجود أدلة محمية، يعطل الحساب/);
+  assert.match(deletion, /عند وجود أدلة محمية أو سجلات رسوم، يعطل الحساب/);
+  assert.match(deletion, /الرسوم المستحقة وسجل التسويات السابقة/);
   assert.match(deletion, /تحذف اشتراكات إشعارات الحساب ورموز إشعارات أجهزته في الحالتين/);
   assert.match(deletion, /180 يومًا بعد إغلاقها/);
   assert.match(deletion, /إتلاف الأدلة ليس آليًا/);
