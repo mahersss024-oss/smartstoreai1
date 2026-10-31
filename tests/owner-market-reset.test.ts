@@ -14,6 +14,15 @@ import {
 import { signMaintenancePreview, verifyMaintenancePreview } from '@/lib/admin/maintenance';
 import { createSessionCookie } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { normalizeMaintenanceConfirmation } from '@/lib/admin/maintenance-confirmation';
+
+test('confirmation formatting accepts pasted spacing and direction marks while retaining the full destructive wording', () => {
+  const decorated = `\u200f  ${marketResetConfirmation.split(' ').join('\u00a0  ')} \u200e`;
+  assert.equal(normalizeMaintenanceConfirmation(decorated), marketResetConfirmation);
+  assert.equal(normalizeMaintenanceConfirmation('  تنظيف\u061c  '), 'تنظيف');
+  assert.notEqual(normalizeMaintenanceConfirmation('حذف بيانات السوق'), marketResetConfirmation);
+  assert.notEqual(normalizeMaintenanceConfirmation('حذف بيانات السوق والابقاء على المستخدمين'), marketResetConfirmation);
+});
 
 const isolatedEnvironment: Record<string, string | undefined> = {
   NODE_ENV: 'production',

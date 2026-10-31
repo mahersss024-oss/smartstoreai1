@@ -13,6 +13,7 @@ import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
 import { DatabaseExplorer } from '@/components/admin/database-explorer';
 import { MarketResetPanel } from '@/components/admin/market-reset-panel';
+import { normalizeMaintenanceConfirmation } from '@/lib/admin/maintenance-confirmation';
 
 type MaintenanceCounts = {
   deletedListings: number;
@@ -88,6 +89,18 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ar-SA').format(value);
 }
 
+function cleanupExclusionReason(key: string, scope: CleanupScope) {
+  const labels: Record<string, string> = {
+    evidence: 'مرتبط بأدلة محفوظة', retention: 'لم تنتهِ مدة الاحتفاظ',
+    commission: 'مرتبط برسوم أو عمولات', open_report: 'بلاغ إعلان مفتوح',
+    open_user_report: 'بلاغ مستخدم مفتوح', active_conversation: 'محادثة نشطة',
+    upload_in_progress: 'رفع صور جارٍ', request_in_progress: 'طلب قيد التنفيذ',
+    related_rows_limit: 'عدد السجلات المرتبطة يتجاوز حد الدفعة', report_retention: 'لم تنتهِ مدة الاحتفاظ بالبلاغ',
+  };
+  if (key === 'recent') return scope === 'old_model_reviews' ? 'ملاحظات لم يتجاوز عمرها 30 يومًا' : 'بيانات لم يتجاوز عمرها يومًا';
+  return labels[key] ?? 'سجلات مستثناة من التنظيف';
+}
+
 export default function AdminMaintenancePage() {
   const router = useRouter();
   const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('owner');
@@ -99,6 +112,7 @@ export default function AdminMaintenancePage() {
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [previewExpired, setPreviewExpired] = useState(false);
   const [siteMessage, setSiteMessage] = useState<SiteMessageDraft>({
     message: '', type: 'info', isEnabled: false, expiresAt: '',
   });
@@ -109,6 +123,14 @@ export default function AdminMaintenancePage() {
     () => cleanupScopes.find((option) => option.value === scope),
     [scope],
   );
+  useEffect(() => {
+    if (!preview) { setPreviewExpired(false); return; }
+    const remaining = Date.parse(preview.expiresAt) - Date.now();
+    setPreviewExpired(remaining <= 0);
+    if (remaining <= 0) return;
+    const timer = window.setTimeout(() => setPreviewExpired(true), remaining);
+    return () => window.clearTimeout(timer);
+  }, [preview]);
   const loadCounts = useCallback(async (selectedScope: CleanupScope) => {
     setIsLoading(true);
     setNotice('');
@@ -218,6 +240,9 @@ export default function AdminMaintenancePage() {
   }, [loadSiteMessage, siteMessage]);
 
   const runCleanup = useCallback(async () => {
+    if (isRunning || isLoading || !preview?.previewToken || !preview.batchCount ||
+      previewExpired || Date.parse(preview.expiresAt) <= Date.now() ||
+      normalizeMaintenanceConfirmation(confirmation) !== 'تنظيف' || reason.trim().length < 5) return;
     setIsRunning(true);
     setNotice('');
 
@@ -225,7 +250,7 @@ export default function AdminMaintenancePage() {
       const response = await fetch('/api/admin/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope, confirmation, reason, previewToken: preview?.previewToken }),
+        body: JSON.stringify({ scope, confirmation: 'تنظيف', reason, previewToken: preview.previewToken }),
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -274,7 +299,19 @@ export default function AdminMaintenancePage() {
     } finally {
       setIsRunning(false);
     }
-  }, [confirmation, loadCounts, preview?.previewToken, reason, scope, router]);
+  }, [confirmation, isRunning, isLoading, loadCounts, preview, previewExpired, reason, scope, router]);
+
+  const cleanupBlock = isRunning ? 'انتظر اكتمال التنظيف الجاري.'
+    : isLoading ? 'انتظر تحميل المعاينة.'
+    : !preview?.previewToken ? 'حدّث المعاينة أولًا.'
+    : previewExpired ? 'انتهت المعاينة. حدّثها قبل التنفيذ.'
+    : preview.batchCount === 0 ? (preview.total === 0 ? 'لا توجد سجلات في هذا القسم لتنظيفها.'
+      : scope === 'old_model_reviews' && preview.reasonCounts.recent === preview.total
+        ? 'لا توجد سجلات مؤهلة للحذف؛ جميع الملاحظات لم يتجاوز عمرها 30 يومًا.'
+        : 'لا توجد سجلات مؤهلة للحذف. راجع أسباب الاستثناء في المعاينة.')
+    : reason.trim().length < 5 ? 'اكتب سببًا من 5 أحرف على الأقل.'
+    : normalizeMaintenanceConfirmation(confirmation) !== 'تنظيف' ? 'اكتب كلمة «تنظيف» في حقل التأكيد.'
+    : null;
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -384,7 +421,7 @@ export default function AdminMaintenancePage() {
                 <p>عدد العناصر في هذه الدفعة: <strong>{formatNumber(preview.batchCount)}</strong> من أصل حد 50.</p>
                 <p className="text-xs text-muted-foreground">تنتهي المعاينة: {new Date(preview.expiresAt).toLocaleString('ar-SA')}</p>
                 {Object.entries(preview.reasonCounts).length > 0 && (
-                  <p className="text-xs text-muted-foreground">أسباب الاستثناء: {Object.entries(preview.reasonCounts).map(([key, value]) => `${key}: ${formatNumber(value)}`).join('، ')}</p>
+                  <p className="text-xs text-muted-foreground">أسباب الاستثناء: {Object.entries(preview.reasonCounts).map(([key, value]) => `${cleanupExclusionReason(key, scope)}: ${formatNumber(value)}`).join('، ')}</p>
                 )}
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-semibold">عرض العناصر المحددة لهذه الدفعة ({formatNumber(preview.affectedIds.length)})</summary>
@@ -401,16 +438,20 @@ export default function AdminMaintenancePage() {
             <Input value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={500} placeholder="اكتب سببًا واضحًا" />
           </label>
 
+          <p id="maintenance-cleanup-block-reason" aria-live="polite" className="text-sm text-muted-foreground">{cleanupBlock ?? 'اكتملت شروط التأكيد. يمكنك تنفيذ التنظيف.'}</p>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input
               name="cleanupConfirmation"
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
               placeholder="اكتب: تنظيف"
+              aria-describedby="maintenance-cleanup-block-reason"
             />
             <Button
-              className="rounded-md bg-red-600 hover:bg-red-700"
-              disabled={isRunning || isLoading || confirmation !== 'تنظيف' || reason.trim().length < 5 || !preview?.previewToken || preview.batchCount === 0}
+              variant="destructive"
+              className="rounded-md"
+              disabled={cleanupBlock !== null}
+              aria-describedby="maintenance-cleanup-block-reason"
               onClick={() => void runCleanup()}
             >
               <Trash2 className="size-4" />

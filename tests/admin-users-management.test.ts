@@ -515,7 +515,7 @@ test('admin maintenance page offers the deleted-listings purge option', () => {
   assert.doesNotMatch(page, /value: 'analytics'/);
   assert.doesNotMatch(page, /marketplace_without_users/);
   assert.match(page, /useAdminAccess\('owner'\)/);
-  assert.match(page, /previewToken: preview\?\.previewToken/);
+  assert.match(page, /previewToken: preview\.previewToken/);
   assert.match(page, /reason, previewToken/);
   assert.match(page, /preview\.eligible/);
   assert.match(page, /preview\.protected/);

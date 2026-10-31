@@ -7,6 +7,7 @@ import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { useAdminAccess } from '@/app/admin/use-admin-access';
 import { useAuthSession } from '@/hooks/use-auth-session';
+import { normalizeMaintenanceConfirmation } from '@/lib/admin/maintenance-confirmation';
 
 const confirmationPhrase = 'حذف بيانات السوق والإبقاء على المستخدمين';
 const endpoint = '/api/admin/maintenance';
@@ -109,6 +110,7 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
   const busy = phase !== 'idle';
+  const confirmationMatches = normalizeMaintenanceConfirmation(confirmation) === confirmationPhrase;
 
   useEffect(() => {
     mounted.current = true;
@@ -163,13 +165,13 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
 
   const execute = async () => {
     if (request.current || !preview || !preview.canExecute || preview.blockers.length || expired ||
-      Date.parse(preview.expiresAt) <= Date.now() || confirmation !== confirmationPhrase ||
+      Date.parse(preview.expiresAt) <= Date.now() || !confirmationMatches ||
       reason.trim().length < 5 || reason.trim().length > 500 || !backupConfirmed || !includeProtectedData) return;
     const controller = new AbortController();
     request.current = controller;
     const current = () => mounted.current && request.current === controller && !controller.signal.aborted;
     const body = { action: 'market_reset', previewToken: preview.previewToken, reason: reason.trim(),
-      confirmation, backupConfirmed, includeProtectedData };
+      confirmation: confirmationPhrase, backupConfirmed, includeProtectedData };
     let submitted = false;
     setPhase('execute');
     setError('');
@@ -204,8 +206,17 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
     }
   };
 
-  const canExecute = !busy && !!preview?.canExecute && !preview.blockers.length && !expired &&
-    confirmation === confirmationPhrase && reason.trim().length >= 5 && backupConfirmed && includeProtectedData;
+  const executionBlock = busy ? 'انتظر اكتمال الطلب الجاري.'
+    : !preview ? 'اطلب معاينة إعادة ضبط السوق أولًا.'
+    : expired ? 'انتهت المعاينة. حدّثها ثم أعد التأكيد.'
+    : preview.blockers.length ? failureMessage(preview.blockers[0].code)
+    : !preview.canExecute ? 'التنفيذ غير متاح لهذه المعاينة. حدّثها وراجع التنبيهات.'
+    : reason.trim().length < 5 || reason.trim().length > 500 ? 'اكتب سببًا من 5 إلى 500 حرف.'
+    : !backupConfirmed ? 'أكّد أخذ نسخة احتياطية قابلة للاستعادة.'
+    : !includeProtectedData ? 'أكّد إقرار حذف بيانات السوق والأدلة والرسوم.'
+    : !confirmationMatches ? 'عبارة التأكيد غير مطابقة. انسخ العبارة المعروضة والصقها كاملة.'
+    : null;
+  const canExecute = executionBlock === null;
 
   return <details className="admin-section admin-danger-zone" data-market-reset>
     <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold">
@@ -256,9 +267,11 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
         </label>
         <label className="grid gap-2 text-sm">
           اكتب للتأكيد: {confirmationPhrase}
-          <Input name="marketResetConfirmation" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false} />
+          <Input name="marketResetConfirmation" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false}
+            aria-invalid={Boolean(confirmation) && !confirmationMatches} aria-describedby="market-reset-block-reason" />
         </label>
-        <Button className="w-fit rounded-md bg-red-600 hover:bg-red-700" disabled={!canExecute} onClick={() => void execute()}>
+        <p id="market-reset-block-reason" aria-live="polite" className="text-sm text-muted-foreground">{executionBlock ?? 'اكتملت شروط التأكيد. يمكنك تنفيذ الحذف.'}</p>
+        <Button variant="destructive" className="w-fit rounded-md" disabled={!canExecute} aria-describedby="market-reset-block-reason" onClick={() => void execute()}>
           <Trash2 className="size-4" />حذف بيانات السوق نهائيًا
         </Button>
       </>}

@@ -220,3 +220,69 @@ test('losing owner access discards a pending preview and cannot restore its form
     await page.screenshot({ path: info.outputPath('owner-reset-access-restored.png'), fullPage: true });
   } finally { release(); }
 });
+
+test('ordinary cleanup explains why recent model reviews are protected instead of silently disabling its action', async ({ page, baseURL }, info) => {
+  await prepare(page, baseURL!, 'owner');
+  const writes: unknown[] = [];
+  await page.route('**/api/admin/maintenance**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.searchParams.get('resource')) return route.fallback();
+    if (request.method() === 'POST') {
+      writes.push(request.postDataJSON());
+      return route.fulfill({ status: 400, json: { error: 'unexpected_cleanup_request' } });
+    }
+    const scope = url.searchParams.get('scope') ?? 'closed_reports';
+    return route.fulfill({ json: {
+      counts: { deletedListings: 0, deletedListingImages: 0, closedReports: 0,
+        closedUserReports: 0, searchStates: 0, idempotencyKeys: 0, modelReviews: 35 },
+      scopes: [{ scope, label: 'ملاحظات النماذج القديمة', total: 35, eligible: 0,
+        protected: 35, reasonCounts: { recent: 35 }, batchCount: 0, affectedIds: [],
+        previewToken: 'isolated-empty-cleanup', expiresAt: new Date(Date.now() + 600_000).toISOString() }],
+      productionCleanupEnabled: true, maxBatchSize: 50,
+    } });
+  });
+  await page.goto('/admin/maintenance');
+  await page.locator('select[name="cleanupScope"]').selectOption('old_model_reviews');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'تنفيذ تنظيف', exact: true }) });
+  await section.getByPlaceholder('اكتب سببًا واضحًا').fill(reason);
+  await section.locator('input[name="cleanupConfirmation"]').fill('تنظيف');
+  const button = section.getByRole('button', { name: 'تنفيذ التنظيف', exact: true });
+  await expect(button).toBeDisabled();
+  const explanation = section.locator('#maintenance-cleanup-block-reason');
+  await expect(explanation).toBeVisible();
+  await expect(section).toContainText(/30|٣٠/);
+  await expect(section).not.toContainText('recent:');
+  await expect(button).toHaveAttribute('aria-describedby', 'maintenance-cleanup-block-reason');
+  await button.evaluate(element => (element as HTMLButtonElement).click());
+  expect(writes).toHaveLength(0);
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath('cleanup-recent-reviews-reason.png'), fullPage: true });
+});
+
+test('reset explains an incorrect phrase and accepts harmless paste formatting with a canonical request', async ({ page, baseURL }, info) => {
+  const { calls, panel } = await setup(page, baseURL!);
+  await panel.locator('summary').click();
+  await panel.getByRole('button', { name: 'معاينة إعادة ضبط السوق', exact: true }).click();
+  await authorize(panel);
+  const confirmation = panel.locator('input[name="marketResetConfirmation"]');
+  const button = panel.getByRole('button', { name: 'حذف بيانات السوق نهائيًا', exact: true });
+  await confirmation.fill('حذف البيانات');
+  await expect(button).toBeDisabled();
+  const explanation = panel.locator('#market-reset-block-reason');
+  await expect(explanation).toBeVisible();
+  await expect(explanation).toContainText(/عبارة|التأكيد/);
+  await expect(button).toHaveAttribute('aria-describedby', 'market-reset-block-reason');
+  expect(calls.resets).toHaveLength(0);
+  // A copied RTL label can include bidi marks, NBSP and repeated whitespace.
+  await confirmation.fill(`\u200f  ${phrase.replaceAll(' ', '\u00a0  ')}  \u200f`);
+  await expect(button).toBeEnabled();
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath('owner-reset-formatted-confirmation.png'), fullPage: true });
+  await button.click();
+  await expect.poll(() => calls.resets.length).toBe(1);
+  expect(calls.resets[0].confirmation).toBe(phrase);
+  expect(calls.resets[0].backupConfirmed).toBe(true);
+  expect(calls.resets[0].includeProtectedData).toBe(true);
+  await expect(panel.getByRole('status')).toContainText('اكتملت إعادة ضبط السوق');
+});
