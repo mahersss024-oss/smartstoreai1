@@ -12,6 +12,7 @@ import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
 import { DatabaseExplorer } from '@/components/admin/database-explorer';
+import { MarketResetPanel } from '@/components/admin/market-reset-panel';
 
 type MaintenanceCounts = {
   deletedListings: number;
@@ -102,6 +103,7 @@ export default function AdminMaintenancePage() {
     message: '', type: 'info', isEnabled: false, expiresAt: '',
   });
   const [isSavingMessage, setIsSavingMessage] = useState(false);
+  const [databaseViewVersion, setDatabaseViewVersion] = useState(0);
 
   const selectedScope = useMemo(
     () => cleanupScopes.find((option) => option.value === scope),
@@ -329,7 +331,7 @@ export default function AdminMaintenancePage() {
           </Button>
         </section>
 
-        <DatabaseExplorer />
+        <DatabaseExplorer key={databaseViewVersion} />
 
         <section className="admin-section admin-danger-zone grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -416,6 +418,15 @@ export default function AdminMaintenancePage() {
             </Button>
           </div>
         </section>
+        <MarketResetPanel onCompleted={() => {
+          setCounts(null);
+          setPreview(null);
+          setConfirmation('');
+          setReason('');
+          setSiteMessage({ message: '', type: 'info', isEnabled: false, expiresAt: '' });
+          setDatabaseViewVersion(current => current + 1);
+          void loadCounts(scope);
+        }} />
       </div>
     </main>
   );

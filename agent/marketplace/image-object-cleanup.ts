@@ -2,7 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { after } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { deleteListingObject, isOwnedProfileImageUrl } from './object-storage';
+import { deleteEvidenceObject, deleteListingObject, isOwnedProfileImageUrl } from './object-storage';
 
 type CleanupDatabase = Pick<Prisma.TransactionClient, 'imageObjectCleanup'>;
 type CleanupInput = { imageId: string; urls: string[]; ownerId?: string };
@@ -14,6 +14,18 @@ export async function enqueueImageObjectCleanup(database: CleanupDatabase, input
   if (!urls.length) return;
   return database.imageObjectCleanup.upsert({ where: { imageId: input.imageId },
     create: { imageId: input.imageId, ownerId: input.ownerId, urls }, update: {} });
+}
+
+/** Private evidence cleanup is issued only from database-owned asset manifests. */
+export async function enqueueEvidenceObjectCleanup(database: CleanupDatabase, asset: {
+  id: string; caseId: string; sourceHash: string; objectKey: string;
+}) {
+  if (!/^[a-f0-9]{64}$/.test(asset.sourceHash) || !asset.caseId || asset.caseId.includes('/') || asset.caseId === '..' ||
+    asset.objectKey !== `cases/${asset.caseId}/${asset.sourceHash}`) throw new Error('invalid_evidence_object_key');
+  const imageId = `evidence:${asset.id}`;
+  const urls = [asset.objectKey];
+  return database.imageObjectCleanup.upsert({ where: { imageId }, create: { imageId, urls },
+    update: { urls, cleanupAt: null, nextAttemptAt: new Date() } });
 }
 
 export function profileImageCleanupInput(userId: string, picture?: string | null): CleanupInput | undefined {
@@ -35,18 +47,32 @@ export async function processImageObjectCleanup(imageId: string, deadline = Date
   if (!claimed.count) return false;
   let completed = false;
   try {
-    // A still-attached object can have been selected again while cleanup waited.
-    // A profile URL held by another user is not an ownership claim on its bytes.
-    if (job.ownerId && !job.urls.every(url => isOwnedProfileImageUrl(job.ownerId!, url))) {
-      completed = true; // Drop the reference; never delete unproven legacy bytes.
+    if (job.imageId.startsWith('evidence:')) {
+      // A private storage key is never interpreted as a public listing URL.
+      if (job.ownerId || job.urls.some(key => !/^cases\/[^/]+\/[a-f0-9]{64}$/.test(key) || key.split('/').includes('..'))) {
+        throw new Error('invalid_evidence_object_key');
+      }
+      const attached = await prisma.evidenceAsset.count({ where: { objectKey: { in: job.urls } } });
+      if (!attached) {
+        for (const key of job.urls) {
+          if (Date.now() >= deadline) throw new Error('evidence_cleanup_deadline');
+          await deleteEvidenceObject(key, deadline);
+        }
+        completed = true;
+      }
     } else {
-      const attached = job.ownerId
-        ? await prisma.user.count({ where: { id: job.ownerId, picture: { in: job.urls } } })
-        : await prisma.listingImage.count({ where: { OR: [
-          { originalUrl: { in: job.urls } }, { displayUrl: { in: job.urls } }, { thumbnailUrl: { in: job.urls } },
-        ] } });
-      if (!attached) completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
-        requireCachePurge: true, deadline });
+      // A still-attached object can have been selected again while cleanup waited.
+      // A profile URL held by another user is not an ownership claim on its bytes.
+      if (job.ownerId && !job.urls.every(url => isOwnedProfileImageUrl(job.ownerId!, url))) {
+        completed = true; // Drop the reference; never delete unproven legacy bytes.
+      } else {
+        const attached = await prisma.user.count({ where: { picture: { in: job.urls } } }) +
+          (job.ownerId ? 0 : await prisma.listingImage.count({ where: { OR: [
+            { originalUrl: { in: job.urls } }, { displayUrl: { in: job.urls } }, { thumbnailUrl: { in: job.urls } },
+          ] } }));
+        if (!attached) completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
+          requireCachePurge: true, deadline });
+      }
     }
   } catch {
     console.warn('[image_object_cleanup] outcome=incomplete');

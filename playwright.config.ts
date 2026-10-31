@@ -20,6 +20,7 @@ const adminBrowserSpecs = [
   '**/admin-page-presentation.spec.ts',
   '**/admin-users-loading.spec.ts',
   '**/admin-workspace.spec.ts',
+  '**/owner-market-reset.spec.ts',
   '**/all-pages-vitals.spec.ts',
   '**/customer-evidence.spec.ts',
   '**/marketplace-car-models.spec.ts',

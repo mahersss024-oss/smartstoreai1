@@ -113,6 +113,11 @@ async function safeDiscard(job: ListingImageUpload, includePublic = false) {
     // A late completion must not remove the shared raw source or public copies
     // being used by a newer lease. A lease mismatch is not a terminal state.
     if (current && ['pending', 'processing'].includes(current.status)) return false;
+    // A reset cancels pending transfers without revoking their signed PUT URL.
+    // Keep the cleanup manifest live until that grant expires so a late upload
+    // is still collected even if its queue event was temporarily unavailable.
+    const manifest = current ?? job;
+    if (manifest.errorCode === 'owner_market_reset' && manifest.expiresAt > new Date()) return false;
     includePublic = includePublic || (current?.status ?? job.status) !== 'ready';
     // A disconnected transaction can have committed. Never remove an attached
     // image just because its acknowledgement was lost.
@@ -372,7 +377,8 @@ export async function cleanupExpiredDirectImageUploads(limit = 50) {
     status: { in: [...activeImageUploadStatuses] }, expiresAt: { lte: new Date() },
   }, data: { status: 'expired', errorCode: 'image_upload_expired', leaseToken: null, leaseUntil: null } });
   const jobs = await prisma.listingImageUpload.findMany({
-    where: { status: { notIn: [...activeImageUploadStatuses] }, cleanupAt: null },
+    where: { status: { notIn: [...activeImageUploadStatuses] }, cleanupAt: null,
+      OR: [{ errorCode: null }, { errorCode: { not: 'owner_market_reset' } }, { expiresAt: { lte: new Date() } }] },
     orderBy: { updatedAt: 'asc' }, take: count,
   });
   const deadline = directImageUploadEffects.now() + 20_000;

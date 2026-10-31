@@ -457,8 +457,8 @@ export async function readEvidenceObject(key: string) {
   return readEvidenceBody(response);
 }
 
-export async function deleteEvidenceObject(key: string) {
-  await deleteStoredObjectKey(getEvidenceStorageConfig(), key);
+export async function deleteEvidenceObject(key: string, deadline?: number) {
+  await deleteStoredObjectKey(getEvidenceStorageConfig(), key, deadline);
 }
 
 function getStoredObjectKeyFromUrl(config: S3ObjectStorageConfig, urlValue: string) {

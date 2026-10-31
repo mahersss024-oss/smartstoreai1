@@ -26,6 +26,11 @@ sessions and browser back navigation. It never contacts a live identity provider
 
 The allowlist covers administrator presentation, users, workspace, evidence,
 listing categories/car models, performance, and page access/rendering contracts.
+`owner-market-reset.spec.ts` covers the owner-only reset preview, confirmations,
+stale/expired previews, uncertain responses without automatic resubmission, and
+revoked owner access on desktop and mobile. Reset requests are mocked; this
+browser spec never deletes production data. Actual transaction behavior is
+verified separately against a newly created disposable local PostgreSQL database.
 The two inventory-driven specs select only `/admin` and paths beginning with
 `/admin/`. Public policy documents are explicitly selected by `legal-pages.spec.ts`:
 terms, privacy, listing rules, fees and account-deletion instructions. It checks
