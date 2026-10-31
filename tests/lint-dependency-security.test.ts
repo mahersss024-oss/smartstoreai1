@@ -20,7 +20,7 @@ test('Next.js root discovery uses tinyglobby with no vulnerable dependency in th
   assert.doesNotMatch(lock, /^\s+(?:braces|micromatch|fast-glob)@/m);
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
   assert.equal(pkg.pnpm.overrides['@next/eslint-plugin-next@16.4.0>fast-glob'], 'npm:tinyglobby@0.2.17');
-  assert.deepEqual(Object.keys(pkg.pnpm.patchedDependencies), ['@next/eslint-plugin-next@16.4.0']);
+  assert.deepEqual(Object.keys(pkg.pnpm.patchedDependencies).sort(), ['@next/eslint-plugin-next@16.4.0', 'minimatch@11.0.1']);
   assert.equal(pkg.pnpm.auditConfig?.ignoreGhsas, undefined);
 });
 
