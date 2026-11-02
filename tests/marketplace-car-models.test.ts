@@ -174,7 +174,8 @@ test('admin car edits reject mismatches without modifying records and audit vali
   let data: Record<string, unknown> | undefined;
   let audits = 0;
   prisma.$transaction = t.mock.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
-    listing: { update: async (args: { data: Record<string, unknown> }) => { data = args.data; return { ...existing, ...data }; } },
+    $executeRaw: async () => 1,
+    listing: { findUnique: async () => existing, update: async (args: { data: Record<string, unknown> }) => { data = args.data; return { ...existing, ...data }; } },
     adminAuditLog: { create: async () => { audits++; } },
   })) as unknown as typeof transaction;
   const headers = { 'Content-Type': 'application/json', Cookie: createSessionCookie({ id: 'car-write-admin', email: 'cars-write@example.test', role: 'admin' }) };

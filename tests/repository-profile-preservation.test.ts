@@ -68,6 +68,7 @@ function mockCustomerDatabase(t: TestContext, existing?: Account) {
   const transaction = {
     $executeRaw: async () => 1,
     user: prisma.user,
+    sellerFollow: prisma.sellerFollow,
     listing: {
       count: async () => 0,
       create: async ({ data }: { data: Record<string, unknown> }) => ({

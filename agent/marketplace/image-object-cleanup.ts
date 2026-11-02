@@ -74,6 +74,12 @@ export async function processImageObjectCleanup(imageId: string, deadline = Date
           ] } }));
         if (!attached) completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
           requireCachePurge: true, deadline });
+        else if (job.imageId.startsWith('legacy-upload:')) {
+          // An unknown attach commit may have reopened its attempt receipt. The
+          // authoritative image now owns these bytes; its eventual deletion
+          // creates the ordinary cleanup manifest in the same database commit.
+          completed = true;
+        }
       }
     }
   } catch {

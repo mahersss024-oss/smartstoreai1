@@ -1410,6 +1410,7 @@ export function addConversationMessage(
   conversationId: string,
   senderId: string,
   body: string,
+  messageId?: string,
 ) {
   seedListings();
   const conversation = conversations.get(conversationId);
@@ -1424,6 +1425,11 @@ export function addConversationMessage(
       conversation: null,
     };
   }
+
+  const existing = messageId && conversation.messages?.find(message => message.id === messageId && message.senderId === senderId);
+  if (existing) return {
+    status: 'sent' as const, message: existing, conversation, replayed: true as const,
+  };
 
   if (conversation.status !== 'open') {
     return {
@@ -1458,7 +1464,7 @@ export function addConversationMessage(
 
   const timestamp = nowIso();
   const message: ConversationMessage = {
-    id: randomUUID(),
+    id: messageId ?? randomUUID(),
     conversationId,
     senderId,
     body: trimmedBody,

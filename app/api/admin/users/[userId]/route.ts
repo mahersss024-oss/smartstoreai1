@@ -441,8 +441,24 @@ async function deleteUser(request: Request, context: RouteContext) {
     (listing) => listing.images,
   );
 
-  await prisma.$transaction(async (tx) => {
+  const deletionResponse = await prisma.$transaction(async (tx) => {
     await lockUserEvidenceEntities(tx, existing.id);
+    await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${existing.id} FOR UPDATE`;
+    const current = await tx.user.findUnique({
+      where: { id: existing.id },
+      select: { deletedAt: true },
+    });
+    if (!current) {
+      return Response.json({ error: 'user_not_found' }, { status: 404, headers: noStoreHeaders });
+    }
+    // A restore may have completed after the initial read. Check the locked
+    // current row, so permanent deletion cannot act on a stale disabled state.
+    if (deleteMode === 'permanent' && !current.deletedAt) {
+      return Response.json({
+        error: 'account_must_be_disabled_first',
+        message: 'The account must be disabled before permanent deletion.',
+      }, { status: 409, headers: noStoreHeaders });
+    }
     await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
@@ -470,7 +486,9 @@ async function deleteUser(request: Request, context: RouteContext) {
       where: { id: existing.id },
       data: { deletedAt: existing.deletedAt ?? new Date() },
     });
-  });
+  }, { isolationLevel: 'ReadCommitted' });
+
+  if (deletionResponse) return deletionResponse;
 
   if (deleteMode === 'permanent') {
     await deleteUserImagesBestEffort(

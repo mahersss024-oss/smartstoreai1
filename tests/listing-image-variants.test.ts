@@ -99,8 +99,8 @@ test('chat and multipart uploads generate server variants when clients omit them
   assert.match(route, /createListingImageVariants\(sanitizedOriginal\)/);
   assert.match(route, /storeListingImageDelivery\(\{/);
   // The high-resolution WebP master is transient; delivery stores only these two variants.
-  assert.match(storage, /variants\.display, imageId, variant: 'display'/);
-  assert.match(storage, /variants\.thumbnail, imageId, variant: 'thumbnail'/);
+  assert.match(storage, /variants\.display, imageId: objectImageId, variant: 'display'/);
+  assert.match(storage, /variants\.thumbnail, imageId: objectImageId, variant: 'thumbnail'/);
 });
 
 test('backfill is batched, dry-run by default, idempotent by database state and preserves originals', async () => {

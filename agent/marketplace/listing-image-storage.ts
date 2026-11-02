@@ -13,7 +13,8 @@ import {
   defaultMaxListingImages,
   getMaxListingImagesPerListing,
 } from './listing-image-limits';
-import { deleteListingObject, storeListingObject } from './object-storage';
+import { deleteListingObject, storeListingObject, type ListingObjectStoragePlan } from './object-storage';
+import { discardPreparedListingImageDelivery, prepareListingImageDelivery } from './prepared-image-delivery';
 import { addListingImageForSeller, getListing } from './repository';
 import type { ListingImage, ImageContentReviewStatus } from './types';
 
@@ -85,12 +86,14 @@ export async function createPersistentListingImageUrl({
   imageId,
   fileName,
   variant = 'original',
+  storagePlan,
 }: {
   data: Uint8Array;
   mediaType: string;
   imageId: string;
   fileName?: string;
   variant?: 'original' | 'display' | 'thumbnail';
+  storagePlan?: ListingObjectStoragePlan;
 }) {
   if (!supportedMimeTypes.has(mediaType)) {
     return null;
@@ -102,7 +105,7 @@ export async function createPersistentListingImageUrl({
     imageId,
     fileName,
     variant,
-  });
+  }, storagePlan);
 
   if (storedObject?.url) {
     return storedObject.url;
@@ -165,14 +168,19 @@ export async function storeListingImageDelivery({
   /** Deterministic chat IDs may be shared by concurrent draft retries. */
   cleanupOnFailure?: boolean;
 }) {
+  const prepared = await prepareListingImageDelivery(imageId, variants);
+  const objectImageId = prepared?.objectImageId ?? imageId;
   const results = await Promise.allSettled([
-    createPersistentListingImageUrl({ ...variants.display, imageId, variant: 'display' }),
-    createPersistentListingImageUrl({ ...variants.thumbnail, imageId, variant: 'thumbnail' }),
+    createPersistentListingImageUrl({ ...variants.display, imageId: objectImageId, variant: 'display', storagePlan: prepared?.display }),
+    createPersistentListingImageUrl({ ...variants.thumbnail, imageId: objectImageId, variant: 'thumbnail', storagePlan: prepared?.thumbnail }),
   ]);
   if (results.some(result => result.status === 'rejected' || !result.value)) {
     incrementRuntimeCounter('image.delivery.incomplete');
     const storedUrls = results.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : []);
-    if (cleanupOnFailure && storedUrls.length) {
+    if (prepared) {
+      await discardPreparedListingImageDelivery({ originalUrl: prepared.display.url,
+        displayUrl: prepared.display.url, thumbnailUrl: prepared.thumbnail.url });
+    } else if (cleanupOnFailure && storedUrls.length) {
       try {
         await deleteListingObject({ imageId, urls: storedUrls });
       } catch {
@@ -194,6 +202,7 @@ export async function storeListingImageDelivery({
 
 export async function discardUnattachedListingImage(image: Pick<ListingImage, 'id' | 'listingId' | 'originalUrl' | 'displayUrl' | 'thumbnailUrl'>) {
   try {
+    if (await discardPreparedListingImageDelivery(image)) return;
     // A failed database response does not prove that its transaction rolled back.
     const listing = await getListing(image.listingId);
     if (listing?.images.some(saved => saved.id === image.id)) return;
@@ -298,6 +307,14 @@ export async function saveUploadedListingImagesForSeller({
       await discardUnattachedListingImage(image);
       if (!updatedListing) return null;
       break;
+    }
+
+    const savedImage = updatedListing.images.find(saved => saved.id === image.id)!;
+    if (savedImage.originalUrl !== image.originalUrl || savedImage.displayUrl !== image.displayUrl ||
+      savedImage.thumbnailUrl !== image.thumbnailUrl) {
+      // A deterministic chat retry can observe a winner with the same logical
+      // ID and different attempt bytes. Keep the winner and retire only ours.
+      await discardUnattachedListingImage(image);
     }
 
     if (updatedListing) {

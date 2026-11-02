@@ -1,7 +1,9 @@
+import type { Listing } from '@prisma/client';
 import { z } from 'zod';
 import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
+import { marketplaceAmountSchema } from '@/lib/marketplace/amounts';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
@@ -25,7 +27,7 @@ const adminListingUpdateSchema = z.object({
   carModel: z.string().max(80).nullable().optional(),
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),
-  price: z.number().nonnegative().nullable().optional(),
+  price: marketplaceAmountSchema.nullable().optional(),
   priceMode: z.enum(['bid', 'negotiable']).nullable().optional(),
   city: z.string().min(2).max(80).nullable().optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).nullable().optional(),
@@ -149,53 +151,63 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { listingId } = await context.params;
-  const existing = await prisma.listing.findUnique({ where: { id: listingId } });
+  // Seller identity is immutable here; all editable state is read after locking.
+  const identity = await prisma.listing.findUnique({ where: { id: listingId }, select: { sellerId: true } });
+  if (!identity) return Response.json({ error: 'listing_not_found' }, { status: 404 });
 
-  if (!existing) {
-    return Response.json({ error: 'listing_not_found' }, { status: 404 });
-  }
+  const mutation = await prisma.$transaction(async (tx): Promise<{ response: Response } | { existing: Listing; updated: Listing }> => {
+    // Match seller edits/account deletion and the evidence triggers: advisory
+    // entity keys precede row locks, then derive every partial update afresh.
+    for (const key of [`listing:${listingId}`, `user:${identity.sellerId}`].sort()) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
+    }
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const existing = await tx.listing.findUnique({ where: { id: listingId } });
 
-  if (parsed.data.category && parsed.data.category !== existing.category && !isMarketplaceCategory(parsed.data.category)) {
-    return Response.json({ error: 'invalid_category', message: 'اختر تصنيفًا من القائمة.' }, { status: 400 });
-  }
+    if (!existing) {
+      return { response: Response.json({ error: 'listing_not_found' }, { status: 404 }) };
+    }
 
-  let attributes: Record<string, unknown>;
-  try {
-    attributes = mergeMarketplaceCategoryAttributes(parsed.data.category ?? existing.category,
-      {
-        ...(parsed.data.categoryOption !== undefined ? { [marketplaceCategoryOptionAttribute]: parsed.data.categoryOption } : {}),
-        ...(parsed.data.carModel !== undefined ? { [marketplaceCarModelAttribute]: parsed.data.carModel } : {}),
-      },
-      { category: existing.category, attributes: existing.attributes && typeof existing.attributes === 'object' && !Array.isArray(existing.attributes) ? existing.attributes as Record<string, unknown> : {} });
-  } catch (error) {
-    if (error instanceof InvalidMarketplaceCategoryOptionError) return Response.json({ error: 'invalid_category_option', message: error.message }, { status: 400 });
-    throw error;
-  }
-  const nextListing = {
-    category: parsed.data.category ?? existing.category,
-    title: parsed.data.title ?? existing.title,
-    description: parsed.data.description ?? existing.description,
-    city: 'city' in parsed.data ? parsed.data.city : existing.city,
-    condition:
-      'condition' in parsed.data ? parsed.data.condition : existing.condition,
-    attributes,
-  };
-  const contentChanged = ['category', 'categoryOption', 'carModel', 'title', 'description', 'city', 'condition'].some(
-    (key) => key in parsed.data,
-  );
-  const compliance = contentChanged
-    ? createUnassessedMarketplaceCompliance()
-    : null;
-  const priceMode =
-    'priceMode' in parsed.data ? parsed.data.priceMode : existing.priceMode;
-  const price =
-    'price' in parsed.data
-      ? priceMode
-        ? null
-        : parsed.data.price
-      : undefined;
+    if (parsed.data.category && parsed.data.category !== existing.category && !isMarketplaceCategory(parsed.data.category)) {
+      return { response: Response.json({ error: 'invalid_category', message: 'اختر تصنيفًا من القائمة.' }, { status: 400 }) };
+    }
 
-  const updated = await prisma.$transaction(async (tx) => {
+    let attributes: Record<string, unknown>;
+    try {
+      attributes = mergeMarketplaceCategoryAttributes(parsed.data.category ?? existing.category,
+        {
+          ...(parsed.data.categoryOption !== undefined ? { [marketplaceCategoryOptionAttribute]: parsed.data.categoryOption } : {}),
+          ...(parsed.data.carModel !== undefined ? { [marketplaceCarModelAttribute]: parsed.data.carModel } : {}),
+        },
+        { category: existing.category, attributes: existing.attributes && typeof existing.attributes === 'object' && !Array.isArray(existing.attributes) ? existing.attributes as Record<string, unknown> : {} });
+    } catch (error) {
+      if (error instanceof InvalidMarketplaceCategoryOptionError) return { response: Response.json({ error: 'invalid_category_option', message: error.message }, { status: 400 }) };
+      throw error;
+    }
+    const nextListing = {
+      category: parsed.data.category ?? existing.category,
+      title: parsed.data.title ?? existing.title,
+      description: parsed.data.description ?? existing.description,
+      city: 'city' in parsed.data ? parsed.data.city : existing.city,
+      condition:
+        'condition' in parsed.data ? parsed.data.condition : existing.condition,
+      attributes,
+    };
+    const contentChanged = ['category', 'categoryOption', 'carModel', 'title', 'description', 'city', 'condition'].some(
+      (key) => key in parsed.data,
+    );
+    const compliance = contentChanged
+      ? createUnassessedMarketplaceCompliance()
+      : null;
+    const priceMode =
+      'priceMode' in parsed.data ? parsed.data.priceMode : existing.priceMode;
+    const price =
+      'price' in parsed.data
+        ? priceMode
+          ? null
+          : parsed.data.price
+        : undefined;
+
     if (parsed.data.status) {
       await recordDatabaseFirstPublication(tx, listingId, parsed.data.status);
     }
@@ -215,7 +227,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         searchText: contentChanged ? buildSearchText(nextListing) : undefined,
         compliance: parsed.data.status
           ? { ...(compliance ?? existing.compliance as Record<string, unknown>), humanDecision: ['published', 'draft'].includes(parsed.data.status) ? 'allow' : 'block', decision: ['published', 'draft'].includes(parsed.data.status) ? 'allow' : (compliance?.decision ?? 'allow') }
-          : compliance ? { ...compliance, ...((existing.compliance as Record<string, unknown>).humanDecision === 'block' ? { humanDecision: 'block' } : {}) } : undefined,
+          : compliance ? { ...compliance, ...((existing.compliance as Record<string, unknown>).humanDecision === 'block' ? { humanDecision: 'block', decision: (existing.compliance as { decision?: string }).decision ?? compliance.decision } : {}) } : undefined,
       },
     });
 
@@ -247,8 +259,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    return listing;
-  });
+    return { existing, updated: listing };
+  }, { isolationLevel: 'ReadCommitted' });
+
+  if ('response' in mutation) return mutation.response;
+  const { existing, updated } = mutation;
 
   if (existing.status !== 'published' && updated.status === 'published') {
     scheduleNotificationDelivery(true);

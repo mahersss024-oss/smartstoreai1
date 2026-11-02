@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 
 import { createListingDraft, toggleSellerFollow } from '@/agent/marketplace/repository';
 import { prisma } from '@/lib/db/prisma';
+import { mockDatabaseMethod } from './helpers/mock-database-method';
 
 const identity = { id: 'old-production-customer', email: 'stale@example.test', name: 'Stale name' };
 
@@ -43,6 +44,13 @@ function productionDatabase(t: TestContext, state: 'active' | 'deleted' | 'missi
   prisma.sellerFollow.findUnique = (async () => null) as never;
   prisma.sellerFollow.create = (async () => { mutations++; return { id: 'follow' }; }) as never;
   prisma.sellerFollow.count = (async () => 1) as never;
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async (sql: TemplateStringsArray) => {
+      assert.match(sql.join('?'), /pg_advisory_xact_lock\(771208/);
+      return 1;
+    },
+    sellerFollow: prisma.sellerFollow,
+  }));
   return { account, currentIdentity, mutations: () => mutations, creates: () => creates };
 }
 

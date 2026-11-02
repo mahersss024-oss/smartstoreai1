@@ -1,3 +1,4 @@
+import { marketplaceAmountSchema } from '@/lib/marketplace/amounts';
 import { z } from 'zod';
 
 import { updateCommissionSaleAmountForSeller } from '@/agent/marketplace/repository';
@@ -9,7 +10,7 @@ import { getAuthSession } from '@/lib/auth/session';
 const maxUpdateCommissionRequestBytes = 4 * 1024;
 
 const updateCommissionSchema = z.object({
-  productValue: z.number().positive(),
+  productValue: marketplaceAmountSchema.positive(),
 });
 
 type RouteContext = {

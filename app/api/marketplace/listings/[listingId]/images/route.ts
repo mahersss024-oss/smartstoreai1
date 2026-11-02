@@ -292,6 +292,13 @@ export async function POST(request: Request, context: RouteContext) {
       : Response.json(responseBody, { status: responseStatus });
   } catch (error) {
     await idempotency?.abandon();
+    if (error instanceof Error && error.message === 'prepared_image_delivery_expired') {
+      incrementRuntimeCounter('listing.image_upload.failed', { reason: 'storage_unavailable' });
+      return Response.json({
+        error: 'image_storage_unavailable',
+        message: 'Image storage is unavailable. The image was not saved.',
+      }, { status: 503 });
+    }
     throw error;
   }
 }

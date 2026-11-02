@@ -1,3 +1,4 @@
+import { marketplaceAmountSchema } from '@/lib/marketplace/amounts';
 import { z } from 'zod';
 
 import {
@@ -23,7 +24,7 @@ const updateListingSchema = z.object({
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),
   price: z
-    .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
+    .union([marketplaceAmountSchema, z.enum(['bid', 'negotiable'])])
     .optional(),
   city: z.string().min(2).max(80).optional(),
   category: z.string().min(2).max(80).optional(),

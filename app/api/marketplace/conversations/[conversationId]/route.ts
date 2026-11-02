@@ -205,12 +205,19 @@ export async function POST(request: Request, context: RouteContext) {
     | Awaited<ReturnType<typeof deleteConversationMessageForUser>>
     | Awaited<ReturnType<typeof addConversationMessage>>;
 
+  let replayedMessage = false;
   if ('body' in parsed.data) {
-    result = await addConversationMessage(
+    const delivery = await addConversationMessage(
       conversationId,
       session.user,
       messageBody,
+      { operationKey: idempotency?.operationKey },
     );
+    if ('replayed' in delivery) {
+      const { replayed, ...publicResult } = delivery;
+      replayedMessage = Boolean(replayed);
+      result = publicResult;
+    } else result = delivery;
   } else if (parsed.data.action === 'share_contact') {
     result = await shareSellerContact(conversationId, session.user);
   } else if (parsed.data.action === 'report_user') {
@@ -361,6 +368,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (
+    !replayedMessage &&
     'body' in parsed.data &&
     result.status === 'sent' &&
     result.conversation &&

@@ -156,7 +156,15 @@ export function getCookieValue(request: Request, name: string) {
   const prefix = `${name}=`;
   const match = cookies.find((cookie) => cookie.startsWith(prefix));
 
-  return match ? decodeURIComponent(match.slice(prefix.length)) : undefined;
+  if (!match) return undefined;
+
+  try {
+    return decodeURIComponent(match.slice(prefix.length));
+  } catch {
+    // A present invalid cookie must fail closed, rather than silently changing
+    // identity to a different credential supplied in an Authorization header.
+    return '';
+  }
 }
 
 export function getAuthSession(request: Request) {

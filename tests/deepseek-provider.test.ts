@@ -186,6 +186,7 @@ test('retries transient DeepSeek fetch responses', async () => {
 
     assert.equal(response.status, 200);
     assert.equal(calls, 2);
+    assert.equal(await response.text(), 'ok');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -213,7 +214,7 @@ test('limits concurrent DeepSeek fetch attempts', async () => {
       Array.from({ length: 8 }, () =>
         fetchDeepseekWithRetry('https://api.deepseek.test', {
           method: 'POST',
-        }),
+        }).then(response => response.text()),
       ),
     );
 
@@ -254,7 +255,7 @@ test('times out queued DeepSeek requests before they hang', async () => {
     );
 
     await assert.rejects(secondRequest, { name: 'AbortError' });
-    await firstRequest;
+    await (await firstRequest).text();
 
     assert.equal(getDeepseekQueueTimeoutMs(), 1000);
   } finally {
@@ -328,7 +329,7 @@ test('rejects DeepSeek requests when the in-memory queue is full', async () => {
 
     releaseActiveRequest();
 
-    await Promise.all([firstRequest, queuedRequest]);
+    await Promise.all([firstRequest, queuedRequest].map(async request => (await request).text()));
     assert.equal(getDeepseekMaxQueuedRequests(), 1);
   } finally {
     globalThis.fetch = originalFetch;
@@ -350,5 +351,170 @@ test('rejects DeepSeek requests when the in-memory queue is full', async () => {
     } else {
       process.env.SMARTSTORE_DEEPSEEK_QUEUE_TIMEOUT_MS = previousTimeout;
     }
+  }
+});
+
+test('holds the provider permit while a response body is still streaming', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  let calls = 0;
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls > 1) return new Response('second');
+      const response = new Response(new ReadableStream<Uint8Array>({
+        start(value) {
+          controller = value;
+          value.enqueue(new TextEncoder().encode('first'));
+        },
+      }));
+      Object.defineProperty(response, 'url', { value: 'https://provider.test/stream' });
+      return response;
+    }) as typeof fetch;
+    const first = await fetchDeepseekWithRetry('https://provider.test/stream', undefined, 1);
+    const secondPending = fetchDeepseekWithRetry('https://provider.test/stream', undefined, 1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 1, 'headers alone must not release the permit');
+    assert.equal(first.url, 'https://provider.test/stream');
+    const reader = first.body!.getReader();
+    assert.equal(new TextDecoder().decode((await reader.read()).value), 'first');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 1, 'a partial body still owns its permit');
+    controller.close();
+    assert.equal((await reader.read()).done, true);
+    const second = await secondPending;
+    assert.equal(await second.text(), 'second');
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousLimit === undefined) delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    else process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+  }
+});
+
+test('cancels a transient response body before starting the provider retry', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  let calls = 0;
+  let cancelled = false;
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls > 1) {
+        assert.equal(cancelled, true);
+        return new Response('ok');
+      }
+      return new Response(new ReadableStream({ cancel() { cancelled = true; } }), { status: 502 });
+    }) as typeof fetch;
+    const response = await fetchDeepseekWithRetry('https://provider.test/retry', undefined, 2);
+    assert.equal(await response.text(), 'ok');
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousLimit === undefined) delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    else process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+  }
+});
+
+test('a stalled cancellation acknowledgement cannot hang retries or an aborted retry wait', { timeout: 6_000 }, async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  const bounded = async <T>(pending: Promise<T>) => {
+    let timeout!: ReturnType<typeof setTimeout>;
+    try {
+      return await Promise.race([pending, new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('stalled upstream cancellation blocked progress')), 2_000);
+      })]);
+    } finally { clearTimeout(timeout); }
+  };
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    for (const abort of [false, true]) {
+      let calls = 0;
+      let cancelStarted!: () => void;
+      const cancelled = new Promise<void>(resolve => { cancelStarted = resolve; });
+      globalThis.fetch = (async () => {
+        calls++;
+        if (calls > 1) return new Response('recovered');
+        return new Response(new ReadableStream({ cancel() {
+          cancelStarted();
+          return new Promise<void>(() => undefined);
+        } }), { status: 502 });
+      }) as typeof fetch;
+      const controller = new AbortController();
+      const pending = fetchDeepseekWithRetry('https://provider.test/stalled-cancel', { signal: controller.signal }, 2);
+      const outcome = pending.then(response => ({ ok: true as const, response }), error => ({ ok: false as const, error }));
+      await bounded(cancelled);
+      if (abort) controller.abort();
+      const settled = await bounded(outcome);
+      if (abort) {
+        assert.ok(!settled.ok);
+        assert.equal(settled.error.name, 'AbortError');
+        assert.equal(calls, 1, 'aborting during retry backoff must not start another request');
+      } else {
+        assert.ok(settled.ok);
+        assert.equal(await settled.response.text(), 'recovered');
+        assert.equal(calls, 2);
+      }
+      const next = await bounded(fetchDeepseekWithRetry('https://provider.test/after-stalled-cancel', undefined, 1));
+      assert.equal(await next.text(), 'recovered', 'the cancelled response must not retain its permit');
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousLimit === undefined) delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    else process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
+  }
+});
+
+test('body cancel, abort, and upstream error each release exactly one provider permit', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousLimit = process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+  try {
+    process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = '1';
+    for (const mode of ['cancel', 'abort', 'error'] as const) {
+      let calls = 0;
+      let cancellations = 0;
+      const controllers: Array<ReadableStreamDefaultController<Uint8Array>> = [];
+      globalThis.fetch = (async () => {
+        calls++;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) { controllers.push(controller); },
+          cancel() { cancellations++; },
+        }));
+      }) as typeof fetch;
+      const abortController = new AbortController();
+      const first = await fetchDeepseekWithRetry(new Request('https://provider.test/first', { signal: abortController.signal }), undefined, 1);
+      const secondPending = fetchDeepseekWithRetry('https://provider.test/second', undefined, 1);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(calls, 1);
+      if (mode === 'cancel') await first.body!.cancel();
+      else if (mode === 'abort') {
+        abortController.abort();
+        await assert.rejects(first.text(), { name: 'AbortError' });
+      } else {
+        controllers[0].error(new Error('upstream body failed'));
+        await assert.rejects(first.text(), /upstream body failed/);
+      }
+      const second = await secondPending;
+      const thirdPending = fetchDeepseekWithRetry('https://provider.test/third', undefined, 1);
+      // A second terminal event from the old request cannot release the new one.
+      abortController.abort();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(calls, 2);
+      await second.body!.cancel();
+      await (await thirdPending).body!.cancel();
+      assert.equal(calls, 3);
+      assert.equal(cancellations, mode === 'error' ? 2 : 3);
+    }
+    globalThis.fetch = (async () => new Response(null, { status: 204 })) as typeof fetch;
+    assert.equal((await fetchDeepseekWithRetry('https://provider.test/no-body', undefined, 1)).status, 204);
+    assert.equal((await fetchDeepseekWithRetry('https://provider.test/no-body', undefined, 1)).status, 204);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousLimit === undefined) delete process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS;
+    else process.env.SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS = previousLimit;
   }
 });

@@ -17,23 +17,29 @@ function fixture(t: TestContext, status = 'pending') {
   let listing = {
     id: 'moderation-listing', sellerId: 'moderation-seller', category: 'furniture',
     title: 'Wooden desk', description: 'Wooden desk in good condition', attributes: {}, images: [],
-    compliance: { decision: 'allow' }, status, price: null, priceMode: null,
+    compliance: { decision: 'allow' } as Record<string, unknown>, status, price: null, priceMode: null,
     createdAt: new Date(0), updatedAt: new Date(0), firstPublicationTracked: true, firstPublishedAt: null as Date | null,
     views: 0, messageCount: 0, favoriteCount: 0,
   };
   let jobs: Array<{ id: string; kind: string; payload: object }> = [];
-  let audit: Array<{ action: string; targetId: string }> = [];
+  let audit: Array<{ action: string; targetId: string; metadata?: Record<string, unknown> }> = [];
+  let beforeTransaction: (() => void) | undefined;
+  const locks: string[] = [];
   let failEnqueue = false;
   let enqueues = 0;
   replaceMethod(t, prisma.listing, 'findUnique', async () => structuredClone(listing));
   replaceMethod(t, prisma.user, 'upsert', async () => ({ id: 'moderation-admin' }));
   replaceMethod(t, prisma.user, 'update', async () => ({ id: 'moderation-admin' }));
   replaceMethod(t, prisma, '$transaction', async callback => {
+    beforeTransaction?.();
+    beforeTransaction = undefined;
     const next = structuredClone(listing);
     const nextJobs = jobs.map(job => ({ ...job }));
     const nextAudit = [...audit];
     const result = await (callback as unknown as (tx: object) => Promise<unknown>)({
+      $executeRaw: async (sql: TemplateStringsArray) => { locks.push(sql.join('?')); return 1; },
       listing: {
+        findUnique: async () => structuredClone(next),
         updateMany: async () => { if (!next.firstPublishedAt) next.firstPublishedAt = new Date(); return { count: 1 }; },
         update: async ({ data }: { data: object }) => Object.assign(next, data),
       },
@@ -50,6 +56,8 @@ function fixture(t: TestContext, status = 'pending') {
   });
   return {
     get listing() { return listing; }, get jobs() { return jobs; }, get audit() { return audit; }, get enqueues() { return enqueues; },
+    get locks() { return locks; },
+    beforeTransaction(callback: () => void) { beforeTransaction = callback; },
     failEnqueue() { failEnqueue = true; },
     moderate: (next: 'published' | 'rejected' | 'deleted') => setListingModerationStatus(listing.id, next, 'moderation-admin'),
   };
@@ -94,4 +102,21 @@ test('moderation approval fails closed and rolls back when its durable job canno
   assert.equal(f.listing.firstPublishedAt, null);
   assert.equal(f.jobs.length, 0);
   assert.equal(f.audit.length, 0);
+});
+
+test('moderation approval uses the locked current state for compliance, audit and publication delivery', async t => {
+  const f = fixture(t);
+  f.beforeTransaction(() => {
+    f.listing.status = 'published';
+    f.listing.compliance = { decision: 'needs_review', checkStatus: 'unavailable', reasons: ['newest review'] };
+  });
+  const result = await f.moderate('published');
+  assert.equal(result.status, 'published');
+  assert.equal(result.listing?.compliance.checkStatus, 'unavailable');
+  assert.deepEqual(result.listing?.compliance.reasons, ['newest review']);
+  assert.equal(f.audit[0].metadata?.previousStatus, 'published');
+  assert.equal(f.jobs.length, 0);
+  assert.equal(f.enqueues, 0);
+  assert.match(f.locks.at(-1)!, /FOR UPDATE/);
+  assert.ok(f.locks.slice(0, -1).every(sql => /pg_advisory_xact_lock/.test(sql)));
 });

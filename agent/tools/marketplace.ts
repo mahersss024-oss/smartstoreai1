@@ -1,3 +1,4 @@
+import { marketplaceAmountSchema } from '@/lib/marketplace/amounts';
 import { tool } from 'ai';
 import sharp from 'sharp';
 import { createHash } from 'node:crypto';
@@ -46,7 +47,7 @@ const listingDetailsSchema = {
     .describe('Customer-facing product description using only seller-confirmed facts. Omit unknown details; never narrate missing or unprovided specifications in the description.')
     .optional(),
   price: z
-    .union([z.number().nonnegative(), z.enum(['bid', 'negotiable'])])
+    .union([marketplaceAmountSchema, z.enum(['bid', 'negotiable'])])
     .optional(),
   city: z.string().min(2).optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),

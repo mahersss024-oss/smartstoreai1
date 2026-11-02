@@ -16,6 +16,8 @@ type StoreListingObjectInput = {
   variant?: 'original' | 'display' | 'thumbnail';
 };
 
+export type ListingObjectStoragePlan = { key: string; url: string; expiresAt: number };
+
 type DeleteListingObjectInput = {
   imageId: string;
   urls?: string[];
@@ -346,16 +348,33 @@ function getCloudflareCachePurgeTimeoutMs() {
   return Math.min(Math.max(parsedValue, 1_000), 30_000);
 }
 
-async function storeListingObjectInS3(input: StoreListingObjectInput) {
+/** Plan exact keys before the remote write so a lost response is recoverable. */
+export function planListingObjectStorage(input: Omit<StoreListingObjectInput, 'data'>): ListingObjectStoragePlan | null {
+  if (!isObjectStorageEnabled()) return null;
+  const missingConfig = getMissingObjectStorageConfig();
+  if (missingConfig.length) {
+    throw new Error(`Missing object storage configuration: ${missingConfig.join(', ')}`);
+  }
+  const key = createObjectKey({ ...input, data: new Uint8Array() });
+  return { key, url: buildPublicUrl(getS3ObjectStorageConfig(), key), expiresAt: Date.now() + 5 * 60_000 };
+}
+
+async function storeListingObjectInS3(input: StoreListingObjectInput, plan?: ListingObjectStoragePlan) {
   const config = getS3ObjectStorageConfig();
   const body = Buffer.from(input.data);
-  const key = createObjectKey(input);
+  const key = plan?.key ?? createObjectKey(input);
   const publicUrl = buildPublicUrl(config, key);
+  if (plan && plan.url !== publicUrl) throw new Error('Image storage configuration changed during upload.');
+  const expiresSeconds = plan ? Math.floor((plan.expiresAt - Date.now()) / 1000) : 300;
+  // A process resumed after its cleanup grace period cannot mint a fresh PUT
+  // for already-abandoned bytes. Bound signatures to the original upload plan.
+  if (expiresSeconds <= 0) throw new Error('prepared_image_delivery_expired');
   const request = createPresignedRequest({
     method: 'PUT',
     key,
     mediaType: input.mediaType,
     config,
+    expiresSeconds,
   });
   try {
     await retryImageStorage(async remainingMs => {
@@ -381,7 +400,7 @@ async function storeListingObjectInS3(input: StoreListingObjectInput) {
   };
 }
 
-export async function storeListingObject(input: StoreListingObjectInput) {
+export async function storeListingObject(input: StoreListingObjectInput, plan?: ListingObjectStoragePlan) {
   if (!isObjectStorageEnabled()) {
     return null;
   }
@@ -394,7 +413,7 @@ export async function storeListingObject(input: StoreListingObjectInput) {
     );
   }
 
-  return storeListingObjectInS3(input);
+  return storeListingObjectInS3(input, plan);
 }
 
 function getEvidenceStorageConfig() {

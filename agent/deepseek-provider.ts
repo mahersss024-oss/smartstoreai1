@@ -154,8 +154,23 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === 'AbortError';
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function wait(ms: number, signal?: AbortSignal | null) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Request aborted.', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason ?? new DOMException('Request aborted.', 'AbortError'));
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function shouldCollectDeepseekProviderMetrics() {
@@ -315,12 +330,104 @@ function acquireDeepseekSlot(signal?: AbortSignal | null) {
   });
 }
 
+function retainSlotForResponseBody(
+  response: Response,
+  release: () => void,
+  signal?: AbortSignal | null,
+) {
+  if (!response.body) {
+    release();
+    return response;
+  }
+
+  const reader = response.body.getReader();
+  let finished = false;
+  let released = false;
+  let bodyController: ReadableStreamDefaultController<Uint8Array>;
+  const finish = () => {
+    if (released) return;
+    released = true;
+    signal?.removeEventListener('abort', onAbort);
+    release();
+  };
+  const cancelUpstream = (reason?: unknown) => {
+    // Cancellation is requested synchronously, but a broken upstream may never
+    // acknowledge it. Neither the consumer nor the retry loop waits for that
+    // acknowledgement. Observe rejection and release the reader when it settles.
+    void reader.cancel(reason).finally(() => reader.releaseLock()).catch(() => undefined);
+  };
+  const onAbort = () => {
+    if (finished) return;
+    finished = true;
+    const reason = signal?.reason ?? new DOMException('Request aborted.', 'AbortError');
+    bodyController.error(reason);
+    finish();
+    cancelUpstream(reason);
+  };
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      bodyController = controller;
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
+    },
+    async pull(controller) {
+      try {
+        const chunk = await reader.read();
+        if (finished) return;
+        if (chunk.done) {
+          finished = true;
+          controller.close();
+          finish();
+          reader.releaseLock();
+        } else {
+          controller.enqueue(chunk.value);
+        }
+      } catch (error) {
+        if (!finished) {
+          finished = true;
+          controller.error(error);
+        }
+        finish();
+      }
+    },
+    cancel(reason) {
+      finished = true;
+      // Release even when a broken upstream implementation cannot acknowledge
+      // cancellation; a later close/abort must not release another request's slot.
+      finish();
+      cancelUpstream(reason);
+    },
+  }, { highWaterMark: 0 });
+  // Observe upstream errors even if the caller has not started reading yet.
+  // A clean upstream close releases the connection without discarding the final
+  // chunk that may still be returning from an in-flight reader.read().
+  void reader.closed.then(finish, (error) => {
+    if (!finished) {
+      finished = true;
+      bodyController.error(error);
+    }
+    finish();
+  });
+  const wrapped = new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+  for (const key of ['url', 'redirected', 'type'] as const) {
+    Object.defineProperty(wrapped, key, { value: response[key] });
+  }
+  return wrapped;
+}
+
 async function fetchDeepseekWithConcurrencyLimit(
   input: Parameters<typeof fetch>[0],
   init: Parameters<typeof fetch>[1],
 ) {
   const queueStartedAt = Date.now();
-  const release = await acquireDeepseekSlot(init?.signal);
+  const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  const release = await acquireDeepseekSlot(signal);
+  let responseOwnsSlot = false;
   recordMetricSample(
     deepseekProviderMetrics.queueWaitMs,
     Date.now() - queueStartedAt,
@@ -352,7 +459,9 @@ async function fetchDeepseekWithConcurrencyLimit(
         { status: response.status },
       );
 
-      return response;
+      const retainedResponse = retainSlotForResponseBody(response, release, signal);
+      responseOwnsSlot = true;
+      return retainedResponse;
     } catch (error) {
       deepseekProviderMetrics.fetchErrors += 1;
       incrementRuntimeCounter('ai.deepseek.fetch_error');
@@ -368,7 +477,7 @@ async function fetchDeepseekWithConcurrencyLimit(
       throw error;
     }
   } finally {
-    release();
+    if (!responseOwnsSlot) release();
   }
 }
 
@@ -378,6 +487,7 @@ export async function fetchDeepseekWithRetry(
   attempts = 3,
 ) {
   let lastError: unknown;
+  const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -389,15 +499,19 @@ export async function fetchDeepseekWithRetry(
       ) {
         return response;
       }
+
+      // These bytes will never be consumed by the SDK. Stop the old response
+      // before obtaining another permit for a retry.
+      await response.body?.cancel().catch(() => undefined);
     } catch (error) {
-      if (isAbortError(error) || attempt === attempts - 1) {
+      if (signal?.aborted || isAbortError(error) || attempt === attempts - 1) {
         throw error;
       }
 
       lastError = error;
     }
 
-    await wait(250 * (attempt + 1));
+    await wait(250 * (attempt + 1), signal);
   }
 
   throw lastError instanceof Error

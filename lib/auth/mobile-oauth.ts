@@ -2,7 +2,6 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   createSignedSession,
-  parseSignedSession,
   type AuthSessionUser,
 } from '@/lib/auth/session';
 
@@ -13,7 +12,7 @@ const mobileTicketMaxAgeSeconds = 60;
 const mobileStateMaxAgeSeconds = 10 * 60;
 
 type MobileAuthTicket = {
-  session: string;
+  user: AuthSessionUser;
   nonce: string;
   issuedAt: number;
   expiresAt: number;
@@ -120,13 +119,15 @@ export function isMobileAuthStateValid(state: string | null | undefined, storedS
 export function createMobileAuthTicket(user: AuthSessionUser) {
   const now = Math.floor(Date.now() / 1000);
   const ticket: MobileAuthTicket = {
-    session: createSignedSession(user),
+    user,
     nonce: randomBytes(16).toString('base64url'),
     issuedAt: now,
     expiresAt: now + mobileTicketMaxAgeSeconds,
   };
   const payload = base64UrlEncode(JSON.stringify(ticket));
-  const signature = signPayload(`mobile-auth:${payload}`);
+  // This short-lived credential must not contain a reusable normal session.
+  // Mint that session only after the server verifies the ticket at exchange.
+  const signature = signPayload(`mobile-auth-v2:${payload}`);
 
   return `${payload}.${signature}`;
 }
@@ -136,12 +137,13 @@ export function parseMobileAuthTicket(value: string | null | undefined) {
     return null;
   }
 
-  const [payload, signature] = value.split('.');
+  const [payload, signature, extra] = value.split('.');
 
   if (
     !payload ||
     !signature ||
-    !safeEqual(signPayload(`mobile-auth:${payload}`), signature)
+    extra !== undefined ||
+    !safeEqual(signPayload(`mobile-auth-v2:${payload}`), signature)
   ) {
     return null;
   }
@@ -150,16 +152,18 @@ export function parseMobileAuthTicket(value: string | null | undefined) {
     const ticket = JSON.parse(base64UrlDecode(payload)) as Partial<MobileAuthTicket>;
 
     if (
-      !ticket.session ||
+      !ticket.user?.id ||
+      !ticket.user.email ||
       !ticket.nonce ||
+      typeof ticket.issuedAt !== 'number' ||
       typeof ticket.expiresAt !== 'number' ||
       ticket.expiresAt <= Math.floor(Date.now() / 1000) ||
-      !parseSignedSession(ticket.session)
+      ticket.expiresAt - ticket.issuedAt !== mobileTicketMaxAgeSeconds
     ) {
       return null;
     }
 
-    return ticket.session;
+    return createSignedSession(ticket.user);
   } catch {
     return null;
   }

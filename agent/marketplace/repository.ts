@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
@@ -65,6 +65,7 @@ import { deleteListingObject } from './object-storage';
 import { recordDatabaseFirstPublication } from './listing-publication';
 import { ensureDatabaseSaleCommission } from './listing-commission';
 import { enqueueImageObjectCleanup, processImageObjectCleanup } from './image-object-cleanup';
+import { sealPreparedListingImageDelivery } from './prepared-image-delivery';
 import { runOptionalTask } from '@/lib/optional-task';
 import { scheduleEvidenceCopy, scheduleListingEvidenceCopy } from './evidence';
 import { activeImageUploadStatuses, directImageUploadsEnabled, DirectImageUploadError, retryDirectImageTransaction } from './direct-image-upload-policy';
@@ -1868,47 +1869,21 @@ export async function toggleSimilarListingFollow(
 
   await ensureActorUser(actor);
 
-  const existingFollow = await marketplacePrisma.similarListingFollow.findUnique({
-    where: {
-      userId_listingId: {
-        userId,
-        listingId: listing.id,
-      },
-    },
+  return prisma.$transaction(async tx => {
+    const key = JSON.stringify(['similar-follow', userId, listing.id]);
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771208, hashtext(${key}))`;
+    const where = { userId_listingId: { userId, listingId: listing.id } };
+    const existingFollow = await tx.similarListingFollow.findUnique({ where });
+    if (existingFollow) {
+      await tx.similarListingFollow.delete({ where });
+      return { status: 'unfollowed' as const, isFollowing: false, canFollow: true };
+    }
+    await tx.similarListingFollow.create({ data: {
+      userId, listingId: listing.id, category: listing.category,
+      city: listing.city, title: listing.title,
+    } });
+    return { status: 'followed' as const, isFollowing: true, canFollow: true };
   });
-
-  if (existingFollow) {
-    await marketplacePrisma.similarListingFollow.delete({
-      where: {
-        userId_listingId: {
-          userId,
-          listingId: listing.id,
-        },
-      },
-    });
-
-    return {
-      status: 'unfollowed' as const,
-      isFollowing: false,
-      canFollow: true,
-    };
-  }
-
-  await marketplacePrisma.similarListingFollow.create({
-    data: {
-      userId,
-      listingId: listing.id,
-      category: listing.category,
-      city: listing.city,
-      title: listing.title,
-    },
-  });
-
-  return {
-    status: 'followed' as const,
-    isFollowing: true,
-    canFollow: true,
-  };
 }
 
 export async function toggleSellerFollow(sellerId: string, follower: Actor) {
@@ -1964,37 +1939,21 @@ export async function toggleSellerFollow(sellerId: string, follower: Actor) {
 
   await ensureActorUser(follower);
 
-  const existingFollow = await prisma.sellerFollow.findUnique({
-    where: {
-      followerId_sellerId: {
-        followerId,
-        sellerId,
-      },
-    },
+  return prisma.$transaction(async tx => {
+    const key = JSON.stringify(['seller-follow', followerId, sellerId]);
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771208, hashtext(${key}))`;
+    const existingFollow = await tx.sellerFollow.findUnique({
+      where: { followerId_sellerId: { followerId, sellerId } },
+    });
+    if (existingFollow) {
+      await tx.sellerFollow.delete({ where: { id: existingFollow.id } });
+      return { status: 'unfollowed' as const, isFollowing: false,
+        followerCount: await tx.sellerFollow.count({ where: { sellerId } }) };
+    }
+    await tx.sellerFollow.create({ data: { followerId, sellerId } });
+    return { status: 'followed' as const, isFollowing: true,
+      followerCount: await tx.sellerFollow.count({ where: { sellerId } }) };
   });
-
-  if (existingFollow) {
-    await prisma.sellerFollow.delete({ where: { id: existingFollow.id } });
-
-    return {
-      status: 'unfollowed' as const,
-      isFollowing: false,
-      followerCount: await prisma.sellerFollow.count({ where: { sellerId } }),
-    };
-  }
-
-  await prisma.sellerFollow.create({
-    data: {
-      followerId,
-      sellerId,
-    },
-  });
-
-  return {
-    status: 'followed' as const,
-    isFollowing: true,
-    followerCount: await prisma.sellerFollow.count({ where: { sellerId } }),
-  };
 }
 
 export async function getSellerRatingState(sellerId: string, rater: Actor) {
@@ -2918,6 +2877,7 @@ export async function addListingImageForSeller(
             (currentImage) => currentImage.status === 'approved',
           );
 
+          await sealPreparedListingImageDelivery(tx, image);
           await tx.listingImage.create({
             data: {
               id: image.id,
@@ -4253,16 +4213,24 @@ export async function addConversationMessage(
   conversationId: string,
   sender: Actor,
   body: string,
+  options: { operationKey?: string } = {},
 ) {
   const senderId = getActorId(sender);
+  // Keep the operation identity on the source row, independently of the
+  // short-lived HTTP receipt. Scope it again here for internal callers.
+  const messageId = options.operationKey ? `message-${createHash('sha256')
+    .update(JSON.stringify(['conversation-message-v1', conversationId, senderId, options.operationKey]))
+    .digest('hex')}` : undefined;
 
   if (!shouldUseDatabaseStore()) {
     const result = memoryStore.addConversationMessage(
       conversationId,
       senderId,
       body,
+      messageId,
     );
 
+    if ('replayed' in result) return result;
     if (result.conversation && result.message) {
       safelyPublishRealtimeEvent({
         type: 'message_created',
@@ -4352,6 +4320,15 @@ export async function addConversationMessage(
     });
     if (!current) return { status: 'not_found' as const };
     if (current.status !== 'open') return { status: 'conversation_closed' as const };
+    if (messageId) {
+      const existing = await tx.conversationMessage.findUnique({ where: { id: messageId } });
+      if (existing) {
+        if (existing.conversationId !== conversationId || existing.senderId !== senderId) {
+          throw new Error('message_operation_ownership_mismatch');
+        }
+        return { status: 'sent' as const, message: existing, replayed: true as const };
+      }
+    }
     const block = await tx.userBlock.findFirst({ where: { OR: [
       { blockerId: conversation.buyerId, blockedId: conversation.sellerId },
       { blockerId: conversation.sellerId, blockedId: conversation.buyerId },
@@ -4371,6 +4348,7 @@ export async function addConversationMessage(
     });
     if (!updated.count) return { status: 'conversation_closed' as const };
     const created = await tx.conversationMessage.create({ data: {
+      ...(messageId ? { id: messageId } : {}),
       conversationId, senderId, body: trimmedBody, status: 'sent', type: 'text',
       reasons: safety.reasons, metadata: toPrismaJsonObject({}),
     } });
@@ -4382,7 +4360,7 @@ export async function addConversationMessage(
     ...(delivery.status === 'conversation_blocked' ? { blockStatus: delivery.blockStatus } : {}),
   };
   const message = delivery.message;
-  scheduleNotificationDelivery(true);
+  if (!('replayed' in delivery)) scheduleNotificationDelivery(true);
 
   const updatedConversation = await getConversationForUser(
     conversationId,
@@ -4394,10 +4372,16 @@ export async function addConversationMessage(
     senderId: message.senderId,
     body: message.body,
     status: message.status as ConversationMessage['status'],
-    type: message.type === 'contact_share' ? 'contact_share' : 'text',
+    type: message.type === 'contact_share' ? 'contact_share'
+      : message.type === 'message_deleted' ? 'message_deleted' : 'text',
     reasons: message.reasons,
-    metadata: asRecord(message.metadata),
+    metadata: conversationMessageMetadata(message),
     createdAt: message.createdAt.toISOString(),
+  };
+
+  if ('replayed' in delivery) return {
+    status: 'sent' as const, message: mappedMessage, conversation: updatedConversation,
+    replayed: true as const,
   };
 
   if (updatedConversation) {
@@ -5299,9 +5283,9 @@ export async function setListingModerationStatus(
     return result;
   }
 
-  const existing = await getListing(listingId);
+  const identity = await getListing(listingId);
 
-  if (!existing) {
+  if (!identity) {
     return {
       status: 'not_found' as const,
       listing: null,
@@ -5315,7 +5299,14 @@ export async function setListingModerationStatus(
       : status === 'deleted'
         ? 'delete_listing'
         : 'reject_listing';
-  const listing = await prisma.$transaction(async (tx) => {
+  const mutation = await prisma.$transaction(async (tx) => {
+    // Use the same advisory-before-row order as seller/admin edits, including
+    // when first publication would otherwise acquire the Listing row first.
+    await lockSellerListingEvidenceEntities(tx, listingId, identity.sellerId);
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const current = await tx.listing.findUnique({ where: { id: listingId }, include: { images: true } });
+    if (!current) return null;
+    const existing = toListingRecord(current);
     await recordDatabaseFirstPublication(tx, listingId, status);
     const updatedListing = await tx.listing.update({
       where: { id: listingId },
@@ -5343,12 +5334,14 @@ export async function setListingModerationStatus(
       await enqueueNotificationDelivery(tx, 'listing-published', updatedListing.id, { listingId: updatedListing.id });
     }
 
-    return updatedListing;
-  });
+    return { listing: updatedListing, previousStatus: existing.status };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 
-  const mappedListing = toListingRecord(listing);
+  if (!mutation) return { status: 'not_found' as const, listing: null };
 
-  if (mappedListing.status === 'published' && existing.status !== 'published') scheduleNotificationDelivery(true);
+  const mappedListing = toListingRecord(mutation.listing);
+
+  if (mappedListing.status === 'published' && mutation.previousStatus !== 'published') scheduleNotificationDelivery(true);
 
   safelyPublishRealtimeEvent({
     type: 'moderation_updated',
@@ -5368,7 +5361,7 @@ export async function setListingModerationStatus(
     payload: {
       listingId: mappedListing.id,
       sellerId: mappedListing.sellerId,
-      previousStatus: existing.status,
+      previousStatus: mutation.previousStatus,
       status: mappedListing.status,
     },
     visibility: getListingRealtimeVisibility(

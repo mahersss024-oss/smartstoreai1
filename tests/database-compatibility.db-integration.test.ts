@@ -16,6 +16,9 @@ test('the committed schema and applied PostgreSQL migrations pass the extended c
   assert.deepEqual(result.schema.mismatchedRelations, []);
   assert.deepEqual(result.schema.mismatchedEnums, []);
   assert.deepEqual(result.schema.unsupportedTypes, []);
+  assert.equal(result.databaseObjects.expectedTriggers.length, 32);
+  assert.ok(result.databaseObjects.expectedTriggers.includes('Listing.evidence_00_lock'));
+  assert.ok(result.databaseObjects.expectedTriggers.includes('User.evidence_guard'));
   assert.deepEqual(result.databaseObjects.missingTriggers, []);
   assert.deepEqual(result.databaseObjects.disabledTriggers, []);
 });

@@ -44,7 +44,9 @@ function fixture(t: TestContext, status = 'pending') {
     const next = { ...listing };
     const pendingJobs = jobs.map(job => ({ ...job }));
     const result = await (callback as unknown as (tx: object) => Promise<unknown>)({
+      $executeRaw: async () => 1,
       listing: {
+        findUnique: async () => ({ ...next }),
         updateMany: async () => { if (!next.firstPublishedAt) next.firstPublishedAt = new Date(clock); return { count: 1 }; },
         update: async ({ data }: { data: Record<string, unknown> }) => {
           Object.assign(next, Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)));

@@ -11,6 +11,7 @@ import { persistGoogleUserRegistration } from '@/lib/auth/google';
 import { persistUserRegistration, selfAccountDeletionOperation } from '@/lib/auth/registration';
 import { acknowledgeReportNotification, listReportNotifications } from '@/lib/admin/report-notifications';
 import { processImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
+import { mergeAppleAuthorization } from '@/lib/auth/apple-authorization';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
 
@@ -67,6 +68,41 @@ async function cleanup(f: Awaited<ReturnType<typeof fixture>>, extraUsers: strin
   await prisma.adminAuditLog.deleteMany({ where: { targetType: 'user', targetId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }
+
+test('database evidence retains account changes but never captures or returns Apple authorization credentials', { skip: !enabled }, async t => {
+  const f = await fixture();
+  const previousSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = 'isolated-evidence-credential-regression-secret';
+  t.after(() => {
+    if (previousSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = previousSecret;
+  });
+  try {
+    const report = await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+    const evidence = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
+    const grant = mergeAppleAuthorization(f.seller.id, null, { clientId: 'com.souqhamad.evidence-fixture', subject: f.seller.id, token: 'synthetic-private-refresh-token', tokenType: 'refresh_token' });
+    await prisma.user.update({ where: { id: f.seller.id }, data: { name: 'Retained profile update', appleAuthorizationTokens: grant } });
+    const saved = await prisma.user.findUniqueOrThrow({ where: { id: f.seller.id } });
+    assert.deepEqual(saved.appleAuthorizationTokens, grant, 'account revocation credentials must still be retained on User');
+    const change = await prisma.evidenceEvent.findFirstOrThrow({ where: { caseId: evidence.id, action: 'User.update' }, orderBy: { createdAt: 'desc' } });
+    assert.ok(!JSON.stringify(change.payload).includes('appleAuthorizationTokens'));
+    assert.equal((change.payload as { after: { name: string } }).after.name, 'Retained profile update');
+    // Simulate a historical payload from before the migration; the response
+    // boundary also protects it if app code is deployed before the migration.
+    const historical = await prisma.evidenceEvent.create({ data: { caseId: evidence.id, action: 'User.update', payload: { before: { id: f.seller.id, appleAuthorizationTokens: grant }, after: { id: f.seller.id, name: 'Retained historical update' } } } });
+    const [{ sanitized }] = await prisma.$queryRaw<Array<{ sanitized: unknown }>>`SELECT evidence_redact_credentials(${JSON.stringify(historical.payload)}::jsonb) AS sanitized`;
+    assert.deepEqual(sanitized, { before: { id: f.seller.id }, after: { id: f.seller.id, name: 'Retained historical update' } });
+    const response = await readCaseEvidence('Report', report.id, f.buyer.id, new Request('https://example.test/evidence'));
+    assert.equal(response.status, 200);
+    assert.ok(!JSON.stringify(await response.json()).includes('appleAuthorizationTokens'));
+    const preserved = await prisma.evidenceCase.findUniqueOrThrow({ where: { id: evidence.id } });
+    assert.deepEqual(preserved.snapshot, evidence.snapshot);
+    assert.equal(preserved.snapshotHash, evidence.snapshotHash);
+    const [guard] = await prisma.$queryRaw<Array<{ enabled: string }>>`SELECT t.tgenabled::text AS enabled FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid WHERE c.relname = 'EvidenceEvent' AND t.tgname = 'evidence_immutable'`;
+    assert.equal(guard.enabled, 'O');
+    await assert.rejects(() => prisma.evidenceEvent.update({ where: { id: change.id }, data: { payload: {} } }), /immutable_evidence_event/);
+  } finally { await cleanup(f); }
+});
 
 test('database evidence captures all related messages, excludes other buyers, preserves versions and guards cascades', { skip: !enabled }, async () => {
   const f = await fixture();

@@ -7,6 +7,7 @@ import { hasVerifiedAdminAccess, isPlatformOwner } from '@/lib/auth/authorizatio
 import type { AuthSession } from '@/lib/auth/session';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { createAdminAuditLog } from '@/lib/admin/audit';
+import { redactEvidenceCredentials } from '@/lib/security/evidence-redaction';
 import { deleteEvidenceObject, readEvidenceObject, readEvidenceSource, storeEvidenceObject } from './object-storage';
 import { enqueueEvidenceObjectCleanup } from './image-object-cleanup';
 
@@ -163,14 +164,14 @@ export async function readCaseEvidence(sourceType: EvidenceSource, sourceId: str
     return new Response(new Uint8Array(data), { headers: { ...noStoreHeaders, 'Content-Type': asset.mediaType ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
   }
   const page = Math.max(1, Math.min(100_000, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1));
-  const snapshot = evidenceCase.snapshot as Record<string, Prisma.JsonValue>;
+  const snapshot = redactEvidenceCredentials(evidenceCase.snapshot) as Record<string, Prisma.JsonValue>;
   const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
   const [assets, events] = await Promise.all([
     prisma.evidenceAsset.findMany({ where: { caseId: evidenceCase.id }, orderBy: { id: 'asc' }, select: { id: true, status: true, mediaType: true, sha256: true, attempts: true, lastError: true } }),
     prisma.evidenceEvent.findMany({ where: { caseId: evidenceCase.id }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], skip: (page - 1) * 50, take: 51 }),
   ]);
   await caseEvent(prisma, evidenceCase.id, actorId, 'case.viewed', { page });
-  return Response.json({ evidenceCase: { ...evidenceCase, snapshot: { ...snapshot, messages: messages.slice((page - 1) * 50, page * 50) } }, assets, events: events.slice(0, 50), page, hasMore: messages.length > page * 50 || events.length > 50 }, { headers: noStoreHeaders });
+  return Response.json({ evidenceCase: { ...evidenceCase, snapshot: { ...snapshot, messages: messages.slice((page - 1) * 50, page * 50) } }, assets, events: events.slice(0, 50).map(event => ({ ...event, payload: redactEvidenceCredentials(event.payload) })), page, hasMore: messages.length > page * 50 || events.length > 50 }, { headers: noStoreHeaders });
 }
 
 export async function actOnCaseEvidence(sourceType: EvidenceSource, sourceId: string, session: AuthSession, payload: unknown) {
