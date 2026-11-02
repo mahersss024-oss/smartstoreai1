@@ -1043,12 +1043,14 @@ export function deleteConversationMessageForUser(
     }
 
     if (mode === 'for_everyone') {
+      const metadata = { ...currentMessage.metadata };
+      delete metadata.phoneNumber;
       return {
         ...currentMessage,
         body: 'message_deleted',
         type: 'message_deleted',
         metadata: {
-          ...currentMessage.metadata,
+          ...metadata,
           deletedForEveryone: {
             by: userId,
             at: deletedAt,

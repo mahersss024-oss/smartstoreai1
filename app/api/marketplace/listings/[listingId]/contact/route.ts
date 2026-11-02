@@ -15,7 +15,7 @@ export async function GET(request: Request, context: RouteContext) {
   });
   if (limited) return limited;
   const { listingId } = await context.params;
-  const listing = await getListing(listingId);
+  const listing = await getListing(listingId, { publicOnly: true });
   if (!listing || listing.status !== 'published') {
     return Response.json({ error: 'listing_not_found' }, { status: 404, headers: noStoreHeaders });
   }

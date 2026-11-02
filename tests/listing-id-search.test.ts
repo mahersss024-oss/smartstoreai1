@@ -95,7 +95,9 @@ test('active database public search wires full IDs to exact SQL before paginatio
   });
   const id = createListingId('seller', 'active-db');
   assert.deepEqual(await listPublicMarketplaceListings({ query: id, city: 'Riyadh', page: 2, limit: 24, take: 25 }), []);
-  assert.match(queries[0].text, /"status" = 'published' AND "id" = \$1 AND "city" = \$2/);
+  assert.match(queries[0].text, /WHERE "status" = 'published'/);
+  assert.match(queries[0].text, /EXISTS \(SELECT 1 FROM "User" seller WHERE seller.id = "Listing"\."sellerId" AND seller\."deletedAt" IS NULL\)/);
+  assert.match(queries[0].text, /AND "id" = \$1 AND "city" = \$2[\s\S]*LIMIT \$3 OFFSET \$4/);
   assert.deepEqual(queries[0].values, [id, 'Riyadh', 25, 24]);
   assert.ok(!queries[0].text.includes('"title"'));
 });

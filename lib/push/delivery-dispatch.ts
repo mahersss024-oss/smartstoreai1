@@ -20,7 +20,7 @@ export async function deliverNotificationJob(kind: string, payload: Payload) {
       let cursor: string | undefined;
       while (!followed) {
         const follows = await prisma.similarListingFollow.findMany({
-          where: { userId: payload.userId, category: listing.category, ...(cursor ? { id: { gt: cursor } } : {}) },
+          where: { userId: payload.userId, listing: { category: listing.category }, ...(cursor ? { id: { gt: cursor } } : {}) },
           include: { listing: true }, orderBy: { id: 'asc' }, take: 500,
         });
         followed = follows.some(follow => follow.listing.status === 'published' && getListingSimilarityScore(listing, {

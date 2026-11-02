@@ -1,39 +1,34 @@
 const defaultFetchTimeoutMs = 10_000;
 
-function createTimeoutReason() {
-  return new DOMException('Request timed out.', 'TimeoutError');
-}
-
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs = defaultFetchTimeoutMs,
 ) {
-  const controller = new AbortController();
-  const externalSignal = init.signal;
-  const abortFromExternalSignal = () => {
-    controller.abort(externalSignal?.reason);
-  };
-  const timeout = setTimeout(
-    () => controller.abort(createTimeoutReason()),
-    timeoutMs,
-  );
-
-  if (externalSignal?.aborted) {
-    controller.abort(externalSignal.reason);
-  } else {
-    externalSignal?.addEventListener('abort', abortFromExternalSignal, {
-      once: true,
-    });
-  }
-
+  const externalSignal = init.signal === undefined && input instanceof Request
+    ? input.signal
+    : init.signal;
+  // fetch resolves when headers arrive, before json()/text()/stream reads finish.
+  // Keep the deadline on the native response body as well as the initial request;
+  // composing signals also preserves caller cancellation throughout both phases.
+  const deadline = new AbortController();
+  const timer = setTimeout(() => {
+    deadline.abort(new DOMException('Request timed out.', 'TimeoutError'));
+  }, timeoutMs);
   try {
-    return await fetch(input, {
+    const response = await fetch(input, {
       ...init,
-      signal: controller.signal,
+      signal: externalSignal
+        ? AbortSignal.any([externalSignal, deadline.signal])
+        : deadline.signal,
     });
-  } finally {
-    clearTimeout(timeout);
-    externalSignal?.removeEventListener('abort', abortFromExternalSignal);
+    // The response socket now keeps in-progress I/O alive. Do not leave an idle
+    // deadline keeping a process alive after callers consume/cancel the body.
+    if (response.body) timer.unref?.();
+    else clearTimeout(timer);
+    return response;
+  } catch (error) {
+    clearTimeout(timer);
+    throw error;
   }
 }

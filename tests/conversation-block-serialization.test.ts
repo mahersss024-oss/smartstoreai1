@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { prisma } from '@/lib/db/prisma';
-import { addConversationMessage, blockConversationUser, unblockConversationUser } from '@/agent/marketplace/repository';
+import { addConversationMessage, blockConversationUser, shareSellerContact, unblockConversationUser } from '@/agent/marketplace/repository';
 
 function deferred() {
   let resolve!: () => void;
@@ -23,6 +23,7 @@ function fixture(t: TestContext) {
   let enqueued = 0;
   let beforeEnsure: ((id: string) => Promise<void>) | undefined;
   let beforeInsert: (() => Promise<void>) | undefined;
+  let beforeBlockRead: (() => Promise<void>) | undefined;
   const mutexes = new Map<string, Promise<void>>();
   const keys: string[] = [];
   function replace(target: object, key: string, value: unknown) {
@@ -43,7 +44,7 @@ function fixture(t: TestContext) {
   replace(prisma.user, 'update', async ({ where }: { where: { id: string } }) => { await beforeEnsure?.(where.id); return { id: where.id }; });
   replace(prisma.conversation, 'findFirst', async () => structuredClone(record));
   replace(prisma.conversation, 'update', async () => record);
-  replace(prisma.userBlock, 'findFirst', findBlock);
+  replace(prisma.userBlock, 'findFirst', async () => { const snapshot = block; await beforeBlockRead?.(); return snapshot; });
   replace(prisma.userBlock, 'upsert', upsertBlock);
   replace(prisma.conversationMessage, 'create', insertMessage);
   replace(prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => {
@@ -70,6 +71,7 @@ function fixture(t: TestContext) {
         delete: async () => { assert.ok(ownsPair); block = null; },
       },
       conversationMessage: { create: insertMessage },
+      user: { findUnique: async () => ({ phoneNumber: '0500000000' }) },
       notificationDeliveryJob: { upsert: async () => { enqueued++; } },
     };
     try { return await work(tx); } finally { releases.forEach(release => release()); }
@@ -78,6 +80,7 @@ function fixture(t: TestContext) {
     record, events, keys,
     pauseEnsure: (value: typeof beforeEnsure) => { beforeEnsure = value; },
     pauseInsert: (value: typeof beforeInsert) => { beforeInsert = value; },
+    pauseBlockRead: (value: typeof beforeBlockRead) => { beforeBlockRead = value; },
     inserted: () => inserted, enqueued: () => enqueued,
   };
 }
@@ -129,4 +132,40 @@ test('a conversation closed after the initial read cannot accept the pending sen
   await entered.promise; state.record.status = 'closed'; resume.resolve();
   assert.equal((await pending).status, 'conversation_closed');
   assert.equal(state.inserted(), 0); assert.equal(state.enqueued(), 0);
+});
+
+test('a contact share cannot pass a block committed after its preflight', async t => {
+  const state = fixture(t); const entered = deferred(); const resume = deferred();
+  state.pauseBlockRead(async () => { entered.resolve(); await resume.promise; });
+  const pending = shareSellerContact('conversation', 'buyer');
+  await entered.promise;
+  assert.equal((await blockConversationUser('conversation', 'seller')).status, 'blocked');
+  resume.resolve();
+  const result = await pending;
+  assert.equal(result.status, 'conversation_blocked'); assert.equal(result.message, null);
+  assert.equal(state.inserted(), 0);
+});
+
+test('a block waits for a contact share already protected by the pair lock', async t => {
+  const state = fixture(t); const entered = deferred(); const resume = deferred();
+  state.pauseInsert(async () => { entered.resolve(); await resume.promise; });
+  const pending = shareSellerContact('conversation', 'buyer');
+  await entered.promise;
+  let completed = false;
+  const blocked = blockConversationUser('conversation', 'seller').then(result => { completed = true; return result; });
+  await flush(); assert.equal(completed, false);
+  resume.resolve();
+  assert.equal((await pending).status, 'shared'); assert.equal((await blocked).status, 'blocked');
+  assert.deepEqual(state.events, ['message', 'block']);
+  assert.equal((await shareSellerContact('conversation', 'buyer')).status, 'conversation_blocked');
+  assert.equal(state.inserted(), 1);
+});
+
+test('closing the conversation after preflight prevents the pending contact share', async t => {
+  const state = fixture(t); const entered = deferred(); const resume = deferred();
+  state.pauseBlockRead(async () => { entered.resolve(); await resume.promise; });
+  const pending = shareSellerContact('conversation', 'seller');
+  await entered.promise; state.record.status = 'closed'; resume.resolve();
+  assert.equal((await pending).status, 'conversation_closed');
+  assert.equal(state.inserted(), 0);
 });

@@ -61,7 +61,7 @@ export async function GET(request: Request, context: RouteContext) {
   const { listingId } = await context.params;
   // Image URLs can be removed immediately. A cached listing snapshot must not
   // keep advertising deleted objects or a listing that is no longer public.
-  const listing = await getListing(listingId);
+  const listing = await getListing(listingId, { publicOnly: true });
 
   if (!listing || listing.status !== 'published') {
     return Response.json({ error: 'listing_not_found' }, { status: 404, headers: noStoreHeaders });

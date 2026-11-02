@@ -37,7 +37,7 @@ function fixture(t: TestContext) {
   return { replace, listing, notificationUsers, jobs, failNextEnqueue: () => { enqueueFailure = true; }, pushRecipientsChecked: () => pushRecipientsChecked };
 }
 
-type FollowQuery = { where: { id?: { gt: string }; userId?: string; category: string }; take: number; orderBy: { id: string } };
+type FollowQuery = { where: { id?: { gt: string }; userId?: string; listing: { category: string } }; take: number; orderBy: { id: string } };
 
 test('publication visits matching similar followers beyond 500 without changing eligibility or duplicating recipients', async t => {
   const state = fixture(t);
@@ -50,7 +50,7 @@ test('publication visits matching similar followers beyond 500 without changing 
   rows[1000].userId = rows[0].userId;
   const cursors: Array<string | undefined> = [];
   state.replace(prisma.similarListingFollow, 'findMany', async (query: FollowQuery) => {
-    assert.equal(query.where.category, state.listing.category);
+    assert.equal(query.where.listing.category, state.listing.category);
     assert.deepEqual(query.orderBy, { id: 'asc' }); assert.equal(query.take, 500);
     cursors.push(query.where.id?.gt);
     return rows.filter(row => !query.where.id || row.id > query.where.id.gt).slice(0, query.take);
@@ -91,5 +91,24 @@ test('recipient delivery can find its only eligible similar follow after the fir
   });
   await deliverNotificationJob('listing-follow', { listingId: state.listing.id, userId: 'recipient', source: 'similar' });
   assert.deepEqual(cursors, [undefined, '00499']);
+  assert.equal(state.pushRecipientsChecked(), 1);
+});
+
+test('similar follow discovery and delivery use the corrected reference category rather than its saved snapshot', async t => {
+  const state = fixture(t);
+  const reference = { ...state.listing, id: 'reference', sellerId: 'reference-seller' };
+  const follow = { id: 'follow', userId: 'recipient', category: 'cars', listing: reference };
+  state.replace(prisma.similarListingFollow, 'findMany', async (query: FollowQuery) => {
+    const matches = query.where.listing.category === reference.category;
+    return matches ? [follow] : [];
+  });
+  await deliverPublishedListingNotifications(state.listing.id);
+  assert.ok(state.notificationUsers.has('recipient'));
+  assert.equal(state.jobs.size, 1);
+  await deliverNotificationJob('listing-follow', { listingId: state.listing.id, userId: follow.userId, source: 'similar' });
+  assert.equal(state.pushRecipientsChecked(), 1);
+  // Moving the reference away also immediately removes eligibility.
+  reference.category = 'cars';
+  await deliverNotificationJob('listing-follow', { listingId: state.listing.id, userId: follow.userId, source: 'similar' });
   assert.equal(state.pushRecipientsChecked(), 1);
 });

@@ -613,7 +613,6 @@ async function listSimilarListingFollowerIds(
   if (!shouldUseDatabaseStore()) {
     return [...memorySimilarListingFollows.values()]
       .filter((follow) => follow.userId !== listing.sellerId)
-      .filter((follow) => follow.category === listing.category)
       .filter((follow) => {
         const referenceListing = memoryStore.getListing(follow.listingId);
 
@@ -632,7 +631,8 @@ async function listSimilarListingFollowerIds(
   // Keyset pagination also avoids duplicate/shifted pages when follows change.
   while (true) {
     const follows = await marketplacePrisma.similarListingFollow.findMany({
-      where: { category: listing.category, ...(cursor ? { id: { gt: cursor } } : {}) },
+      // Follow the current reference listing, including category corrections.
+      where: { listing: { category: listing.category }, ...(cursor ? { id: { gt: cursor } } : {}) },
       include: { listing: { include: { images: true } } },
       orderBy: { id: 'asc' },
       take: 500,
@@ -885,6 +885,16 @@ async function getAdminAuditActorId(actor?: Actor) {
   return getActorId(actor);
 }
 
+function conversationMessageMetadata(message: { type?: string; metadata?: unknown }) {
+  const metadata = { ...asRecord(message.metadata) };
+  // Redact old rows as well as newly deleted contact shares. Evidence remains
+  // in its protected snapshot; customer responses must not replay the number.
+  if (message.type === 'message_deleted' || Object.keys(asRecord(metadata.deletedForEveryone)).length) {
+    delete metadata.phoneNumber;
+  }
+  return metadata;
+}
+
 function toConversationRecord(
   conversation: DatabaseConversationRecord,
 ): Conversation & {
@@ -931,7 +941,7 @@ function toConversationRecord(
                     ? 'message_deleted'
                     : 'text',
               reasons: message.reasons,
-              metadata: asRecord(message.metadata),
+              metadata: conversationMessageMetadata(message),
               createdAt: message.createdAt.toISOString(),
             }) as ConversationMessage,
         ) ?? [],
@@ -1027,13 +1037,15 @@ export async function listPublicMarketplaceListings(filters: PublicMarketplaceLi
   return prisma.$transaction(async db => {
     const ids = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT "id" FROM "Listing"
-      WHERE "status" = 'published' AND ${publicListingFiltersSql(filters)}
+      WHERE "status" = 'published'
+        AND EXISTS (SELECT 1 FROM "User" seller WHERE seller.id = "Listing"."sellerId" AND seller."deletedAt" IS NULL)
+        AND ${publicListingFiltersSql(filters)}
       ORDER BY ${order}
       LIMIT ${pagination.take} OFFSET ${pagination.skip}
     `);
     if (!ids.length) return [];
     const records = await db.listing.findMany({
-      where: { status: 'published', id: { in: ids.map(item => item.id) } },
+      where: { status: 'published', seller: { deletedAt: null }, id: { in: ids.map(item => item.id) } },
       include: {
         images: { where: { status: 'approved' }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], take: 1 },
       },
@@ -1193,13 +1205,14 @@ export async function listMarketplaceListings(
     : prisma.$transaction(readListings, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
-export async function getListing(listingId: string) {
+export async function getListing(listingId: string, options: { publicOnly?: boolean } = {}) {
   if (!shouldUseDatabaseStore()) {
-    return memoryStore.getListing(listingId);
+    const listing = memoryStore.getListing(listingId);
+    return options.publicOnly && listing?.status !== 'published' ? null : listing;
   }
 
   const listing = await prisma.listing.findUnique({
-    where: { id: listingId },
+    where: { id: listingId, ...(options.publicOnly ? { status: 'published' as const, seller: { deletedAt: null } } : {}) },
     include: {
       images: {
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
@@ -3374,6 +3387,7 @@ function mergeConversationMessageMetadata(
     SET "metadata" =
       (CASE WHEN jsonb_typeof(message."metadata") = 'object'
         THEN message."metadata" ELSE '{}'::jsonb END)
+      - (CASE WHEN ${deleteEveryone} THEN ARRAY['phoneNumber'] ELSE ARRAY[]::text[] END)
       || jsonb_build_object(${field}::text,
         (CASE WHEN jsonb_typeof(message."metadata" -> ${field}::text) = 'object'
           THEN message."metadata" -> ${field}::text ELSE '{}'::jsonb END)
@@ -3654,6 +3668,34 @@ async function lockConversationUserPair(
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(771207, hashtext(${pair}))`;
 }
 
+async function lockConversationParticipants(
+  tx: Prisma.TransactionClient,
+  conversation: { listingId: string; buyerId: string; sellerId: string },
+) {
+  await lockConversationUserPair(tx, conversation.buyerId, conversation.sellerId);
+  const keys = [`listing:${conversation.listingId}`, `user:${conversation.buyerId}`, `user:${conversation.sellerId}`];
+  for (const key of [...new Set(keys)].sort()) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
+  }
+  // Keep an account active through the write, in the same advisory-before-row
+  // order used by account deletion and profile updates. Lock both rows in order.
+  await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${conversation.buyerId} OR id = ${conversation.sellerId} ORDER BY id FOR SHARE`;
+}
+
+async function lockActiveConversationTarget(
+  tx: Prisma.TransactionClient,
+  target: { listingId: string; buyerId: string; sellerId: string },
+) {
+  await lockConversationParticipants(tx, target);
+  const current = await tx.listing.findFirst({
+    where: { id: target.listingId, sellerId: target.sellerId, status: 'published', seller: { deletedAt: null } },
+    select: { id: true },
+  });
+  return Boolean(current) && await tx.user.count({
+    where: { id: { in: [target.sellerId, target.buyerId] }, deletedAt: null },
+  }) === 2;
+}
+
 export async function getConversationBlockStatus(
   conversationId: string,
   userId: string,
@@ -3740,7 +3782,7 @@ export async function createConversationForListing(
   }
 
   const listing = await prisma.listing.findUnique({
-    where: { id: listingId },
+    where: { id: listingId, status: 'published', seller: { deletedAt: null } },
     include: {
       images: {
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
@@ -3785,16 +3827,20 @@ export async function createConversationForListing(
   });
 
   if (existing) {
+    const allowed = await prisma.$transaction(tx =>
+      lockActiveConversationTarget(tx, { listingId, sellerId: listing.sellerId, buyerId }));
+    if (!allowed) return { status: 'not_found' as const, conversation: null };
     return {
       status: 'existing' as const,
       conversation: toConversationRecord(existing),
     };
   }
 
-  let conversation: DatabaseConversationRecord;
+  let conversation: DatabaseConversationRecord | null;
 
   try {
     conversation = await prisma.$transaction(async (tx) => {
+      if (!await lockActiveConversationTarget(tx, { listingId, sellerId: listing.sellerId, buyerId })) return null;
       const created = await tx.conversation.create({
         data: {
           listingId,
@@ -3849,11 +3895,17 @@ export async function createConversationForListing(
       throw error;
     }
 
+    const allowed = await prisma.$transaction(tx =>
+      lockActiveConversationTarget(tx, { listingId, sellerId: listing.sellerId, buyerId }));
+    if (!allowed) return { status: 'not_found' as const, conversation: null };
+
     return {
       status: 'existing' as const,
       conversation: toConversationRecord(racedConversation),
     };
   }
+
+  if (!conversation) return { status: 'not_found' as const, conversation: null };
 
   const mappedConversation = toConversationRecord(conversation);
 
@@ -4429,36 +4481,41 @@ export async function shareSellerContact(conversationId: string, actor: Actor) {
     };
   }
 
-  const actorProfile = await prisma.user.findUnique({
-    where: { id: actorId },
-    select: { phoneNumber: true },
+  const sharing = await prisma.$transaction(async tx => {
+    await lockConversationParticipants(tx, conversation);
+    const current = await tx.conversation.findFirst({
+      where: { id: conversationId, buyerId: conversation.buyerId, sellerId: conversation.sellerId,
+        buyer: { deletedAt: null }, seller: { deletedAt: null } },
+      select: { id: true, status: true },
+    });
+    if (!current) return { status: 'not_found' as const };
+    if (current.status !== 'open') return { status: 'conversation_closed' as const };
+    const block = await tx.userBlock.findFirst({ where: { OR: [
+      { blockerId: conversation.buyerId, blockedId: conversation.sellerId },
+      { blockerId: conversation.sellerId, blockedId: conversation.buyerId },
+    ] } });
+    if (block) return { status: 'conversation_blocked' as const, blockStatus: {
+      blocked: true, blockedByMe: block.blockerId === actorId,
+      blockerId: block.blockerId, blockedUserId: block.blockedId,
+    } };
+    const profile = await tx.user.findUnique({ where: { id: actorId }, select: { phoneNumber: true } });
+    if (!profile?.phoneNumber) return { status: 'missing_phone' as const };
+    const updated = await tx.conversation.updateMany({
+      where: { id: conversationId, status: 'open', buyer: { deletedAt: null }, seller: { deletedAt: null } },
+      data: { updatedAt: new Date() },
+    });
+    if (!updated.count) return { status: 'conversation_closed' as const };
+    const message = await tx.conversationMessage.create({ data: {
+      conversationId, senderId: actorId, body: 'official_contact_share', status: 'sent',
+      type: 'contact_share', reasons: ['official_contact_share'],
+      metadata: toPrismaJsonObject({ phoneNumber: profile.phoneNumber }),
+    } });
+    return { status: 'shared' as const, message };
   });
-  const phoneNumber = actorProfile?.phoneNumber;
-
-  if (!phoneNumber) {
-    return {
-      status: 'missing_phone' as const,
-      message: null,
-      conversation,
-    };
-  }
-
-  const message = await prisma.conversationMessage.create({
-    data: {
-      conversationId,
-      senderId: actorId,
-      body: 'official_contact_share',
-      status: 'sent',
-      type: 'contact_share',
-      reasons: ['official_contact_share'],
-      metadata: toPrismaJsonObject({ phoneNumber }),
-    },
-  });
-
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { updatedAt: new Date() },
-  });
+  if (sharing.status !== 'shared') return {
+    ...sharing, message: null, conversation: sharing.status === 'not_found' ? null : conversation,
+  };
+  const message = sharing.message;
 
   const updatedConversation = await getConversationForUser(
     conversationId,
@@ -5282,10 +5339,16 @@ export async function setListingModerationStatus(
       },
     });
 
+    if (updatedListing.status === 'published' && existing.status !== 'published') {
+      await enqueueNotificationDelivery(tx, 'listing-published', updatedListing.id, { listingId: updatedListing.id });
+    }
+
     return updatedListing;
   });
 
   const mappedListing = toListingRecord(listing);
+
+  if (mappedListing.status === 'published' && existing.status !== 'published') scheduleNotificationDelivery(true);
 
   safelyPublishRealtimeEvent({
     type: 'moderation_updated',

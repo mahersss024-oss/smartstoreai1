@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db/prisma';
@@ -8,6 +9,7 @@ type IdempotencyInput = {
 };
 
 type IdempotencyReservation = {
+  operationKey: string;
   response?: Response;
   complete: (body: unknown, status?: number) => Promise<Response>;
   abandon: () => Promise<void>;
@@ -71,6 +73,14 @@ function memoryKey(input: IdempotencyInput, key: string) {
   return `${input.namespace}:${input.actorKey}:${key}`;
 }
 
+function operationKey(input: IdempotencyInput, key: string) {
+  // A source operation can retain this identity after the response receipt is
+  // lost or pruned. Keep clients' raw keys private and isolate every actor/API.
+  return createHash('sha256')
+    .update(JSON.stringify(['api-idempotency-v1', input.namespace, input.actorKey, key]))
+    .digest('hex');
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return Response.json(body, { status });
 }
@@ -98,6 +108,7 @@ function createDatabaseReservationHandle(
   key: string,
 ): IdempotencyReservation {
   return {
+    operationKey: operationKey(input, key),
     complete: async (body, status = 200) => {
       const safeBody = toJsonSafeValue(body);
 
@@ -140,6 +151,7 @@ export async function reserveIdempotencyKey(
   if (!key) {
     return null;
   }
+  const sourceOperationKey = operationKey(input, key);
 
   if (!shouldUseDatabaseStore()) {
     const now = Date.now();
@@ -150,6 +162,7 @@ export async function reserveIdempotencyKey(
 
     if (existing?.status === 'completed') {
       return {
+        operationKey: sourceOperationKey,
         response: jsonResponse(existing.response, existing.statusCode),
         complete: async (body, status) => jsonResponse(body, status),
         abandon: async () => {},
@@ -158,6 +171,7 @@ export async function reserveIdempotencyKey(
 
     if (existing?.status === 'pending') {
       return {
+        operationKey: sourceOperationKey,
         response: jsonResponse(
           {
             error: 'idempotency_in_progress',
@@ -177,6 +191,7 @@ export async function reserveIdempotencyKey(
     });
 
     return {
+      operationKey: sourceOperationKey,
       complete: async (body, status = 200) => {
         const completedAt = Date.now();
         pruneMemoryRecords(completedAt);
@@ -213,6 +228,7 @@ export async function reserveIdempotencyKey(
 
     if (existing?.status === 'completed' && existing.response !== null) {
       return {
+        operationKey: sourceOperationKey,
         response: jsonResponse(existing.response, existing.statusCode ?? 200),
         complete: async (body, status) => jsonResponse(body, status),
         abandon: async () => {},
@@ -244,6 +260,7 @@ export async function reserveIdempotencyKey(
     }
 
     return {
+      operationKey: sourceOperationKey,
       response: jsonResponse(
         {
           error: 'idempotency_in_progress',

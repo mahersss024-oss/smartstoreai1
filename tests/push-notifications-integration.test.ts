@@ -120,7 +120,9 @@ test('followed sellers notify followers only when listings become published', ()
   assert.match(repository, /listing\.status !== 'published'/);
   assert.match(repository, /type: 'follow_listing_published'/);
   assert.match(adminRoute, /existing\.status !== 'published' && updated\.status === 'published'/);
-  assert.match(adminRoute, /notifyFollowersForAdminPublishedListing/);
+  assert.match(adminRoute, /enqueueNotificationDelivery\(tx, 'listing-published', listing\.id/);
+  assert.match(adminRoute, /scheduleNotificationDelivery\(true\)/);
+  assert.doesNotMatch(adminRoute, /notifyFollowersForAdminPublishedListing|admin_listing_notifications/);
   assert.match(followNotifications, /listActiveSubscriptionsForUser/);
   assert.match(followNotifications, /userId !== listing\.sellerId/);
   assert.match(followNotifications, /tag: `follow:listing:\$\{listing\.id\}`/);

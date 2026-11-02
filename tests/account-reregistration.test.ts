@@ -70,11 +70,18 @@ function mockRegistration(t: TestContext, initial: Account[] = [], history: Audi
   });
   const users = new Map(initial.map(user => [user.id, { ...user }]));
   const writes: Array<{ kind: string; id: string }> = [];
+  const locks: string[] = [];
   const database = {
+    $executeRaw: async (strings: TemplateStringsArray, key: string) => {
+      assert.match(strings.join('?'), /pg_advisory_xact_lock\(771204/);
+      locks.push(key);
+      return 1;
+    },
     user: {
       findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
         [...users.values()].find(user => where.id ? user.id === where.id : user.email === where.email) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Partial<Account> }) => {
+        assert.ok(locks.includes(`user:${where.id}`), 'Registration must lock the identity before updating its User row');
         const existing = users.get(where.id)!;
         const defined = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
         const updated = { ...existing, ...defined };
@@ -113,8 +120,18 @@ function mockRegistration(t: TestContext, initial: Account[] = [], history: Audi
   };
   const transaction = database as unknown as Prisma.TransactionClient;
   t.mock.method(prisma, '$transaction', (async (work: (db: Prisma.TransactionClient) => unknown) => work(transaction)) as never);
-  return { users, writes, history, database: transaction };
+  return { users, writes, locks, history, database: transaction };
 }
+
+test('registration locks linked provider and canonical identities in sorted order before User updates', async t => {
+  const canonical = account({ id: 'apple:canonical-account', name: 'Canonical profile' });
+  const state = mockRegistration(t, [canonical]);
+  const result = await persistUserRegistration(request(), identity);
+  assert.equal(result.id, canonical.id);
+  assert.equal(result.name, canonical.name);
+  assert.deepEqual(state.locks, [`user:${canonical.id}`, `user:${identity.id}`].sort());
+  assert.equal(state.writes.length, 1);
+});
 
 test('first registration preserves the verified identity and agreement', async t => {
   const state = mockRegistration(t);

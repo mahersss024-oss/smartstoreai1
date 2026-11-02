@@ -54,7 +54,8 @@ test('concurrent read, delivery and local deletion preserve all message metadata
   replace(prisma, '$executeRaw', async (strings: TemplateStringsArray, ...values: unknown[]) => {
     assert.match(strings.join('?'), /UPDATE "ConversationMessage" AS message/);
     assert.match(strings.join('?'), /FROM "Conversation" AS conversation/);
-    const [field, secondField, thirdField, encoded, deleteEveryone, secondFlag, messageId, buyer, seller, authFlag, actor] = values;
+    const [redactContact, field, secondField, thirdField, encoded, deleteEveryone, secondFlag, messageId, buyer, seller, authFlag, actor] = values;
+    assert.equal(redactContact, false);
     assert.equal(field, secondField); assert.equal(field, thirdField);
     assert.equal(deleteEveryone, false); assert.equal(secondFlag, false); assert.equal(authFlag, false);
     assert.equal(messageId, 'message'); assert.equal(buyer, 'buyer'); assert.equal(seller, 'buyer'); assert.equal(actor, 'buyer');

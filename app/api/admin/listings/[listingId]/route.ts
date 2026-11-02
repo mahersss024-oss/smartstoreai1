@@ -4,7 +4,6 @@ import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
-import { createFollowNotificationsForListing } from '@/agent/marketplace/repository';
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
 import { ensureDatabaseSaleCommission } from '@/agent/marketplace/listing-commission';
 import { deleteListingObject } from '@/agent/marketplace/object-storage';
@@ -15,9 +14,8 @@ import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
-import { notifySellerFollowersOfPublishedListing } from '@/lib/push/follow-notifications';
+import { enqueueNotificationDelivery, scheduleNotificationDelivery } from '@/lib/push/delivery-jobs';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
-import { runOptionalTask } from '@/lib/optional-task';
 
 const maxAdminListingUpdateRequestBytes = 64 * 1024;
 
@@ -52,39 +50,6 @@ async function enforceAdminListingMutationRateLimit(
     maxRequests: 60,
     windowMs: 60_000,
   });
-}
-
-async function notifyFollowersForAdminPublishedListing(listing: {
-  id: string;
-  sellerId: string;
-  title: string | null;
-  city: string | null;
-}) {
-  const followers = await prisma.sellerFollow.findMany({
-    where: { sellerId: listing.sellerId },
-    select: { followerId: true },
-  });
-  const followerIds = followers.map((follow) => follow.followerId);
-
-  if (followerIds.length === 0) {
-    return;
-  }
-
-  await createFollowNotificationsForListing(listing, followerIds);
-
-  publishRealtimeEvent({
-    type: 'follow_listing_published',
-    payload: {
-      listingId: listing.id,
-      sellerId: listing.sellerId,
-      status: 'published',
-    },
-    visibility: {
-      userIds: followerIds,
-    },
-  });
-
-  await notifySellerFollowersOfPublishedListing({ listing, followerIds });
 }
 
 async function deleteStoredListingImagesBestEffort(
@@ -255,6 +220,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     await ensureDatabaseSaleCommission(tx, listing);
+    if (existing.status !== 'published' && listing.status === 'published') {
+      await enqueueNotificationDelivery(tx, 'listing-published', listing.id, { listingId: listing.id });
+    }
     await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
@@ -281,6 +249,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return listing;
   });
+
+  if (existing.status !== 'published' && updated.status === 'published') {
+    scheduleNotificationDelivery(true);
+  }
 
   const nextStatus = updated.status;
   const visibility = {
@@ -327,10 +299,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         },
         visibility,
       });
-    }
-
-    if (existing.status !== 'published' && updated.status === 'published') {
-      await runOptionalTask('admin_listing_notifications', () => notifyFollowersForAdminPublishedListing(updated));
     }
   } catch {
     // Admin update must not fail due to realtime delivery.

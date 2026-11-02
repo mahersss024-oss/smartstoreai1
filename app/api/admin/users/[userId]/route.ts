@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withEvidenceProtection } from '@/agent/marketplace/evidence';
+import { lockUserEvidenceEntities, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { deleteListingObject, isOwnedProfileImageUrl } from '@/agent/marketplace/object-storage';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -255,6 +255,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const now = new Date();
   const updated = await prisma.$transaction(async (tx) => {
+    await lockUserEvidenceEntities(tx, userId);
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -441,6 +442,7 @@ async function deleteUser(request: Request, context: RouteContext) {
   );
 
   await prisma.$transaction(async (tx) => {
+    await lockUserEvidenceEntities(tx, existing.id);
     await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,

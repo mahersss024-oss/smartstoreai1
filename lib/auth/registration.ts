@@ -89,6 +89,11 @@ export async function persistUserRegistration(request: Request, identity: AuthSe
         const byIdentity = byEmail?.id === user.id ? byEmail
           : await database.user.findUnique({ where: { id: user.id } });
         const ids = [...new Set([user.id, byEmail?.id, byIdentity?.id].filter((id): id is string => Boolean(id)))];
+        // Match profile, deactivation and conversation writers: acquire the
+        // evidence key before UPDATE takes a User row lock (including email).
+        for (const id of [...ids].sort()) {
+          await database.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'user:' + id}))`;
+        }
         const history = await database.adminAuditLog.findMany({
           where: {
             targetType: 'user', action: { in: ['delete_user', 'update_user'] },

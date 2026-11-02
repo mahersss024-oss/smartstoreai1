@@ -166,7 +166,9 @@ export async function POST(request: Request) {
   let listing: Awaited<ReturnType<typeof createListingDraft>>;
 
   try {
-    listing = await createListingDraft(session.user, parsed.data);
+    listing = await createListingDraft(session.user, parsed.data, {
+      idempotencyKey: idempotency?.operationKey,
+    });
   } catch (error) {
     if (error instanceof InvalidMarketplaceCategoryOptionError) {
       await idempotency?.abandon();

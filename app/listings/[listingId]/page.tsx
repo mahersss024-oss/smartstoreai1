@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { listingId } = await params;
-  const listing = await getListing(listingId);
+  const listing = await getListing(listingId, { publicOnly: true });
   if (!listing || listing.status !== 'published') return { title: 'الإعلان غير متاح', robots: { index: false } };
   const image = listing.images.find(image => image.status === 'approved' && image.isPrimary)
     || listing.images.find(image => image.status === 'approved');
@@ -27,6 +27,6 @@ export default async function ListingDetailsPage({ params }: PageProps) {
   const [listing, session] = await Promise.all([getListing(listingId), getPageSession()]);
   if (!listing) notFound();
   if (await hasVerifiedModeratorAccess(session)) return <AdminListingPreview listing={listing} />;
-  if (listing.status !== 'published') notFound();
+  if (listing.status !== 'published' || !await getListing(listingId, { publicOnly: true })) notFound();
   return <CustomerAppGateway path={`/listings/${encodeURIComponent(listing.id)}`} />;
 }
