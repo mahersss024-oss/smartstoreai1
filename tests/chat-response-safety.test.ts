@@ -25,6 +25,31 @@ test('keeps normal assistant text', () => {
   assert.equal(getSafeAssistantText(`  ${text}  `), text);
 });
 
+test('assistant prose uses the service description rather than model-provider names', () => {
+  for (const name of ['DeepSeek', 'deepseek', 'DEEP SEEK', 'Deep-Seek', 'ديب سيك', 'ديبسيك', 'ديب-سيك']) {
+    assert.equal(getSafeAssistantText(`تتم المعالجة عبر ${name}.`), 'تتم المعالجة عبر خدمة الذكاء الاصطناعي.');
+  }
+  assert.equal(getSafeAssistantText('أنا حمد، مساعدك في سوق حمد.'), 'أنا حمد، مساعدك في سوق حمد.');
+});
+
+test('attached Arabic prepositions remain grammatical without exposing a model name', () => {
+  assert.equal(getSafeAssistantText('تتم المعالجة بديب سيك.'), 'تتم المعالجة بخدمة الذكاء الاصطناعي.');
+  assert.equal(getSafeAssistantText('يرسل الطلب لديبسيك.'), 'يرسل الطلب لخدمة الذكاء الاصطناعي.');
+  assert.equal(getSafeAssistantText('يرسل الطلب لـديب سيك.'), 'يرسل الطلب لـخدمة الذكاء الاصطناعي.');
+});
+
+test('model-name neutralization preserves functional link destinations and normal Arabic words', () => {
+  assert.equal(
+    getSafeAssistantText('راجع [التفاصيل](https://souqhamad.com/listings/deepseek-item?source=deepseek).'),
+    'راجع [التفاصيل](/listings/deepseek-item?source=deepseek).',
+  );
+  assert.equal(
+    getSafeAssistantText('راجع [DeepSeek](/listings/deepseek-item).'),
+    'راجع [خدمة الذكاء الاصطناعي](/listings/deepseek-item).',
+  );
+  assert.equal(getSafeAssistantText('يمكنك اختيار ديبسيكستان من بياناتك.'), 'يمكنك اختيار ديبسيكستان من بياناتك.');
+});
+
 test('same-site page links become relative and external URLs are rejected', () => {
   const text = 'راجع [إعلاناتي](https://www.souqhamad.com/account/listings?tab=draft).';
   assert.equal(getSafeAssistantText(text), 'راجع [إعلاناتي](/account/listings?tab=draft).');

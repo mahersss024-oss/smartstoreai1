@@ -18,7 +18,6 @@ import { marketplaceCategoryIds } from '@/lib/marketplace/categories';
 import { getMarketplaceCategoryOption, InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
 import { getMarketplaceCarModel } from '@/lib/marketplace/car-models';
 import { sortPreferenceSchema } from '@/agent/marketplace/structured-search-intent';
-import { aiConsentRequiredResponse, hasAiSharingConsent } from '@/lib/platform/ai-consent';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,8 +150,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  if (parsed.data.autoCategory && !hasAiSharingConsent(request)) return aiConsentRequiredResponse();
 
   const idempotency = await reserveIdempotencyKey(request, {
     namespace: 'listing_create',

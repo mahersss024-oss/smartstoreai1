@@ -17,7 +17,12 @@ export function isRawServiceErrorResponse(text: string) {
 }
 
 export function getSafeAssistantText(text: string) {
-  const trimmed = normalizeFirstPartyChatLinks(text.trim());
+  // Only generated prose is branded as Hamad. Preserve functional destinations;
+  // these identifiers may also occur in seller-owned paths and must not change.
+  const trimmed = normalizeFirstPartyChatLinks(text.trim()).replace(
+    /(\]\((?:https?:\/\/|\/)[^\s)]*\)|https?:\/\/[^\s<>]+)|(?<![\p{L}\p{N}])([بل]ـ*)?(?:deep[\s-]*seek|ديب[\sـ-]*سيك)(?![\p{L}\p{N}])/giu,
+    (match, destination: string | undefined, prefix: string | undefined) => destination ?? `${prefix ?? ''}خدمة الذكاء الاصطناعي`,
+  );
 
   return isRawServiceErrorResponse(trimmed) || !isArabicCustomerText(trimmed) ? '' : trimmed;
 }

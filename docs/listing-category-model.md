@@ -13,6 +13,10 @@ only. A legacy description field remains accepted and bounded, but is discarded
 before inference. Requests require at least two title characters and are bounded
 to 24KiB, 140 title characters and 4000 description characters, and rate-limited
 to 20 requests per user per minute.
+Suggestions run automatically for a new listing without a separate consent
+dialog or a Hamad sharing receipt. The editor's suggestion toggle only controls
+this feature; Hamad chat sharing remains independent. A manual category choice
+always locks out subsequent automatic suggestions in the same editor session.
 Model responses must match an existing category ID or null and confidence in
 the range 0..1. Scores below 0.8 yield an uncertain result, not a guessed
 category. Model confidence is self-reported, not a calibrated accuracy metric.
@@ -30,7 +34,7 @@ Both analysis and classifier cache keys include the catalog, so catalog updates
 cannot reuse an obsolete selection. This uses the same existing model task, not
 another inference step. Customer selection always takes precedence.
 
-Client suggestions wait 900ms after title typing stops. Editing the title clears the
+Native client suggestions wait 600ms after title typing stops. Editing the title clears the
 previous automatic suggestion; aborted or stale replies cannot overwrite new
 text or a manual selection. Blur does not trigger duplicate calls. The UI
 shows loading, uncertain and unavailable states while retaining manual choice.

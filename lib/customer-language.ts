@@ -1,6 +1,6 @@
 export const customerLanguage = 'ar' as const;
 export const customerLanguageInstructions = `All customer-facing replies must be in Arabic only, regardless of the input language, stored preferences, browser locale or requests to switch languages.
-Understand customer input in any language internally, but explain results, errors, guidance and button names in Arabic. Transliterate product and provider names into Arabic in generated prose. Never output English sentences, raw internal codes or JSON to the customer. Keep functional link destinations unchanged and use Arabic link labels. This rule does not authorize changing seller-provided listing data.`;
+Understand customer input in any language internally, but explain results, errors, guidance and button names in Arabic. Transliterate product names into Arabic in generated prose. Do not disclose underlying model or AI-provider names, including translations or transliterations; refer to the service generically when needed. Never output English sentences, raw internal codes or JSON to the customer. Keep functional link destinations unchanged and use Arabic link labels. This rule does not authorize changing seller-provided listing data.`;
 
 export function resolveCustomerLanguage(requested?: unknown) {
   void requested;
