@@ -200,9 +200,9 @@ const marketplacePrisma = prisma as typeof prisma & {
   };
   similarListingFollow: {
     findMany(input: {
-      where: { category?: string; userId?: string };
+      where: { category?: string; userId?: string; id?: { gt: string } };
       include?: { listing: { include: { images: true } } };
-      orderBy?: { createdAt: 'desc' };
+      orderBy?: { createdAt: 'desc' } | { id: 'asc' };
       take?: number;
     }): Promise<SimilarListingFollowDatabaseRecord[]>;
     findUnique(input: {
@@ -626,32 +626,23 @@ async function listSimilarListingFollowerIds(
       .map((follow) => follow.userId);
   }
 
-  const follows = await marketplacePrisma.similarListingFollow.findMany({
-    where: {
-      category: listing.category,
-    },
-    include: {
-      listing: {
-        include: { images: true },
-      },
-    },
-    take: 500,
-  });
-
   const followerIds: string[] = [];
-
-  for (const follow of follows) {
-    if (
-      follow.userId === listing.sellerId ||
-      !follow.listing ||
-      follow.listing.status !== 'published'
-    ) {
-      continue;
+  let cursor: string | undefined;
+  // A batch bounds each database read, never the number of eligible followers.
+  // Keyset pagination also avoids duplicate/shifted pages when follows change.
+  while (true) {
+    const follows = await marketplacePrisma.similarListingFollow.findMany({
+      where: { category: listing.category, ...(cursor ? { id: { gt: cursor } } : {}) },
+      include: { listing: { include: { images: true } } },
+      orderBy: { id: 'asc' },
+      take: 500,
+    });
+    for (const follow of follows) {
+      if (follow.userId === listing.sellerId || !follow.listing || follow.listing.status !== 'published') continue;
+      if (isSimilarListingMatch(toListingRecord(follow.listing), listing)) followerIds.push(follow.userId);
     }
-
-    if (isSimilarListingMatch(toListingRecord(follow.listing), listing)) {
-      followerIds.push(follow.userId);
-    }
+    if (follows.length < 500) break;
+    cursor = follows[follows.length - 1].id;
   }
 
   return followerIds;
@@ -692,6 +683,7 @@ async function notifyFollowersWhenListingIsPublished(
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[follow_listing_push] failure=${errorName}`);
+    if (shouldUseDatabaseStore()) throw error;
   }
 }
 
@@ -2887,12 +2879,14 @@ export async function addListingImageForSeller(
     try {
       listing = await prisma.$transaction(
         async (tx) => {
+          await lockSellerListingEvidenceEntities(tx, listingId, sellerId);
+          await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
           const existing = await tx.listing.findUnique({
             where: { id: listingId },
             include: { images: true },
           });
 
-          if (!existing || existing.sellerId !== sellerId || (options.draftOnly && existing.status !== 'draft')) {
+          if (!existing || existing.sellerId !== sellerId || existing.status === 'deleted' || (options.draftOnly && existing.status !== 'draft')) {
             return null;
           }
 
@@ -3649,6 +3643,17 @@ function getOtherConversationUserId(conversation: Conversation, userId: string) 
   return null;
 }
 
+async function lockConversationUserPair(
+  tx: Prisma.TransactionClient,
+  firstUserId: string,
+  secondUserId: string,
+) {
+  // Blocks apply to the pair across all of its conversations and in either
+  // direction. Hold this key through the block decision and message commit.
+  const pair = JSON.stringify([firstUserId, secondUserId].sort());
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(771207, hashtext(${pair}))`;
+}
+
 export async function getConversationBlockStatus(
   conversationId: string,
   userId: string,
@@ -4047,7 +4052,15 @@ export async function blockConversationUser(
 
   await ensureActorUser(blocker);
 
-  const block = await prisma.userBlock.upsert({
+  const block = await prisma.$transaction(async tx => {
+    await lockConversationUserPair(tx, blockerId, blockedId);
+    const current = await tx.conversation.findFirst({
+      where: { id: conversationId, buyerId: conversation.buyerId, sellerId: conversation.sellerId,
+        buyer: { deletedAt: null }, seller: { deletedAt: null } },
+      select: { id: true },
+    });
+    if (!current) return null;
+    return tx.userBlock.upsert({
     where: {
       blockerId_blockedId: {
         blockerId,
@@ -4064,7 +4077,10 @@ export async function blockConversationUser(
       conversationId,
       reason,
     },
+    });
   });
+
+  if (!block) return { status: 'not_found' as const, block: null, conversation: null };
 
   safelyPublishRealtimeEvent({
     type: 'conversation_updated',
@@ -4127,13 +4143,19 @@ export async function unblockConversationUser(
     };
   }
 
-  const existingBlock = await prisma.userBlock.findUnique({
+  const existingBlock = await prisma.$transaction(async tx => {
+    await lockConversationUserPair(tx, blockerId, blockedId);
+    const existing = await tx.userBlock.findUnique({
     where: {
       blockerId_blockedId: {
         blockerId,
         blockedId,
       },
     },
+    });
+    if (!existing) return null;
+    await tx.userBlock.delete({ where: { blockerId_blockedId: { blockerId, blockedId } } });
+    return existing;
   });
 
   if (!existingBlock) {
@@ -4144,15 +4166,6 @@ export async function unblockConversationUser(
       blockStatus: await getConversationBlockStatus(conversationId, blockerId),
     };
   }
-
-  await prisma.userBlock.delete({
-    where: {
-      blockerId_blockedId: {
-        blockerId,
-        blockedId,
-      },
-    },
-  });
 
   safelyPublishRealtimeEvent({
     type: 'conversation_updated',
@@ -4278,27 +4291,46 @@ export async function addConversationMessage(
     };
   }
 
-  const message = await prisma.$transaction(async tx => {
-    const created = await tx.conversationMessage.create({
-    data: {
-      conversationId,
-      senderId,
-      body: trimmedBody,
-      status: 'sent',
-      type: 'text',
-      reasons: safety.reasons,
-      metadata: toPrismaJsonObject({}),
-    },
+  const delivery = await prisma.$transaction(async tx => {
+    await lockConversationUserPair(tx, conversation.buyerId, conversation.sellerId);
+    const current = await tx.conversation.findFirst({
+      where: { id: conversationId, buyerId: conversation.buyerId, sellerId: conversation.sellerId,
+        buyer: { deletedAt: null }, seller: { deletedAt: null } },
+      select: { id: true, status: true, listingId: true },
     });
-    await enqueueNotificationDelivery(tx, 'conversation-message', created.id, { messageId: created.id });
-    return created;
-  });
-  scheduleNotificationDelivery(true);
+    if (!current) return { status: 'not_found' as const };
+    if (current.status !== 'open') return { status: 'conversation_closed' as const };
+    const block = await tx.userBlock.findFirst({ where: { OR: [
+      { blockerId: conversation.buyerId, blockedId: conversation.sellerId },
+      { blockerId: conversation.sellerId, blockedId: conversation.buyerId },
+    ] } });
+    if (block) return { status: 'conversation_blocked' as const, blockStatus: {
+      blocked: true as const, blockedByMe: block.blockerId === senderId,
+      blockerId: block.blockerId, blockedUserId: block.blockedId,
+    } };
 
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { updatedAt: new Date() },
+    // Acquire the evidence key before the conversation row is written, in the
+    // same order as the existing delete/capture flows. The guarded update also
+    // detects a close/account deletion committed while this transaction waited.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'listing:' + current.listingId}))`;
+    const updated = await tx.conversation.updateMany({
+      where: { id: conversationId, status: 'open', buyer: { deletedAt: null }, seller: { deletedAt: null } },
+      data: { updatedAt: new Date() },
+    });
+    if (!updated.count) return { status: 'conversation_closed' as const };
+    const created = await tx.conversationMessage.create({ data: {
+      conversationId, senderId, body: trimmedBody, status: 'sent', type: 'text',
+      reasons: safety.reasons, metadata: toPrismaJsonObject({}),
+    } });
+    await enqueueNotificationDelivery(tx, 'conversation-message', created.id, { messageId: created.id });
+    return { status: 'sent' as const, message: created };
   });
+  if (delivery.status !== 'sent') return {
+    status: delivery.status, message: null, conversation,
+    ...(delivery.status === 'conversation_blocked' ? { blockStatus: delivery.blockStatus } : {}),
+  };
+  const message = delivery.message;
+  scheduleNotificationDelivery(true);
 
   const updatedConversation = await getConversationForUser(
     conversationId,

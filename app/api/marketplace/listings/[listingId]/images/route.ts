@@ -71,7 +71,7 @@ export async function POST(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-  const oversizedRequestResponse = rejectOversizedRequest(
+  const oversizedRequestResponse = await rejectOversizedRequest(
     request,
     maxImageUploadRequestBytes,
     'Image upload request body is too large.',

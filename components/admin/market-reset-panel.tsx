@@ -16,7 +16,7 @@ type ResetPreview = {
   previewToken: string;
   expiresAt: string;
   counts: Array<{ kind: string; label: string; count: number; mode: 'delete' | 'cleanup' }>;
-  preserved: { users: number; profileImages: number };
+  preserved: { users: number; profileImages: number; accountSecurityRecords?: number };
   blockers: Array<{ code: string; count: number }>;
   protectedData: { evidenceCases: number; heldEvidenceCases: number; commissions: number };
   maxRows: number;
@@ -47,6 +47,7 @@ function validPreview(value: unknown): value is ResetPreview {
     typeof view.expiresAt === 'string' && Number.isFinite(Date.parse(view.expiresAt)) &&
     typeof view.canExecute === 'boolean' && count(view.maxRows) && count(view.totalRows) &&
     !!view.preserved && count(view.preserved.users) && count(view.preserved.profileImages) &&
+    (view.preserved.accountSecurityRecords === undefined || count(view.preserved.accountSecurityRecords)) &&
     !!view.protectedData && count(view.protectedData.evidenceCases) &&
     count(view.protectedData.heldEvidenceCases) && count(view.protectedData.commissions) &&
     Array.isArray(view.counts) && view.counts.length > 0 && view.counts.every(row => row &&
@@ -226,7 +227,7 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
     <div className="mt-4 grid gap-4">
       <p className="text-sm text-muted-foreground">
         يحذف بيانات السوق، بما فيها الإعلانات والمحادثات والبلاغات والأدلة والرسوم والإشعارات ورسالة الموقع وسجل الإدارة السابق.
-        تبقى حسابات المستخدمين وبياناتها وصورها فقط، مع مهام تنظيف الملفات وسجل العملية الجديدة.
+        تبقى حسابات المستخدمين وبياناتها وصورها وقرارات أمان الدخول والحذف، مع مهام تنظيف الملفات وسجل العملية الجديدة.
       </p>
       <Button variant="outline" size="sm" className="w-fit" disabled={busy} onClick={() => void loadPreview()}>
         <RefreshCw className={`size-4${phase === 'preview' ? ' animate-spin' : ''}`} />
@@ -237,10 +238,11 @@ function OwnerResetPanel({ verifyOwner, onCompleted }: {
       {preview && <>
         <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/20" role="status">
           يبقى {number(preview.preserved.users)} حساب مستخدم، منها {number(preview.preserved.profileImages)} بصورة حساب.
+          {preview.preserved.accountSecurityRecords !== undefined && <> وتُحفظ {number(preview.preserved.accountSecurityRecords)} من سجلات أمان الحسابات.</>}
         </div>
         <div className="grid gap-2 sm:grid-cols-2" aria-label="أثر إعادة ضبط السوق">
           {preview.counts.map(row => <div key={row.kind} className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-xs">
-            <span>{row.label}{row.mode === 'cleanup' ? ' · تُستكمل مهام حذف الملفات' : ''}</span><strong>{number(row.count)}</strong>
+            <span>{row.label}{row.mode === 'cleanup' ? row.kind === 'AdminAuditLog' ? ' · تُحفظ قرارات أمان الحسابات' : ' · تُستكمل مهام حذف الملفات' : ''}</span><strong>{number(row.count)}</strong>
           </div>)}
         </div>
         <p className="text-xs text-destructive">

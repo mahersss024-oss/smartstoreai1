@@ -27,13 +27,17 @@ test('registration agreement explicitly accepts platform policies', () => {
   }
 });
 
-test('privacy policy describes service providers without naming vendors', () => {
+test('privacy policy names the AI recipient and explains consent and the manual alternative', () => {
   const privacyPage = readProjectFile('app', 'privacy', 'page.tsx');
 
   assert.match(privacyPage, /platformPolicies\.privacy/);
   const policy = JSON.stringify(platformPolicies.privacy);
   assert.match(policy, /مزودي خدمة موثوقين/);
-  assert.doesNotMatch(policy, /DeepSeek|Cloudinary|Render|Google|Apple/);
+  assert.match(policy, /DeepSeek/);
+  assert.match(policy, /يطلب التطبيق موافقتك/);
+  assert.match(policy, /رفض المشاركة واستخدام الإنشاء اليدوي/);
+  assert.match(policy, /إيقاف الموافقة من حسابي/);
+  assert.doesNotMatch(policy, /Cloudinary|Render/);
 });
 
 test('documented policy help limits Hamad to drafts and help and keeps review decisions human', () => {

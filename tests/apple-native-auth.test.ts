@@ -4,7 +4,7 @@ import test, { type TestContext } from 'node:test';
 
 import { POST as challengeRoute } from '@/app/api/auth/apple/native/challenge/route';
 import { POST as nativeRoute } from '@/app/api/auth/apple/native/route';
-import { appleNativeDigest, parseAppleNativeChallenge, consumeAppleNativeChallenge } from '@/lib/auth/apple-native';
+import { appleNativeDigest, parseAppleNativeChallenge, consumeAppleNativeChallenge, exchangeAppleNativeCode } from '@/lib/auth/apple-native';
 import { createCommissionAgreementToken, parseSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
@@ -137,4 +137,26 @@ test('Apple native verifies authorization code and exchange identity before issu
   assert.equal((await nativeRoute(req('/api/auth/apple/native', body, agreement))).status, 409);
   assert.equal(exchanges(), 4);
   assert.ok(!JSON.stringify(payload).includes('client_secret'));
+});
+
+test('production Apple exchange requires a revocable provider grant alongside the verified identity', async t => {
+  setup(t);
+  const agreement = createCommissionAgreementToken();
+  const issued = await start(agreement);
+  const challenge = parseAppleNativeChallenge(issued.challengeToken, verifier, agreement)!;
+  const previousNodeEnvironment = process.env.NODE_ENV;
+  Object.assign(process.env, { NODE_ENV: 'production' });
+  t.after(() => { if (previousNodeEnvironment === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV'); else Object.assign(process.env, { NODE_ENV: previousNodeEnvironment }); });
+  let includeRefresh = false;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    if (String(input) === 'https://appleid.apple.com/auth/keys') return Response.json({ keys: [{ ...rsa.publicKey.export({ format: 'jwk' }), kid: 'test-rsa', alg: 'RS256' }] });
+    assert.equal(String(input), 'https://appleid.apple.com/auth/token');
+    return Response.json({ id_token: jwt(challenge.nonce), ...(includeRefresh ? { refresh_token: 'revocable-refresh-fixture' } : {}) });
+  });
+  assert.equal(await exchangeAppleNativeCode('valid-code', challenge), null);
+  includeRefresh = true;
+  const exchanged = await exchangeAppleNativeCode('valid-code', challenge);
+  assert.equal(exchanged?.sub, 'native-apple-user');
+  assert.equal(exchanged?.authorization?.token, 'revocable-refresh-fixture');
+  assert.equal(exchanged?.authorization?.clientId, clientId);
 });

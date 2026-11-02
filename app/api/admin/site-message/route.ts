@@ -50,7 +50,7 @@ export async function PATCH(request: Request) {
   });
   if (rateLimited) return rateLimited;
 
-  const oversized = rejectOversizedRequest(request, 8 * 1024);
+  const oversized = await rejectOversizedRequest(request, 8 * 1024);
   if (oversized) return oversized;
 
   const payload = await request.json().catch(() => null);

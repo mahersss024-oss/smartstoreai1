@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { enqueueEvidenceObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
+import { accountSecurityAuditWhere, clearResettableAdminAuditHistory } from '@/lib/auth/registration';
 
 export const marketResetConfirmation = 'حذف بيانات السوق والإبقاء على المستخدمين';
 const purpose = 'owner-market-reset-v1';
@@ -37,7 +38,7 @@ export const marketResetModels = [
   { kind: 'SiteVisitDaily', label: 'إحصاءات الزيارات', mode: 'delete' },
   { kind: 'SiteVisitUnique', label: 'الزيارات الفريدة', mode: 'delete' },
   { kind: 'SiteMessage', label: 'رسالة الموقع', mode: 'delete' },
-  { kind: 'AdminAuditLog', label: 'سجل الإدارة السابق', mode: 'delete' },
+  { kind: 'AdminAuditLog', label: 'سجل الإدارة السابق', mode: 'cleanup' },
 ] as const;
 
 export class MarketResetError extends Error {
@@ -107,6 +108,7 @@ async function inspect(tx: Prisma.TransactionClient) {
     (SELECT count(*) FROM "EvidenceCase" WHERE "legalHold"=true)::bigint AS "heldEvidenceCases",
     (SELECT count(*) FROM "Commission")::bigint AS commissions`;
   const profileImages = await tx.user.count({ where: { picture: { not: null } } });
+  const accountSecurityRecords = await tx.adminAuditLog.count({ where: accountSecurityAuditWhere });
   const digest = createHash('sha256');
   // No row contents, tokens, private messages or image keys leave this function.
   // Heartbeats do not invalidate a preview; substantive account changes do.
@@ -119,8 +121,10 @@ async function inspect(tx: Prisma.TransactionClient) {
   }
   return {
     fingerprint: digest.digest('hex'), totalRows, blockers,
-    counts: marketResetModels.map(model => ({ ...model, count: byKind.get(model.kind) ?? 0 })),
-    preserved: { users: byKind.get('User') ?? 0, profileImages },
+    counts: marketResetModels.map(model => ({ ...model, count: model.kind === 'AdminAuditLog'
+      ? (byKind.get(model.kind) ?? 0) - accountSecurityRecords
+      : byKind.get(model.kind) ?? 0 })),
+    preserved: { users: byKind.get('User') ?? 0, profileImages, accountSecurityRecords },
     protectedData: Object.fromEntries(Object.entries(protectedData).map(([key, value]) => [key, Number(value)])),
   };
 }
@@ -180,8 +184,9 @@ export async function executeMarketReset(input: MarketResetInput) {
     const order = ['NotificationDeliveryJob', 'FollowNotification', 'SimilarListingFollow', 'Favorite',
       'UserBlock', 'SellerFollow', 'SellerRating', 'MobilePushToken', 'PushSubscription',
       'ConversationMessage', 'UserReport', 'Report', 'Commission', 'Conversation', 'ListingImage', 'Listing',
-      'MarketplaceSearchState', 'ApiIdempotencyKey', 'SiteVisitUnique', 'SiteVisitDaily', 'SiteMessage', 'AdminAuditLog'];
+      'MarketplaceSearchState', 'ApiIdempotencyKey', 'SiteVisitUnique', 'SiteVisitDaily', 'SiteMessage'];
     for (const kind of order) deleted[kind] = await tx.$executeRaw(Prisma.sql`DELETE FROM ${identifier(kind)}`);
+    deleted.AdminAuditLog = (await clearResettableAdminAuditHistory(tx)).count;
 
     // Listing triggers enqueue public-file deletion and cancel their manifests.
     // Also cancel orphaned manifests, preserving them beyond signed transfer expiry

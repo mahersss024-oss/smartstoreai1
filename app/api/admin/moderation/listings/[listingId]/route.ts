@@ -62,7 +62,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-  const oversizedRequestResponse = rejectOversizedRequest(
+  const oversizedRequestResponse = await rejectOversizedRequest(
     request,
     maxModerationListingActionRequestBytes,
   );

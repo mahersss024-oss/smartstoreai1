@@ -103,5 +103,10 @@ export async function exchangeAppleNativeCode(code: string, challenge: AppleNati
   });
   const payload = await response.json().catch(() => null) as { id_token?: unknown; error?: unknown } | null;
   if (!response.ok || payload?.error || typeof payload?.id_token !== 'string') return null;
-  return verifyAppleIdentityToken(payload.id_token, challenge.clientId, challenge.nonce);
+  const identity = await verifyAppleIdentityToken(payload.id_token, challenge.clientId, challenge.nonce);
+  if (!identity) return null;
+  const { appleGrantFromTokenResponse } = await import('./apple-authorization');
+  const authorization = appleGrantFromTokenResponse(payload, challenge.clientId, identity.sub);
+  if (!authorization && process.env.NODE_ENV === 'production') return null;
+  return { ...identity, authorization };
 }

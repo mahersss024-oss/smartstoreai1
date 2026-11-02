@@ -20,6 +20,7 @@ import { saudiMarketplaceCities } from '@/lib/marketplace/cities';
 import { platformPolicies } from '@/lib/platform/policies';
 import { getActiveSiteMessage } from '@/lib/site-message';
 import { schedulePendingImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
+import { aiSharingConsent } from '@/lib/platform/ai-consent';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
     },
     auth: { google: Boolean(getGoogleNativeClientId()), apple: isAppleNativeAuthConfigured() },
     assistant: { capabilities: ['listing_drafts', 'platform_help'], requiresSignIn: true },
+    aiConsent: aiSharingConsent,
     imageUploads: getDirectImageUploadCapability(),
     siteMessage: await getActiveSiteMessage(),
   }, { headers: noStoreHeaders });

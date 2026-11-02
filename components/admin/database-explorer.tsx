@@ -23,8 +23,8 @@ type RowPage = {
 type Compatibility = {
   checkedAt: string;
   migrations: { historyAvailable: boolean; filesAvailable: boolean; expected: number; applied: number; pending: string[]; failed: string[]; unknownApplied: string[] };
-  schema: { tablesChecked: number; missingTables: string[]; missingColumns: string[]; extraColumns: string[]; extraTables: string[] };
-  databaseObjects: { expectedFunctions: string[]; missingFunctions: string[]; expectedTriggers: string[]; missingTriggers: string[]; expectedExtensions: string[]; missingExtensions: string[] };
+  schema: { tablesChecked: number; missingTables: string[]; missingColumns: string[]; extraColumns: string[]; extraTables: string[]; mismatchedColumns: string[]; mismatchedNullability: string[]; missingKeys: string[]; mismatchedRelations: string[]; mismatchedEnums: string[]; unsupportedTypes: string[] };
+  databaseObjects: { expectedFunctions: string[]; missingFunctions: string[]; expectedTriggers: string[]; missingTriggers: string[]; disabledTriggers: string[]; expectedExtensions: string[]; missingExtensions: string[] };
 };
 
 function valueText(value: unknown) {
@@ -120,6 +120,9 @@ export function DatabaseExplorer() {
     ? compatibility.migrations.pending.length + compatibility.migrations.failed.length + compatibility.migrations.unknownApplied.length
       + compatibility.schema.missingTables.length + compatibility.schema.missingColumns.length + compatibility.schema.extraColumns.length + compatibility.schema.extraTables.length + compatibility.databaseObjects.missingFunctions.length
       + compatibility.databaseObjects.missingTriggers.length + compatibility.databaseObjects.missingExtensions.length
+      + [compatibility.schema.mismatchedColumns, compatibility.schema.mismatchedNullability, compatibility.schema.missingKeys,
+        compatibility.schema.mismatchedRelations, compatibility.schema.mismatchedEnums, compatibility.schema.unsupportedTypes,
+        compatibility.databaseObjects.disabledTriggers].reduce((total, issues) => total + (issues?.length ?? 0), 0)
       + Number(!compatibility.migrations.historyAvailable || !compatibility.migrations.filesAvailable)
     : 0;
 
@@ -196,7 +199,7 @@ export function DatabaseExplorer() {
           <div className="grid gap-3">
           <p className="text-xs text-muted-foreground">آخر فحص: {new Date(compatibility.checkedAt).toLocaleString('ar-SA')}</p>
           <p className={`rounded-md border p-3 text-sm font-semibold ${compatibilityIssueCount ? 'border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200' : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'}`}>
-            {compatibilityIssueCount ? `تم العثور على ${compatibilityIssueCount} اختلافات تحتاج مراجعة.` : 'المخطط والترحيلات والدوال المتوقعة متطابقة مع الملفات المقروءة.'}
+            {compatibilityIssueCount ? `تم العثور على ${compatibilityIssueCount} اختلافات تحتاج مراجعة.` : 'لم تظهر اختلافات ضمن فحوص المخطط والترحيلات المطبقة.'}
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-md border bg-background p-3 text-sm">الترحيلات: {compatibility.migrations.applied} مطبقة من {compatibility.migrations.expected}</div>
@@ -208,11 +211,18 @@ export function DatabaseExplorer() {
             <ResultList title="ترحيلات فاشلة" items={compatibility.migrations.failed} />
             <ResultList title="جداول مفقودة" items={compatibility.schema.missingTables} />
             <ResultList title="أعمدة مفقودة" items={compatibility.schema.missingColumns} />
+            <ResultList title="أنواع أعمدة أو أبعاد غير مطابقة" items={compatibility.schema.mismatchedColumns ?? []} />
+            <ResultList title="قيود القيم الفارغة غير مطابقة" items={compatibility.schema.mismatchedNullability ?? []} />
+            <ResultList title="مفاتيح أساسية أو فريدة غير سليمة" items={compatibility.schema.missingKeys ?? []} />
+            <ResultList title="علاقات قاعدة بيانات غير مطابقة" items={compatibility.schema.mismatchedRelations ?? []} />
+            <ResultList title="قيم تعدادات غير مطابقة" items={compatibility.schema.mismatchedEnums ?? []} />
+            <ResultList title="أنواع تحتاج فحصًا إضافيًا" items={compatibility.schema.unsupportedTypes ?? []} />
             <ResultList title="أعمدة إضافية غير موجودة في Prisma" items={compatibility.schema.extraColumns} />
             <ResultList title="جداول إضافية غير موجودة في Prisma" items={compatibility.schema.extraTables} />
             <ResultList title="ترحيلات مطبقة غير موجودة في المستودع" items={compatibility.migrations.unknownApplied} />
             <ResultList title="دوال قاعدة البيانات المفقودة" items={compatibility.databaseObjects.missingFunctions} />
             <ResultList title="مشغلات قاعدة البيانات المفقودة" items={compatibility.databaseObjects.missingTriggers} />
+            <ResultList title="مشغلات قاعدة البيانات المعطلة" items={compatibility.databaseObjects.disabledTriggers ?? []} />
             <ResultList title="امتدادات قاعدة البيانات المفقودة" items={compatibility.databaseObjects.missingExtensions} />
           </div>
         </div>

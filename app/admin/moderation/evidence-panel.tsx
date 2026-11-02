@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@ui/button';
+import { useAdminAccess } from '@/app/admin/use-admin-access';
 import {
   RecordDetails,
   TechnicalDetails,
@@ -79,6 +80,7 @@ export function EvidencePanel({
   sourceType: 'Report' | 'UserReport';
   canManage: boolean;
 }) {
+  const { isAdminAccessAllowed: canDispose } = useAdminAccess('owner');
   const endpoint = `/api/admin/moderation/${sourceType === 'Report' ? 'reports' : 'user-reports'}/${encodeURIComponent(reportId)}`;
   const [data, setData] = useState<EvidenceView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -389,7 +391,7 @@ export function EvidencePanel({
                         ? 'رفع تعليق الإتلاف'
                         : 'تعليق الإتلاف'}
                     </Button>
-                    <label className="grid gap-1">
+                    {canDispose && <><label className="grid gap-1">
                       تأكيد الإتلاف: إتلاف الأدلة
                       <input
                         value={confirmation}
@@ -414,7 +416,7 @@ export function EvidencePanel({
                       {current.status === 'disposing'
                         ? 'استكمال الإتلاف'
                         : 'إتلاف الأدلة'}
-                    </Button>
+                    </Button></>}
                   </div>
                 </details>
               )}

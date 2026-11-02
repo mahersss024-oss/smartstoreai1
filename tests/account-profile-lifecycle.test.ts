@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
+import { generateKeyPairSync } from 'node:crypto';
 import test, { beforeEach, type TestContext } from 'node:test';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 
 import { PATCH, DELETE } from '@/app/api/account/profile/route';
 import { POST as uploadPicture, DELETE as removePicture } from '@/app/api/account/profile/picture/route';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { mergeAppleAuthorization } from '@/lib/auth/apple-authorization';
 
 const identity = { id: 'profile-lifecycle', email: 'lifecycle@example.test', name: 'Before' };
-type Account = typeof identity & { picture: string | null; role: string; deletedAt: Date | null; phoneNumber: string | null };
+type Account = typeof identity & { picture: string | null; role: string; deletedAt: Date | null; phoneNumber: string | null; appleAuthorizationTokens?: unknown };
 let accountSequence = 0;
 beforeEach(() => {
   identity.id = `profile-lifecycle-${++accountSequence}`;
@@ -82,7 +84,7 @@ function database(t: TestContext, initial = [account()], commissions: Commission
       findMany: async () => [{ id: 'owned-listing' }],
       updateMany: async () => { writes.push('listings:hidden'); return { count: 1 }; },
     },
-    conversation: { updateMany: async () => { writes.push('conversations:closed'); return { count: 1 }; } },
+    conversation: { findMany: async () => [], updateMany: async () => { writes.push('conversations:closed'); return { count: 1 }; } },
     pushSubscription: { deleteMany: async () => { writes.push('browser-push:removed'); return { count: 1 }; } },
     mobilePushToken: { deleteMany: async () => { writes.push('native-push:removed'); return { count: 1 }; } },
     commission: { findFirst: async ({ where }: { where: { sellerId: string } }) => ledger.find(item => item.sellerId === where.sellerId) ?? null },
@@ -250,4 +252,103 @@ test('profile image preparation finishing after account deletion rejects its com
   assert.equal(db.users.has(identity.id), false);
   assert.ok(db.requests.some(item => item.method === 'DELETE'));
   assert.equal(db.cleanups.size, 1);
+});
+
+const appleKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+function appleConfiguration(t: TestContext) {
+  const values = { APPLE_TEAM_ID: 'test-team', APPLE_KEY_ID: 'test-key',
+    APPLE_PRIVATE_KEY: appleKey.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() };
+  const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  Object.assign(process.env, values);
+  t.after(() => { for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  } });
+}
+
+function appleDatabase(t: TestContext, retained = false, linkedGoogle = false) {
+  if (!linkedGoogle) identity.id = `apple:${identity.id}`;
+  const db = database(t, [account()], retained ? [{ id: 'fee', sellerId: identity.id, status: 'due', amount: 100 }] : []);
+  appleConfiguration(t);
+  const grant = { clientId: 'com.souqhamad.fixture', subject: 'apple-fixture-subject', token: 'private-refresh-fixture', tokenType: 'refresh_token' as const };
+  db.users.get(identity.id)!.appleAuthorizationTokens = mergeAppleAuthorization(identity.id, null, grant);
+  return { ...db, grant };
+}
+
+for (const retained of [false, true]) {
+  test(`Apple self-deletion revokes the provider authorization before ${retained ? 'retaining the financial ledger' : 'removing the account'}`, async t => {
+    const db = appleDatabase(t, retained);
+    const calls: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push(String(input));
+      assert.equal(String(input), 'https://appleid.apple.com/auth/revoke');
+      assert.equal(init?.method, 'POST');
+      assert.equal(init?.redirect, 'error');
+      const body = init?.body as URLSearchParams;
+      assert.equal(body.get('client_id'), db.grant.clientId);
+      assert.equal(body.get('token'), db.grant.token);
+      assert.equal(body.get('token_type_hint'), 'refresh_token');
+      assert.ok(body.get('client_secret'));
+      assert.deepEqual(db.writes, [], 'No deletion may commit before provider revocation succeeds.');
+      return new Response(null, { status: 200 });
+    });
+    const response = await DELETE(request('DELETE'));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { status: 'deleted' });
+    assert.equal(calls.length, 1);
+    if (retained) {
+      assert.ok(db.users.get(identity.id)?.deletedAt);
+      assert.equal(db.users.get(identity.id)?.appleAuthorizationTokens, Prisma.DbNull);
+      assert.equal(db.ledger.length, 1);
+    } else assert.equal(db.users.has(identity.id), false);
+    assert.ok(!JSON.stringify(db.audits).includes(db.grant.token));
+  });
+}
+
+test('deleting a Google account previously linked to Apple still revokes its stored Apple authorization', async t => {
+  const db = appleDatabase(t, false, true);
+  let revoked = false;
+  t.mock.method(globalThis, 'fetch', async () => { revoked = true; return new Response(null, { status: 200 }); });
+  assert.equal((await DELETE(request('DELETE'))).status, 200);
+  assert.ok(revoked);
+  assert.equal(db.users.size, 0);
+});
+
+test('Apple revocation failure preserves the account, ledger and deletion audit history', async t => {
+  const db = appleDatabase(t, true);
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
+  const response = await DELETE(request('DELETE'));
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, 'apple_revocation_unavailable');
+  assert.equal(db.users.get(identity.id)?.deletedAt, null);
+  assert.equal(db.ledger.length, 1);
+  assert.deepEqual(db.writes, []);
+  assert.deepEqual(db.audits, []);
+});
+
+for (const missing of [null, []]) {
+  test(`a legacy Apple account with ${missing === null ? 'missing' : 'empty'} authorization requests reauthentication before deletion`, async t => {
+    const db = appleDatabase(t);
+    db.users.get(identity.id)!.appleAuthorizationTokens = missing;
+    const response = await DELETE(request('DELETE'));
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).error, 'apple_reauthorization_required');
+    assert.deepEqual(db.requests, []);
+    assert.deepEqual(db.writes, []);
+    assert.equal(db.users.get(identity.id)?.deletedAt, null);
+  });
+}
+
+test('a fresh Apple authorization obtained while deletion is awaiting the provider cannot be deleted by a stale request', async t => {
+  const db = appleDatabase(t);
+  t.mock.method(globalThis, 'fetch', async () => {
+    const current = db.users.get(identity.id)!;
+    current.appleAuthorizationTokens = mergeAppleAuthorization(identity.id, current.appleAuthorizationTokens, { ...db.grant, token: 'new-refresh-token' });
+    return new Response(null, { status: 200 });
+  });
+  const response = await DELETE(request('DELETE'));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, 'apple_authorization_changed');
+  assert.equal(db.users.get(identity.id)?.deletedAt, null);
+  assert.deepEqual(db.writes, []);
+  assert.deepEqual(db.audits, []);
 });

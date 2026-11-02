@@ -4,6 +4,7 @@ import { reportUserDirect } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
+import { rejectOversizedRequest } from '@/lib/api/request-size';
 
 type RouteContext = {
   params: Promise<{
@@ -36,6 +37,8 @@ export async function POST(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
+  const oversized = await rejectOversizedRequest(request, 8 * 1024);
+  if (oversized) return oversized;
   const payload = await request.json().catch(() => null);
   const parsed = reportSchema.safeParse(payload);
 

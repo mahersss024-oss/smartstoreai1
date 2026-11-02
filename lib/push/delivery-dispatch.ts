@@ -16,10 +16,19 @@ export async function deliverNotificationJob(kind: string, payload: Payload) {
     const users = listing ? await prisma.user.findMany({ where: { id: { in: [listing.sellerId, payload.userId] }, deletedAt: null }, select: { id: true } }) : [];
     if (!listing || listing.status !== 'published' || users.length !== 2) return;
     if (payload.source === 'similar') {
-      const follows = await prisma.similarListingFollow.findMany({ where: { userId: payload.userId, category: listing.category }, include: { listing: true }, take: 500 });
-      const followed = follows.some(follow => follow.listing.status === 'published' && getListingSimilarityScore(listing, {
-        ...follow.listing, attributes: follow.listing.attributes && typeof follow.listing.attributes === 'object' && !Array.isArray(follow.listing.attributes) ? follow.listing.attributes as Record<string, unknown> : {},
-      }) >= 85);
+      let followed = false;
+      let cursor: string | undefined;
+      while (!followed) {
+        const follows = await prisma.similarListingFollow.findMany({
+          where: { userId: payload.userId, category: listing.category, ...(cursor ? { id: { gt: cursor } } : {}) },
+          include: { listing: true }, orderBy: { id: 'asc' }, take: 500,
+        });
+        followed = follows.some(follow => follow.listing.status === 'published' && getListingSimilarityScore(listing, {
+          ...follow.listing, attributes: follow.listing.attributes && typeof follow.listing.attributes === 'object' && !Array.isArray(follow.listing.attributes) ? follow.listing.attributes as Record<string, unknown> : {},
+        }) >= 85);
+        if (follows.length < 500) break;
+        cursor = follows[follows.length - 1].id;
+      }
       if (!followed) return;
       await notifySimilarListingFollowersOfPublishedListing({ listing, followerIds: [payload.userId] });
     } else {

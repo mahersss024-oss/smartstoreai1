@@ -1,3 +1,4 @@
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createListingCategoryClassifier, listingCategoryClassifier, parseListingCategoryModelOutput, resolveListingCategoryWithModel } from '@/agent/marketplace/listing-category-model';
@@ -94,7 +95,7 @@ function request(body: string, actor = 'category-route', authenticated = true, s
   return new Request('http://localhost/api/marketplace/listing-category', {
     method: 'POST', body,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
       ...(size ? { 'Content-Length': size } : {}),
       ...(authenticated ? { Cookie: createSessionCookie({ id: actor, email: `${actor}@example.test` }).split(';')[0] } : {}),
     },

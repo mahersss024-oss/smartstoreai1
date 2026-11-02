@@ -80,9 +80,33 @@ When the database store is enabled, listings, images, conversations, messages, f
   variable no longer enables or disables it. Ordinary cleanup retains its
   eligibility/evidence guards; the separately confirmed full market reset is
   described in [owner-market-reset.ar.md](owner-market-reset.ar.md).
-- Configure `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and
-  `APPLE_PRIVATE_KEY` before submitting an iOS app that also offers Google
-  sign-in.
+- Configure `APPLE_NATIVE_CLIENT_ID` (the iOS bundle identifier),
+  `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and `APPLE_PRIVATE_KEY` for native Apple
+  sign-in. `APPLE_CLIENT_ID` is the separate web Services ID when web Apple
+  sign-in is enabled.
+
+### Apple authorization and account deletion
+
+Apply migration `20261102000000_store_apple_authorization_tokens` before deploying
+the updated server. Successful Apple code exchange stores the revocable refresh
+token (or access token fallback) in `User.appleAuthorizationTokens`, encrypted
+with AES-256-GCM and bound to the account, Apple client and Apple subject. Public
+profile/session responses and owner database inspection do not expose it.
+
+`AUTH_SECRET` also derives the encryption key for these grants. Keep it stable
+across server instances and deployments. Rotating it requires a separate grant
+re-encryption plan; it must not be changed as a routine deployment step.
+
+The existing account DELETE route revokes all stored Apple grants at Apple's
+`/auth/revoke` endpoint before deleting or disabling the account. Failure returns
+503 and preserves account data for retry. A concurrent fresh authorization
+returns 409 instead of deleting it under an older snapshot. An older Apple
+account without a saved grant must sign in with Apple again before deletion;
+the previous implementation did not retain a token that could be recovered.
+Existing financial/evidence retention rules still apply after revocation.
+
+See Apple's [revocation endpoint](https://developer.apple.com/documentation/signinwithapplerestapi/revoke-tokens)
+and [account deletion guidance](https://developer.apple.com/help/app-review/guideline-reference/5-1-1-account-deletion/).
 
 ## Listing Image Storage
 
@@ -131,7 +155,8 @@ shown to sellers as "رقم الحساب". `SMARTSTORE_COMMISSION_STC_PAY_NUMBER
 accepted as a legacy alias when `..._ACCOUNT` is not set. Set only one of them
 in production; the account key takes priority when both are present.
 
-Keep these values managed in the Render dashboard so payment recipients can be
+Keep these values in the production service configuration (AWS App Runner /
+Secrets Manager for the current deployment) so payment recipients can be
 changed without a code deployment.
 
 `SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL` must be a public bucket URL or CDN URL that can serve uploaded listing images in the browser. If `SMARTSTORE_IMAGE_STORAGE` is empty, the app keeps the local development fallback.

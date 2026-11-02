@@ -1,3 +1,4 @@
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { POST } from '@/app/api/chat/route';
@@ -17,7 +18,7 @@ function completion(content: string | null, tool?: { name: string; arguments: st
 
 function request(userId: string, turnId: string, extra: Record<string, unknown> = {}) {
   return new Request('http://localhost/api/chat', { method: 'POST', headers: {
-    'content-type': 'application/json', cookie: createSessionCookie({ id: userId, email: userId+'@example.test' }),
+    'content-type': 'application/json', [aiConsentHeader]: aiSharingConsent.version, cookie: createSessionCookie({ id: userId, email: userId+'@example.test' }),
   }, body: JSON.stringify({ messages: [{ id: turnId, role: 'user', parts: [{ type: 'text', text: 'أريد تجهيز إعلان هاتف' }] }], ...extra }) });
 }
 

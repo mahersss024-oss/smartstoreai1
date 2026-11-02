@@ -3,15 +3,17 @@ import { getAuthSession } from '@/lib/auth/session';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { noStoreHeaders } from '@/lib/api/no-store';
+import { aiConsentRequiredResponse, hasAiSharingConsent } from '@/lib/platform/ai-consent';
 
 export async function POST(request: Request) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
+  if (!hasAiSharingConsent(request)) return aiConsentRequiredResponse();
   const limited = await enforceApiRateLimit(request, {
     namespace: 'listing_category', actorId: session.user.id, maxRequests: 20, windowMs: 60_000,
   });
   if (limited) return limited;
-  const oversized = rejectOversizedRequest(request, 24 * 1024);
+  const oversized = await rejectOversizedRequest(request, 24 * 1024);
   if (oversized) return oversized;
   let body: unknown;
   try { body = await request.json(); }

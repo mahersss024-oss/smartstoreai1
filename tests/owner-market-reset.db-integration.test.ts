@@ -62,6 +62,10 @@ test('owner market reset is atomic, preserves users and retains durable storage 
     await prisma.siteVisitUnique.create({ data: { day: '2026-01-01', visitorId: 'fixture' } });
     await prisma.siteMessage.create({ data: { message: 'fixture', updatedById: owner.id } });
     await prisma.adminAuditLog.create({ data: { adminId: owner.id, action: 'update_listing', targetType: 'fixture', targetId: listing.id } });
+    await prisma.adminAuditLog.createMany({ data: [
+      { action: 'delete_user', targetType: 'user', targetId: buyer.id, metadata: { operation: 'self_user_delete', email: buyer.email, deletedAt: buyer.deletedAt!.toISOString() } },
+      { action: 'delete_user', targetType: 'user', targetId: 'permanently-blocked', metadata: { operation: 'admin_user_delete', email: 'permanently-blocked@example.test', mode: 'permanent' } },
+    ] });
     await prisma.listingImageUpload.create({ data: { id: 'reset-upload', listingId: listing.id, sellerId: owner.id, idempotencyKey: 'fixture', requestFingerprint: 'a'.repeat(64), fileName: 'fixture.jpg', sizeBytes: 100, sha256: 'b'.repeat(64), sourceKey: 'intake/fixture.jpg', originalKey: 'listings/fixture.webp', displayKey: 'listings/fixture-display.webp', thumbnailKey: 'listings/fixture-thumbnail.webp', expiresAt: new Date(Date.now() + 86_400_000) } });
     await prisma.listingImageUpload.create({ data: { id: 'orphan-ready-upload', listingId: 'previously-removed-listing', sellerId: owner.id, idempotencyKey: 'orphan', requestFingerprint: 'c'.repeat(64), fileName: 'orphan.jpg', sizeBytes: 100, sha256: 'd'.repeat(64), sourceKey: 'intake/orphan.jpg', originalKey: 'listings/orphan.webp', displayKey: 'listings/orphan-display.webp', thumbnailKey: 'listings/orphan-thumbnail.webp', status: 'ready', cleanupAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) } });
     await prisma.imageObjectCleanup.create({ data: { imageId: 'completed-fixture', urls: [], cleanupAt: new Date() } });
@@ -75,6 +79,7 @@ test('owner market reset is atomic, preserves users and retains durable storage 
       assert.ok(preview.counts.every(row => row.count > 0), 'Every model has a populated fixture');
       assert.equal(preview.preserved.users, 2);
       assert.equal(preview.preserved.profileImages, 1);
+      assert.equal(preview.preserved.accountSecurityRecords, 2);
       assert.equal(preview.protectedData.heldEvidenceCases, 2);
       assert.equal(preview.protectedData.commissions, 1);
       assert.equal(preview.canExecute, true);
@@ -141,12 +146,18 @@ test('owner market reset is atomic, preserves users and retains durable storage 
       assert.equal(result.status, 'completed');
       assert.deepEqual(await prisma.user.findMany({ orderBy: { id: 'asc' } }), before);
       for (const model of marketResetModels) {
-        if (model.mode === 'cleanup' || model.kind === 'AdminAuditLog') continue;
+        if (model.mode === 'cleanup') continue;
         const rows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(`SELECT count(*) FROM "${model.kind}"`);
         assert.equal(Number(rows[0].count), 0, model.kind);
       }
-      assert.equal(await prisma.adminAuditLog.count(), 1);
-      assert.equal((await prisma.adminAuditLog.findFirstOrThrow()).id, result.operationId);
+      assert.equal(await prisma.adminAuditLog.count(), 3);
+      assert.ok(await prisma.adminAuditLog.findUnique({ where: { id: result.operationId } }));
+      const { persistUserRegistration } = await import('@/lib/auth/registration');
+      const registrationRequest = new Request('http://localhost/api/auth/google/native');
+      await assert.rejects(persistUserRegistration(registrationRequest, { id: 'permanently-blocked', email: 'permanently-blocked@example.test' }), /ACCOUNT_SOFT_DELETED/);
+      const restored = await persistUserRegistration(registrationRequest, { id: buyer.id, email: buyer.email });
+      assert.notEqual(restored.id, buyer.id);
+      assert.ok(restored.id.startsWith(`${buyer.id}:r:`));
       const upload = await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: 'reset-upload' } });
       assert.equal(upload.status, 'cancelled');
       assert.equal(upload.cleanupAt, null);
@@ -163,7 +174,7 @@ test('owner market reset is atomic, preserves users and retains durable storage 
       assert.ok(jobs.some(row => row.imageId === image.id));
       assert.equal(await processImageObjectCleanup(image.id), false, 'A user profile keeps its shared listing object');
       await assert.rejects(executeMarketReset(request(preview.previewToken)), { code: 'preview_stale' });
-      assert.equal(await prisma.user.count(), 2);
+      assert.equal(await prisma.user.count(), 3, 'Reset preserved two users; explicit re-registration added one fresh identity afterward');
     });
     await t.test('reset upload grants stay pending for final cleanup until they expire', async () => {
       const { cleanupExpiredDirectImageUploads, directImageUploadEffects } = await import('@/agent/marketplace/direct-image-uploads');

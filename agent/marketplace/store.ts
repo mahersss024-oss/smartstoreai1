@@ -571,7 +571,7 @@ export function addListingImageForSeller(
 
   const listing = listings.get(listingId);
 
-  if (!listing || listing.sellerId !== sellerId) {
+  if (!listing || listing.sellerId !== sellerId || listing.status === 'deleted') {
     return null;
   }
 

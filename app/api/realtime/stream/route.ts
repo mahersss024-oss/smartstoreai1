@@ -1,4 +1,3 @@
-import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import {
@@ -6,6 +5,7 @@ import {
   subscribeRealtimeEvents,
 } from '@/lib/realtime/event-bus';
 import type { RealtimeEvent } from '@/lib/realtime/events';
+import { resolveRealtimeSubscriberContext } from '@/lib/realtime/authorization';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -54,11 +54,13 @@ export async function GET(request: Request) {
     return rateLimitResponse;
   }
 
-  const isAdmin = await hasVerifiedAdminAccess(session);
-  const context = {
-    userId: session?.user.id ?? null,
-    isAdmin,
-  };
+  const context = await resolveRealtimeSubscriberContext(session).catch(() => undefined);
+  if (context === undefined) return Response.json({ error: 'realtime_unavailable' }, {
+    status: 503, headers: { 'Cache-Control': 'private, no-store' },
+  });
+  if (!context) return Response.json({ error: 'auth_required' }, {
+    status: 401, headers: { 'Cache-Control': 'private, no-store' },
+  });
   const url = new URL(request.url);
   const lastEventId =
     parseLastEventId(request.headers.get('last-event-id')) ??
@@ -72,6 +74,8 @@ export async function GET(request: Request) {
       let unsubscribe: (() => void) | null = null;
       let heartbeatId: ReturnType<typeof setInterval> | null = null;
       let lifetimeId: ReturnType<typeof setTimeout> | null = null;
+      const pending: Array<RealtimeEvent | null> = [];
+      let flushing = false;
 
       const write = (value: string) => {
         if (closed) {
@@ -87,6 +91,7 @@ export async function GET(request: Request) {
         }
 
         closed = true;
+        pending.length = 0;
 
         if (heartbeatId !== null) {
           clearInterval(heartbeatId);
@@ -112,8 +117,34 @@ export async function GET(request: Request) {
         close();
       };
 
-      const sendEvent = (event: RealtimeEvent) => {
-        write(toSseEvent(event));
+      const flush = async () => {
+        if (flushing || closed) return;
+        flushing = true;
+        try {
+          while (!closed && pending.length) {
+            // A synchronous batch shares one current authorization decision;
+            // later arrivals wait for the next check. Bound queued work so an
+            // unavailable database cannot accumulate an unlimited event list.
+            const batch = pending.splice(0, 100);
+            const current = await resolveRealtimeSubscriberContext(session);
+            if (closed) return;
+            if (!current || current.userId !== context.userId || current.isAdmin !== context.isAdmin) {
+              close();
+              return;
+            }
+            for (const event of batch) write(event ? toSseEvent(event) : toSseHeartbeat());
+          }
+        } catch {
+          close();
+        } finally {
+          flushing = false;
+        }
+      };
+      const sendEvent = (event: RealtimeEvent | null) => {
+        if (closed) return;
+        if (pending.length >= 2000) { close(); return; }
+        pending.push(event);
+        void flush();
       };
 
       write(`retry: 2000\nevent: ready\ndata: ${JSON.stringify({
@@ -128,7 +159,7 @@ export async function GET(request: Request) {
 
       unsubscribe = subscribeRealtimeEvents(context, sendEvent);
       heartbeatId = setInterval(() => {
-        write(toSseHeartbeat());
+        sendEvent(null);
       }, 15_000);
       lifetimeId = setTimeout(() => {
         // Graceful end-of-life close; the client reconnects and replays.

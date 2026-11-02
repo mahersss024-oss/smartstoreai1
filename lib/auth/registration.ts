@@ -14,8 +14,26 @@ import {
   type AuthSessionUser,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { mergeAppleAuthorization, type AppleAuthorizationGrant } from './apple-authorization';
 
 export const selfAccountDeletionOperation = 'self_user_delete';
+
+// These receipts are account state: registration needs them even after the
+// owner clears market history. Keep deletion decisions (including legacy
+// receipts) and explicit restorations, without retaining unrelated audit data.
+export const accountSecurityAuditWhere = {
+  targetType: 'user',
+  OR: [
+    { action: 'delete_user' },
+    { action: 'update_user', metadata: { path: ['updates', 'accountStatus'], equals: 'active' } },
+  ],
+} satisfies Prisma.AdminAuditLogWhereInput;
+
+export async function clearResettableAdminAuditHistory(
+  database: Pick<Prisma.TransactionClient, 'adminAuditLog'>,
+) {
+  return database.adminAuditLog.deleteMany({ where: { NOT: accountSecurityAuditWhere } });
+}
 
 function metadataObject(value: Prisma.JsonValue) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -42,7 +60,7 @@ export async function getRegistrationIdentityEmail(
   return normalizeAuthEmail(email);
 }
 
-export async function persistUserRegistration(request: Request, identity: AuthSessionUser) {
+export async function persistUserRegistration(request: Request, identity: AuthSessionUser, appleAuthorization?: AppleAuthorizationGrant) {
   if (process.env.SMARTSTORE_MARKETPLACE_STORE !== 'database') {
     if (process.env.NODE_ENV === 'production') throw new Error('DATABASE_USER_REGISTRATION_REQUIRED');
     return identity;
@@ -121,6 +139,7 @@ export async function persistUserRegistration(request: Request, identity: AuthSe
               ...registrationData,
               name: existing.name ?? user.name,
               picture: existing.picture ?? user.picture,
+              ...(appleAuthorization ? { appleAuthorizationTokens: mergeAppleAuthorization(existing.id, existing.appleAuthorizationTokens, appleAuthorization) } : {}),
             },
           });
           return sessionUser(updated);
@@ -136,11 +155,13 @@ export async function persistUserRegistration(request: Request, identity: AuthSe
 
         // A fresh identity leaves retained records and old session cookies
         // attached to the deleted account, without restoring its privileges.
+        const newId = selfDeletion ? `${user.id}:r:${randomUUID()}` : user.id;
         const created = await database.user.create({
           data: {
-            id: selfDeletion ? `${user.id}:r:${randomUUID()}` : user.id,
+            id: newId,
             role: getConfiguredRoleForEmail(user.email),
             ...registrationData,
+            ...(appleAuthorization ? { appleAuthorizationTokens: mergeAppleAuthorization(newId, null, appleAuthorization) } : {}),
           },
         });
         return sessionUser(created);

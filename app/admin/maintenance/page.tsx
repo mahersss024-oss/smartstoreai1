@@ -14,6 +14,7 @@ import { useAdminAccess } from '../use-admin-access';
 import { DatabaseExplorer } from '@/components/admin/database-explorer';
 import { MarketResetPanel } from '@/components/admin/market-reset-panel';
 import { normalizeMaintenanceConfirmation } from '@/lib/admin/maintenance-confirmation';
+import { toLocalDateTimeInput } from '@/lib/datetime-local';
 
 type MaintenanceCounts = {
   deletedListings: number;
@@ -188,9 +189,7 @@ export default function AdminMaintenancePage() {
       message: payload.siteMessage.message,
       type: payload.siteMessage.type,
       isEnabled: payload.siteMessage.isEnabled,
-      expiresAt: payload.siteMessage.expiresAt
-        ? new Date(payload.siteMessage.expiresAt).toISOString().slice(0, 16)
-        : '',
+      expiresAt: toLocalDateTimeInput(payload.siteMessage.expiresAt),
     });
   }, []);
 

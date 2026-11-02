@@ -25,7 +25,9 @@ export async function enqueueEvidenceObjectCleanup(database: CleanupDatabase, as
   const imageId = `evidence:${asset.id}`;
   const urls = [asset.objectKey];
   return database.imageObjectCleanup.upsert({ where: { imageId }, create: { imageId, urls },
-    update: { urls, cleanupAt: null, nextAttemptAt: new Date() } });
+    // A copy can finish after a previous deletion began. Invalidate that lease
+    // so its stale completion cannot close the renewed cleanup receipt.
+    update: { urls, cleanupAt: null, nextAttemptAt: new Date(), leaseToken: null, leaseUntil: null } });
 }
 
 export function profileImageCleanupInput(userId: string, picture?: string | null): CleanupInput | undefined {

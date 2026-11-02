@@ -35,7 +35,6 @@ test('publication and global optional reads are isolated without weakening datab
   assert.match(repository, /runOptionalTask\('listing_similar_notifications'/);
   assert.equal((repository.match(/await notifyPublishedListingBestEffort\(/g) ?? []).length, 2);
   const health = readFileSync('app/api/health/route.ts', 'utf8');
-  assert.match(health, /runOptionalTask\('health_analytics'/);
   assert.match(health, /status: database.ok \? 200 : 503/);
   assert.match(readFileSync('lib/site-message.ts', 'utf8'), /runOptionalTask\('site_message'/);
 });

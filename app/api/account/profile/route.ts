@@ -14,6 +14,7 @@ import {
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { isConfiguredImageObjectUrl, isOwnedProfileImageUrl } from '@/agent/marketplace/object-storage';
+import { hasAppleAuthorization, revokeAppleAuthorizations } from '@/lib/auth/apple-authorization';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,7 +94,7 @@ export async function PATCH(request: Request) {
     return rateLimitResponse;
   }
 
-  const oversized = rejectOversizedRequest(
+  const oversized = await rejectOversizedRequest(
     request,
     maxProfileRequestBytes,
     'Account profile request body is too large.',
@@ -233,6 +234,21 @@ async function deleteProfile(request: Request) {
 
   // Retry serialization/deadlock conflicts with concurrent listing sales. The
   // transaction either preserves the ledger or commits the entire deletion.
+  const authorizationOwner = await prisma.user.findUnique({
+    where: { id: session.user.id }, select: { id: true, deletedAt: true, appleAuthorizationTokens: true },
+  });
+  const appleAuthorizations = authorizationOwner?.appleAuthorizationTokens ?? null;
+  const authorizationSnapshot = JSON.stringify(appleAuthorizations);
+  if (authorizationOwner && !authorizationOwner.deletedAt && authorizationOwner.id.startsWith('apple:') && !hasAppleAuthorization(appleAuthorizations)) {
+    return NextResponse.json({ error: 'apple_reauthorization_required', message: 'لإكمال حذف حسابك، سجّل خروجك ثم ادخل باستخدام Apple مجددًا وأعد طلب الحذف.' }, { status: 409, headers: noStoreHeaders });
+  }
+  if (appleAuthorizations) {
+    try { await revokeAppleAuthorizations(session.user.id, appleAuthorizations); }
+    catch {
+      console.warn('[account_delete] apple_revocation_unavailable');
+      return NextResponse.json({ error: 'apple_revocation_unavailable', message: 'تعذّر إكمال طلب الحذف مؤقتًا. أعد المحاولة بعد قليل.' }, { status: 503, headers: noStoreHeaders });
+    }
+  }
   for (let attempt = 0; ; attempt++) {
     try {
       await prisma.$transaction(async tx => {
@@ -243,6 +259,7 @@ async function deleteProfile(request: Request) {
         await tx.$executeRaw`SELECT id FROM "Listing" WHERE "sellerId" = ${userId} ORDER BY id FOR UPDATE`;
         const current = await lockActiveProfileUser(tx, userId);
         if (!current) return;
+        if (JSON.stringify(current.appleAuthorizationTokens ?? null) !== authorizationSnapshot) throw new Error('apple_authorization_changed');
         const email = await getRegistrationIdentityEmail(tx, current);
         const deletedAt = new Date();
         const [protectedEvidence, financialRecord] = await Promise.all([
@@ -261,7 +278,7 @@ async function deleteProfile(request: Request) {
           },
         } });
         if (retained) {
-          await tx.user.update({ where: { id: userId }, data: { deletedAt } });
+          await tx.user.update({ where: { id: userId }, data: { deletedAt, appleAuthorizationTokens: Prisma.DbNull } });
           await tx.listing.updateMany({ where: { sellerId: userId, status: { not: 'deleted' } }, data: { status: 'deleted' } });
           await tx.conversation.updateMany({ where: { OR: [{ sellerId: userId }, { buyerId: userId }] }, data: { status: 'closed' } });
           await tx.pushSubscription.deleteMany({ where: { userId } });
@@ -272,6 +289,9 @@ async function deleteProfile(request: Request) {
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       break;
     } catch (error) {
+      if (error instanceof Error && error.message === 'apple_authorization_changed') {
+        return NextResponse.json({ error: 'apple_authorization_changed', message: 'تجدد تسجيل الدخول أثناء طلب الحذف. أعد المحاولة لإكمال الحذف بأمان.' }, { status: 409, headers: noStoreHeaders });
+      }
       const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
       const metadata = error && typeof error === 'object' && 'meta' in error ? error.meta : undefined;
       const sqlState = metadata && typeof metadata === 'object' && 'code' in metadata ? metadata.code : undefined;

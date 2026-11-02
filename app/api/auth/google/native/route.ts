@@ -1,6 +1,6 @@
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
-import { rejectOversizedRequest } from '@/lib/api/request-size';
+import { getRequestContentLength, rejectOversizedRequest } from '@/lib/api/request-size';
 import {
   persistGoogleUserRegistration,
   verifyGoogleIdentityToken,
@@ -15,14 +15,10 @@ import {
 const maxNativeGoogleRequestBytes = 12 * 1024;
 
 export async function POST(request: Request) {
-  const oversizedRequest = rejectOversizedRequest(
-    request,
-    maxNativeGoogleRequestBytes,
-    'Google native sign-in request body is too large.',
-  );
-
-  if (oversizedRequest) {
-    return oversizedRequest;
+  const declaredLength = getRequestContentLength(request);
+  if (declaredLength !== null && declaredLength > maxNativeGoogleRequestBytes) {
+    return (await rejectOversizedRequest(request, maxNativeGoogleRequestBytes,
+      'Google native sign-in request body is too large.'))!;
   }
 
   const rateLimitResponse = await enforceApiRateLimit(request, {
@@ -41,6 +37,11 @@ export async function POST(request: Request) {
       { status: 409, headers: noStoreHeaders },
     );
   }
+
+  const oversizedRequest = await rejectOversizedRequest(
+    request, maxNativeGoogleRequestBytes, 'Google native sign-in request body is too large.',
+  );
+  if (oversizedRequest) return oversizedRequest;
 
   const body = (await request.json().catch(() => null)) as {
     idToken?: unknown;

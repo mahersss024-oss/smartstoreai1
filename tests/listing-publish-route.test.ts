@@ -1,3 +1,4 @@
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import { beforeEach } from 'node:test';
 import { mockAllowedTextAnalysis } from './helpers/text-understanding';
@@ -21,7 +22,7 @@ test('manual category suggestion precedes photo-free save and preserves ownershi
   try {
     const headers = {
       Cookie: createSessionCookie({ id: 'photo-free-seller', email: 'photo-free@example.test' }).split(';')[0],
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
     };
     const suggestion = await suggestCategory(new Request('http://localhost/api/marketplace/listing-category', { method: 'POST', headers, body: JSON.stringify({ title: 'iPhone 15' }) }));
     assert.equal(suggestion.status, 200);
@@ -66,7 +67,7 @@ for (const category of ['animals', 'mobile_phones']) {
     t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
     const headers = {
       Cookie: createSessionCookie({ id: `manual-description-${category}`, email: `${category}@example.test` }).split(';')[0],
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
     };
     const description = category === 'animals' ? 'أغنام بصحة جيدة، التفاصيل موضحة في الوصف.' : 'جوال جديد لم يستخدم، وصف الحالة من البائع.';
     const response = await POST(new Request('http://localhost/api/marketplace/listings', {
@@ -97,7 +98,7 @@ test('accepted manual title category survives conflicting description analysis a
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
   const classify = t.mock.method(listingCategoryClassifier, 'suggest', async () => { throw new Error('Accepted manual categories must not be reclassified'); });
   const response = await POST(new Request('http://localhost/api/marketplace/listings', {
-    method: 'POST', headers: { 'Content-Type': 'application/json',
+    method: 'POST', headers: { 'Content-Type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
       Cookie: createSessionCookie({ id: 'manual-title-save', email: 'manual-title-save@example.test' }).split(';')[0] },
     body: JSON.stringify({ category: 'watches_accessories', autoCategory: false, title: 'نظارة شمسية',
       description: 'أبيع النظارة ولا أبيع الحاسب المذكور للمقارنة.',

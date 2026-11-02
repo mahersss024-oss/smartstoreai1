@@ -10,6 +10,7 @@ import { GET as getAuthSession } from '@/app/api/auth/session/route';
 import { persistGoogleUserRegistration } from '@/lib/auth/google';
 import { persistUserRegistration, selfAccountDeletionOperation } from '@/lib/auth/registration';
 import { acknowledgeReportNotification, listReportNotifications } from '@/lib/admin/report-notifications';
+import { processImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
 
@@ -338,38 +339,121 @@ test('database evidence verifies private image copies and original image deletio
   }
 });
 
-test('database disposal enforces closure, 180 days, explicit confirmation, holds, outstanding fees and administrator authority', { skip: !enabled }, async () => {
+test('owner disposal removes a late evidence upload even when an older cleanup finishes around it', { skip: !enabled, timeout: 30_000 }, async t => {
+  for (const overlapCleanup of [false, true]) await t.test(overlapCleanup ? 'in-flight cleanup cannot close a renewed receipt' : 'completed cleanup is reopened after late PUT', async t => {
+    const f = await fixture();
+    const env = { ...process.env };
+    Object.assign(process.env, {
+      SMARTSTORE_MARKETPLACE_STORE: 'database',
+      SMARTSTORE_ADMIN_EMAILS: f.seller.email,
+      SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://example.r2.cloudflarestorage.com',
+      SMARTSTORE_OBJECT_STORAGE_BUCKET: 'public-listings',
+      SMARTSTORE_EVIDENCE_STORAGE_BUCKET: 'private-evidence',
+      SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'test-only',
+      SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-only',
+    });
+    const objects = new Map<string, Uint8Array>();
+    let putStarted!: () => void;
+    let releasePut!: () => void;
+    const putReady = new Promise<void>(resolve => { putStarted = resolve; });
+    const mayPut = new Promise<void>(resolve => { releasePut = resolve; });
+    let cleanupStarted!: () => void;
+    let releaseCleanup!: () => void;
+    const cleanupReady = new Promise<void>(resolve => { cleanupStarted = resolve; });
+    const mayCompleteCleanup = new Promise<void>(resolve => { releaseCleanup = resolve; });
+    let delayDeleteResponse = false;
+    let imageId: string | undefined;
+    let copy: Promise<void> | undefined;
+    let processing: Promise<boolean> | undefined;
+    t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+      const key = new URL(String(url)).pathname;
+      assert.ok(key.startsWith('/private-evidence/'));
+      if (init?.method === 'PUT') {
+        putStarted();
+        await mayPut;
+        objects.set(key, new Uint8Array(init.body as Uint8Array));
+        return new Response(null, { status: 200 });
+      }
+      if (init?.method === 'DELETE') {
+        objects.delete(key);
+        if (delayDeleteResponse) { cleanupStarted(); await mayCompleteCleanup; }
+        return new Response(null, { status: 204 });
+      }
+      const value = objects.get(key);
+      return value ? new Response(new Uint8Array(value)) : new Response(null, { status: 404 });
+    });
+    try {
+      const source = `data:image/webp;base64,${Buffer.alloc(1024, 9).toString('base64')}`;
+      await prisma.listingImage.create({ data: { listingId: f.listing.id, originalUrl: source, displayUrl: source, thumbnailUrl: source, qualityScore: 90, status: 'approved' } });
+      const report = await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+      const evidence = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
+      const asset = await prisma.evidenceAsset.findFirstOrThrow({ where: { caseId: evidence.id } });
+      imageId = `evidence:${asset.id}`;
+      assert.equal(await prisma.evidenceAsset.count({ where: { caseId: evidence.id } }), 1);
+      copy = copyEvidenceAssets('Report', report.id);
+      await putReady;
+      const session = { user: { id: f.seller.id, email: f.seller.email }, issuedAt: Date.now(), expiresAt: Date.now() + 60_000 };
+      const result = await actOnCaseEvidence('Report', report.id, session, { action: 'evidence_dispose', reason: 'Dispose while upload is in flight', confirmation: 'إتلاف الأدلة' });
+      assert.equal(result?.status, 200);
+      assert.equal((await prisma.evidenceCase.findUniqueOrThrow({ where: { id: evidence.id } })).status, 'disposed');
+      assert.equal(await prisma.evidenceAsset.count({ where: { caseId: evidence.id } }), 0);
+      delayDeleteResponse = overlapCleanup;
+      processing = processImageObjectCleanup(imageId);
+      if (overlapCleanup) await cleanupReady;
+      else { assert.equal(await processing, true); assert.ok((await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } })).cleanupAt); }
+      releasePut();
+      await copy;
+      assert.equal(objects.size, 1, 'The paused upload finishes after disposal deleted the earlier object');
+      const reopened = await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } });
+      assert.equal(reopened.cleanupAt, null);
+      assert.equal(reopened.leaseToken, null);
+      assert.equal(reopened.leaseUntil, null);
+      releaseCleanup();
+      await processing;
+      assert.equal((await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } })).cleanupAt, null, 'An older completion cannot acknowledge a newer object write');
+      delayDeleteResponse = false;
+      assert.equal(await processImageObjectCleanup(imageId), true);
+      assert.equal(objects.size, 0);
+      assert.ok((await prisma.imageObjectCleanup.findUniqueOrThrow({ where: { imageId } })).cleanupAt);
+      assert.equal(await prisma.evidenceAsset.count({ where: { caseId: evidence.id } }), 0);
+    } finally {
+      releasePut(); releaseCleanup();
+      await Promise.allSettled([copy, processing].filter(Boolean));
+      t.mock.restoreAll();
+      await cleanup(f);
+      if (imageId) await prisma.imageObjectCleanup.deleteMany({ where: { imageId } });
+      for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];
+      Object.assign(process.env, env);
+    }
+  });
+});
+
+test('individual disposal requires the configured owner and confirmation but permits an open held case with outstanding fees', { skip: !enabled }, async () => {
   const f = await fixture();
   const previousStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const previousOwners = process.env.SMARTSTORE_ADMIN_EMAILS;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
-  process.env.SMARTSTORE_ADMIN_EMAILS = 'evidence-owner@example.test';
-  const session = { user: { id: 'evidence-owner', email: 'evidence-owner@example.test', role: 'admin' }, issuedAt: Date.now(), expiresAt: Date.now() + 60_000 };
+  process.env.SMARTSTORE_ADMIN_EMAILS = f.seller.email;
+  const session = { user: { id: f.seller.id, email: f.seller.email, role: 'admin' }, issuedAt: Date.now(), expiresAt: Date.now() + 60_000 };
   const action = { action: 'evidence_dispose', reason: 'Synthetic test disposal', confirmation: 'إتلاف الأدلة' };
   try {
     const report = await prisma.report.create({ data: { listingId: f.listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
     const c = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
     assert.equal((await actOnCaseEvidence('Report', report.id, { ...session, user: { ...session.user, email: 'not-owner@example.test' } }, action))?.status, 403);
     assert.equal((await actOnCaseEvidence('Report', report.id, session, { ...action, confirmation: '' }))?.status, 400);
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 409);
-    await prisma.report.update({ where: { id: report.id }, data: { status: 'reviewed' } });
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 409);
-    await prisma.evidenceCase.update({ where: { id: c.id }, data: { retainUntil: new Date(Date.now() - 1000), closedAt: new Date(Date.now() - 181 * 86_400_000), legalHold: true } });
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 409);
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, { action: 'evidence_release', reason: 'Test release of hold' }))?.status, 200);
+    assert.equal((await actOnCaseEvidence('Report', report.id, session, { ...action, reason: '' }))?.status, 400);
+    await prisma.evidenceCase.update({ where: { id: c.id }, data: { legalHold: true, captureStatus: 'incomplete', retainUntil: new Date(Date.now() + 180 * 86_400_000) } });
     const commission = await prisma.commission.create({ data: { listingId: f.listing.id, sellerId: f.seller.id } });
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 409);
-    await prisma.commission.update({ where: { id: commission.id }, data: { status: 'paid' } });
-    const extension = await actOnCaseEvidence('Report', report.id, session, { action: 'evidence_extend', days: 180, reason: 'Test retention extension' });
-    assert.equal(extension?.status, 200);
-    assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 409);
-    await prisma.evidenceCase.update({ where: { id: c.id }, data: { retainUntil: new Date(Date.now() - 1000) } });
+    assert.equal((await prisma.report.findUniqueOrThrow({ where: { id: report.id } })).status, 'open');
     assert.equal((await actOnCaseEvidence('Report', report.id, session, action))?.status, 200);
     const disposed = await prisma.evidenceCase.findUniqueOrThrow({ where: { id: c.id } });
     assert.equal(disposed.status, 'disposed');
     assert.deepEqual(disposed.snapshot, {});
     assert.deepEqual(disposed.participantIds, []);
     assert.equal(await prisma.evidenceEvent.count({ where: { caseId: c.id } }), 1);
+    assert.ok(await prisma.adminAuditLog.count({ where: { targetId: c.id, metadata: { path: ['operation'], equals: 'case.owner_disposal_authorized' } } }));
+    assert.equal((await prisma.commission.findUniqueOrThrow({ where: { id: commission.id } })).status, 'pending_amount');
+    assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: f.listing.id } })).status, 'published');
     await prisma.report.delete({ where: { id: report.id } });
     await prisma.evidenceEvent.deleteMany({ where: { caseId: c.id } });
     await prisma.evidenceCase.delete({ where: { id: c.id } });

@@ -35,7 +35,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   });
   if (rateLimited) return rateLimited;
 
-  const oversized = rejectOversizedRequest(request, 4 * 1024);
+  const oversized = await rejectOversizedRequest(request, 4 * 1024);
   if (oversized) return oversized;
 
   const payload = await request.json().catch(() => null);

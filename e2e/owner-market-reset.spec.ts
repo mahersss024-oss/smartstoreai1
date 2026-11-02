@@ -15,7 +15,7 @@ function preview(expiresAt = new Date(Date.now() + 600_000).toISOString()) {
       { kind: 'MobilePushToken', label: 'تسجيلات إشعارات الجوال', count: 2, mode: 'delete' },
       { kind: 'ImageObjectCleanup', label: 'مهام تنظيف الملفات', count: 2, mode: 'cleanup' },
     ],
-    preserved: { users: 9, profileImages: 6 },
+    preserved: { users: 9, profileImages: 6, accountSecurityRecords: 2 },
     blockers: [],
     protectedData: { evidenceCases: 3, heldEvidenceCases: 1, commissions: 2 },
     maxRows: 50_000, totalRows: 26, canExecute: true,
@@ -91,6 +91,7 @@ test('owner reset requires an explicit preview and every confirmation before one
     expect(calls.previews).toBe(0);
     await load.click();
     await expect(panel.getByRole('status')).toContainText('حساب مستخدم');
+    await expect(panel.getByRole('status')).toContainText('سجلات أمان الحسابات');
     const execute = panel.getByRole('button', { name: 'حذف بيانات السوق نهائيًا', exact: true });
     await expect(execute).toBeDisabled();
     await panel.locator('input[name="marketResetReason"]').fill(`  ${reason}  `);

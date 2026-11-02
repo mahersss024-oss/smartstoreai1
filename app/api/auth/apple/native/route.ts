@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
-import { rejectOversizedRequest } from '@/lib/api/request-size';
+import { getRequestContentLength, rejectOversizedRequest } from '@/lib/api/request-size';
 import { verifyAppleIdentityToken } from '@/lib/auth/apple';
 import { consumeAppleNativeChallenge, exchangeAppleNativeCode, isAppleNativeAuthConfigured, parseAppleNativeChallenge } from '@/lib/auth/apple-native';
 import { normalizeAuthEmail } from '@/lib/auth/identity';
@@ -18,12 +18,14 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const oversized = rejectOversizedRequest(request, 24 * 1024);
-  if (oversized) return oversized;
+  const declaredLength = getRequestContentLength(request);
+  if (declaredLength !== null && declaredLength > 24 * 1024) return (await rejectOversizedRequest(request, 24 * 1024))!;
   const limited = await enforceApiRateLimit(request, { namespace: 'apple_native_auth', maxRequests: 30, windowMs: 60_000 });
   if (limited) return limited;
   if (!getCommissionAgreement(request)) return Response.json({ error: 'commission_agreement_required' }, { status: 409, headers: noStoreHeaders });
   if (!isAppleNativeAuthConfigured()) return Response.json({ error: 'apple_native_unavailable' }, { status: 503, headers: noStoreHeaders });
+  const oversized = await rejectOversizedRequest(request, 24 * 1024);
+  if (oversized) return oversized;
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'invalid_request' }, { status: 400, headers: noStoreHeaders });
   const agreementToken = getCookieValue(request, 'smartstore_commission_agreement') ?? request.headers.get('x-souq-hamad-commission-agreement')!;
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
     }
     const user = await persistUserRegistration(request, {
       id: `apple:${identity.sub}`, email: normalizeAuthEmail(identity.email), name: parsed.data.fullName,
-    });
+    }, exchanged.authorization);
     const sessionToken = createSignedSession(user);
     return Response.json({ authenticated: true, user, sessionToken, expiresAt: parseSignedSession(sessionToken)!.expiresAt }, { headers: noStoreHeaders });
   } catch (error) {

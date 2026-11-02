@@ -83,7 +83,7 @@ async function cleanup(request: Request): Promise<Response> {
   const owner = access(request); if ('response' in owner) return owner.response;
   const limited = await enforceApiRateLimit(request, { namespace: 'owner_maintenance_cleanup', actorId: owner.session.user.id, maxRequests: 6, windowMs: 60_000 });
   if (limited) return noStoreResponse(limited);
-  const oversized = rejectOversizedRequest(request, 4096); if (oversized) return oversized;
+  const oversized = await rejectOversizedRequest(request, 4096); if (oversized) return oversized;
   const body: unknown = await request.json().catch(() => null);
   if (body && typeof body === 'object' && 'action' in body && body.action === 'market_reset') {
     const reset = resetSchema.safeParse(body);

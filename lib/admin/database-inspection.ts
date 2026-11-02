@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { getActiveMigrationTriggers, isPrismaTableType } from './database-compatibility-utils';
+import { compareDatabaseSchema, type CatalogColumn, type CatalogIndex, type CatalogForeignKey, type CatalogEnum } from './database-schema-contract';
 
 type DmmfModel = (typeof Prisma.dmmf.datamodel.models)[number];
 type DmmfField = DmmfModel['fields'][number];
@@ -144,6 +145,7 @@ export async function getDatabaseTablePage(modelName: string, page: number, page
 export async function getDatabaseCompatibility() {
   const models = Prisma.dmmf.datamodel.models;
   const migrations = await migrationFiles();
+  const schema = await readFile(path.join(process.cwd(), 'prisma', 'schema.prisma'), 'utf8');
   const expectedColumns = new Map(models.map((model) => [
     modelTable(model), scalarFields(model).map(dbField),
   ]));
@@ -151,8 +153,9 @@ export async function getDatabaseCompatibility() {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SET TRANSACTION READ ONLY`;
     await tx.$executeRaw`SET LOCAL statement_timeout = '7000ms'`;
-    const actualColumns = await tx.$queryRaw<Array<{ table_name: string; column_name: string; data_type: string; udt_name: string }>>`
-      SELECT table_name, column_name, data_type, udt_name
+    const actualColumns = await tx.$queryRaw<CatalogColumn[]>`
+      SELECT table_name, column_name, data_type, udt_name, is_nullable,
+        character_maximum_length, numeric_precision, numeric_scale, datetime_precision
       FROM information_schema.columns
       WHERE table_schema = current_schema()
       ORDER BY table_name, ordinal_position
@@ -195,14 +198,42 @@ export async function getDatabaseCompatibility() {
       SELECT p.proname AS name FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = current_schema() AND p.prokind IN ('f', 'p')
     `;
-    const actualTriggers = await tx.$queryRaw<Array<{ name: string; table_name: string }>>`
-      SELECT t.tgname AS name, c.relname AS table_name FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+    const actualTriggers = await tx.$queryRaw<Array<{ name: string; table_name: string; enabled: string }>>`
+      SELECT t.tgname AS name, c.relname AS table_name, t.tgenabled::text AS enabled FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = current_schema() AND NOT t.tgisinternal
     `;
     const actualExtensions = await tx.$queryRaw<Array<{ name: string }>>`
       SELECT e.extname AS name FROM pg_extension e ORDER BY e.extname
     `;
+    const actualIndexes = await tx.$queryRaw<CatalogIndex[]>`
+      SELECT c.relname AS table_name, i.indisprimary AS is_primary, i.indisunique AS is_unique,
+        (i.indisvalid AND i.indisready) AS is_valid, i.indpred IS NOT NULL AS is_partial,
+        ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum
+          WHERE k.position<=i.indnkeyatts ORDER BY k.position) AS columns
+      FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname=current_schema() AND (i.indisprimary OR i.indisunique)
+    `;
+    const actualForeignKeys = await tx.$queryRaw<CatalogForeignKey[]>`
+      SELECT c.relname AS table_name, r.relname AS referenced_table, f.confdeltype::text AS delete_action,
+        f.confupdtype::text AS update_action, f.convalidated AS validated,
+        ARRAY(SELECT a.attname::text FROM unnest(f.conkey) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum ORDER BY k.position) AS columns,
+        ARRAY(SELECT a.attname::text FROM unnest(f.confkey) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid=r.oid AND a.attnum=k.attnum ORDER BY k.position) AS referenced_columns
+      FROM pg_constraint f JOIN pg_class c ON c.oid=f.conrelid JOIN pg_class r ON r.oid=f.confrelid
+      JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_namespace rn ON rn.oid=r.relnamespace
+      WHERE n.nspname=current_schema() AND rn.nspname=current_schema() AND f.contype='f'
+    `;
+    const actualEnums = await tx.$queryRaw<CatalogEnum[]>`
+      SELECT t.typname AS name, array_agg(e.enumlabel::text ORDER BY e.enumsortorder) AS values
+      FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace JOIN pg_enum e ON e.enumtypid=t.oid
+      WHERE n.nspname=current_schema() GROUP BY t.typname
+    `;
+    const contract = compareDatabaseSchema(models, Prisma.dmmf.datamodel.enums, schema, {
+      columns: actualColumns, indexes: actualIndexes, foreignKeys: actualForeignKeys, enums: actualEnums,
+    });
     const expectedFunctions = new Set<string>();
     const expectedTriggers = getActiveMigrationTriggers(migrations.sql);
     const expectedExtensions = new Set<string>();
@@ -215,6 +246,8 @@ export async function getDatabaseCompatibility() {
     const presentExtensions = new Set(actualExtensions.map((row) => row.name));
     const missingFunctions = [...expectedFunctions].filter((name) => !presentFunctions.has(name));
     const missingTriggers = [...expectedTriggers].filter((name) => !presentTriggers.has(name));
+    const disabledTriggers = actualTriggers.filter(trigger => expectedTriggers.has(`${trigger.table_name}.${trigger.name}`) && !['O', 'A'].includes(trigger.enabled))
+      .map(trigger => `${trigger.table_name}.${trigger.name}`);
     const missingExtensions = [...expectedExtensions].filter((name) => !presentExtensions.has(name));
     return {
       checkedAt: new Date().toISOString(),
@@ -228,6 +261,7 @@ export async function getDatabaseCompatibility() {
         unknownApplied: unknownAppliedMigrations,
       },
       schema: {
+        ...contract,
         tablesChecked: tables.length,
         missingTables: tables.filter((table) => table.missingTable).map((table) => table.table),
         missingColumns: tables.flatMap((table) => table.missingColumns.map((column) => `${table.table}.${column}`)),
@@ -239,6 +273,7 @@ export async function getDatabaseCompatibility() {
         missingFunctions,
         expectedTriggers: [...expectedTriggers].sort(),
         missingTriggers,
+        disabledTriggers,
         expectedExtensions: [...expectedExtensions].sort(),
         missingExtensions,
       },

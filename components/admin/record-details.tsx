@@ -205,6 +205,8 @@ export function evidenceEventLabel(action: string) {
     'notification.viewed': 'الاطلاع على إشعار البلاغ للجميع',
     'case.opened': 'فتح القضية',
     'case.viewed': 'عرض القضية',
+    'case.owner_disposal_authorized': 'اعتماد المالك إتلاف الأدلة',
+    'case.disposed': 'إتلاف الأدلة',
     'asset.viewed': 'عرض صورة محفوظة',
     'asset.stored': 'حفظ صورة',
     'asset.failed': 'تعذّر حفظ صورة',

@@ -147,7 +147,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return rateLimitResponse;
   }
 
-  const oversized = rejectOversizedRequest(
+  const oversized = await rejectOversizedRequest(
     request,
     maxAdminUserUpdateBytes,
     'Admin user update request body is too large.',

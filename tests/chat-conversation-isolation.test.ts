@@ -1,3 +1,4 @@
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import test, { beforeEach } from 'node:test';
 import { parseChatConversationId } from '@/lib/chat/conversation';
@@ -17,7 +18,7 @@ beforeEach(t => { resetMarketplaceStoreForTests(); mockAllowedTextAnalysis(t); }
 
 function request(conversationId: string, reset = false) {
   return new Request(`http://localhost/api/chat${reset ? '/reset' : ''}`, {
-    method: 'POST', headers: { cookie: createSessionCookie(user), 'content-type': 'application/json',
+    method: 'POST', headers: { cookie: createSessionCookie(user), 'content-type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
       ...(reset ? { 'x-chat-conversation-id': conversationId } : {}) },
     body: reset ? undefined : JSON.stringify({ chatOwnerId: user.id, chatConversationId: conversationId,
       messages: [{ id: crypto.randomUUID(), role: 'user', parts: [{ type: 'text', text: 'هاتف' }] }] }),

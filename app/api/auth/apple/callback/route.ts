@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
-import { rejectOversizedRequest } from '@/lib/api/request-size';
+import { getRequestContentLength, rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAppBaseUrl } from '@/lib/app-url';
 import {
   createAppleClientSecret,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/apple';
 import { normalizeAuthEmail } from '@/lib/auth/identity';
 import { persistUserRegistration } from '@/lib/auth/registration';
+import { appleGrantFromTokenResponse } from '@/lib/auth/apple-authorization';
 import {
   createMobileAuthCallbackUrl,
   createMobileAuthTicket,
@@ -28,6 +29,8 @@ import {
 
 type AppleTokenResponse = {
   id_token?: string;
+  refresh_token?: string;
+  access_token?: string;
   error?: string;
 };
 
@@ -95,7 +98,17 @@ async function readCallbackParams(request: Request) {
 }
 
 async function handleAppleCallback(request: Request) {
-  const oversizedRequest = rejectOversizedRequest(
+  const declaredLength = getRequestContentLength(request);
+  if (declaredLength !== null && declaredLength > maxAppleCallbackRequestBytes) {
+    return (await rejectOversizedRequest(request, maxAppleCallbackRequestBytes,
+      'Apple sign-in callback request body is too large.'))!;
+  }
+  const rateLimitResponse = await enforceApiRateLimit(request, {
+    namespace: 'auth_apple_callback', maxRequests: 60, windowMs: 60_000,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
+  const oversizedRequest = await rejectOversizedRequest(
     request,
     maxAppleCallbackRequestBytes,
     'Apple sign-in callback request body is too large.',
@@ -123,21 +136,9 @@ async function handleAppleCallback(request: Request) {
     return new Response('Invalid Apple sign-in state.', { status: 400 });
   }
 
-  const rateLimitResponse = await enforceApiRateLimit(request, {
-    namespace: 'auth_apple_callback',
-    maxRequests: 60,
-    windowMs: 60_000,
-  });
-
-  if (rateLimitResponse) {
-    return rateLimitResponse;
-  }
-
   if (!isAppleAuthConfigured()) {
     console.warn('[apple_auth] callback_unavailable=missing_config');
-    return new Response('Apple sign-in is temporarily unavailable.', {
-      status: 503,
-    });
+    return new Response('Apple sign-in is temporarily unavailable.', { status: 503 });
   }
 
   const clientId = getAppleClientId();
@@ -188,9 +189,11 @@ async function handleAppleCallback(request: Request) {
     name,
   };
   let registeredUser = user;
+  const authorization = appleGrantFromTokenResponse(tokenJson, clientId, identity.sub);
+  if (!authorization && process.env.NODE_ENV === 'production') return new Response('Apple token exchange failed.', { status: 502 });
 
-    try {
-    registeredUser = await persistUserRegistration(request, user);
+  try {
+    registeredUser = await persistUserRegistration(request, user, authorization);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'UnknownError';
 

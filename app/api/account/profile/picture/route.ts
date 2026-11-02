@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     return rateLimitResponse;
   }
 
-  const oversized = rejectOversizedRequest(
+  const oversized = await rejectOversizedRequest(
     request,
     maxProfileImageRequestBytes,
     'Profile picture upload request body is too large.',

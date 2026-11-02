@@ -3,6 +3,7 @@ import { parseJsonEventStream, uiMessageChunkSchema } from 'ai';
 
 import { createSessionCookie } from '../lib/auth/session';
 import { chatServiceUnavailableMessage } from '../lib/chat-response-safety';
+import { aiConsentHeader, aiSharingConsent } from '../lib/platform/ai-consent';
 import { createPlatformHelpCompletion } from './testing/platform-help-model-fixture.mjs';
 
 type DeepseekProviderModule = typeof import('../agent/deepseek-provider');
@@ -61,6 +62,9 @@ const providerMaxInFlight = Number.parseInt(
 );
 const providerStatus = Number.parseInt(process.env.AI_LOAD_PROVIDER_STATUS ?? '200', 10);
 const mode = process.env.AI_LOAD_MODE ?? 'mock';
+if (mode !== 'mock' && process.env.AI_LOAD_SHARING_CONSENT !== aiSharingConsent.version) {
+  throw new Error(`AI load with a live provider requires AI_LOAD_SHARING_CONSENT=${aiSharingConsent.version}. Only use consenting test-account data.`);
+}
 const realFetch = globalThis.fetch.bind(globalThis);
 const originalConsoleLog = console.log.bind(console);
 let providerCalls = 0;
@@ -156,6 +160,7 @@ function buildRequest(index: number, signal: AbortSignal) {
     signal,
     headers: {
       'content-type': 'application/json',
+      [aiConsentHeader]: aiSharingConsent.version,
       cookie,
       'x-forwarded-for': `10.${Math.floor(index / 65536) % 255}.${Math.floor(index / 256) % 255}.${index % 255}`,
     },

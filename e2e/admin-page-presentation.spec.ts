@@ -122,7 +122,7 @@ test('evidence remains readable and original technical values and write payloads
   await page.getByText('إدارة الاحتفاظ والإتلاف', { exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'إتلاف الأدلة', exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await page
     .getByLabel('سبب الإجراء', { exact: true })
     .fill('سبب إداري موثق للاختبار');
@@ -131,7 +131,7 @@ test('evidence remains readable and original technical values and write payloads
   ).toBeEnabled();
   await expect(
     page.getByRole('button', { name: 'إتلاف الأدلة', exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath('evidence-readable.png'),
     fullPage: true,

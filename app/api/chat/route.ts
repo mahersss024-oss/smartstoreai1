@@ -8,6 +8,7 @@ import {
 } from 'ai';
 
 import { createChatAgent } from '@/agent/chat-agent';
+import { aiConsentRequiredResponse, hasAiSharingConsent } from '@/lib/platform/ai-consent';
 import { modelReviewImageFingerprint, recordModelReview } from '@/lib/admin/model-review';
 import {
   getDeepseekApiKey,
@@ -50,7 +51,7 @@ import {
   stripImageAttachmentsFromModelMessages,
 } from '@/agent/vision-messages';
 import type { AppLanguage } from '@/app/i18n';
-import { rejectOversizedRequest } from '@/lib/api/request-size';
+import { getRequestContentLength, rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
 import { getSafeAssistantText, chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
 import { customerLanguageInstructions, resolveCustomerLanguage } from '@/lib/customer-language';
@@ -380,7 +381,7 @@ function buildAuthSystemMessage(session: ReturnType<typeof getAuthSession>) {
 
   return {
     role: 'system',
-    content: `Authenticated user context: signed_in=true, user_id=${session.user.id}, email=${session.user.email}. The user has already passed sign-in; do not ask again. Authentication or chat confirmation does not authorize sensitive actions. Tools may prepare unpublished drafts only; direct the user to perform all sensitive actions themselves in the marketplace UI.`,
+    content: 'Authenticated user context: signed_in=true. The user has already passed sign-in; do not ask again. Authentication or chat confirmation does not authorize sensitive actions. Tools receive the verified account separately and may prepare unpublished drafts only; direct the user to perform all sensitive actions themselves in the marketplace UI.',
   } satisfies ModelMessage;
 }
 
@@ -920,7 +921,24 @@ ${customerLanguageInstructions}`,
 }
 
 export async function POST(request: Request) {
-  const oversizedRequestResponse = rejectOversizedRequest(
+  const declaredLength = getRequestContentLength(request);
+  if (declaredLength !== null && declaredLength > maxChatRequestBytes) {
+    return (await rejectOversizedRequest(request, maxChatRequestBytes,
+      'حجم طلب المحادثة أكبر من الحد المسموح.'))!;
+  }
+
+  const session = getAuthSession(request);
+  if (!session) return createTextUIResponse(getAuthRequiredResponse(getRequestLanguage(undefined)));
+  if (!hasAiSharingConsent(request)) return aiConsentRequiredResponse();
+  const retryAfterSeconds = await checkChatRateLimit(`user:${session.user.id}`);
+  if (retryAfterSeconds !== null) {
+    return new Response('Too many requests. Please try again shortly.', {
+      status: 429,
+      headers: { 'Retry-After': retryAfterSeconds.toString() },
+    });
+  }
+
+  const oversizedRequestResponse = await rejectOversizedRequest(
     request,
     maxChatRequestBytes,
     'حجم طلب المحادثة أكبر من الحد المسموح.',
@@ -977,11 +995,6 @@ export async function POST(request: Request) {
   const preliminaryUserRequest = getLatestUserRequest(filteredMessages);
   const latestUserMessage = [...filteredMessages].reverse().find(message => isChatMessage(message) && message.role === 'user') as { id?: unknown } | undefined;
   const requestKey = typeof latestUserMessage?.id === 'string' && latestUserMessage.id.length <= 200 ? latestUserMessage.id : undefined;
-  const session = getAuthSession(request);
-
-  if (!session) {
-    return createTextUIResponse(getAuthRequiredResponse(language));
-  }
   if (body.chatOwnerId !== undefined && body.chatOwnerId !== session.user.id) {
     return new Response('تغيّر حساب الدخول. حدّث الصفحة لبدء محادثة تخص حسابك الحالي.', { status: 409 });
   }
@@ -995,17 +1008,6 @@ export async function POST(request: Request) {
   }
   if (body.beginDraftWithHamad !== undefined && (typeof body.beginDraftWithHamad !== 'boolean' || (body.beginDraftWithHamad && body.creationMethod !== 'chat'))) {
     return new Response('اختيار طريقة إنشاء الإعلان غير صالح.', { status: 400 });
-  }
-
-  const retryAfterSeconds = await checkChatRateLimit(`user:${session.user.id}`);
-
-  if (retryAfterSeconds !== null) {
-    return new Response('Too many requests. Please try again shortly.', {
-      status: 429,
-      headers: {
-        'Retry-After': retryAfterSeconds.toString(),
-      },
-    });
   }
 
   const missingApiKeys = getMissingApiKeys();

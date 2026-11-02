@@ -8,6 +8,7 @@ import type { AuthSession } from '@/lib/auth/session';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { createAdminAuditLog } from '@/lib/admin/audit';
 import { deleteEvidenceObject, readEvidenceObject, readEvidenceSource, storeEvidenceObject } from './object-storage';
+import { enqueueEvidenceObjectCleanup } from './image-object-cleanup';
 
 export type EvidenceSource = 'Report' | 'UserReport';
 const activeCases = { status: { not: 'disposed' } };
@@ -35,8 +36,16 @@ async function lockCaseEntities(tx: Prisma.TransactionClient, sourceType: Eviden
 }
 
 export async function lockUserEvidenceEntities(tx: Prisma.TransactionClient, userId: string) {
-  const listings = await tx.listing.findMany({ where: { sellerId: userId }, select: { id: true } });
-  const keys = [`user:${userId}`, ...listings.map(listing => `listing:${listing.id}`)].sort();
+  const [listings, conversations] = await Promise.all([
+    tx.listing.findMany({ where: { sellerId: userId }, select: { id: true } }),
+    tx.conversation.findMany({ where: { OR: [{ buyerId: userId }, { sellerId: userId }] }, select: { listingId: true } }),
+  ]);
+  // Buyer deletion closes/cascades conversations on listings it does not own.
+  // Lock those listing keys before the User row too, matching message and
+  // evidence triggers, so a sender never waits on that row while deletion
+  // waits on the sender's listing key.
+  const keys = [...new Set([`user:${userId}`, ...listings.map(listing => `listing:${listing.id}`),
+    ...conversations.map(conversation => `listing:${conversation.listingId}`)])].sort();
   for (const key of keys) await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
 }
 
@@ -79,10 +88,26 @@ export async function copyEvidenceAssets(sourceType: EvidenceSource, sourceId: s
       await storeEvidenceObject(asset.objectKey, data, mediaType);
       const stored = await readEvidenceObject(asset.objectKey);
       if (evidenceHash(stored) !== hash) throw new Error('evidence_checksum_mismatch');
-      await prisma.evidenceAsset.update({ where: { id: asset.id }, data: { status: 'stored', sha256: hash, byteLength: data.length, mediaType, lastError: null } });
+      await prisma.$transaction(async tx => {
+        await lockEvidenceWrites(tx);
+        const current = await tx.evidenceCase.findUnique({ where: { id: evidenceCase.id }, select: { status: true } });
+        if (!current || ['disposed', 'disposing'].includes(current.status)) {
+          // The owner may dispose while an object transfer is in flight. Reopen
+          // the durable cleanup receipt after that transfer, even if a prior
+          // cleanup already ran before the late write completed.
+          await enqueueEvidenceObjectCleanup(tx, asset);
+          return;
+        }
+        await tx.evidenceAsset.updateMany({ where: { id: asset.id, status: 'copying' }, data: { status: 'stored', sha256: hash, byteLength: data.length, mediaType, lastError: null } });
+      });
     } catch (error) {
       const code = error instanceof Error && /^[a-z_]+$/.test(error.message) ? error.message : 'evidence_copy_failed';
-      await prisma.evidenceAsset.update({ where: { id: asset.id }, data: { status: 'failed', lastError: code } });
+      await prisma.$transaction(async tx => {
+        await lockEvidenceWrites(tx);
+        const current = await tx.evidenceCase.findUnique({ where: { id: evidenceCase.id }, select: { status: true } });
+        if (!current || ['disposed', 'disposing'].includes(current.status)) await enqueueEvidenceObjectCleanup(tx, asset);
+        else await tx.evidenceAsset.updateMany({ where: { id: asset.id, status: 'copying' }, data: { status: 'failed', lastError: code } });
+      });
     }
   }
   await prisma.$transaction(async tx => {
@@ -168,9 +193,16 @@ export async function actOnCaseEvidence(sourceType: EvidenceSource, sourceId: st
     if (current.status === 'disposed') return { error: 'evidence_disposed', status: 409 };
     if (current.status === 'disposing' && action !== 'evidence_dispose') return { error: 'evidence_disposal_in_progress', status: 409 };
     if (action === 'evidence_dispose') {
-      const relatedOpen = await tx.evidenceCase.count({ where: { status: 'open', OR: [{ id: current.id }, ...(current.listingId ? [{ listingId: current.listingId }] : []), { participantIds: { hasSome: current.participantIds } }] } });
-      const outstanding = current.listingId ? await tx.commission.count({ where: { listingId: current.listingId, status: { not: 'paid' } } }) : 0;
-      if (relatedOpen || outstanding || current.legalHold || !current.closedAt || !current.retainUntil || current.retainUntil > new Date() || current.captureStatus !== 'complete') return { error: 'evidence_retention_protected', status: 409 };
+      // This action is restricted above to the configured platform owner and
+      // requires the existing reason and explicit destructive confirmation.
+      // Retention and source-record protection remain unchanged for all other
+      // actions and actors. Each object gets a restart-safe cleanup receipt.
+      const assets = await tx.evidenceAsset.findMany({ where: { caseId: current.id } });
+      for (const asset of assets) await enqueueEvidenceObjectCleanup(tx, asset);
+      await caseEvent(tx, current.id, session.user.id, 'case.owner_disposal_authorized', {
+        reason, previousStatus: current.status, previousCaptureStatus: current.captureStatus,
+        legalHold: current.legalHold, retainUntil: current.retainUntil?.toISOString() ?? null,
+      });
       await tx.evidenceCase.update({ where: { id: current.id }, data: { status: 'disposing' } });
     } else if (action === 'evidence_extend') {
       const base = Math.max(Date.now(), current.retainUntil?.getTime() ?? 0);

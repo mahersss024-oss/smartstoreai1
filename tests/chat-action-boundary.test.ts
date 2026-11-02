@@ -94,7 +94,7 @@ test('draft image writes recheck status inside the serializable transaction', as
     run: (tx: unknown) => Promise<unknown>, options: { isolationLevel: string },
   ) => {
     assert.equal(options.isolationLevel, Prisma.TransactionIsolationLevel.Serializable);
-    return run({ listing: { findUnique: async () => databaseRecord('published') },
+    return run({ $executeRaw: async () => 1, listing: { findUnique: async () => databaseRecord('published') },
       listingImage: { create: async () => { inserts++; } } });
   } });
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';

@@ -92,7 +92,7 @@ export async function PATCH(request: Request) {
     windowMs: 60_000,
   });
   if (limited) return limited;
-  const oversized = rejectOversizedRequest(request, 2048);
+  const oversized = await rejectOversizedRequest(request, 2048);
   if (oversized) return oversized;
   const parsed = acknowledgeSchema.safeParse(
     await request.json().catch(() => null),

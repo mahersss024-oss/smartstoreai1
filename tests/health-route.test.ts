@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { prisma } from '@/lib/db/prisma';
+import { mockDatabaseMethod } from './helpers/mock-database-method';
 
 import { GET } from '@/app/api/health/route';
 import {
@@ -30,6 +32,32 @@ test('health endpoint never caches its response', async () => {
     response.headers.get('cache-control') ?? '',
     /no-store/,
   );
+});
+
+test('database health checks do not query or wait for visitor analytics', async (t) => {
+  const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
+  t.after(() => {
+    if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE;
+    else process.env.SMARTSTORE_MARKETPLACE_STORE = previous;
+  });
+  let analyticsCalls = 0;
+  let available = true;
+  mockDatabaseMethod(t, prisma.siteVisitDaily, 'findUnique', async () => { analyticsCalls++; throw new Error('analytics stalled'); });
+  mockDatabaseMethod(t, prisma.siteVisitDaily, 'findMany', async () => { analyticsCalls++; throw new Error('analytics stalled'); });
+  mockDatabaseMethod(t, prisma, '$queryRaw', async () => {
+    if (!available) throw new Error('database unavailable');
+    return [{ '?column?': 1 }];
+  });
+  const healthy = await GET();
+  assert.equal(healthy.status, 200);
+  assert.equal((await healthy.json()).checks.database, 'ok');
+  assert.equal(analyticsCalls, 0);
+  available = false;
+  const unavailable = await GET();
+  assert.equal(unavailable.status, 503);
+  assert.equal((await unavailable.json()).checks.database, 'error');
+  assert.equal(analyticsCalls, 0);
 });
 
 test('health endpoint exposes runtime metrics only when explicitly enabled', async () => {

@@ -1,3 +1,4 @@
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -114,7 +115,7 @@ test('rejects oversized chat bodies before model or auth work', async () => {
     new Request('http://localhost/api/chat', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
+        'content-type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
         'content-length': String(141 * 1024 * 1024),
       },
       body: JSON.stringify({ messages: [] }),
@@ -136,7 +137,7 @@ test('hides missing AI provider configuration details from chat users', async ()
       new Request('http://localhost/api/chat', {
         method: 'POST',
         headers: {
-          'content-type': 'application/json',
+          'content-type': 'application/json', [aiConsentHeader]: aiSharingConsent.version,
           cookie: createSessionCookie({
             id: 'google:chat-config-user',
             email: 'chat-config@example.com',

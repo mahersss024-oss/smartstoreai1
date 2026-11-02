@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     return rateLimitResponse;
   }
 
-  const oversizedRequestResponse = rejectOversizedRequest(
+  const oversizedRequestResponse = await rejectOversizedRequest(
     request,
     maxMobilePushRequestBytes,
   );
@@ -105,7 +105,7 @@ export async function DELETE(request: Request) {
     return rateLimitResponse;
   }
 
-  const oversizedRequestResponse = rejectOversizedRequest(
+  const oversizedRequestResponse = await rejectOversizedRequest(
     request,
     maxMobilePushRequestBytes,
   );

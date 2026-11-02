@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { createSessionCookie } from '@/lib/auth/session';
 
-for (const role of ['admin', 'moderator']) {
+for (const role of ['owner', 'admin', 'moderator']) {
   test(`existing report details expose evidence and preserve ${role} permissions`, async ({ page, baseURL }, testInfo) => {
-    const user = { id: 'evidence-admin', email: 'evidence-admin@example.test', role };
+    const user = { id: 'evidence-admin', email: role === 'owner' ? 'browser-owner@example.test' : 'evidence-admin@example.test', role };
     const cookie = createSessionCookie(user).split(';')[0].split('=');
     await page.context().addCookies([{ name: cookie[0], value: cookie[1], url: baseURL! }]);
     await page.route('**/api/auth/session', route => route.fulfill({ json: { authenticated: true, user } }));
@@ -26,12 +26,18 @@ for (const role of ['admin', 'moderator']) {
     await expect(page.getByText('الوصف الأصلي وقت البلاغ')).toBeVisible();
     await page.getByText('المحادثة المحفوظة', { exact: true }).click();
     await expect(page.getByText('نص محفوظ من المحادثة', { exact: true })).toBeVisible();
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'owner') {
       await page.getByText('إدارة الاحتفاظ والإتلاف', { exact: true }).click();
-      await expect(page.getByRole('button', { name: 'إتلاف الأدلة', exact: true })).toBeDisabled();
+      const dispose = page.getByRole('button', { name: 'إتلاف الأدلة', exact: true });
+      if (role === 'owner') await expect(dispose).toBeDisabled();
+      else await expect(dispose).toHaveCount(0);
       await page.getByLabel('سبب الإجراء', { exact: true }).fill('سبب إداري موثق للمراجعة');
       await expect(page.getByRole('button', { name: 'تمديد الاحتفاظ' })).toBeEnabled();
-      await expect(page.getByRole('button', { name: 'إتلاف الأدلة', exact: true })).toBeDisabled();
+      if (role === 'owner') {
+        await expect(dispose).toBeDisabled();
+        await page.getByLabel('تأكيد الإتلاف: إتلاف الأدلة', { exact: true }).fill('إتلاف الأدلة');
+        await expect(dispose).toBeEnabled();
+      } else await expect(dispose).toHaveCount(0);
     } else {
       await expect(page.getByText('إدارة الاحتفاظ والإتلاف', { exact: true })).toHaveCount(0);
     }

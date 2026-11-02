@@ -90,6 +90,7 @@ model User {
   picture                     String?
   phoneNumber                 String?   @db.VarChar(32)
   phoneUpdatedAt              DateTime?
+  appleAuthorizationTokens    Json?
   role                        String    @default("user")
   commissionAgreementVersion  String?
   commissionAgreementAccepted DateTime?

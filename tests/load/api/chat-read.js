@@ -9,6 +9,10 @@ assertSafeReadScenario();
 if (!loadEnv.sessionCookie) {
   throw new Error('Chat load tests require K6_SESSION_COOKIE for a test account.');
 }
+const aiConsent = (__ENV.K6_AI_SHARING_CONSENT || '').trim();
+if (aiConsent !== 'deepseek-sharing-2026-11-02-v1') {
+  throw new Error('Consenting test-account data requires K6_AI_SHARING_CONSENT=deepseek-sharing-2026-11-02-v1.');
+}
 
 export const options = {
   scenarios: {
@@ -45,7 +49,7 @@ export default function chatReadFlow() {
         ],
         locationSettings: { country: 'SA', currency: 'SAR', language: 'ar' },
       }),
-      { timeout: '90s' },
+      { timeout: '90s', headers: { 'x-souq-hamad-ai-consent': aiConsent } },
     );
     check(response, {
       'chat reply completes': result => result.status === 200 && String(result.body).includes('"type":"finish"'),
