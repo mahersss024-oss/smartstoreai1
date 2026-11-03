@@ -2,42 +2,30 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
 import { buildInventory } from './testing/inventory';
-import { routeContract } from './testing/route-contracts';
+import { buildCoverageEvidence } from './testing/coverage-evidence';
 
 const inventory = buildInventory();
+const evidence = buildCoverageEvidence(process.cwd(), inventory.items);
 const measurement = JSON.parse(readFileSync('coverage/unit-summary.json', 'utf8')) as {
   scope: string;
+  tests?: Record<string, number>;
   files: Array<{ path: string }>;
   totals: Record<string, number>;
 };
 const measuredFiles = new Set(measurement.files.map(file => relative(process.cwd(), file.path).replaceAll('\\', '/')));
 const neverLoaded = inventory.files.filter(file => !measuredFiles.has(file));
 const report = {
-  interpretation: 'A passing baseline is not complete behavioral coverage. Never-loaded files are NOT covered by Node tests. Existing browser tests may exercise them separately. Every discovered control still needs an explicit behavior-to-test mapping before claiming complete button coverage.',
+  interpretation: 'Evidence and gaps only. Module imports and configured test baselines do not prove individual behavior passed. No source item is marked fully behavior-covered.',
   sourceFiles: inventory.files.length,
   nodeMeasuredFiles: inventory.files.filter(file => measuredFiles.has(file)).length,
   neverLoadedByNodeTests: neverLoaded,
-  nativeRuntimeMeasurement: { scope: measurement.scope, totals: measurement.totals },
-  endpoints: inventory.items.filter(item => item.kind === 'endpoint').map(endpoint => ({
-    id: endpoint.id,
-    file: endpoint.file,
-    accessContract: routeContract(endpoint) ?? 'unclassified',
-    baselineTests: [
-      'e2e/route-contracts.spec.ts: HTTP method routing',
-      ...(routeContract(endpoint) === 'guest' ? [] : [
-        'tests/route-access-contracts.test.ts: invalid sessions',
-        'e2e/route-contracts.spec.ts: HTTP access restrictions',
-      ]),
-    ],
-    completeBehaviorVerified: false,
-  })),
-  pages: inventory.items.filter(item => item.kind === 'page').map(page => ({
-    path: page.path,
-    file: page.file,
-    baselineTest: 'e2e/route-contracts.spec.ts: guest/customer rendering',
-    completeBehaviorVerified: false,
-  })),
-  controlsRequiringExplicitBehaviorMapping: inventory.items.filter(item => item.kind === 'control'),
+  nativeRuntimeMeasurement: { scope: measurement.scope, totals: measurement.totals, tests: measurement.tests },
+  evidenceMap: 'coverage/evidence-map.json',
+  testFileReferences: evidence.sourceModuleReferenceSummary,
+  endpoints: evidence.endpoints,
+  pages: evidence.pages,
+  controls: evidence.controls,
+  e2eProjects: evidence.testFiles.e2e,
   functionsInFilesNotLoadedByNodeTests: inventory.items.filter(item => item.kind === 'function' && !measuredFiles.has(item.file)),
   externalGaps: [
     'Real Google/Apple login and callback exchange with provider credentials',
@@ -49,11 +37,14 @@ const report = {
   ],
 };
 mkdirSync('coverage', { recursive: true });
+writeFileSync('coverage/evidence-map.json', JSON.stringify(evidence, null, 2) + '\n');
 writeFileSync('coverage/gaps.json', JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify({
   sourceFiles: report.sourceFiles,
   nodeMeasuredFiles: report.nodeMeasuredFiles,
   neverLoadedByNodeTests: neverLoaded.length,
-  controlsRequiringExplicitBehaviorMapping: report.controlsRequiringExplicitBehaviorMapping.length,
+  directEndpointHandlerReferences: evidence.sourceModuleReferenceSummary.endpointsWithDirectHandlerImportReference,
+  controls: evidence.controls.length,
   report: 'coverage/gaps.json',
+  evidenceMap: 'coverage/evidence-map.json',
 }, null, 2));
