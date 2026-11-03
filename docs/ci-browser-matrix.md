@@ -88,6 +88,13 @@ stale/expired previews, uncertain responses without automatic resubmission, and
 revoked owner access on desktop and mobile. Reset requests are mocked; this
 browser spec never deletes production data. Actual transaction behavior is
 verified separately against a newly created disposable local PostgreSQL database.
+`admin-recovery.spec.ts` covers the protected recovery console, fresh restore
+previews, explicit cost confirmation, unavailable cloud capabilities, revoked
+sessions, uncertain responses without resubmission, and quarantine-only media
+actions in both layouts. Cloud responses are mocked; it creates no RDS instance
+or Cloudflare objects. `test:recovery:worker` separately exercises bounded copies,
+checksums, manifests, retries and concurrent leases with in-memory R2/Queue fixtures,
+and is required by the quality job. Live recovery remains a separate operator drill.
 The two inventory-driven specs select only `/admin` and paths beginning with
 `/admin/`. Public policy documents are explicitly selected by `legal-pages.spec.ts`:
 terms, privacy, listing rules, fees and account-deletion instructions. It checks

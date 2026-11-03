@@ -12,6 +12,7 @@ import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
 import { useAdminAccess } from '../use-admin-access';
 import { DatabaseExplorer } from '@/components/admin/database-explorer';
+import { RecoveryPanel } from '@/components/admin/recovery-panel';
 import { MarketResetPanel } from '@/components/admin/market-reset-panel';
 import { normalizeMaintenanceConfirmation } from '@/lib/admin/maintenance-confirmation';
 import { toLocalDateTimeInput } from '@/lib/datetime-local';
@@ -368,6 +369,8 @@ export default function AdminMaintenancePage() {
         </section>
 
         <DatabaseExplorer key={databaseViewVersion} />
+
+        <RecoveryPanel />
 
         <section className="admin-section admin-danger-zone grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">

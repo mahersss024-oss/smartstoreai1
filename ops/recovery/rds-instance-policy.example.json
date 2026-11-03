@@ -1,0 +1,52 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeRecoveryMetadataInFrankfurt",
+      "Effect": "Allow",
+      "Action": ["rds:DescribeDBInstances", "rds:DescribeDBSnapshots", "rds:DescribeDBInstanceAutomatedBackups"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "eu-central-1" } }
+    },
+    {
+      "Sid": "ReadAttestationsOnRecoveryCopies",
+      "Effect": "Allow",
+      "Action": "rds:ListTagsForResource",
+      "Resource": "arn:aws:rds:eu-central-1:102913100808:db:souqhamad-recovery-*"
+    },
+    {
+      "Sid": "RestoreCopiesAndReadRestoreSources",
+      "Effect": "Allow",
+      "Action": ["rds:RestoreDBInstanceFromDBSnapshot", "rds:RestoreDBInstanceToPointInTime"],
+      "Resource": [
+        "arn:aws:rds:eu-central-1:102913100808:db:smartstore-db",
+        "arn:aws:rds:eu-central-1:102913100808:db:souqhamad-recovery-*",
+        "arn:aws:rds:eu-central-1:102913100808:snapshot:*",
+        "arn:aws:rds:eu-central-1:102913100808:pg:default.postgres18",
+        "arn:aws:rds:eu-central-1:102913100808:og:default:postgres-18",
+        "arn:aws:rds:eu-central-1:102913100808:subgrp:REPLACE_WITH_PRIVATE_RECOVERY_SUBNET_GROUP"
+      ],
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "eu-central-1" } }
+    },
+    {
+      "Sid": "WriteRecoveryAttestationOnNewCopies",
+      "Effect": "Allow",
+      "Action": "rds:AddTagsToResource",
+      "Resource": "arn:aws:rds:eu-central-1:102913100808:db:souqhamad-recovery-*",
+      "Condition": { "StringEquals": { "aws:RequestTag/RecoveryPurpose": "souqhamad-rds-recovery-v1" } }
+    },
+    {
+      "Sid": "NeverCreatePublicRecoveryCopies",
+      "Effect": "Deny",
+      "Action": ["rds:RestoreDBInstanceFromDBSnapshot", "rds:RestoreDBInstanceToPointInTime"],
+      "Resource": "*",
+      "Condition": { "Bool": { "rds:PubliclyAccessible": "true" } }
+    },
+    {
+      "Sid": "RecoveryCannotModifyOrDeleteDatabases",
+      "Effect": "Deny",
+      "Action": ["rds:ModifyDBInstance", "rds:DeleteDBInstance", "rds:DeleteDBSnapshot", "rds:StopDBInstance", "rds:RebootDBInstance"],
+      "Resource": "*"
+    }
+  ]
+}

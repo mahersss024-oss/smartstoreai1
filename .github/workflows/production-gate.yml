@@ -46,6 +46,9 @@ jobs:
       - name: Image processing Worker contracts
         run: pnpm test:images:worker
 
+      - name: Recovery Worker contracts
+        run: pnpm test:recovery:worker
+
       - name: Production build
         run: pnpm build
         env:

@@ -54,6 +54,6 @@ export function concretePath(path: string, values: Record<string, string> = {}) 
 }
 
 export function staffDeniedError(path: string) {
-  return /^\/api\/admin\/(commissions|maintenance|site-message)(\/|$)/.test(path)
+  return /^\/api\/admin\/(commissions|maintenance|site-message|recovery)(\/|$)/.test(path)
     ? 'owner_required' : 'admin_required';
 }
