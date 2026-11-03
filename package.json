@@ -24,7 +24,6 @@
     "test:pages": "node tests/load/scripts/run-k6.mjs tests/load/scenarios/page-flow.js",
     "test:images": "node tests/load/scripts/run-k6.mjs tests/load/images/image-flow.js",
     "test:images:worker": "node --test cloudflare/image-pipeline/worker.test.mjs",
-    "test:recovery:worker": "node --test cloudflare/recovery/worker.test.mjs",
     "test:browser": "playwright test -c tests/load/browser/playwright.config.ts",
     "test:load:chat": "node tests/load/scripts/run-k6.mjs tests/load/api/chat-read.js",
     "test:load:writes": "node tests/load/scripts/run-k6.mjs tests/load/api/write-smoke.js",

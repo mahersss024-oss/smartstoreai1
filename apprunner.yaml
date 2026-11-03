@@ -26,8 +26,6 @@ run:
       value: database
     - name: SMARTSTORE_HEALTH_INCLUDE_METRICS
       value: "0"
-    - name: SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP
-      value: "0"
     - name: SMARTSTORE_DEEPSEEK_MAX_CONCURRENT_REQUESTS
       value: "100"
     - name: SMARTSTORE_DEEPSEEK_MAX_QUEUED_REQUESTS

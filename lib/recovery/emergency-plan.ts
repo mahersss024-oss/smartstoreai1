@@ -8,6 +8,9 @@ export function getRecoveryEmergencyPlan(env: Record<string, string | undefined>
     region: /^[a-z]{2}-[a-z]+-\d$/.test(region) ? region : 'eu-central-1',
     sourceDatabase: /^[a-z][a-z0-9-]{0,62}$/.test(source) ? source : 'smartstore-db',
     applicationService: 'smartstore-ai',
+    monitoringOnly: true,
+    applicationCanExecuteRecovery: false,
+    executionConsole: 'AWS',
     steps: [
       'سجّل وقت الحادث بتوقيت الرياض وUTC وحدّد سبب الحذف قبل أي استعادة.',
       'أوقف الكتابات ومهام التنظيف والرفع والإشعارات عبر إجراءات التشغيل المعتمدة، وتحقق من توقفها فعليًا؛ رسالة الموقع وحدها لا توقفها.',

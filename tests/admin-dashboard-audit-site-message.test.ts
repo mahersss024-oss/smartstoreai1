@@ -5,6 +5,9 @@ import test from 'node:test';
 import { getAdminOverview } from '@/lib/admin/overview';
 import { authenticatedUserActiveWindowMs } from '@/lib/auth/session';
 import { isSiteMessageVisible } from '@/lib/site-message';
+import { GET as readSiteMessage, PATCH as patchSiteMessage, POST as postSiteMessage, PUT as putSiteMessage, DELETE as deleteSiteMessage } from '@/app/api/admin/site-message/route';
+import { createSessionCookie } from '@/lib/auth/session';
+import { prisma } from '@/lib/db/prisma';
 
 async function source(relativePath: string) {
   return readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
@@ -97,29 +100,41 @@ test('site message visibility honors activation and expiration', () => {
   assert.equal(isSiteMessageVisible({ isEnabled: true, expiresAt: new Date('2026-09-27T12:00:01.000Z') }, now), true);
 });
 
-test('site message updates require the configured owner, are transactional and audited', async () => {
-  const route = await source('app/api/admin/site-message/route.ts');
+test('site message maintenance exposes a read-only message and denies every legacy update verb', async t => {
+  const values: Record<string, string | undefined> = { AUTH_SECRET: 'monitoring-site-message-only-test-secret',
+    SMARTSTORE_ADMIN_EMAILS: 'monitor-owner@example.test', SMARTSTORE_MARKETPLACE_STORE: 'database' };
+  const previous = new Map(Object.keys(values).map(key => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(values)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  t.after(() => { for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
+  const saved = { id: 'primary', message: 'رسالة متابعة محفوظة', type: 'info', isEnabled: true, expiresAt: null };
+  const delegate = prisma.siteMessage;
+  const read = t.mock.fn(async () => saved);
+  const upsert = t.mock.fn(async () => { throw new Error('unexpected_message_write'); });
+  for (const [name, value] of [['findUnique', read], ['upsert', upsert]] as const) {
+    const previous = Object.getOwnPropertyDescriptor(delegate, name);
+    Object.defineProperty(delegate, name, { configurable: true, writable: true, value });
+    t.after(() => { if (previous) Object.defineProperty(delegate, name, previous); else Reflect.deleteProperty(delegate, name); });
+  }
+  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_write'); });
+  const headers = { cookie: createSessionCookie({ id: 'owner', email: 'monitor-owner@example.test', role: 'admin' }) };
+  const response = await readSiteMessage(new Request('https://smartstore.test/api/admin/site-message', { headers }));
+  assert.equal(response.status, 200); assert.deepEqual((await response.json()).siteMessage, saved); assert.equal(read.mock.callCount(), 1);
+  for (const [method, handler] of [['POST', postSiteMessage], ['PATCH', patchSiteMessage], ['PUT', putSiteMessage], ['DELETE', deleteSiteMessage]] as const) {
+    const request = new Request('https://smartstore.test/api/admin/site-message', { method, headers,
+      body: JSON.stringify({ message: 'forbidden replacement', type: 'maintenance', isEnabled: false, expiresAt: null }) });
+    const result = await handler(request);
+    assert.equal(result.status, 403); assert.equal((await result.json()).error, 'maintenance_read_only');
+    assert.match(result.headers.get('cache-control') ?? '', /no-store/);
+    assert.equal((await handler(new Request('https://smartstore.test/api/admin/site-message', { method }))).status, 401);
+  }
+  assert.equal(transaction.mock.callCount(), 0); assert.equal(upsert.mock.callCount(), 0);
+  assert.deepEqual(saved.message, 'رسالة متابعة محفوظة');
   const banner = await source('components/site-message-banner.tsx');
   const homeOnly = await source('components/site-message-home-only.tsx');
   const layout = await source('app/layout.tsx');
-  const maintenance = await source('app/admin/maintenance/page.tsx');
-
-  assert.match(route, /isPlatformOwner/);
-  assert.match(route, /auth_required/);
-  assert.match(route, /owner_required/);
-  assert.match(route, /prisma\.\$transaction/);
-  assert.match(route, /action: 'update_site_message'/);
-  assert.match(route, /previous:/);
-  assert.match(route, /next:/);
-  assert.match(route, /expiration_must_be_future/);
-  assert.match(banner, /getActiveSiteMessage/);
-  assert.match(banner, /role="status"/);
-  assert.match(homeOnly, /usePathname/);
-  assert.match(homeOnly, /pathname !== '\/'/);
-  assert.doesNotMatch(layout, /<SiteMessageHomeOnly>/, 'the app download gateway does not mount the retired market home message');
-  assert.doesNotMatch(layout, /<SiteMessageBanner/);
-  assert.match(maintenance, /رسالة الموقع/);
-  assert.doesNotMatch(maintenance, /localStorage/);
+  assert.match(banner, /getActiveSiteMessage/); assert.match(banner, /role="status"/);
+  assert.match(homeOnly, /usePathname/); assert.match(homeOnly, /pathname !== '\/'/);
+  assert.doesNotMatch(layout, /<SiteMessageHomeOnly>|<SiteMessageBanner/);
 });
 
 test('migration adds only the required activity, audit and site message storage', async () => {

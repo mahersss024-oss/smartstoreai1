@@ -83,18 +83,16 @@ sessions and browser back navigation. It never contacts a live identity provider
 
 The allowlist covers administrator presentation, users, workspace, evidence,
 listing categories/car models, performance, and page access/rendering contracts.
-`owner-market-reset.spec.ts` covers the owner-only reset preview, confirmations,
-stale/expired previews, uncertain responses without automatic resubmission, and
-revoked owner access on desktop and mobile. Reset requests are mocked; this
-browser spec never deletes production data. Actual transaction behavior is
-verified separately against a newly created disposable local PostgreSQL database.
-`admin-recovery.spec.ts` covers the protected recovery console, fresh restore
-previews, explicit cost confirmation, unavailable cloud capabilities, revoked
-sessions, uncertain responses without resubmission, and quarantine-only media
-actions in both layouts. Cloud responses are mocked; it creates no RDS instance
-or Cloudflare objects. `test:recovery:worker` separately exercises bounded copies,
-checksums, manifests, retries and concurrent leases with in-memory R2/Queue fixtures,
-and is required by the quality job. Live recovery remains a separate operator drill.
+`owner-market-reset.spec.ts` retains the regression filename for the retired wipe:
+it verifies GET-only maintenance, no editable site message, ignored legacy enable
+flags, and owner revocation in both layouts. The matching PostgreSQL check now
+compares all table fingerprints before and after rejected legacy operations; it
+creates no fixtures and performs no cleanup. `admin-recovery.spec.ts` verifies
+read-only backup metadata and emergency-plan downloads with no execution controls,
+even if an upstream response advertises old capabilities. Cloud responses are
+mocked. RDS monitoring imports only Describe operations; the proposed recovery
+Worker and its creation/restore contract have been removed. Live recovery belongs
+to an independent AWS operator, outside the application.
 The two inventory-driven specs select only `/admin` and paths beginning with
 `/admin/`. Public policy documents are explicitly selected by `legal-pages.spec.ts`:
 terms, privacy, listing rules, fees and account-deletion instructions. It checks
