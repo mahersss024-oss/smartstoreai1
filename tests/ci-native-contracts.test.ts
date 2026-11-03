@@ -64,7 +64,7 @@ test('native backend CI is mandatory and uses an ephemeral loopback PostgreSQL s
   assert.notEqual(job['continue-on-error'], true);
   const postgres = job.services?.postgres;
   assert.ok(postgres, 'A fresh job-scoped PostgreSQL service is required');
-  assert.match(postgres.image, /^postgres:17(?:[.-].*)?$/);
+  assert.equal(postgres.image, 'postgres:18.3', 'Match the current RDS engine version confirmed during prelaunch review');
   assert.equal(postgres.env?.POSTGRES_DB, 'smartstore_codex_test');
   assert.equal(postgres.env?.POSTGRES_USER, 'codex_local');
   assert.ok(postgres.ports?.includes('55432:5432'));

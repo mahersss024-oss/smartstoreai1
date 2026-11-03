@@ -24,7 +24,8 @@ cannot read this secret and cannot pass this private-source check until run in a
 trusted repository context; the workflow never uses `pull_request_target` to give
 untrusted code access. The database and test processes receive no hosted secrets.
 
-Its PostgreSQL 17 service is created for that job only. Port 55432 and database
+Its PostgreSQL 18.3 service matches the RDS version shown in the prelaunch
+configuration review and is created for that job only. Port 55432 and database
 `smartstore_codex_test` satisfy the existing integration-test destination guards.
 The portable runner requires an explicit CI opt-in, verifies loopback destination,
 database name and database-creation permission, applies committed migrations to

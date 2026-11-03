@@ -157,7 +157,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18.3
         env:
           POSTGRES_USER: codex_local
           POSTGRES_PASSWORD: ci-only-disposable-postgres-password

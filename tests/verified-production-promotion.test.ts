@@ -195,6 +195,19 @@ test('provider redirects and malformed JSON fail without exposing response data 
   }
 });
 
+test('workflow permission failures expose only a fixed diagnostic category and never provider text', async () => {
+  const h = harness();
+  h.overrides.set('PATCH /git/refs/heads/production', () => json({
+    message: 'Refusing to update workflow without workflows permission; private diagnostic SECRET1234',
+  }, 403));
+  await assert.rejects(h.invoke(), error => {
+    assert.match(String(error), /workflow_permission_required/);
+    assert.doesNotMatch(String(error), /SECRET1234|private diagnostic|offline-test-token/);
+    return true;
+  });
+  assert.equal(h.writes().length, 1);
+});
+
 test('promotion workflow trusts only main-push gate completions and isolates its write permission', () => {
   const rootRequire = createRequire(resolve('package.json'));
   const yaml = createRequire(rootRequire.resolve('eslint'))('js-yaml') as { load: (input: string) => unknown };
