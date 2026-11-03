@@ -46,12 +46,19 @@ delivery. Those remain separate live/device checks.
 required result makes this final status fail. The optional staging job cannot
 substitute for a failed required job and is not required for this status.
 
-Configure `Production Readiness` as a required branch/ruleset check if merges must
-be blocked. This workflow change does not edit remote branch protection, App Runner
-automatic deployment, Codemagic or AWS credentials. An App Runner deployment that
-independently watches main is not blocked by this status until the deployment flow
-is explicitly wired to it. A successful status establishes the declared automated
-criteria for the tested commit pair, not universal production readiness.
+The separate `Promote Verified Production` workflow advances the `production`
+branch only after a successful, trusted main-push gate run. It checks the run and
+attempt, requires the final status, rejects stale main results and uses only a
+fast-forward ref update. App Runner must watch `production` for this restriction
+to govern deployment; an App Runner service watching `main` can still publish
+before tests finish. Branch protection is a separate GitHub setting, not a side
+effect of parsing this YAML. Applied settings, baseline revisions, live checks,
+backup evidence and the rollback procedure are recorded in
+[the prelaunch operations guide](prelaunch-operations.ar.md).
+
+A successful status establishes the declared automated criteria for the tested
+commit pair, not universal production readiness. Codemagic and native binary
+publishing remain independent of the server promotion workflow.
 
 ## Administrator browser scope
 
