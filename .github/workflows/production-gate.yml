@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -149,6 +150,113 @@ jobs:
             test-results/
           if-no-files-found: warn
           retention-days: 14
+
+  mobile-contracts:
+    name: Mobile And PostgreSQL Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: codex_local
+          POSTGRES_PASSWORD: ci-only-disposable-postgres-password
+          POSTGRES_DB: smartstore_codex_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U codex_local -d smartstore_codex_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # This database belongs to this disposable job; no hosted database secret is used.
+      DATABASE_URL: postgresql://codex_local:ci-only-disposable-postgres-password@127.0.0.1:55432/smartstore_codex_test?schema=public
+      SMARTSTORE_CI_DB_TESTS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned native application
+        uses: actions/checkout@v4
+        with:
+          repository: mahersss024-oss/app
+          # Update deliberately when validating a new server/mobile version pair.
+          ref: b8a200c165dc42916bac3e98f2cf2ebaa3333684
+          path: AI
+          ssh-key: ${{ secrets.MOBILE_REPO_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            AI/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install native application dependencies
+        working-directory: AI
+        run: pnpm install --frozen-lockfile
+
+      - name: Native application types and lint
+        working-directory: AI
+        run: pnpm check
+
+      - name: Install Chromium for native React reconciliation tests
+        working-directory: AI
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Native application tests
+        working-directory: AI
+        run: pnpm test
+
+      - name: Verify mobile operations and isolated PostgreSQL contracts
+        timeout-minutes: 15
+        run: pnpm test:mobile-contracts --run-node --run-mobile --run-postgres
+
+      - name: Upload mobile backend contract reports
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-backend-contracts-${{ github.run_attempt }}
+          path: |
+            coverage/mobile-*.json
+            coverage/mobile-*.md
+            coverage/mobile-*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  production-readiness:
+    name: Production Readiness
+    if: ${{ always() }}
+    needs: [quality, e2e, api-contracts, mobile-contracts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Require all automated checks to succeed
+        run: node scripts/testing/check-production-readiness.mjs
+        env:
+          REQUIRED_JOB_RESULTS: ${{ toJSON(needs) }}
 
   optional-db-integration:
     name: Optional Staging DB Integration

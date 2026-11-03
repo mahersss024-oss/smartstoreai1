@@ -1,8 +1,57 @@
 # Public Pages, Administrator Browser CI and Server API Contracts
 
-The Production Gate runs public-page and administrator browser checks and server API contracts
-as separate jobs. Android/iPhone application binaries are built in the independent
+The Production Gate runs public-page and administrator browser checks, server API
+contracts, and native-helper/PostgreSQL contracts as separate required jobs.
+Android/iPhone application binaries are built in the independent
 mobile repository; neither Playwright browser project runs an installed native app.
+
+## Required native and PostgreSQL contracts
+
+`Mobile And PostgreSQL Contracts` checks out `mahersss024-oss/app` into `AI` at the
+immutable commit recorded in `.github/workflows/production-gate.yml`. Update that
+commit deliberately when validating a newer server/mobile pair. It installs both
+lockfiles, runs the mobile application's full type/lint and helper test commands,
+then executes the reviewed operation map with server, mobile and PostgreSQL results.
+Chromium and its system dependencies are installed in this same job so the two
+real React reconciliation checks have their browser prerequisite instead of skipping.
+This job runs on every main push, pull request and manual workflow run; it does
+not depend on the optional staging-database setting.
+
+The mobile repository is private. The server repository secret
+`MOBILE_REPO_DEPLOY_KEY` holds a dedicated SSH deploy key registered read-only on
+the mobile repository. Checkout does not persist that credential. Fork pull requests
+cannot read this secret and cannot pass this private-source check until run in a
+trusted repository context; the workflow never uses `pull_request_target` to give
+untrusted code access. The database and test processes receive no hosted secrets.
+
+Its PostgreSQL 17 service is created for that job only. Port 55432 and database
+`smartstore_codex_test` satisfy the existing integration-test destination guards.
+The portable runner requires an explicit CI opt-in, verifies loopback destination,
+database name and database-creation permission, applies committed migrations to
+that test service, and runs all discovered PostgreSQL integration files sequentially.
+The owner-reset test creates and drops its own randomly named temporary database.
+No production or staging database secret is passed to this job. The existing
+optional hosted staging job is retained separately.
+
+`coverage/mobile-*.json`, `.md` and `.log` are uploaded with `always()` for 14 days.
+They retain the actual named-test results and source fingerprints. Native-helper
+tests use controlled module/provider fixtures; they do not exercise installed
+Android/iPhone binaries, real OAuth sign-in, Cloudflare processing or native push
+delivery. Those remain separate live/device checks.
+
+## Final automated status
+
+`Production Readiness` always evaluates the actual results of `quality`, `e2e`,
+`api-contracts` and `mobile-contracts`. A failed, cancelled, skipped or missing
+required result makes this final status fail. The optional staging job cannot
+substitute for a failed required job and is not required for this status.
+
+Configure `Production Readiness` as a required branch/ruleset check if merges must
+be blocked. This workflow change does not edit remote branch protection, App Runner
+automatic deployment, Codemagic or AWS credentials. An App Runner deployment that
+independently watches main is not blocked by this status until the deployment flow
+is explicitly wired to it. A successful status establishes the declared automated
+criteria for the tested commit pair, not universal production readiness.
 
 ## Administrator browser scope
 
@@ -101,8 +150,9 @@ The workflow contract test parses YAML, verifies browser/API selection and
 deadline/report protections, and checks that API specs have no browser fixtures.
 Use Playwright's `--list` to inspect registered cases without running them.
 These local checks do not establish that GitHub Actions or a native-device build
-passed. Required branch-protection checks should include both administrator
-browser names, `Server API Contracts`, and the existing quality gate. Remote
+passed. Use the aggregate `Production Readiness` status as the required
+branch-protection check; it requires both administrator browser projects, server
+API contracts, quality checks, and mobile/PostgreSQL contracts to succeed. Remote
 branch protection is not changed by this source configuration.
 
 Verified locally on 2026-10-25 against an isolated production build and test store:

@@ -104,13 +104,21 @@ async function main() {
     runFailed ||= code !== 0;
   }
   if (args.includes('--run-postgres')) {
-    if (process.platform !== 'win32') throw new Error('The dedicated PostgreSQL runner uses this workspace Windows local cluster; use a separately reviewed runner on other systems.');
     console.log('Running mapped PostgreSQL tests on the dedicated loopback test database.');
     const plan = join(root, 'coverage/mobile-contracts-run-plan.json');
     writeFileSync(plan, JSON.stringify({ postgresFiles: uniqueFiles('postgres'), serverContextHash: report.sourceContext.server }, null, 2));
-    const code = await run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-      'scripts/testing/run-mobile-postgres-contracts.ps1', '-PlanPath', plan], root,
-    isolatedEnvironment(report.sourceContext.server), 'mobile-contracts-postgres-runner.log');
+    const ciPostgres = process.env.SMARTSTORE_CI_DB_TESTS === '1';
+    if (!ciPostgres && process.platform !== 'win32') throw new Error('PostgreSQL contracts require the dedicated Windows local cluster or an explicitly opted-in disposable CI service.');
+    const environment = isolatedEnvironment(report.sourceContext.server);
+    // Only the separately guarded CI runner receives its configured loopback database.
+    // File-store and mobile runs above never receive a database URL.
+    if (ciPostgres) environment.DATABASE_URL = process.env.DATABASE_URL;
+    const code = ciPostgres
+      ? await run(process.execPath, ['scripts/testing/run-ci-postgres-contracts.mjs', '--plan', plan], root,
+        environment, 'mobile-contracts-postgres-runner.log')
+      : await run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+        'scripts/testing/run-mobile-postgres-contracts.ps1', '-PlanPath', plan], root,
+      environment, 'mobile-contracts-postgres-runner.log');
     console.log(`PostgreSQL tests exited ${code}.`);
     runFailed ||= code !== 0;
   }
