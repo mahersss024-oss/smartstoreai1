@@ -8,6 +8,7 @@ import {
   type S3ObjectStorageConfig,
 } from './object-storage';
 import { ImageStorageResponseError, retryImageStorage } from './image-storage-retry';
+import { directImagePromotionBudgetMs } from './direct-image-promotion';
 
 export type DirectImageVariant = 'original' | 'display' | 'thumbnail';
 export type DirectImageObjectJob = {
@@ -190,11 +191,10 @@ export async function readProcessedImage(job: DirectImageObjectJob, variant: Dir
 }
 
 /** Staged objects remain private. Only the server can copy them to public storage. */
-export async function promoteProcessedImages(job: DirectImageObjectJob) {
+export async function promoteProcessedImages(job: DirectImageObjectJob, deadline = Date.now() + directImagePromotionBudgetMs) {
   const { intakeStorage, storage } = requireConfiguration();
-  // The database transaction has a 120s limit. Keep all copy/head operations
-  // within one 90s I/O budget, including ambiguous-response verification.
-  const deadline = Date.now() + 90_000;
+  // One absolute I/O budget also bounds ambiguous-response verification. The
+  // durable promotion receipt protects fixed URLs beyond this deadline.
   const variants: DirectImageVariant[] = job.originalKey === job.displayKey
     ? ['display', 'thumbnail']
     : ['original', 'display', 'thumbnail'];

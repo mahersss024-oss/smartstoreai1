@@ -75,7 +75,7 @@ export const mobileMarketplaceContracts = [
   {
     id: 'listing.owned-read', label: 'Read my listing pages and an owned draft for editing',
     endpoints: ['GET /api/marketplace/me/listings', 'GET /api/marketplace/me/listings/[listingId]'],
-    mobileFiles: ['src/app/(tabs)/listings.tsx', 'src/features/listing-editor/screen.tsx', 'src/core/listing-image-upload-recovery.ts'],
+    mobileFiles: ['src/app/(tabs)/listings.tsx', 'src/features/listing-editor/screen.tsx', 'src/core/listing-image-upload-recovery.ts', 'src/core/listing-publication.ts'],
     serverEffects: ['Return only the signed seller listings; unpublished draft details are readable only by the owner.'],
     scenarios: [lifecycle('Actual owned-listing collection contains the seller listing and not another account listing.'),
     scenario('tests/native-mobile-api.test.ts', 'owned detail admits only the authenticated owner including unpublished drafts', 'node',
@@ -96,7 +96,7 @@ export const mobileMarketplaceContracts = [
   },
   {
     id: 'listing.create-manual', label: 'Save a new manual listing draft',
-    endpoints: ['POST /api/marketplace/listings'], mobileFiles: ['src/features/listing-editor/screen.tsx'],
+    endpoints: ['POST /api/marketplace/listings'], mobileFiles: ['src/features/listing-editor/screen.tsx', 'src/core/listing-publication.ts'],
     serverEffects: ['Validate fields and catalog values, bind seller to session and save one draft per operation key.'],
     scenarios: [lifecycle('Actual POST rejects an empty title, creates a draft and binds sellerId to the signed account.'),
     scenario('tests/manual-listing-idempotency.test.ts', 'manual create replays its committed listing after the response receipt failed and its reservation became stale', 'node',
@@ -105,7 +105,7 @@ export const mobileMarketplaceContracts = [
   },
   {
     id: 'listing.edit', label: 'Save edits to my listing',
-    endpoints: [`PATCH ${listingEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx'],
+    endpoints: [`PATCH ${listingEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx', 'src/core/listing-publication.ts'],
     serverEffects: ['Apply owned partial edits with validation and preserve concurrent fields and human moderation decisions.'],
     scenarios: [lifecycle('Actual PATCH rejects another seller and negative price, then saves a valid owned change.'),
     scenario('tests/listing-partial-edits.db-integration.test.ts', 'PostgreSQL serializes partial listing merges without losing attributes or search text', 'postgres',
@@ -114,14 +114,16 @@ export const mobileMarketplaceContracts = [
   },
   {
     id: 'listing.publish', label: 'Publish my draft or republish a paused listing',
-    endpoints: [`PATCH ${listingEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx', 'src/app/(tabs)/listings.tsx'],
+    endpoints: [`PATCH ${listingEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx', 'src/app/(tabs)/listings.tsx', 'src/core/listing-publication.ts'],
     serverEffects: ['Apply action=publish only to the owner; keep optional images optional and block pending image work.'],
     scenarios: [scenario('tests/listing-publish-route.test.ts', 'manual category suggestion precedes photo-free save and preserves ownership without reclassification', 'node',
       'Actual publish rejects guest/other owner, publishes without images, preserves accepted category and first publication time on replay.'),
     directDatabase('database pending images block publication and blank-draft reset without making photos mandatory',
       'Real database publication refuses pending image jobs, then succeeds without photos once the job is cancelled.'),
-    scenario('mobile:tests/listing-editor-image-save.test.mjs', 'direct processing keeps the chosen asset queued and blocks publish until ready', 'mobile-node',
-      'Executes actual editor save/publish mutation callbacks; publish occurs only after the awaited image becomes ready.')],
+    scenario('mobile:tests/listing-publication.test.cjs', 'a handed-off publication keeps running without screen subscribers and announces success only after all photos and server publication', 'mobile-node',
+      'Executes the actual application-owned coordinator: navigation does not stop work; all selected images and final server publication are required.'),
+    scenario('mobile:tests/listing-publication.test.cjs', 'duplicate handoffs and an ambiguous create response reuse one operation and stable create/upload/publish keys', 'mobile-node',
+      'Repeated submissions and lost responses reuse the existing operation rather than create duplicate listings or photos.')],
     remainingChecks: ['Real outbound notification delivery following a publication requires separate live-provider verification.', ...nativeChecks],
   },
   {
@@ -206,7 +208,7 @@ export const mobileMarketplaceContracts = [
   {
     id: 'images.direct-recover', label: 'Restore pending photos when reopening the editor',
     endpoints: [`GET ${uploadsEndpoint}`, 'GET /api/marketplace/me/listings/[listingId]'],
-    mobileFiles: ['src/core/listing-image-upload-recovery.ts', 'src/features/listing-editor/screen.tsx'],
+    mobileFiles: ['src/core/listing-image-upload-recovery.ts', 'src/features/listing-editor/screen.tsx', 'src/core/listing-publication-context.tsx'],
     serverEffects: ['List owned active reservations without private object keys, then reload authoritative image rows.'],
     scenarios: [directDatabase('database reopening an editor recovers only owned active tasks and releases them during rollback',
       'Actual SQL excludes expired/foreign tasks, does not disclose source keys or transfers and cancels tasks on protocol rollback.'),
@@ -216,7 +218,7 @@ export const mobileMarketplaceContracts = [
   },
   {
     id: 'images.set-primary', label: 'Choose my listing primary image',
-    endpoints: [`PATCH ${imageEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx'],
+    endpoints: [`PATCH ${imageEndpoint}`], mobileFiles: ['src/features/listing-editor/screen.tsx', 'src/core/listing-publication.ts'],
     serverEffects: ['Apply action=set_primary only to the owned listing image and preserve one selected approved primary.'],
     scenarios: [store('lets sellers set a primary listing image', 'Actual store mutation clears the old primary and selects the requested photo.'),
     scenario('tests/listing-image-actions-route.test.ts', 'image action handlers reject guests, foreign listing owners and foreign image IDs without mutation', 'node',

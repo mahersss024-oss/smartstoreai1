@@ -27,7 +27,7 @@ import { createUnassessedMarketplaceCompliance, evaluateListingComplianceBestEff
 import { resolveListingCategoryWithModel } from './listing-category-model';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
-import { getComparableListings } from './market-intelligence';
+import { createComparableListingSelector, getComparableListings } from './market-intelligence';
 import { listingSemanticText, marketplaceTextAnalyzer } from './text-understanding';
 import {
   getMarketplaceSearchTermVariants,
@@ -1258,7 +1258,7 @@ export async function listSimilarMarketplaceListings(target: memoryStore.Listing
   if (!availableTarget) return [];
 
   let cursor: string | undefined;
-  let best: memoryStore.ListingRecord[] = [];
+  const bestListings = createComparableListingSelector(target, similarListingLimit);
   while (true) {
     const batch = await prisma.listing.findMany({
       where: { ...publicWhere, id: { not: target.id, ...(cursor ? { gt: cursor } : {}) } },
@@ -1269,14 +1269,14 @@ export async function listSimilarMarketplaceListings(target: memoryStore.Listing
         attributes: true, city: true, createdAt: true, updatedAt: true,
       },
     });
-    const candidates = batch.map(row => toListingRecord({
+    for (const row of batch) bestListings.add(toListingRecord({
       ...row, price: null, priceMode: null, condition: null,
       status: 'published', views: 0, messageCount: 0, favoriteCount: 0, compliance: null,
     }));
-    best = getComparableListings(target, [...best, ...candidates]).slice(0, similarListingLimit);
     if (batch.length < similarListingBatchSize) break;
     cursor = batch[batch.length - 1].id;
   }
+  const best = bestListings.list();
   if (!best.length) return [];
 
   // Re-read after ranking: a concurrent pause/deletion or rejected image must

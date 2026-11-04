@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { after } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { deleteEvidenceObject, deleteListingObject, isOwnedProfileImageUrl } from './object-storage';
+import { directImagePromotionUploadId } from './direct-image-promotion';
 
 type CleanupDatabase = Pick<Prisma.TransactionClient, 'imageObjectCleanup'>;
 type CleanupInput = { imageId: string; urls: string[]; ownerId?: string };
@@ -47,6 +48,17 @@ export async function processImageObjectCleanup(imageId: string, deadline = Date
     OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }],
   }, data: { leaseToken, leaseUntil: new Date(now.getTime() + leaseMs), attempts: { increment: 1 } } });
   if (!claimed.count) return false;
+  const directUploadId = directImagePromotionUploadId(job.imageId);
+  if (directUploadId) {
+    const upload = await prisma.listingImageUpload.findUnique({ where: { id: directUploadId } });
+    if (upload && ['pending', 'processing'].includes(upload.status) && upload.expiresAt > new Date()) {
+      // No DELETE has started. Release only our own claim so an active/new lease
+      // may reserve the same fixed URLs; a writer never steals a cleaner token.
+      await prisma.imageObjectCleanup.updateMany({ where: { id: job.id, leaseToken, cleanupAt: null },
+        data: { leaseToken: null, leaseUntil: null, attempts: 0, nextAttemptAt: new Date(Date.now() + 60_000) } });
+      return false;
+    }
+  }
   let completed = false;
   try {
     if (job.imageId.startsWith('evidence:')) {
@@ -74,7 +86,7 @@ export async function processImageObjectCleanup(imageId: string, deadline = Date
           ] } }));
         if (!attached) completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
           requireCachePurge: true, deadline });
-        else if (job.imageId.startsWith('legacy-upload:')) {
+        else if (job.imageId.startsWith('legacy-upload:') || directUploadId) {
           // An unknown attach commit may have reopened its attempt receipt. The
           // authoritative image now owns these bytes; its eventual deletion
           // creates the ordinary cleanup manifest in the same database commit.

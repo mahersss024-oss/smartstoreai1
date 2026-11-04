@@ -13,8 +13,12 @@ import { getMaxListingImagesPerListing } from './listing-image-limits';
 import { scheduleListingEvidenceCopy } from './evidence';
 import {
   createDirectImageTransfer, discardDirectImageObjects, getDirectImageUploadConfiguration,
-  promoteProcessedImages, readProcessedImage, getDirectImageVariantMediaType,
+  promoteProcessedImages, readProcessedImage, getDirectImageVariantMediaType, getDirectImagePublicUrls,
 } from './direct-image-objects';
+import {
+  DirectImagePromotionBusyError, assertDirectImagePromotionIdle, directImagePromotionProtectsCleanup, reserveDirectImagePromotion,
+  sealDirectImagePromotion, releaseDirectImagePromotion, type DirectImagePromotion,
+} from './direct-image-promotion';
 import {
   activeImageUploadStatuses, DirectImageUploadError, directImageUploadsEnabled,
   directImageUploadLeaseMs, directImageUploadLifetimeMs, directImageUploadMaxAttempts,
@@ -113,6 +117,7 @@ async function safeDiscard(job: ListingImageUpload, includePublic = false) {
     // A late completion must not remove the shared raw source or public copies
     // being used by a newer lease. A lease mismatch is not a terminal state.
     if (current && ['pending', 'processing'].includes(current.status)) return false;
+    if (await directImagePromotionProtectsCleanup(job.id)) return false;
     // A reset cancels pending transfers without revoking their signed PUT URL.
     // Keep the cleanup manifest live until that grant expires so a late upload
     // is still collected even if its queue event was temporarily unavailable.
@@ -225,6 +230,7 @@ export async function claimDirectImageUpload(uploadId: string) {
     if (!job) return discardClaim();
     const now = new Date();
     if (!['pending', 'processing'].includes(job.status)) return discardClaim(job);
+    await assertDirectImagePromotionIdle(tx, job.id, now);
     if (job.status === 'processing' && job.leaseUntil && job.leaseUntil > now) {
       throw new DirectImageUploadError('image_upload_processing', 409);
     }
@@ -301,6 +307,7 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     schedulePrivateCleanup(job);
     return { action: 'discard' as const };
   }
+  let promotion: DirectImagePromotion | undefined;
   try {
     const noOriginal = job.originalKey === job.displayKey;
     const variantNames = noOriginal ? ['display', 'thumbnail'] as const : ['original', 'display', 'thumbnail'] as const;
@@ -313,6 +320,39 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     // The direct/manual upload path performs technical checks only. Hamad
     // retains its independent image understanding and review within chat.
     const quality = analyzeImageQuality({ fileName: job.fileName, mimeType: original.mediaType, sizeBytes: original.data.byteLength });
+    const waitDeadline = Date.now() + 150_000;
+    let reserved: { state: 'reserved'; job: ListingImageUpload; promotion: DirectImagePromotion } | { state: 'ready' } | { state: 'discard' };
+    while (true) {
+      try {
+        reserved = await serializable(async tx => {
+          const current = await tx.listingImageUpload.findUnique({ where: { id: job.id } });
+          if (current?.status === 'ready') return { state: 'ready' as const };
+          if (!current || !isImageUploadActive(current)) return { state: 'discard' as const };
+          if (current.status !== 'processing' || current.leaseToken !== input.leaseToken ||
+            !current.leaseUntil || current.leaseUntil <= new Date()) throw new DirectImageUploadError('image_upload_lease_mismatch', 409);
+          const { listing, allowed } = await ownedTarget(tx, job.listingId, job.sellerId);
+          if (!directImageUploadsEnabled() || !allowed || !listing || listing.images.length >= getMaxListingImagesPerListing()) {
+            await tx.listingImageUpload.update({ where: { id: job.id }, data: { status: 'cancelled', errorCode: 'image_upload_target_changed', leaseToken: null, leaseUntil: null } });
+            return { state: 'discard' as const };
+          }
+          // Keep the resource mutation lock order, but never retain these locks during I/O.
+          await tx.listing.update({ where: { id: listing.id }, data: { updatedAt: listing.updatedAt } });
+          const reservedPromotion = await reserveDirectImagePromotion(tx, current, getDirectImagePublicUrls(current));
+          return { state: 'reserved' as const, job: current, promotion: reservedPromotion };
+        });
+        break;
+      } catch (error) {
+        if (!(error instanceof DirectImagePromotionBusyError) || Date.now() >= waitDeadline) throw error;
+        // Same-lease replays wait without holding a database transaction or copying bytes.
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    if (reserved.state === 'ready') return { action: 'ready' as const };
+    if (reserved.state === 'discard') { schedulePrivateCleanup(job); return { action: 'discard' as const }; }
+    const ownedPromotion = reserved.promotion;
+    promotion = ownedPromotion;
+    const urls = await directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline);
+    if (Date.now() > ownedPromotion.deadline) throw new Error('image_promotion_deadline');
     const finalized = await serializable(async tx => {
       const current = await tx.listingImageUpload.findUnique({ where: { id: job.id } });
       if (current?.status === 'ready') return 'ready' as const;
@@ -324,12 +364,9 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
         await tx.listingImageUpload.update({ where: { id: job.id }, data: { status: 'cancelled', errorCode: 'image_upload_target_changed', leaseToken: null, leaseUntil: null } });
         return 'discard' as const;
       }
-      // Claim the durable job row before network promotion. Cancellation waits
-      // for this transaction; a new lease cannot overwrite an attached image.
-      // Resource mutation paths acquire the listing before cancelling its jobs.
       await tx.listing.update({ where: { id: listing.id }, data: { updatedAt: listing.updatedAt } });
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { updatedAt: new Date() } });
-      const urls = await directImageUploadEffects.promote(current);
+      await sealDirectImagePromotion(tx, ownedPromotion);
       const approved = listing.images.filter(image => image.status === 'approved');
       const firstBySelection = !approved.some(image => image.createdAt <= job.createdAt);
       if (firstBySelection && approved.length) {
@@ -367,6 +404,10 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     if (technical) schedulePrivateCleanup(job);
     incrementRuntimeCounter('image.direct.incomplete');
     return { action: technical ? 'discard' as const : 'retry' as const };
+  } finally {
+    if (promotion) await releaseDirectImagePromotion(promotion).catch(() => {
+      console.warn('[direct_image_upload] promotion_receipt=retained');
+    });
   }
 }
 

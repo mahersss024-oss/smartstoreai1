@@ -5,7 +5,7 @@ import {
 } from './ranking-engine';
 import { normalizeMarketplaceSearchText } from './search';
 import type { ListingRecord } from './store';
-import { getListingSimilarityScore } from './listing-similarity';
+import { createListingSimilarityScorer } from './listing-similarity';
 
 export type ListingMarketIntelligence = {
   listingId: string;
@@ -150,10 +150,6 @@ function confidence(similarListingCount: number) {
   return 'low';
 }
 
-function productSimilarityScore(target: ListingRecord, candidate: ListingRecord) {
-  return getListingSimilarityScore(target, candidate);
-}
-
 function buildInsights(input: {
   price: number | null;
   medianMarketPrice: number | null;
@@ -197,66 +193,64 @@ function buildInsights(input: {
   return insights.slice(0, 4);
 }
 
+type ComparableListing = { listing: ListingRecord; productScore: number };
+
+function compareComparableListings(left: ComparableListing, right: ComparableListing) {
+  return right.productScore - left.productScore
+    || right.listing.updatedAt.localeCompare(left.listing.updatedAt)
+    || right.listing.id.localeCompare(left.listing.id);
+}
+
+function createComparableListingScorer(target: ListingRecord) {
+  const targetYear = extractListingYear(target);
+  const targetMileage = extractListingMileage(target);
+  const targetCity = target.city ? normalizeMarketplaceSearchText(target.city) : null;
+  const scoreProduct = createListingSimilarityScorer(target);
+
+  return (candidate: ListingRecord): ComparableListing | null => {
+    const productScore = scoreProduct(candidate);
+    if (productScore <= 0) return null;
+    if (targetCity !== null && candidate.city && normalizeMarketplaceSearchText(candidate.city) !== targetCity) return null;
+    const candidateYear = extractListingYear(candidate);
+    if (targetYear && candidateYear && Math.abs(candidateYear - targetYear) > 3) return null;
+    const candidateMileage = extractListingMileage(candidate);
+    if (targetMileage && candidateMileage && Math.abs(candidateMileage - targetMileage) > 80_000) return null;
+    return { listing: candidate, productScore };
+  };
+}
+
 export function getComparableListings(
   target: ListingRecord,
   candidates: ListingRecord[],
 ) {
-  const targetYear = extractListingYear(target);
-  const targetMileage = extractListingMileage(target);
+  const score = createComparableListingScorer(target);
+  return candidates.map(score)
+    .filter((candidate): candidate is ComparableListing => candidate !== null)
+    .sort(compareComparableListings)
+    .map(candidate => candidate.listing);
+}
 
-  return candidates
-    .map((candidate) => ({
-      listing: candidate,
-      productScore: productSimilarityScore(target, candidate),
-    }))
-    .filter(({ listing: candidate, productScore }) => {
-      if (candidate.id === target.id) {
-        return false;
+/** Same total ordering as the full sort, retaining only the requested best rows. */
+export function createComparableListingSelector(target: ListingRecord, limit: number) {
+  const score = createComparableListingScorer(target);
+  const best: ComparableListing[] = [];
+  return {
+    add(candidate: ListingRecord) {
+      const entry = score(candidate);
+      if (!entry) return;
+      let low = 0;
+      let high = best.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (compareComparableListings(entry, best[middle]) < 0) high = middle;
+        else low = middle + 1;
       }
-
-      if (candidate.category !== target.category) {
-        return false;
-      }
-
-      if (productScore <= 0) {
-        return false;
-      }
-
-      if (
-        target.city &&
-        candidate.city &&
-        normalizeMarketplaceSearchText(candidate.city) !==
-          normalizeMarketplaceSearchText(target.city)
-      ) {
-        return false;
-      }
-
-      const candidateYear = extractListingYear(candidate);
-
-      if (
-        targetYear &&
-        candidateYear &&
-        Math.abs(candidateYear - targetYear) > 3
-      ) {
-        return false;
-      }
-
-      const candidateMileage = extractListingMileage(candidate);
-
-      if (
-        targetMileage &&
-        candidateMileage &&
-        Math.abs(candidateMileage - targetMileage) > 80_000
-      ) {
-        return false;
-      }
-
-      return true;
-    })
-    .sort((left, right) => right.productScore - left.productScore
-      || right.listing.updatedAt.localeCompare(left.listing.updatedAt)
-      || right.listing.id.localeCompare(left.listing.id))
-    .map(({ listing }) => listing);
+      if (low >= limit) return;
+      best.splice(low, 0, entry);
+      if (best.length > limit) best.pop();
+    },
+    list: () => best.map(entry => entry.listing),
+  };
 }
 
 export function analyzeListingMarket(

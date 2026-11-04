@@ -3,6 +3,36 @@ import test from 'node:test';
 
 import { buildMobileApiInventory, inspectMobileApiSource } from '@/scripts/testing/mobile-api-inventory';
 
+test('publication coordinator inventory resolves concrete operations while retaining the reviewed HTTP adapter as transport', () => {
+  const rows = inspectMobileApiSource('src/core/listing-publication.ts', `
+    class Publication {
+      async run(id: string) {
+        const request = (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown) => this.dependencies.request(method, path, body);
+        await request('POST', '/api/marketplace/listings', {});
+        const path = \`/api/marketplace/listings/\${encodeURIComponent(id)}\`;
+        await request('PATCH', path, { action: 'publish' });
+        await request('PATCH', \`\${path}/images/\${id}\`, { action: 'set_primary' });
+        await this.dependencies.request('GET', \`/api/marketplace/me/listings/\${id}\`);
+      }
+    }
+  `);
+  const operations = rows.filter(row => row.role === 'operation');
+  assert.deepEqual(operations.map(row => [row.method, row.path]), [
+    ['POST', '/api/marketplace/listings'], ['PATCH', '/api/marketplace/listings/[param]'],
+    ['PATCH', '/api/marketplace/listings/[param]/images/[param]'], ['GET', '/api/marketplace/me/listings/[param]'],
+  ]);
+  assert.ok(operations.every(row => row.resolution === 'resolved'));
+  assert.ok(rows.some(row => row.role === 'transport' && row.reason?.includes('adapter')));
+  const provider = inspectMobileApiSource('src/core/listing-publication-context.tsx', `
+    import { api } from './api';
+    const request = (path: string) => api.get(path);
+    api.get('/api/unreviewed-literal');
+  `);
+  assert.equal(provider[0].role, 'transport');
+  assert.equal(provider[1].role, 'operation', 'literal provider calls must still be mapped');
+  assert.equal(provider[1].path, '/api/unreviewed-literal');
+});
+
 test('mobile API inventory resolves scoped templates, conditional URLs and named helper returns without reading comments', () => {
   const rows = inspectMobileApiSource('src/features/sample.tsx', `
     import { api } from '../core/api';

@@ -26,6 +26,7 @@ for (const scenario of [
       leaseUntil: null, sha256: 'a'.repeat(64), sizeBytes: 123,
       ...imageUploadObjectKeys('format-job', 'previous-lease') };
     const tx = {
+      imageObjectCleanup: { async findUnique() { return null; } },
       listingImageUpload: {
         async findUnique() { return job; },
         async update({ data }: { data: Record<string, unknown> }) {
@@ -67,7 +68,14 @@ test('unsupported worker format metadata is rejected before claiming a job', asy
 
 for (const useWrongDisplay of [false, true]) {
   test(useWrongDisplay ? 'WebP finalization refuses non-WebP display bytes' : 'WebP finalization validates the two retained derivatives and aliases the legacy original URL', async t => {
-    const flags = { SMARTSTORE_DIRECT_IMAGE_UPLOADS: 'true', SMARTSTORE_MARKETPLACE_STORE: 'database' };
+    const flags = {
+      SMARTSTORE_DIRECT_IMAGE_UPLOADS: 'true', SMARTSTORE_MARKETPLACE_STORE: 'database',
+      SMARTSTORE_IMAGE_STORAGE: 's3', SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://format-test.r2.cloudflarestorage.com',
+      SMARTSTORE_OBJECT_STORAGE_BUCKET: 'format-public', SMARTSTORE_IMAGE_INTAKE_BUCKET: 'format-intake',
+      SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL: 'https://images.test',
+      SMARTSTORE_OBJECT_STORAGE_ACCESS_KEY_ID: 'format-test-key', SMARTSTORE_OBJECT_STORAGE_SECRET_ACCESS_KEY: 'format-test-secret',
+      SMARTSTORE_EVIDENCE_STORAGE_BUCKET: 'format-evidence', SMARTSTORE_IMAGE_WORKER_SECRET: 'format-isolated-worker-secret-at-least-32-characters',
+    };
     const previous = new Map(Object.keys(flags).map(key => [key, process.env[key]]));
     Object.assign(process.env, flags);
     t.after(() => { for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
@@ -80,10 +88,25 @@ for (const useWrongDisplay of [false, true]) {
     const jpeg = new Uint8Array(await source.clone().jpeg().toBuffer());
     let attached: Record<string, unknown> | null = null;
     let promotions = 0;
+    let receipt: Record<string, unknown> | null = null;
+    const receipts = {
+      async findUnique() { return receipt; },
+      async create({ data }: { data: Record<string, unknown> }) { receipt = { id: 'format-receipt', ...data }; return receipt; },
+      async updateMany({ where, data }: { where: { leaseToken: string }; data: Record<string, unknown> }) {
+        if (!receipt || receipt.leaseToken !== where.leaseToken) return { count: 0 };
+        receipt = { ...receipt, ...data }; return { count: 1 };
+      },
+      async deleteMany({ where }: { where: { leaseToken: string } }) {
+        if (!receipt || receipt.leaseToken !== where.leaseToken) return { count: 0 };
+        receipt = null; return { count: 1 };
+      },
+    };
     const tx = {
+      imageObjectCleanup: receipts,
       listingImageUpload: {
         async findUnique() { return job; },
         async update({ data }: { data: Record<string, unknown> }) { job = { ...job, ...data } as typeof job; return job; },
+        async updateMany({ data }: { data: Record<string, unknown> }) { job = { ...job, ...data } as typeof job; return { count: 1 }; },
       },
       listing: {
         async findUnique() { return { id: 'listing', sellerId: 'owner', status: 'draft', images: [], compliance: {}, updatedAt: new Date() }; },
@@ -98,6 +121,7 @@ for (const useWrongDisplay of [false, true]) {
       Object.defineProperty(target, key, { configurable: true, writable: true, value });
       t.after(() => { if (descriptor) Object.defineProperty(target, key, descriptor); else Reflect.deleteProperty(target, key); });
     };
+    replaceDelegate(prisma.imageObjectCleanup, 'updateMany', receipts.updateMany);
     replaceDelegate(prisma.listingImageUpload, 'findUnique', async () => job);
     replaceDelegate(prisma.listingImageUpload, 'updateMany', async ({ data }: { data: Record<string, unknown> }) => { job = { ...job, ...data } as typeof job; return { count: 1 }; });
     replaceDelegate(prisma.listingImage, 'findUnique', async () => attached);

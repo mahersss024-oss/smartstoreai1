@@ -166,11 +166,25 @@ export function inspectMobileApiSource(file: string, source: string): MobileApiC
     let methods: Array<string | null> = [];
     let role: MobileApiCallsite['role'] = 'operation';
     let reason: string | undefined;
+    let urlArgument = 0;
     const target = call.expression;
-    if (ts.isPropertyAccessExpression(target) && ts.isIdentifier(target.expression) &&
+    if (file === 'src/core/listing-publication.ts' &&
+      ((ts.isIdentifier(target) && target.text === 'request') || target.getText(ast) === 'this.dependencies.request')) {
+      transport = target.getText(ast);
+      methods = resolveStrings(call.arguments[0]).map(value => value.toUpperCase()).filter(value => httpMethods.has(value));
+      urlArgument = 1;
+      if (target.getText(ast) === 'this.dependencies.request' && call.arguments[1]?.getText(ast) === 'path') {
+        role = 'transport';
+        reason = 'Injected publication HTTP adapter; concrete operation calls in this coordinator are inventoried separately.';
+      }
+    } else if (ts.isPropertyAccessExpression(target) && ts.isIdentifier(target.expression) &&
       apiNames.has(target.expression.text) && apiMethods[target.name.text]) {
       transport = target.getText(ast);
       methods = [apiMethods[target.name.text]];
+      if (file === 'src/core/listing-publication-context.tsx' && call.arguments[0]?.getText(ast) === 'path') {
+        role = 'transport';
+        reason = 'Publication provider HTTP adapter; concrete operations are reviewed in src/core/listing-publication.ts.';
+      }
     } else if (ts.isIdentifier(target) && apiFetchNames.has(target.text)) {
       transport = target.text;
       methods = methodsForOptions(call.arguments[1]);
@@ -187,8 +201,9 @@ export function inspectMobileApiSource(file: string, source: string): MobileApiC
       methods = methodsForOptions(call.arguments[1]);
       role = 'transport';
     }
-    if (!transport || !call.arguments[0]) continue;
-    const urls = resolveStrings(call.arguments[0]);
+    if (!transport || !call.arguments[urlArgument]) continue;
+    if (!methods.length) methods = [null];
+    const urls = resolveStrings(call.arguments[urlArgument]);
     const position = ast.getLineAndCharacterOfPosition(call.getStart(ast));
     let variant = 0;
     for (const url of [...new Set(urls)]) {
@@ -204,8 +219,8 @@ export function inspectMobileApiSource(file: string, source: string): MobileApiC
         result.push({
           id: `${file}:${position.line + 1}:${position.character + 1}:${variant++}`,
           file, line: position.line + 1, column: position.character + 1, transport,
-          method, path, query, rawExpression: call.arguments[0].getText(ast),
-          requestArguments: call.arguments.slice(1).map(argument => argument.getText(ast)),
+          method, path, query, rawExpression: call.arguments[urlArgument].getText(ast),
+          requestArguments: call.arguments.slice(urlArgument + 1).map(argument => argument.getText(ast)),
           resolution, role: knownApi ? 'operation' : role,
           reason: reason ?? (resolution === 'unresolved'
             ? 'Destination or HTTP method depends on runtime values; this call must be reviewed rather than counted as matched.'

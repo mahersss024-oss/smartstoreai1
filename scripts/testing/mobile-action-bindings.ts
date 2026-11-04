@@ -7,7 +7,8 @@ const listings = 'src/app/(tabs)/listings.tsx';
 const binding = (file: string, sourceText: string, description: string) => ({ file, sourceText, description });
 const anchors: Record<string, MobileOperationContract['actionEvidence']> = {
   'market.similar-cards': [binding('src/features/marketplace/listing-screen.tsx', '{ view: "similar" }', 'The detail GET uses view=similar for the separate similar-cards query.')],
-  'listing.publish': [binding('src/features/listing-editor/screen.tsx', '{ action: "publish" }', 'The editor explicitly publishes through the existing listing PATCH.')],
+  'listing.publish': [binding('src/features/listing-editor/screen.tsx', 'coordinator.enqueue(', 'The editor hands the submitted snapshot to the application-owned coordinator.'),
+    binding('src/core/listing-publication.ts', '{ action: "publish" }', 'The coordinator uses the existing listing PATCH after verifying all selected images.')],
   'listing.pause': [binding(listings, 'action(menuListing, "pause")', 'My listings dispatches the pause action after confirmation.')],
   'listing.mark-sold': [binding(listings, 'action(menuListing, "mark_sold")', 'My listings dispatches the sold action after confirmation.')],
   'listing.delete': [binding(listings, 'action(menuListing, "delete")', 'My listings dispatches listing deletion after confirmation.')],
