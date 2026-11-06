@@ -15,7 +15,7 @@
 | `/api/admin/commissions/{commissionId}` | `PATCH (36)`، `DELETE (96)` | [التنفيذ](../app/api/admin/commissions/[commissionId]/route.ts) |
 | `/api/admin/listings` | `GET (71)` | [التنفيذ](../app/api/admin/listings/route.ts) |
 | `/api/admin/listings/{listingId}` | `PATCH (141)`، `DELETE (354)` | [التنفيذ](../app/api/admin/listings/[listingId]/route.ts) |
-| `/api/admin/maintenance` | `GET (161)`، `POST (171)` | [التنفيذ](../app/api/admin/maintenance/route.ts) |
+| `/api/admin/maintenance` | Legacy tombstone: `GET`/`POST` return `401`, `403`, or `410`; no maintenance action is available. | [التنفيذ](../app/api/admin/maintenance/route.ts) |
 | `/api/admin/moderation` | `GET (17)`، `PATCH (82)` | [التنفيذ](../app/api/admin/moderation/route.ts) |
 | `/api/admin/moderation/listings/{listingId}` | `PATCH (45)` | [التنفيذ](../app/api/admin/moderation/listings/[listingId]/route.ts) |
 | `/api/admin/moderation/reports/{reportId}` | `PATCH (39)`، `DELETE (101)`، `GET (158)` | [التنفيذ](../app/api/admin/moderation/reports/[reportId]/route.ts) |

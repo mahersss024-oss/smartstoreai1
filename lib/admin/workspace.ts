@@ -79,7 +79,7 @@ export async function getAdminWorkspace(
       id: 'site-message-expiry',
       title: 'انتهاء رسالة الموقع',
       date: getSaudiDay(siteMessage.expiresAt),
-      href: '/admin/maintenance',
+      href: '/admin/site-message',
     });
   }
   return {

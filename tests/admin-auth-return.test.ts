@@ -4,12 +4,12 @@ import { createOauthState, parseOauthState, sanitizeAuthReturnTo } from '@/lib/a
 import { GET } from '@/app/api/auth/google/start/route';
 
 test('administrative sign-in returns only to existing allowlisted administration pages', () => {
-  for (const path of ['/admin', '/admin/audit-log', '/admin/commissions', '/admin/listings', '/admin/maintenance', '/admin/moderation', '/admin/users']) {
+  for (const path of ['/admin', '/admin/audit-log', '/admin/commissions', '/admin/listings', '/admin/site-message', '/admin/moderation', '/admin/users']) {
     assert.equal(sanitizeAuthReturnTo(path), path);
     assert.equal(parseOauthState(createOauthState(path))?.returnTo, path);
     assert.equal(sanitizeAuthReturnTo(`${path}?ticket=private#token=private`), path);
   }
-  for (const path of ['https://evil.test/admin', '//evil.test/admin', '/admin\\evil', '/api/auth/google/start', '/admin/unknown', '/administrator', '/favorites', '/admin/%2f%2fevil.test', '/admin/../privacy']) {
+  for (const path of ['https://evil.test/admin', '//evil.test/admin', '/admin\\evil', '/api/auth/google/start', '/admin/unknown', '/administrator', '/favorites', '/admin/%2f%2fevil.test', '/admin/../privacy', '/admin/maintenance', '/admin/maintenance?scope=search_state']) {
     assert.equal(sanitizeAuthReturnTo(path), '/', path);
   }
 });

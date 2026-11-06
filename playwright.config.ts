@@ -58,7 +58,7 @@ export default defineConfig({
         // Individual test and assertion timeouts remain unchanged.
         timeout: 300_000,
         env: {
-          // A real configured owner is required by the server-rendered maintenance layout.
+          // Owner-only admin pages verify the configured platform owner server-side.
           SMARTSTORE_ADMIN_EMAILS: 'browser-owner@example.test',
           AUTH_SECRET:
             process.env.AUTH_SECRET ?? 'development-only-smartstore-auth-secret',

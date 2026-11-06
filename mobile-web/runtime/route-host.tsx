@@ -30,8 +30,8 @@ const AdminHomePage = dynamic(() => import('../../app/admin/page'), { loading: L
 const AdminAuditLogPage = dynamic(() => import('../../app/admin/audit-log/page'), { loading: LoadingPage, ssr: false });
 const AdminCommissionsPage = dynamic(() => import('../../app/admin/commissions/page'), { loading: LoadingPage, ssr: false });
 const AdminListingsPage = dynamic(() => import('../../app/admin/listings/page'), { loading: LoadingPage, ssr: false });
-const AdminMaintenancePage = dynamic(() => import('../../app/admin/maintenance/page'), { loading: LoadingPage, ssr: false });
 const AdminModerationPage = dynamic(() => import('../../app/admin/moderation/page'), { loading: LoadingPage, ssr: false });
+const AdminSiteMessagePage = dynamic(() => import('../../app/admin/site-message/page'), { loading: LoadingPage, ssr: false });
 const AdminUsersPage = dynamic(() => import('../../app/admin/users/page'), { loading: LoadingPage, ssr: false });
 const CommissionAgreementPage = dynamic(() => import('../../app/commission-agreement/page'), { loading: LoadingPage, ssr: false });
 
@@ -60,8 +60,8 @@ export function MobileRouteHost() {
   if (pathname === '/admin/audit-log') return <AdminAuditLogPage />;
   if (pathname === '/admin/commissions') return <AdminCommissionsPage />;
   if (pathname === '/admin/listings') return <AdminListingsPage />;
-  if (pathname === '/admin/maintenance') return <AdminMaintenancePage />;
   if (pathname === '/admin/moderation') return <AdminModerationPage />;
+  if (pathname === '/admin/site-message') return <AdminSiteMessagePage />;
   if (pathname === '/admin/users') return <AdminUsersPage />;
   if (pathname === '/commission-agreement') return <CommissionAgreementPage />;
   if (pathname === '/commission-policy') return <MobilePolicyPage kind="commissions" />;

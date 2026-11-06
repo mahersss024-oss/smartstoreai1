@@ -15,7 +15,6 @@ import {
   Percent,
   ShieldCheck,
   Users,
-  Wrench,
   X,
   Megaphone,
   Search,
@@ -49,7 +48,7 @@ const sections = [
   { href: '/admin/users', label: 'العملاء', icon: Users },
   { href: '/admin/commissions', label: 'العمولات', icon: Percent },
   { href: '/admin/audit-log', label: 'سجل الإدارة', icon: ClipboardList },
-  { href: '/admin/maintenance', label: 'الصيانة', icon: Wrench, ownerOnly: true },
+  { href: '/admin/site-message', label: 'رسالة الموقع', icon: Megaphone, ownerOnly: true },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

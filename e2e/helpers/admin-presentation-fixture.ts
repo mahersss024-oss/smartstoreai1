@@ -88,23 +88,6 @@ export async function prepare(page: Page, baseURL: string, role = 'admin') {
       return route.fulfill({
         json: { notifications: [], page: 1, hasMore: false },
       });
-    if (url.pathname.endsWith('/maintenance') && url.searchParams.get('resource') === 'database') {
-      const columns = [
-        { name: 'id', type: 'String', redacted: false },
-        { name: 'name', type: 'String', redacted: false },
-      ];
-      const json = url.searchParams.get('view') === 'compatibility'
-        ? {
-            checkedAt: now,
-            migrations: { historyAvailable: true, filesAvailable: true, expected: 1, applied: 1, pending: [], failed: [], unknownApplied: [] },
-            schema: { tablesChecked: 1, missingTables: [], missingColumns: [], extraColumns: [], extraTables: [] },
-            databaseObjects: { expectedFunctions: [], missingFunctions: [], expectedTriggers: [], missingTriggers: [], expectedExtensions: [], missingExtensions: [] },
-          }
-        : url.searchParams.has('model')
-          ? { label: 'User', columns, page: 1, pageSize: 25, total: 1, rows: [{ id: customer.id, name: customer.name }] }
-          : { models: [{ name: 'User', table: 'User', label: 'User', estimatedRows: 1, fields: columns }] };
-      return route.fulfill({ json });
-    }
     if (url.searchParams.has('asset'))
       return route.fulfill({
         contentType: 'image/webp',
@@ -202,19 +185,7 @@ export async function prepare(page: Page, baseURL: string, role = 'admin') {
                   ],
                   pagination,
                 }
-              : url.pathname.endsWith('/maintenance')
-                ? {
-                    counts: {
-                      deletedListings: 1,
-                      deletedListingImages: 2,
-                      closedReports: 1,
-                      closedUserReports: 1,
-                      searchStates: 0,
-                      idempotencyKeys: 0,
-                      modelReviews: 0,
-                    },
-                  }
-                : url.pathname.endsWith('/site-message')
+              : url.pathname.endsWith('/site-message')
                   ? {
                       siteMessage: {
                         message: 'رسالة الاختبار',

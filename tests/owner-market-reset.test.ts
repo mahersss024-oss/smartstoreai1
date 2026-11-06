@@ -131,7 +131,7 @@ test('market reset fails closed without its server signing secret', async () => 
   });
 });
 
-test('guest, customer, moderator and appointed admin cannot preview or execute full reset', async t => {
+test('the retired maintenance endpoint denies non-owners and returns gone to the configured owner', async t => {
   const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
   await withEnvironment(isolatedEnvironment, async () => {
     for (const actor of [
@@ -140,56 +140,18 @@ test('guest, customer, moderator and appointed admin cannot preview or execute f
       { email: 'moderator-reset@example.test', role: 'moderator', status: 403, error: 'owner_required' },
       { email: 'admin-reset@example.test', role: 'admin', status: 403, error: 'owner_required' },
       { email: 'fake-owner-reset@example.test', role: 'owner', status: 403, error: 'owner_required' },
+      { email: 'reset-owner@example.test', role: 'admin', status: 410, error: 'maintenance_retired' },
     ]) {
+      const read = await readMaintenance(resetRequest(actor.email, actor.role));
+      const write = await runMaintenance(resetRequest(actor.email, actor.role, resetPayload));
       for (const response of [
-        await readMaintenance(resetRequest(actor.email, actor.role)),
-        await runMaintenance(resetRequest(actor.email, actor.role, resetPayload)),
+        read,
+        write,
       ]) {
         assert.equal(response.status, actor.status);
         assert.equal((await response.json()).error, actor.error);
         assert.match(response.headers.get('cache-control') ?? '', /no-store/);
       }
-    }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('full reset requires database mode before preview or execute can connect', async t => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withEnvironment({ ...isolatedEnvironment, SMARTSTORE_MARKETPLACE_STORE: 'file' }, async () => {
-    for (const response of [
-      await readMaintenance(resetRequest('reset-owner@example.test', 'admin')),
-      await runMaintenance(resetRequest('reset-owner@example.test', 'admin', resetPayload)),
-    ]) {
-      assert.equal(response.status, 503);
-      assert.equal((await response.json()).error, 'database_required');
-    }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('owner full reset validates exact confirmation, both acknowledgements and strict request shape before database work', async t => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  const malformed: Record<string, unknown>[] = [
-    { ...resetPayload, confirmation: 'تنظيف' },
-    { ...resetPayload, backupConfirmed: false },
-    { ...resetPayload, backupConfirmed: undefined },
-    { ...resetPayload, includeProtectedData: false },
-    { ...resetPayload, includeProtectedData: undefined },
-    { ...resetPayload, reason: 'tiny' },
-    { ...resetPayload, reason: 'a'.repeat(501) },
-    { ...resetPayload, previewToken: '' },
-    { ...resetPayload, previewToken: 'x'.repeat(2001) },
-    { ...resetPayload, actorId: 'browser-chosen-owner' },
-    { ...resetPayload, model: 'User' },
-  ];
-  const owners = malformed.map((_, index) => `reset-validation-${index}@example.test`);
-  await withEnvironment({ ...isolatedEnvironment, SMARTSTORE_ADMIN_EMAILS: owners.join(',') }, async () => {
-    for (const [index, payload] of malformed.entries()) {
-      const response = await runMaintenance(resetRequest(owners[index], 'user', payload));
-      assert.equal(response.status, 400, `Invalid payload ${index}`);
-      assert.equal((await response.json()).error, 'invalid_reset_request');
-      assert.match(response.headers.get('cache-control') ?? '', /no-store/);
     }
   });
   assert.equal(transaction.mock.callCount(), 0);
@@ -203,25 +165,6 @@ test('direct reset execution cannot start a transaction without the explicit des
       { reason: 'tiny' }, { reason: 'a'.repeat(501) },
     ]) {
       await assert.rejects(executeMarketReset({ ...resetPayload, ...changed, actorId: 'owner' }), hasError('invalid_reset_request', 400));
-    }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('owner reset rejects forged, expired and different-owner previews before opening a transaction', async t => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  const owners = ['reset-forged@example.test', 'reset-expired@example.test', 'reset-other-actor@example.test'];
-  await withEnvironment({ ...isolatedEnvironment, SMARTSTORE_ADMIN_EMAILS: owners.join(',') }, async () => {
-    const now = Date.now();
-    const tokens = [
-      'invalid-preview',
-      signMarketResetPreview({ actorId: `google:${owners[1]}`, asOf: now - 10 * 60_000 - 1000, fingerprint: 'e'.repeat(64) }),
-      signMarketResetPreview({ actorId: 'different-owner', asOf: now, fingerprint: 'f'.repeat(64) }),
-    ];
-    for (const [index, previewToken] of tokens.entries()) {
-      const response = await runMaintenance(resetRequest(owners[index], 'admin', { ...resetPayload, previewToken }));
-      assert.equal(response.status, 409);
-      assert.equal((await response.json()).error, 'preview_invalid');
     }
   });
   assert.equal(transaction.mock.callCount(), 0);

@@ -85,7 +85,7 @@ test('workspace reads bounded existing records without snapshots or database wri
   assert.equal(data.events.length, 101);
   assert.equal(data.hasMoreEvents, true);
   assert.match(data.events[0].title, /الإتلاف معلّق/);
-  assert.equal(data.events.at(-1)?.href, '/admin/maintenance');
+  assert.equal(data.events.at(-1)?.href, '/admin/site-message');
   assert.equal((calls.retention as { take: number }).take, 101);
   assert.deepEqual((calls.retention as { where: unknown }).where, {
     disposedAt: null,
@@ -171,9 +171,10 @@ test('template integration is read-only and retains existing routes and theme', 
     'users',
     'commissions',
     'audit-log',
-    'maintenance',
+    'site-message',
   ])
     assert.ok(shell.includes(`/admin/${route}`));
+  assert.doesNotMatch(shell, /\/admin\/maintenance/);
   assert.match(shell, /ThemeToggle/);
   assert.doesNotMatch(shell, /ThemeProvider|localStorage|next-intl/);
   assert.doesNotMatch(service, /\.(create|update|delete|upsert|executeRaw)\(/);

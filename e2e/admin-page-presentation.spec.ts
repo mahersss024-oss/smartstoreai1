@@ -7,7 +7,7 @@ test('changed administration pages fit mobile tablet and desktop without duplica
   baseURL,
 }, testInfo) => {
   test.setTimeout(180_000);
-  // This matrix includes owner-only commissions and maintenance.
+  // This matrix includes owner-only commissions and site-message settings.
   await prepare(page, baseURL!, 'owner');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -20,7 +20,7 @@ test('changed administration pages fit mobile tablet and desktop without duplica
       '/moderation',
       '/commissions',
       '/audit-log',
-      '/maintenance',
+      '/site-message',
     ]) {
       await page.goto('/admin' + route);
       await expect(page.locator('.admin-page')).toBeVisible();
@@ -37,7 +37,7 @@ test('changed administration pages fit mobile tablet and desktop without duplica
             exact: true,
           }),
         ).toBeVisible();
-      } else if (route === '/maintenance') {
+      } else if (route === '/site-message') {
         await expect(page.locator('textarea')).toHaveValue('رسالة الاختبار');
       } else if (route === '') {
         await expect(

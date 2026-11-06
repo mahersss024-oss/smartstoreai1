@@ -102,7 +102,8 @@ test('site message updates require the configured owner, are transactional and a
   const banner = await source('components/site-message-banner.tsx');
   const homeOnly = await source('components/site-message-home-only.tsx');
   const layout = await source('app/layout.tsx');
-  const maintenance = await source('app/admin/maintenance/page.tsx');
+  const siteMessagePage = await source('app/admin/site-message/page.tsx');
+  const siteMessageLayout = await source('app/admin/site-message/layout.tsx');
 
   assert.match(route, /isPlatformOwner/);
   assert.match(route, /auth_required/);
@@ -118,8 +119,12 @@ test('site message updates require the configured owner, are transactional and a
   assert.match(homeOnly, /pathname !== '\/'/);
   assert.doesNotMatch(layout, /<SiteMessageHomeOnly>/, 'the app download gateway does not mount the retired market home message');
   assert.doesNotMatch(layout, /<SiteMessageBanner/);
-  assert.match(maintenance, /رسالة الموقع/);
-  assert.doesNotMatch(maintenance, /localStorage/);
+  assert.match(siteMessagePage, /رسالة الموقع/);
+  assert.match(siteMessagePage, /useAdminAccess\('owner'\)/);
+  assert.match(siteMessageLayout, /isPlatformOwner/);
+  assert.match(siteMessageLayout, /notFound/);
+  assert.match(siteMessagePage, /\/api\/admin\/site-message/);
+  assert.doesNotMatch(siteMessagePage, /localStorage|\/api\/admin\/maintenance|DatabaseExplorer|MarketResetPanel/);
 });
 
 test('migration adds only the required activity, audit and site message storage', async () => {

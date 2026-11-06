@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -146,7 +146,7 @@ test('admin pages verify access before protected admin api requests', () => {
     ['app', 'admin', 'listings', 'page.tsx'],
     ['app', 'admin', 'commissions', 'page.tsx'],
     ['app', 'admin', 'moderation', 'page.tsx'],
-    ['app', 'admin', 'maintenance', 'page.tsx'],
+    ['app', 'admin', 'site-message', 'page.tsx'],
     ['app', 'admin', 'audit-log', 'page.tsx'],
   ];
 
@@ -234,7 +234,7 @@ test('customer mutation apis are scoped to the authenticated user', () => {
   }
 });
 
-test('cloud storage deletions stay behind moderator, configured-owner or listing-owner checks', () => {
+test('cloud storage deletions stay behind listing permissions and retired maintenance cannot schedule them', () => {
   const adminListingRoute = readProjectFile(
     'app',
     'api',
@@ -264,8 +264,8 @@ test('cloud storage deletions stay behind moderator, configured-owner or listing
   assert.match(adminListingRoute, /hasVerifiedModeratorAccess/);
   assert.match(adminListingRoute, /deleteStoredListingImagesBestEffort/);
   assert.match(maintenanceRoute, /isPlatformOwner/);
-  assert.match(maintenanceRoute, /executeMaintenanceCleanup/);
-  assert.match(maintenanceRoute, /schedulePendingImageObjectCleanup/);
+  assert.match(maintenanceRoute, /maintenance_retired/);
+  assert.doesNotMatch(maintenanceRoute, /executeMaintenanceCleanup|executeMarketReset|schedulePendingImageObjectCleanup/);
   const cleanup = readProjectFile('lib', 'admin', 'maintenance.ts');
   assert.match(cleanup, /enqueueImageObjectCleanup/);
   assert.match(cleanup, /imagesQueuedForStorageCleanup/);
@@ -376,7 +376,7 @@ test('admin listings offer permanent deletion only for deleted listings', () => 
   assert.match(page, /method: 'DELETE'/);
 });
 
-test('admin commission, moderation, and maintenance mutations are rate limited', () => {
+test('active commission and moderation mutations remain rate limited while maintenance is retired', () => {
   const commissionRoute = readProjectFile(
     'app',
     'api',
@@ -414,8 +414,8 @@ test('admin commission, moderation, and maintenance mutations are rate limited',
   assert.match(commissionRoute, /admin_commission_mutation/);
   assert.match(listingModerationRoute, /moderation_mutation/);
   assert.match(reportModerationRoute, /moderation_report_mutation/);
-  assert.match(maintenanceRoute, /owner_maintenance_cleanup/);
-  assert.match(maintenanceRoute, /actorId: owner\.session\.user\.id, maxRequests: 6, windowMs: 60_000/);
+  assert.match(maintenanceRoute, /maintenance_retired/);
+  assert.doesNotMatch(maintenanceRoute, /enforceApiRateLimit|executeMaintenanceCleanup|executeMarketReset/);
 });
 
 test('closed moderation reports can be deleted only through moderator-protected routes', () => {
@@ -462,14 +462,9 @@ test('conversation reports stay compact until an administrator opens details', (
   assert.match(page, /method: 'DELETE'/);
 });
 
-test('owner maintenance keeps bounded cleanup away from protected customer and financial data', () => {
-  const route = readProjectFile('app', 'api', 'admin', 'maintenance', 'route.ts');
+test('retained offline bounded cleanup keeps protected customer and financial data out of its inventory', () => {
   const cleanup = readProjectFile('lib', 'admin', 'maintenance.ts');
 
-  assert.match(route, /z\.enum\(maintenanceScopes\)/);
-  assert.match(route, /executeMaintenanceCleanup/);
-  assert.match(route, /reason: z\.string\(\)\.trim\(\)\.min\(5\)\.max\(500\)/);
-  assert.match(route, /previewToken: z\.string\(\)\.min\(1\)\.max\(2000\)/);
   for (const scope of ['purge_deleted_listings', 'closed_reports', 'closed_user_reports', 'search_state', 'old_model_reviews']) {
     assert.ok(cleanup.includes(scope));
   }
@@ -498,34 +493,22 @@ test('owner maintenance keeps bounded cleanup away from protected customer and f
   assert.match(cleanup, /reason: input\.reason/);
 });
 
-test('admin maintenance page offers the deleted-listings purge option', () => {
-  const page = readProjectFile('app', 'admin', 'maintenance', 'page.tsx');
+test('maintenance pages and destructive controls are removed while the owner site message stays independent', () => {
+  for (const path of [
+    ['app', 'admin', 'maintenance', 'page.tsx'],
+    ['app', 'admin', 'maintenance', 'layout.tsx'],
+    ['components', 'admin', 'database-explorer.tsx'],
+    ['components', 'admin', 'market-reset-panel.tsx'],
+  ]) assert.equal(existsSync(join(process.cwd(), ...path)), false, path.join('/'));
 
-  assert.match(page, /purge_deleted_listings/);
-  assert.match(page, /حذف نهائي للإعلانات المحذوفة من العملاء/);
-  assert.match(page, /closed_user_reports/);
-  assert.doesNotMatch(page, /value: 'commissions'/);
-  assert.doesNotMatch(page, /value: 'conversations'/);
-  assert.doesNotMatch(page, /value: 'reports'/);
-  assert.doesNotMatch(page, /value: 'user_reports'/);
-  assert.doesNotMatch(page, /value: 'user_blocks'/);
-  assert.doesNotMatch(page, /value: 'seller_follows'/);
-  assert.doesNotMatch(page, /value: 'seller_ratings'/);
-  assert.doesNotMatch(page, /value: 'push_subscriptions'/);
-  assert.doesNotMatch(page, /value: 'analytics'/);
-  assert.doesNotMatch(page, /marketplace_without_users/);
+  const shell = readProjectFile('components', 'admin', 'admin-shell.tsx');
+  const page = readProjectFile('app', 'admin', 'site-message', 'page.tsx');
+  assert.doesNotMatch(shell, /\/admin\/maintenance/);
+  assert.match(shell, /\/admin\/site-message/);
   assert.match(page, /useAdminAccess\('owner'\)/);
-  assert.match(page, /previewToken: preview\.previewToken/);
-  assert.match(page, /reason, previewToken/);
-  assert.match(page, /preview\.eligible/);
-  assert.match(page, /preview\.protected/);
-  assert.match(page, /preview\.batchCount/);
-  assert.match(page, /preview\.affectedIds/);
-  assert.match(page, /deletedListings/);
-  assert.match(page, /deletedListingImages/);
-  assert.match(page, /تحديث المعاينة/);
-  assert.doesNotMatch(page, /معاينة الأعداد الحالية/);
-  assert.doesNotMatch(page, /Object\.entries\(counts\)/);
+  assert.match(page, /\/api\/admin\/site-message/);
+  assert.match(page, /حفظ رسالة الموقع/);
+  assert.doesNotMatch(page, /MarketResetPanel|DatabaseExplorer|cleanupScope|cleanupConfirmation|marketResetConfirmation|\/api\/admin\/maintenance/);
 });
 
 function withMaintenanceEnv(
@@ -556,21 +539,6 @@ function withMaintenanceEnv(
   });
 }
 
-function maintenanceCleanupRequest(
-  email: string | null,
-  role = 'admin',
-  payload: Record<string, unknown> = { scope: 'purge_deleted_listings', confirmation: 'confirm' },
-) {
-  return new Request('https://smartstore.test/api/admin/maintenance', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(email ? { cookie: createSessionCookie({ id: `google:${email}`, email, role }) } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
-}
-
 const isolatedMaintenanceEnv = {
   NODE_ENV: 'production',
   SMARTSTORE_MARKETPLACE_STORE: 'database',
@@ -583,81 +551,38 @@ const isolatedMaintenanceEnv = {
   UPSTASH_REDIS_REST_TOKEN: undefined,
 };
 
-const cleanupPayload = {
-  scope: 'purge_deleted_listings',
-  confirmation: '\u062a\u0646\u0638\u064a\u0641',
-  reason: 'Remove obsolete test fixtures',
-  previewToken: 'invalid-preview',
-};
-
 function maintenanceReadRequest(email: string | null, role: string) {
   return new Request('https://smartstore.test/api/admin/maintenance', {
     headers: email ? { cookie: createSessionCookie({ id: `google:${email}`, email, role }) } : {},
   });
 }
 
-test('maintenance reads and writes require the configured owner even when legacy cleanup flag is enabled', async (t) => {
+test('retired maintenance API denies non-owners and returns gone to the configured owner without database access', async (t) => {
   const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withMaintenanceEnv({ ...isolatedMaintenanceEnv, SMARTSTORE_ENABLE_ADMIN_MAINTENANCE_CLEANUP: '1' }, async () => {
+  await withMaintenanceEnv(isolatedMaintenanceEnv, async () => {
     for (const actor of [
       { email: null, role: 'user', status: 401, error: 'auth_required' },
       { email: 'user@example.com', role: 'user', status: 403, error: 'owner_required' },
       { email: 'moderator@example.com', role: 'moderator', status: 403, error: 'owner_required' },
       { email: 'appointed-admin@example.com', role: 'admin', status: 403, error: 'owner_required' },
       { email: 'owner-claim@example.com', role: 'owner', status: 403, error: 'owner_required' },
+      { email: 'owner@example.com', role: 'admin', status: 410, error: 'maintenance_retired' },
     ]) {
-      for (const response of [
-        await readMaintenance(maintenanceReadRequest(actor.email, actor.role)),
-        await runMaintenanceCleanup(maintenanceCleanupRequest(actor.email, actor.role, cleanupPayload)),
-      ]) {
+      const read = await readMaintenance(maintenanceReadRequest(actor.email, actor.role));
+      const write = await runMaintenanceCleanup(new Request('https://smartstore.test/api/admin/maintenance', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(actor.email ? { cookie: createSessionCookie({ id: `google:${actor.email}`, email: actor.email, role: actor.role }) } : {}),
+        },
+        body: JSON.stringify({ action: 'market_reset', confirmation: 'delete' }),
+      }));
+      for (const response of [read, write]) {
         assert.equal(response.status, actor.status);
         assert.equal((await response.json()).error, actor.error);
         assert.match(response.headers.get('cache-control') ?? '', /no-store/);
       }
     }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('owner production maintenance requires database storage without attempting a connection in file mode', async (t) => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withMaintenanceEnv({ ...isolatedMaintenanceEnv, SMARTSTORE_MARKETPLACE_STORE: 'file' }, async () => {
-    for (const response of [
-      await readMaintenance(maintenanceReadRequest('owner@example.com', 'admin')),
-      await runMaintenanceCleanup(maintenanceCleanupRequest('owner@example.com', 'admin', cleanupPayload)),
-    ]) {
-      assert.equal(response.status, 503);
-      assert.equal((await response.json()).error, 'database_required');
-    }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('enabled owner production cleanup validates scope, confirmation, reason and preview before database work', async (t) => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withMaintenanceEnv({ ...isolatedMaintenanceEnv, SMARTSTORE_ADMIN_EMAILS: 'owner-validation@example.com' }, async () => {
-    for (const payload of [
-      { scope: 'purge_deleted_listings', confirmation: 'confirm' },
-      { ...cleanupPayload, confirmation: 'confirm' },
-      { ...cleanupPayload, reason: 'tiny' },
-      { ...cleanupPayload, scope: 'commissions' },
-      { ...cleanupPayload, previewToken: '' },
-      { ...cleanupPayload, actorId: 'different-user' },
-    ]) {
-      const response = await runMaintenanceCleanup(maintenanceCleanupRequest('owner-validation@example.com', 'admin', payload));
-      assert.equal(response.status, 400);
-      assert.equal((await response.json()).error, 'invalid_cleanup_request');
-    }
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
-
-test('owner cleanup rejects a forged preview before opening a database transaction', async (t) => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withMaintenanceEnv({ ...isolatedMaintenanceEnv, SMARTSTORE_ADMIN_EMAILS: 'owner-preview@example.com' }, async () => {
-    const response = await runMaintenanceCleanup(maintenanceCleanupRequest('owner-preview@example.com', 'admin', cleanupPayload));
-    assert.equal(response.status, 409);
-    assert.equal((await response.json()).error, 'preview_invalid');
   });
   assert.equal(transaction.mock.callCount(), 0);
 });
@@ -679,21 +604,6 @@ test('signed cleanup preview binds the owner, scope, contents and expiry', async
   });
 });
 
-test('owner cleanup enforces six requests per actor and retains no-store and retry headers', async (t) => {
-  const transaction = t.mock.method(prisma, '$transaction', async () => { throw new Error('unexpected_database_access'); });
-  await withMaintenanceEnv({ ...isolatedMaintenanceEnv, SMARTSTORE_ADMIN_EMAILS: 'owner-rate@example.com' }, async () => {
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const response = await runMaintenanceCleanup(maintenanceCleanupRequest('owner-rate@example.com'));
-      assert.equal(response.status, 400);
-    }
-    const response = await runMaintenanceCleanup(maintenanceCleanupRequest('owner-rate@example.com'));
-    assert.equal(response.status, 429);
-    assert.equal((await response.json()).error, 'rate_limited');
-    assert.ok(Number(response.headers.get('retry-after')) > 0);
-    assert.match(response.headers.get('cache-control') ?? '', /no-store/);
-  });
-  assert.equal(transaction.mock.callCount(), 0);
-});
 
 test('the configured owner account remains protected from appointed admins', () => {
   const updateRoute = readProjectFile(
@@ -823,7 +733,7 @@ test('admin action pages use floating feedback for mutation results', () => {
     ['app', 'admin', 'users', 'page.tsx'],
     ['app', 'admin', 'commissions', 'page.tsx'],
     ['app', 'admin', 'moderation', 'page.tsx'],
-    ['app', 'admin', 'maintenance', 'page.tsx'],
+    ['app', 'admin', 'site-message', 'page.tsx'],
   ];
 
   for (const pageSegments of pages) {

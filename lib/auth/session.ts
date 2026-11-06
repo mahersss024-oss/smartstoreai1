@@ -301,7 +301,7 @@ export function isModeratorSession(session: AuthSession | null) {
 
 const adminAuthDestinations = new Set([
   '/admin', '/admin/audit-log', '/admin/commissions', '/admin/listings',
-  '/admin/maintenance', '/admin/moderation', '/admin/users',
+  '/admin/moderation', '/admin/site-message', '/admin/users',
 ]);
 
 export function sanitizeAuthReturnTo(value: string | null | undefined) {
