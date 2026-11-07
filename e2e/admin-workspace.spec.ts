@@ -28,9 +28,12 @@ async function prepare(
               visits: [
                 {
                   day: new Date().toISOString().slice(0, 10),
+                  platform: 'ios',
                   visits: 12,
                   uniqueVisitors: 8,
                 },
+                { day: new Date().toISOString().slice(0, 10), platform: 'android', visits: 4, uniqueVisitors: 3 },
+                { day: new Date().toISOString().slice(0, 10), platform: 'web', visits: 99, uniqueVisitors: 50 },
               ],
               events: [
                 {
@@ -47,6 +50,13 @@ async function prepare(
               activeUsers: 7,
               publishedListings: 15,
               openReports: 4,
+              appUsage: {
+                today: 11, last7Days: 17, last30Days: 35,
+                platforms: {
+                  ios: { today: 8, last7Days: 12, last30Days: 20 },
+                  android: { today: 3, last7Days: 5, last30Days: 15 },
+                },
+              },
             },
     }),
   );
@@ -104,6 +114,24 @@ test('admin workspace renders real payloads, charts and read-only calendar on al
       .last(),
   ).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('activity defaults to native app usage and keeps website traffic and rolling unique periods separate', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!);
+  await page.goto('/admin');
+  const panel = page.getByRole('region', { name: 'نشاط التطبيق والموقع', exact: true });
+  await expect(panel).toBeVisible();
+  const source = panel.getByRole('combobox', { name: 'مصدر النشاط' });
+  await expect(source).toHaveValue('app');
+  const metrics = panel.getByRole('definition');
+  await expect(metrics).toHaveText(['١١', '١٧', '٣٥']);
+  await panel.getByText('عرض أرقام النشاط', { exact: true }).click();
+  await expect(panel.getByRole('table').locator('tbody td')).toHaveText(['١٦', '١١']);
+  await source.selectOption('web');
+  await expect(panel.getByRole('table').locator('tbody td')).toHaveText(['٩٩', '٥٠']);
+  await source.selectOption('ios');
+  await expect(panel.getByRole('table').locator('tbody td')).toHaveText(['١٢', '٨']);
+  await expect(metrics).toHaveText(['١١', '١٧', '٣٥']);
 });
 
 test('calendar keeps seven aligned columns on narrow screens', async ({ page, baseURL }, testInfo) => {

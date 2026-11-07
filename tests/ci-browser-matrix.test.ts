@@ -34,7 +34,7 @@ const browserProjects = playwrightConfig.projects!.filter(project => project.nam
 const adminSpecs = [
   'app-download-gateway.spec.ts', 'admin-session.spec.ts',
   'legal-pages.spec.ts',
-  'admin-page-presentation.spec.ts', 'admin-users-loading.spec.ts', 'admin-workspace.spec.ts',
+  'admin-page-presentation.spec.ts', 'admin-state-correctness.spec.ts', 'admin-users-loading.spec.ts', 'admin-workspace.spec.ts',
   'owner-market-reset.spec.ts',
   'all-pages-vitals.spec.ts', 'customer-evidence.spec.ts', 'marketplace-car-models.spec.ts',
   'marketplace-categories.spec.ts', 'performance-stability.spec.ts', 'route-contracts.spec.ts',

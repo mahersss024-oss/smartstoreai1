@@ -38,7 +38,7 @@ export async function getAdminWorkspace(
           day: { gte: range.month + '-01', lt: getSaudiDay(range.end) },
         },
         orderBy: { day: 'asc' },
-        select: { day: true, visits: true, uniqueVisitors: true },
+        select: { day: true, platform: true, visits: true, uniqueVisitors: true },
       }),
       database.evidenceCase.findMany({
         where: {

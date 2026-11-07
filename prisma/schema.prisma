@@ -193,22 +193,37 @@ model ApiIdempotencyKey {
   @@index([createdAt])
 }
 
+enum AnalyticsPlatform {
+  web
+  ios
+  android
+}
+
 model SiteVisitDaily {
-  day            String   @id
+  day            String
+  platform       AnalyticsPlatform @default(web)
   visits         Int      @default(0)
   uniqueVisitors Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@id([day, platform])
+  @@index([platform, day])
 }
 
 model SiteVisitUnique {
   id        String   @id @default(cuid())
   day       String
   visitorId String
+  platform  AnalyticsPlatform @default(web)
+  lastSessionId String?
+  seenSessionIds String[] @default([])
+  lastSeenAt DateTime @default(now())
   createdAt DateTime @default(now())
 
-  @@unique([day, visitorId])
+  @@unique([day, platform, visitorId])
   @@index([day, createdAt])
+  @@index([platform, day, visitorId])
 }
 
 enum PushPlatform {

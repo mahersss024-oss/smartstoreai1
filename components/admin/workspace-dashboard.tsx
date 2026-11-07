@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@ui/button';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
+import type { AppUsageStats } from '@/lib/analytics/site-visits';
 import { WorkspaceCharts } from './workspace-charts';
 import { StatusDistribution } from './status-distribution';
 
@@ -50,7 +51,7 @@ const number = (value: number | string) =>
     Number(value),
   );
 
-export function WorkspaceDashboard() {
+export function WorkspaceDashboard({ appUsage }: { appUsage?: AppUsageStats }) {
   const params = useSearchParams();
   const calendar = params.get('view') === 'calendar';
   const [month, setMonth] = useState(() =>
@@ -214,7 +215,7 @@ export function WorkspaceDashboard() {
             <WorkspaceCalendar data={data} />
           ) : (
             <>
-              <WorkspaceCharts data={data} />
+              <WorkspaceCharts data={data} appUsage={appUsage} />
               <div className="grid min-w-0 gap-6 lg:grid-cols-2">
                 <StatusDistribution
                   title="توزيع حالات الإعلانات"

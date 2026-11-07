@@ -1,0 +1,121 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import test, { type TestContext } from 'node:test';
+import { DELETE as deleteListing, PATCH as editListing } from '@/app/api/admin/listings/[listingId]/route';
+import { PATCH as resolveReport } from '@/app/api/admin/moderation/reports/[reportId]/route';
+import { setReportModerationStatus } from '@/agent/marketplace/repository';
+import { createSignedSession } from '@/lib/auth/session';
+import { prisma } from '@/lib/db/prisma';
+import { mockDatabaseMethod } from './helpers/mock-database-method';
+
+function environment(t: TestContext) {
+  for (const [key, value] of Object.entries({
+    SMARTSTORE_MARKETPLACE_STORE: 'database', SMARTSTORE_ADMIN_EMAILS: 'moderation-owner@example.test',
+    AUTH_SECRET: 'isolated-admin-moderation-mutations-only', SMARTSTORE_RATE_LIMIT_BACKEND: 'memory',
+    UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
+  })) {
+    const previous = process.env[key]; process.env[key] = value;
+    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
+  mockDatabaseMethod(t, prisma.user, 'upsert', async () => ({ id: 'moderation-owner' }));
+  mockDatabaseMethod(t, prisma.user, 'update', async () => ({ id: 'moderation-owner' }));
+  mockDatabaseMethod(t, prisma.evidenceAsset, 'count', async () => 0);
+  const token = createSignedSession({ id: 'moderation-owner', email: 'moderation-owner@example.test' });
+  return (path: string, method: string, body?: object) => new Request('https://example.test' + path, {
+    method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+for (const currentStatus of ['published', 'deleted']) {
+  test(`permanent listing deletion uses the locked current ${currentStatus} state`, async t => {
+    const request = environment(t);
+    const identity = { id: 'delete-listing', sellerId: 'seller', status: 'deleted', images: [] };
+    const current = { ...identity, status: currentStatus, images: [{ id: 'new-image', originalUrl: 'https://example.test/new.webp', displayUrl: 'https://example.test/new.webp', thumbnailUrl: 'https://example.test/new-thumb.webp' }] };
+    const locks: string[] = [];
+    let deleted = 0;
+    let audits = 0;
+    const cleanedHashes: string[][] = [];
+    mockDatabaseMethod(t, prisma.evidenceAsset, 'count', async ({ where }: { where: { sourceHash: { in: string[] } } }) => {
+      cleanedHashes.push(where.sourceHash.in); return 0;
+    });
+    mockDatabaseMethod(t, prisma.listing, 'findUnique', async () => identity);
+    mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+      $executeRaw: async (sql: TemplateStringsArray) => { locks.push(sql.join('?')); return 1; },
+      listing: {
+        findUnique: async () => { assert.match(locks.at(-1)!, /FOR UPDATE/); return current; },
+        delete: async () => { deleted++; return current; },
+      },
+      adminAuditLog: { create: async () => { audits++; return {}; } },
+    }));
+    const response = await deleteListing(request('/api/admin/listings/delete-listing', 'DELETE'), {
+      params: Promise.resolve({ listingId: identity.id }),
+    });
+    assert.equal(response.status, currentStatus === 'deleted' ? 200 : 409);
+    assert.equal(deleted, currentStatus === 'deleted' ? 1 : 0);
+    assert.equal(audits, deleted);
+    assert.equal(locks.length, 3);
+    assert.ok(locks.slice(0, 2).every(sql => sql.includes('pg_advisory_xact_lock')));
+    if (currentStatus === 'published') assert.equal((await response.json()).error, 'listing_must_be_deleted_first');
+    else assert.deepEqual(cleanedHashes, [[current.images[0].originalUrl, current.images[0].displayUrl, current.images[0].thumbnailUrl]
+      .map(url => createHash('sha256').update(url).digest('hex'))], 'cleanup uses images read inside the locked transaction');
+  });
+}
+
+test('a stale administrative listing save returns a conflict without mutation or audit', async t => {
+  const request = environment(t);
+  const listing = { id: 'changed-listing', sellerId: 'seller', updatedAt: new Date('2026-01-02T00:00:00Z') };
+  mockDatabaseMethod(t, prisma.listing, 'findUnique', async () => listing);
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async () => 1,
+    listing: { findUnique: async () => listing, update: async () => assert.fail('stale save must not write') },
+    adminAuditLog: { create: async () => assert.fail('stale save must not audit a mutation') },
+  }));
+  const response = await editListing(request('/api/admin/listings/changed-listing', 'PATCH', {
+    title: 'A stale title', expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
+  }), { params: Promise.resolve({ listingId: listing.id }) });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, 'listing_changed');
+});
+
+test('concurrent listing-report decisions claim the open report once and audit only the winner', async t => {
+  environment(t);
+  const report = { id: 'report', status: 'open', listingId: 'listing', reporterId: 'reporter',
+    reason: 'fraud', details: null, createdAt: new Date(0), updatedAt: new Date(0), listing: null };
+  let reads = 0;
+  let release!: () => void;
+  const bothRead = new Promise<void>(resolve => { release = resolve; });
+  const audits: Array<{ metadata: { previousStatus: string; nextStatus: string } }> = [];
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    report: {
+      findUnique: async () => { reads++; if (reads === 2) release(); await bothRead; return { status: 'open' }; },
+      updateMany: async ({ where, data }: { where: { status: string }; data: { status: string } }) => {
+        if (report.status !== where.status) return { count: 0 };
+        report.status = data.status; return { count: 1 };
+      },
+      findUniqueOrThrow: async () => ({ ...report }),
+    },
+    adminAuditLog: { create: async ({ data }: { data: typeof audits[number] }) => { audits.push(data); } },
+  }));
+  const results = await Promise.all([
+    setReportModerationStatus(report.id, 'reviewed', 'moderation-owner'),
+    setReportModerationStatus(report.id, 'dismissed', 'moderation-owner'),
+  ]);
+  assert.equal(results.filter(result => result.status === 'already_resolved').length, 1);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].metadata.previousStatus, 'open');
+  assert.equal(audits[0].metadata.nextStatus, report.status);
+});
+
+test('the listing-report route returns 409 when another moderator already resolved it', async t => {
+  const request = environment(t);
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    report: { findUnique: async () => ({ status: 'reviewed' }), updateMany: async () => assert.fail('closed report must not change') },
+  }));
+  const response = await resolveReport(request('/api/admin/moderation/reports/report', 'PATCH', { action: 'dismiss' }), {
+    params: Promise.resolve({ reportId: 'report' }),
+  });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, 'report_already_resolved');
+});

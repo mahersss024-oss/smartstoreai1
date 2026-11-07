@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { prisma } from '@/lib/db/prisma';
-import { addConversationMessage, blockConversationUser, shareSellerContact, unblockConversationUser } from '@/agent/marketplace/repository';
+import { addConversationMessage, blockConversationUser, setUserReportModerationStatus, shareSellerContact, unblockConversationUser } from '@/agent/marketplace/repository';
 
 function deferred() {
   let resolve!: () => void;
@@ -16,7 +16,7 @@ function fixture(t: TestContext) {
   t.after(() => { if (previous === undefined) delete process.env.SMARTSTORE_MARKETPLACE_STORE; else process.env.SMARTSTORE_MARKETPLACE_STORE = previous; });
   const record = { id: 'conversation', buyerId: 'buyer', sellerId: 'seller', listingId: 'listing', status: 'open',
     createdAt: new Date(0), updatedAt: new Date(0), messages: [], listing: null };
-  type Block = { id: string; blockerId: string; blockedId: string; conversationId: string; reason: null; createdAt: Date };
+  type Block = { id: string; blockerId: string; blockedId: string; conversationId: string; reason: string | null; createdAt: Date };
   let block: Block | null = null;
   const events: string[] = [];
   let inserted = 0;
@@ -32,8 +32,8 @@ function fixture(t: TestContext) {
     t.after(() => { if (descriptor) Object.defineProperty(target, key, descriptor); else Reflect.deleteProperty(target, key); });
   }
   const findBlock = async () => block;
-  const upsertBlock = async ({ create }: { create: { blockerId: string; blockedId: string } }) => {
-    block = { id: 'block', ...create, conversationId: record.id, reason: null, createdAt: new Date() };
+  const upsertBlock = async ({ create }: { create: { blockerId: string; blockedId: string; conversationId?: string; reason?: string } }) => {
+    block = { id: 'block', conversationId: record.id, reason: null, ...create, createdAt: new Date() };
     events.push('block'); return block;
   };
   const insertMessage = async ({ data }: { data: Record<string, unknown> }) => {
@@ -63,6 +63,14 @@ function fixture(t: TestContext) {
       conversation: {
         findFirst: async () => { assert.ok(ownsPair); return structuredClone(record); },
         updateMany: async () => { assert.ok(ownsPair); return { count: record.status === 'open' ? 1 : 0 }; },
+        update: async () => { assert.ok(ownsPair); return { id: 'reported-conversation', status: 'closed' }; },
+      },
+      userReport: {
+        findUnique: async () => ({ id: 'report', conversationId: 'reported-conversation', reporterId: 'buyer', targetUserId: 'seller', status: 'open' }),
+        updateMany: async () => { assert.ok(ownsPair, 'moderation must take the pair lock before evidence/report locks'); return { count: 1 }; },
+        findUniqueOrThrow: async () => ({ id: 'report', reporterId: 'buyer', targetUserId: 'seller', status: 'reviewed',
+          reason: 'fraud', details: null, conversationId: 'reported-conversation', resolution: 'restrict', resolvedBy: null,
+          resolvedAt: new Date(), createdAt: new Date(), updatedAt: new Date() }),
       },
       userBlock: {
         findFirst: async () => { assert.ok(ownsPair); return findBlock(); },
@@ -123,6 +131,35 @@ test('a block waits for an already locked send, then prevents the next message i
   state.pauseInsert(undefined);
   assert.equal((await addConversationMessage('conversation', 'buyer', 'Allowed after unblock')).status, 'sent');
   assert.equal(state.inserted(), 2);
+});
+
+test('moderation waits for a send in another conversation of the pair and then blocks later sends', async t => {
+  const state = fixture(t); const entered = deferred(); const resume = deferred();
+  state.pauseInsert(async () => { entered.resolve(); await resume.promise; });
+  const sending = addConversationMessage('conversation', 'buyer', 'A message before administrative restriction');
+  await entered.promise;
+  let completed = false;
+  const restricting = setUserReportModerationStatus('report', 'restrict').then(result => { completed = true; return result; });
+  await flush(); assert.equal(completed, false);
+  resume.resolve();
+  assert.equal((await sending).status, 'sent');
+  assert.equal((await restricting).status, 'reviewed');
+  assert.deepEqual(state.events, ['message', 'block']);
+  assert.equal(state.record.status, 'open', 'the second conversation remains open but the pair is blocked');
+  assert.equal((await addConversationMessage('conversation', 'seller', 'A message after administrative restriction')).status, 'conversation_blocked');
+  assert.equal(state.inserted(), 1);
+});
+
+test('customer block and unblock actions cannot downgrade or remove an administrative restriction', async t => {
+  const state = fixture(t);
+  assert.equal((await setUserReportModerationStatus('report', 'restrict')).status, 'reviewed');
+  const personal = await blockConversationUser('conversation', 'buyer', 'customer_reason');
+  assert.equal(personal.block?.reason, 'admin_moderation');
+  const unblocked = await unblockConversationUser('conversation', 'buyer');
+  assert.equal(unblocked.status, 'conversation_blocked');
+  assert.equal(unblocked.blockStatus?.blocked, true);
+  assert.equal((await addConversationMessage('conversation', 'seller', 'Still administratively blocked')).status, 'conversation_blocked');
+  assert.equal(state.inserted(), 0);
 });
 
 test('a conversation closed after the initial read cannot accept the pending send', async t => {

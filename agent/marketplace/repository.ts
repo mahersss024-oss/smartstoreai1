@@ -4072,6 +4072,11 @@ export async function blockConversationUser(
       select: { id: true },
     });
     if (!current) return null;
+    const existing = await tx.userBlock.findUnique({
+      where: { blockerId_blockedId: { blockerId, blockedId } },
+    });
+    // A customer-owned block must not replace a human moderation restriction.
+    if (existing?.reason === 'admin_moderation') return existing;
     return tx.userBlock.upsert({
     where: {
       blockerId_blockedId: {
@@ -4155,7 +4160,7 @@ export async function unblockConversationUser(
     };
   }
 
-  const existingBlock = await prisma.$transaction(async tx => {
+  const outcome = await prisma.$transaction(async tx => {
     await lockConversationUserPair(tx, blockerId, blockedId);
     const existing = await tx.userBlock.findUnique({
     where: {
@@ -4165,19 +4170,21 @@ export async function unblockConversationUser(
       },
     },
     });
-    if (!existing) return null;
+    if (!existing) return { status: 'not_blocked' as const };
+    if (existing.reason === 'admin_moderation') return { status: 'conversation_blocked' as const };
     await tx.userBlock.delete({ where: { blockerId_blockedId: { blockerId, blockedId } } });
-    return existing;
+    return { status: 'unblocked' as const, block: existing };
   });
 
-  if (!existingBlock) {
+  if (outcome.status !== 'unblocked') {
     return {
-      status: 'not_blocked' as const,
+      status: outcome.status,
       block: null,
       conversation,
       blockStatus: await getConversationBlockStatus(conversationId, blockerId),
     };
   }
+  const existingBlock = outcome.block;
 
   safelyPublishRealtimeEvent({
     type: 'conversation_updated',
@@ -5144,6 +5151,11 @@ export async function setUserReportModerationStatus(
     if (!existing) return null;
     if (existing.status !== 'open') return 'already_resolved' as const;
 
+    // Sends and customer block actions hold this pair key through commit. Take
+    // it before the report update's evidence locks, in the same lock order.
+    if (shouldCloseConversation && existing.conversationId) {
+      await lockConversationUserPair(tx, existing.reporterId, existing.targetUserId);
+    }
     const claimed = await tx.userReport.updateMany({
       where: { id: reportId, status: 'open' },
       data: {
@@ -5418,9 +5430,16 @@ export async function setReportModerationStatus(
 
   const adminId = await getAdminAuditActorId(admin);
   const report = await prisma.$transaction(async (tx) => {
-    const updatedReport = await tx.report.update({
-      where: { id: reportId },
+    const existing = await tx.report.findUnique({ where: { id: reportId }, select: { status: true } });
+    if (!existing) return null;
+    if (existing.status !== 'open') return 'already_resolved' as const;
+    const claimed = await tx.report.updateMany({
+      where: { id: reportId, status: 'open' },
       data: { status },
+    });
+    if (!claimed.count) return 'already_resolved' as const;
+    const updatedReport = await tx.report.findUniqueOrThrow({
+      where: { id: reportId },
       include: {
         listing: {
           include: {
@@ -5438,7 +5457,7 @@ export async function setReportModerationStatus(
       targetType: 'report',
       targetId: reportId,
       metadata: {
-        previousStatus: 'open',
+        previousStatus: existing.status,
         nextStatus: status,
         listingId: updatedReport.listingId,
         reporterId: updatedReport.reporterId,
@@ -5446,7 +5465,7 @@ export async function setReportModerationStatus(
     });
 
     return updatedReport;
-  }).catch(() => null);
+  });
 
   if (!report) {
     return {
@@ -5454,6 +5473,7 @@ export async function setReportModerationStatus(
       report: null,
     };
   }
+  if (report === 'already_resolved') return { status: 'already_resolved' as const, report: null };
 
   const mappedReport = toReportRecord(report);
 

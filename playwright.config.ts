@@ -18,6 +18,7 @@ const adminBrowserSpecs = [
   '**/admin-session.spec.ts',
   '**/legal-pages.spec.ts',
   '**/admin-page-presentation.spec.ts',
+  '**/admin-state-correctness.spec.ts',
   '**/admin-users-loading.spec.ts',
   '**/admin-workspace.spec.ts',
   '**/owner-market-reset.spec.ts',

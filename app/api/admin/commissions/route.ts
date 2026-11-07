@@ -1,4 +1,5 @@
 import { listAdminCommissionsPage } from '@/agent/marketplace/repository';
+import { getAdminCommissionSummary } from '@/lib/admin/commission-summary';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
@@ -17,13 +18,15 @@ export async function GET(request: Request) {
     return Response.json({ error: 'owner_required' }, { status: 403 });
   }
 
-  const commissionsPage = await listAdminCommissionsPage(
-    parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 }),
-  );
+  const [commissionsPage, summary] = await Promise.all([
+    listAdminCommissionsPage(parsePaginationFromRequest(request, { defaultLimit: 20, maxLimit: 48 })),
+    getAdminCommissionSummary(),
+  ]);
 
   return Response.json({
     commissions: commissionsPage.items,
     pagination: commissionsPage.pagination,
+    summary,
   }, {
     headers: noStoreHeaders,
   });

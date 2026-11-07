@@ -3,7 +3,7 @@ import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { noStoreHeaders } from '@/lib/api/no-store';
-import { parsePaginationFromRequest } from '@/lib/pagination';
+import { createPaginationMeta, parsePaginationFromRequest } from '@/lib/pagination';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 import { getMarketplaceCategoryOption, marketplaceCategoryOptionAttribute } from '@/lib/marketplace/category-options';
 import { getMarketplaceCarModel, marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
@@ -128,21 +128,18 @@ export async function GET(request: Request) {
           select: { id: true, originalUrl: true, displayUrl: true, thumbnailUrl: true, isPrimary: true },
         },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       skip: pagination.skip,
       take: pagination.take,
     }),
     prisma.listing.count({ where }),
   ]);
 
+  const hasMore = listings.length > pagination.limit;
   return Response.json({
-    listings: listings.map(mapListing),
+    listings: listings.slice(0, pagination.limit).map(mapListing),
     pagination: {
-      page: pagination.page,
-      limit: pagination.limit,
-      hasMore: pagination.skip + listings.length < total,
-      nextPage:
-        pagination.skip + listings.length < total ? pagination.page + 1 : null,
+      ...createPaginationMeta({ page: pagination.page, limit: pagination.limit, hasMore }),
       total,
     },
   }, {

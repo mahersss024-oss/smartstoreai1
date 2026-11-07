@@ -4,6 +4,7 @@ import { AdminPageHeading } from '@/components/admin/page-heading';
 import { AdminRecordPreview } from '@/components/admin/record-preview';
 import { AdminResultsTable } from '@/components/admin/results-table';
 import { TechnicalDetails } from '@/components/admin/record-details';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -97,6 +98,7 @@ export default function AdminUsersPage() {
   const {
     adminAccessNotice,
     adminAccessRole,
+    isAdminAccessAllowed,
     verifyAdminAccess,
   } = useAdminAccess('admin');
   const isOwner = adminAccessRole === 'owner' || adminAccessRole === 'admin';
@@ -117,6 +119,8 @@ export default function AdminUsersPage() {
     user: AdminUserRecord;
     action: 'soft' | 'permanent' | 'restore';
   } | null>(null);
+  const { begin: beginLoad, invalidate: invalidateLoad } = useAdminRequest(isAdminAccessAllowed, JSON.stringify([appliedQuery, roleFilter]));
+  const { begin: beginMutation } = useAdminRequest(isAdminAccessAllowed);
 
   const totalUsers = pagination?.total ?? users.length;
   const usersWithPhone = useMemo(
@@ -128,15 +132,18 @@ export default function AdminUsersPage() {
 
   const refreshUsers = useCallback(
     async (page = 1) => {
+      const request = beginLoad();
       setIsLoading(true);
       setNotice('');
 
       try {
         if (!(await verifyAdminAccess())) {
+          if (!request.isCurrent()) return;
           setUsers([]);
           setPagination(null);
           return;
         }
+        if (!request.isCurrent()) return;
 
         const params = new URLSearchParams({
           page: String(page),
@@ -154,7 +161,9 @@ export default function AdminUsersPage() {
 
         const response = await fetch(`/api/admin/users?${params}`, {
           cache: 'no-store',
+          signal: request.signal,
         });
+        if (!request.isCurrent()) return;
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -177,9 +186,10 @@ export default function AdminUsersPage() {
           pagination?: PaginationMeta;
         };
         const nextUsers = payload.users ?? [];
+        if (!request.isCurrent()) return;
 
         setUsers((currentUsers) =>
-          page === 1 ? nextUsers : [...currentUsers, ...nextUsers],
+          page === 1 ? nextUsers : [...currentUsers, ...nextUsers.filter(user => !currentUsers.some(row => row.id === user.id))],
         );
         setDrafts((currentDrafts) => {
           const nextDrafts = { ...currentDrafts };
@@ -194,11 +204,13 @@ export default function AdminUsersPage() {
           return page === 1 ? nextDrafts : nextDrafts;
         });
         setPagination(payload.pagination ?? null);
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل المستخدمين. حاول مجددًا.');
       } finally {
-        setIsLoading(false);
+        if (request.isCurrent()) setIsLoading(false);
       }
     },
-    [appliedQuery, isOwner, roleFilter, router, verifyAdminAccess],
+    [appliedQuery, isOwner, roleFilter, router, verifyAdminAccess, beginLoad],
   );
 
   useEffect(() => {
@@ -227,8 +239,14 @@ export default function AdminUsersPage() {
     }
 
     if (!adminAccessRole) {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setUsers([]); setDrafts({}); setPagination(null); setSelectedId(null); setPendingUserConfirm(null);
+        setSavingUserId(null); setDeletingUserId(null); setUserAction(null);
+      });
       void verifyAdminAccess();
-      return;
+      return () => { cancelled = true; };
     }
 
     let cancelled = false;
@@ -268,10 +286,19 @@ export default function AdminUsersPage() {
   const saveUser = useCallback(
     async (userId: string, phoneOverride?: string) => {
       const draft = drafts[userId];
+      const user = users.find(row => row.id === userId);
 
-      if (!draft) {
+      if (!draft || !user) {
         return;
       }
+      const phoneNumber = phoneOverride ?? draft.phoneNumber;
+      const body = {
+        ...(phoneOverride === undefined && isOwner && draft.role !== normalizeRole(user.role) ? { role: draft.role } : {}),
+        ...(phoneNumber !== (user.phoneNumber ?? '') ? { phoneNumber } : {}),
+      };
+      if (!Object.keys(body).length) return;
+      const request = beginMutation();
+      invalidateLoad();
 
       setSavingUserId(userId);
       setNotice('');
@@ -280,16 +307,14 @@ export default function AdminUsersPage() {
         const response = await fetch(`/api/admin/users/${userId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...(isOwner ? { role: draft.role } : {}),
-            phoneNumber: phoneOverride ?? draft.phoneNumber,
-          }),
+          body: JSON.stringify(body),
         });
         const payload = (await response.json().catch(() => null)) as {
           user?: AdminUserRecord;
           message?: string;
           error?: string;
         } | null;
+        if (!request.isCurrent()) return;
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -320,15 +345,19 @@ export default function AdminUsersPage() {
           },
         }));
         setNotice('تم تحديث بيانات المستخدم.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لحفظ المستخدم. بقيت تعديلاتك في المسودة.');
       } finally {
-        setSavingUserId(null);
+        if (request.isCurrent()) setSavingUserId(null);
       }
     },
-    [drafts, isOwner, router],
+    [drafts, users, isOwner, router, beginMutation, invalidateLoad],
   );
 
   const deleteUser = useCallback(
     async (user: AdminUserRecord, mode: 'soft' | 'permanent') => {
+      const request = beginMutation();
+      invalidateLoad();
       const isPermanent = mode === 'permanent';
       setPendingUserConfirm(null);
       setDeletingUserId(user.id);
@@ -343,6 +372,7 @@ export default function AdminUsersPage() {
           message?: string;
           error?: string;
         } | null;
+        if (!request.isCurrent()) return;
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -379,16 +409,19 @@ export default function AdminUsersPage() {
             ? 'تم حذف المستخدم وبياناته نهائيًا.'
             : 'تم تعطيل حساب المستخدم مع الاحتفاظ ببياناته.',
         );
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لتنفيذ إجراء الحساب. حاول مجددًا.');
       } finally {
-        setDeletingUserId(null);
-        setUserAction(null);
+        if (request.isCurrent()) { setDeletingUserId(null); setUserAction(null); }
       }
     },
-    [isOwner, router],
+    [isOwner, router, beginMutation, invalidateLoad],
   );
 
   const restoreUser = useCallback(
     async (user: AdminUserRecord) => {
+      const request = beginMutation();
+      invalidateLoad();
       setPendingUserConfirm(null);
       setDeletingUserId(user.id);
       setUserAction('restore');
@@ -405,6 +438,7 @@ export default function AdminUsersPage() {
           message?: string;
           error?: string;
         } | null;
+        if (!request.isCurrent()) return;
 
         if (!response.ok || !payload?.user) {
           setNotice(payload?.message ?? payload?.error ?? 'تعذر إعادة تفعيل الحساب.');
@@ -417,13 +451,16 @@ export default function AdminUsersPage() {
           ),
         );
         setNotice('تمت إعادة تفعيل حساب المستخدم.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لإعادة تفعيل الحساب. حاول مجددًا.');
       } finally {
-        setDeletingUserId(null);
-        setUserAction(null);
+        if (request.isCurrent()) { setDeletingUserId(null); setUserAction(null); }
       }
     },
-    [],
+    [beginMutation, invalidateLoad],
   );
+
+  if (!isAdminAccessAllowed) return <main dir="rtl"><div className="admin-page"><AdminPageHeading title="إدارة المستخدمين" /><p role="status">{adminAccessNotice || 'جارٍ التحقق من الصلاحية…'}</p></div></main>;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">

@@ -9,6 +9,7 @@ export function SiteVisitTracker() {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname === '/admin' || pathname.startsWith('/admin/')) return;
     return scheduleIdleTask(() => {
       const body = JSON.stringify({ path: pathname });
 

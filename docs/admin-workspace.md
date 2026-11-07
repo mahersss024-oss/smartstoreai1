@@ -19,8 +19,15 @@ authentication, routing, providers and sample data are not part of the app.
 
 ## Data Semantics
 
-Daily visit charts use `SiteVisitDaily`; unique visitors are unique per day,
-not unique across the month. Missing days are not invented or interpolated.
+Daily activity charts use `SiteVisitDaily`, with application activity (iOS and
+Android) selected by default and website traffic selectable separately. Daily
+unique devices are unique per day, not unique across the selected month.
+Rolling application activity for today, seven days and thirty days counts
+distinct anonymous installation identifiers across the entire period in
+`SiteVisitUnique`, including guests and signed-in customers. The platform
+breakdown is explicit; these values are neither online presence nor downloads.
+The existing authenticated-account metric is labeled as its actual fourteen-day
+window. Missing days are not invented or interpolated.
 Listing, commission and evidence totals describe current retained records,
 not historical snapshots. Decimal commission amounts are serialized as strings.
 

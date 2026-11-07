@@ -1,10 +1,11 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Activity, Megaphone, Flag, Users } from 'lucide-react';
 import { useAdminAccess } from './use-admin-access';
 import { WorkspaceDashboard } from '@/components/admin/workspace-dashboard';
+import type { AppUsageStats } from '@/lib/analytics/site-visits';
 
 export default function AdminHomePage() {
   const [overview, setOverview] = useState<{
@@ -12,6 +13,7 @@ export default function AdminHomePage() {
     activeUsers: number;
     publishedListings: number;
     openReports: number;
+    appUsage?: AppUsageStats;
   } | null>(null);
   const [overviewNotice, setOverviewNotice] = useState('');
   const {
@@ -54,7 +56,7 @@ export default function AdminHomePage() {
       href: '/admin/users',
     },
     {
-      label: 'المستخدمون النشطون',
+      label: 'حسابات نشطة خلال 14 يوماً',
       value: overview?.activeUsers ?? null,
       icon: Activity,
       href: '/admin/users',
@@ -145,7 +147,7 @@ export default function AdminHomePage() {
                     </p>
                   }
                 >
-                  <WorkspaceDashboard />
+                  <WorkspaceDashboard appUsage={overview?.appUsage} />
                 </Suspense>
               </>
             ) : (

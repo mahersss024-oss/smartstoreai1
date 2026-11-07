@@ -3,19 +3,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-function readProjectFile(...segments: string[]) {
-  return readFileSync(join(process.cwd(), ...segments), 'utf8');
-}
-
 test('site visit writes are rate limited before recording analytics', () => {
-  const route = readProjectFile('app', 'api', 'analytics', 'visit', 'route.ts');
-
+  const route = readFileSync(join(process.cwd(), 'app/api/analytics/visit/route.ts'), 'utf8');
   assert.match(route, /enforceApiRateLimit/);
   assert.match(route, /namespace: 'site_visit'/);
-  assert.match(route, /actorId: existingVisitorId \?\? undefined/);
-  assert.match(route, /recordSiteVisit/);
-  assert.ok(
-    route.indexOf('const rateLimitResponse') <
-      route.indexOf('await recordSiteVisit'),
-  );
+  assert.match(route, /existingVisitorId \?\? undefined/);
+  assert.ok(route.indexOf('const rateLimitResponse') < route.indexOf('await recordSiteVisit'));
 });

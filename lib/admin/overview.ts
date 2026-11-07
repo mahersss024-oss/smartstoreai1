@@ -2,15 +2,16 @@ import type { PrismaClient } from '@prisma/client';
 
 import { authenticatedUserActiveWindowMs } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { getAppUsageStats } from '@/lib/analytics/site-visits';
 
-type OverviewDatabase = Pick<PrismaClient, 'user' | 'listing' | 'report' | 'userReport'>;
+type OverviewDatabase = Pick<PrismaClient, 'user' | 'listing' | 'report' | 'userReport' | '$queryRaw'>;
 
 export async function getAdminOverview(
   now = new Date(),
   database: OverviewDatabase = prisma,
 ) {
   const activeSince = new Date(now.getTime() - authenticatedUserActiveWindowMs);
-  const [totalUsers, activeUsers, publishedListings, listingReports, conversationReports] =
+  const [totalUsers, activeUsers, publishedListings, listingReports, conversationReports, appUsage] =
     await Promise.all([
       database.user.count({ where: { deletedAt: null } }),
       database.user.count({
@@ -21,6 +22,7 @@ export async function getAdminOverview(
       database.userReport.count({
         where: { status: 'open', conversationId: { not: null } },
       }),
+      getAppUsageStats(now, database),
     ]);
 
   return {
@@ -28,5 +30,6 @@ export async function getAdminOverview(
     activeUsers,
     publishedListings,
     openReports: listingReports + conversationReports,
+    appUsage,
   };
 }

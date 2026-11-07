@@ -1293,6 +1293,10 @@ export function unblockConversationUser(
     };
   }
 
+  if (existingBlock.reason === 'admin_moderation') {
+    return { status: 'conversation_blocked' as const, block: null, conversation,
+      blockStatus: getConversationBlockStatus(conversationId, blockerId) };
+  }
   userBlocks.delete(existingBlock.id);
   persistStore();
 
@@ -1745,15 +1749,17 @@ export function setUserReportModerationStatus(
       conversations.set(conversation.id, conversation);
     }
 
+    const existingBlock = [...userBlocks.values()].find(block =>
+      block.blockerId === report.reporterId && block.blockedId === report.targetUserId);
     const block: UserBlockRecord = {
-      id: randomUUID(),
+      id: existingBlock?.id ?? randomUUID(),
       blockerId: report.reporterId,
       blockedId: report.targetUserId,
       conversationId: report.conversationId,
       reason: 'admin_moderation',
-      createdAt: nowIso(),
+      createdAt: existingBlock?.createdAt ?? nowIso(),
     };
-    userBlocks.set(`${block.blockerId}:${block.blockedId}`, block);
+    userBlocks.set(block.id, block);
   }
 
   persistStore();
@@ -1801,6 +1807,7 @@ export function setReportModerationStatus(
     };
   }
 
+  if (report.status !== 'open') return { status: 'already_resolved' as const, report };
   report.status = status;
   reports.set(report.id, report);
   persistStore();

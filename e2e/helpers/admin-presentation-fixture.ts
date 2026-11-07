@@ -209,6 +209,10 @@ export async function prepare(page: Page, baseURL: string, role = 'admin') {
                         activeUsers: 2,
                         publishedListings: 5,
                         openReports: 1,
+                        appUsage: { today: 0, last7Days: 0, last30Days: 0, platforms: {
+                          ios: { today: 0, last7Days: 0, last30Days: 0 },
+                          android: { today: 0, last7Days: 0, last30Days: 0 },
+                        } },
                       };
     return route.fulfill({ json });
   });

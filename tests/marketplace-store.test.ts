@@ -606,6 +606,10 @@ test('restricting a conversation report blocks contact between the parties', () 
   // Restricting closes the conversation, so later replies are still refused.
   assert.equal(afterMessage.status, 'conversation_closed');
   assert.equal(afterMessage.message, null);
+  const personalBlock = blockConversationUser(opened.conversation!.id, 'buyer:report-restrict', 'personal_reason');
+  assert.equal(personalBlock.block?.reason, 'admin_moderation');
+  assert.equal(unblockConversationUser(opened.conversation!.id, 'buyer:report-restrict').status, 'conversation_blocked');
+  assert.equal(getConversationBlockStatus(opened.conversation!.id, 'buyer:report-restrict')?.blocked, true);
 });
 
 test('keeps a conversation report open when the admin only reviews it', () => {
@@ -816,6 +820,16 @@ test('updates report moderation status', () => {
   );
 
   assert.equal(reviewed.status, 'reviewed');
+});
+
+test('a resolved listing report retains the first human decision', () => {
+  const listing = createListingDraft({ sellerId: 'seller:final-report', category: 'furniture', title: 'A report decision fixture' });
+  publishListing(listing.id);
+  const reported = reportListing(listing.id, 'buyer:final-report', 'fraud');
+  assert.equal(setReportModerationStatus(reported.report!.id, 'reviewed').status, 'reviewed');
+  const delayed = setReportModerationStatus(reported.report!.id, 'dismissed');
+  assert.equal(delayed.status, 'already_resolved');
+  assert.equal(delayed.report?.status, 'reviewed');
 });
 
 test('creates a pending platform fee record when a seller marks a listing as sold', () => {

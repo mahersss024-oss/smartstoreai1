@@ -2,6 +2,7 @@
 
 import { AdminPageHeading } from '@/components/admin/page-heading';
 import { TechnicalDetails } from '@/components/admin/record-details';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -68,14 +69,18 @@ export default function AdminCommissionsPage() {
     adminAccessNotice,
     isAdminAccessAllowed,
     verifyAdminAccess,
-  } = useAdminAccess('owner');
+  } = useAdminAccess('admin');
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [commissionsPagination, setCommissionsPagination] =
     useState<PaginationMeta | null>(null);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [summary, setSummary] = useState<{ totalDue: number; totalPaid: number; totalRecords: number } | null>(null);
+  const [pendingCommissionId, setPendingCommissionId] = useState<string | null>(null);
   const [pendingDeleteCommissionId, setPendingDeleteCommissionId] =
     useState<string | null>(null);
+  const { begin: beginLoad, invalidate: invalidateLoad } = useAdminRequest(isAdminAccessAllowed);
+  const { begin: beginMutation } = useAdminRequest(isAdminAccessAllowed);
 
   const totalDue = useMemo(
     () =>
@@ -93,19 +98,25 @@ export default function AdminCommissionsPage() {
   );
 
   const refreshCommissions = useCallback(async (page = 1) => {
+    const request = beginLoad();
     setIsLoading(true);
     setNotice('');
 
     try {
       if (!(await verifyAdminAccess())) {
+        if (!request.isCurrent()) return;
         setCommissions([]);
         setCommissionsPagination(null);
+        setSummary(null);
         return;
       }
+      if (!request.isCurrent()) return;
 
       const response = await fetch(`/api/admin/commissions?page=${page}&limit=20`, {
         cache: 'no-store',
+        signal: request.signal,
       });
+      if (!request.isCurrent()) return;
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -126,22 +137,37 @@ export default function AdminCommissionsPage() {
       const payload = (await response.json()) as {
         commissions?: CommissionRecord[];
         pagination?: PaginationMeta;
+        summary?: { totalDue: number; totalPaid: number; totalRecords: number };
       };
+      if (!request.isCurrent()) return;
       setCommissions((currentCommissions) =>
         page === 1
           ? (payload.commissions ?? [])
-          : [...currentCommissions, ...(payload.commissions ?? [])],
+          : [...currentCommissions, ...(payload.commissions ?? []).filter(commission => !currentCommissions.some(row => row.id === commission.id))],
       );
       setCommissionsPagination(payload.pagination ?? null);
+      setSummary(payload.summary ?? null);
+    } catch {
+      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل رسوم المنصة. حاول مجددًا.');
     } finally {
-      setIsLoading(false);
+      if (request.isCurrent()) setIsLoading(false);
     }
-  }, [router, verifyAdminAccess]);
+  }, [router, verifyAdminAccess, beginLoad]);
+
+  useEffect(() => {
+    if (isAdminAccessAllowed) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) { setCommissions([]); setSummary(null); setCommissionsPagination(null); setPendingDeleteCommissionId(null); }
+    });
+    return () => { cancelled = true; };
+  }, [isAdminAccessAllowed]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
 
+    if (!isAdminAccessAllowed) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -152,7 +178,7 @@ export default function AdminCommissionsPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshCommissions]);
+  }, [isAdminAccessAllowed, refreshCommissions]);
 
   useSmartstoreRealtime({
     enabled: isAdminAccessAllowed,
@@ -183,40 +209,49 @@ export default function AdminCommissionsPage() {
       commissionId: string,
       status: 'due' | 'paid' | 'waived' | 'disputed',
     ) => {
-      const response = await fetch(`/api/admin/commissions/${commissionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-
-      if (!response.ok) {
-        setNotice('تعذر تحديث حالة الرسوم.');
-        return;
+      const request = beginMutation();
+      invalidateLoad();
+      setPendingCommissionId(commissionId);
+      try {
+        const response = await fetch(`/api/admin/commissions/${commissionId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+        });
+        if (!request.isCurrent()) return;
+        if (!response.ok) { setNotice('تعذر تحديث حالة الرسوم.'); return; }
+        await refreshCommissions(1);
+        if (request.isCurrent()) setNotice('تم تحديث حالة الرسوم.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لتحديث حالة الرسوم. حاول مجددًا.');
+      } finally {
+        if (request.isCurrent()) setPendingCommissionId(null);
       }
-
-      await refreshCommissions(1);
     },
-    [refreshCommissions],
+    [refreshCommissions, beginMutation, invalidateLoad],
   );
 
   const deleteCommission = useCallback(
     async (commissionId: string) => {
+      const request = beginMutation();
+      invalidateLoad();
       setPendingDeleteCommissionId(null);
-      const response = await fetch(`/api/admin/commissions/${commissionId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
+      setPendingCommissionId(commissionId);
+      try {
+        const response = await fetch(`/api/admin/commissions/${commissionId}`, { method: 'DELETE' });
         const payload = await response.json().catch(() => null) as { message?: string } | null;
-        setNotice(payload?.message ?? 'تعذر حذف سجل الرسوم.');
-        return;
+        if (!request.isCurrent()) return;
+        if (!response.ok) { setNotice(payload?.message ?? 'تعذر حذف سجل الرسوم.'); return; }
+        await refreshCommissions(1);
+        if (request.isCurrent()) setNotice('تم حذف سجل الرسوم.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لحذف سجل الرسوم. حاول مجددًا.');
+      } finally {
+        if (request.isCurrent()) setPendingCommissionId(null);
       }
-
-      setNotice('تم حذف سجل الرسوم.');
-      await refreshCommissions(1);
     },
-    [refreshCommissions],
+    [refreshCommissions, beginMutation, invalidateLoad],
   );
+
+  if (!isAdminAccessAllowed) return <main dir="rtl"><div className="admin-page"><AdminPageHeading title="إدارة رسوم المنصة" /><p role="status">{adminAccessNotice || 'جارٍ التحقق من الصلاحية…'}</p></div></main>;
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -251,16 +286,16 @@ export default function AdminCommissionsPage() {
 
         <section className="admin-statistics sm:grid-cols-3">
           <div>
-            <div className="text-xs text-muted-foreground">مستحق</div>
-            <div className="mt-1 text-2xl font-bold">{formatMoney(totalDue)}</div>
+            <div className="text-xs text-muted-foreground">{summary ? 'مستحق' : 'مستحق في السجلات المحمّلة'}</div>
+            <div className="mt-1 text-2xl font-bold">{formatMoney(summary?.totalDue ?? totalDue)}</div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">مدفوع</div>
-            <div className="mt-1 text-2xl font-bold">{formatMoney(totalPaid)}</div>
+            <div className="text-xs text-muted-foreground">{summary ? 'مدفوع' : 'مدفوع في السجلات المحمّلة'}</div>
+            <div className="mt-1 text-2xl font-bold">{formatMoney(summary?.totalPaid ?? totalPaid)}</div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">السجلات</div>
-            <div className="mt-1 text-2xl font-bold">{commissions.length}</div>
+            <div className="text-xs text-muted-foreground">{summary ? 'إجمالي السجلات' : 'السجلات المحمّلة'}</div>
+            <div className="mt-1 text-2xl font-bold">{new Intl.NumberFormat('ar-SA').format(summary?.totalRecords ?? commissions.length)}</div>
           </div>
         </section>
 
@@ -302,6 +337,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(pendingCommissionId)}
                       onClick={() => setCommissionStatus(commission.id, 'paid')}
                     >
                       <CheckCircle2 className="size-4" />
@@ -310,6 +346,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(pendingCommissionId)}
                       onClick={() => setCommissionStatus(commission.id, 'due')}
                     >
                       مستحقة
@@ -317,6 +354,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(pendingCommissionId)}
                       onClick={() => setCommissionStatus(commission.id, 'disputed')}
                     >
                       متنازع
@@ -324,6 +362,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(pendingCommissionId)}
                       onClick={() => setCommissionStatus(commission.id, 'waived')}
                     >
                       إعفاء
@@ -331,6 +370,7 @@ export default function AdminCommissionsPage() {
                     <Button
                       variant="outline"
                       className="rounded-md"
+                      disabled={Boolean(pendingCommissionId)}
                       onClick={() => setPendingDeleteCommissionId(commission.id)}
                     >
                       <Trash2 className="size-4" />

@@ -67,7 +67,7 @@ test('workspace reads bounded existing records without snapshots or database wri
     siteVisitDaily: {
       findMany: async (args: unknown) => {
         calls.visits = args;
-        return [{ day: '2026-10-15', visits: 9, uniqueVisitors: 4 }];
+        return [{ day: '2026-10-15', platform: 'ios', visits: 9, uniqueVisitors: 4 }];
       },
     },
     siteMessage: {
@@ -80,7 +80,7 @@ test('workspace reads bounded existing records without snapshots or database wri
   const data = await getAdminWorkspace(range, database as never);
   assert.equal(data.commissions[0].amount, '42.50');
   assert.deepEqual(data.visits, [
-    { day: '2026-10-15', visits: 9, uniqueVisitors: 4 },
+    { day: '2026-10-15', platform: 'ios', visits: 9, uniqueVisitors: 4 },
   ]);
   assert.equal(data.events.length, 101);
   assert.equal(data.hasMoreEvents, true);

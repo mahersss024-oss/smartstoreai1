@@ -7,7 +7,7 @@ test('changed administration pages fit mobile tablet and desktop without duplica
   baseURL,
 }, testInfo) => {
   test.setTimeout(180_000);
-  // This matrix includes owner-only commissions and site-message settings.
+  // This matrix includes owner-only site-message settings.
   await prepare(page, baseURL!, 'owner');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -138,7 +138,7 @@ test('evidence remains readable and original technical values and write payloads
   });
 });
 
-test('rearranged listing fields and user controls send their original save contracts', async ({
+test('listing and user saves send only the fields the administrator changed', async ({
   page,
   baseURL,
 }) => {
@@ -157,14 +157,6 @@ test('rearranged listing fields and user controls send their original save contr
     body: {
       title: 'عنوان بعد الترتيب',
       description: 'الوصف بعد الترتيب',
-      category: 'other',
-      categoryOption: null,
-      carModel: null,
-      city: 'الرياض',
-      condition: 'used',
-      price: 100,
-      priceMode: null,
-      status: 'published',
     },
   });
   await page.goto('/admin/users');
@@ -177,7 +169,7 @@ test('rearranged listing fields and user controls send their original save contr
     .click();
   await expect.poll(() => writes.length).toBe(2);
   expect(writes[1].method).toBe('PATCH');
-  expect(writes[1].body).toEqual({ role: 'user', phoneNumber: '0555555555' });
+  expect(writes[1].body).toEqual({ phoneNumber: '0555555555' });
 });
 
 test('record previews preserve drafts results focus and original deletion confirmation', async ({

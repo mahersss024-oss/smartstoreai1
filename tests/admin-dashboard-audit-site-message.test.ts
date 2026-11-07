@@ -40,6 +40,10 @@ test('admin overview calculates the four required database metrics with actual s
     activeUsers: 4,
     publishedListings: 7,
     openReports: 5,
+    appUsage: { today: 0, last7Days: 0, last30Days: 0, platforms: {
+      ios: { today: 0, last7Days: 0, last30Days: 0 },
+      android: { today: 0, last7Days: 0, last30Days: 0 },
+    } },
   });
   assert.deepEqual(calls[0], { delegate: 'user', args: { where: { deletedAt: null } } });
   assert.deepEqual(calls[1], {

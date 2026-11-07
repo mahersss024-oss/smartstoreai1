@@ -27,8 +27,9 @@ const auditActions = new Set<AdminAuditAction>([
 
 function parseDate(value: string | null, endOfDay = false) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const calendarDate = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== value) return null;
+  return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+03:00`);
 }
 
 export async function GET(request: Request) {
@@ -45,6 +46,9 @@ export async function GET(request: Request) {
   const targetType = url.searchParams.get('targetType')?.trim();
   const from = parseDate(url.searchParams.get('from'));
   const to = parseDate(url.searchParams.get('to'), true);
+  if ((url.searchParams.get('from') && !from) || (url.searchParams.get('to') && !to) || (from && to && from > to)) {
+    return Response.json({ error: 'invalid_date_range' }, { status: 400, headers: noStoreHeaders });
+  }
   const pagination = parsePaginationFromRequest(request, { defaultLimit: 25, maxLimit: 50 });
   const where: Prisma.AdminAuditLogWhereInput = {
     ...(actionValue && auditActions.has(actionValue) ? { action: actionValue } : {}),

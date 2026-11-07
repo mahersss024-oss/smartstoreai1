@@ -3,8 +3,10 @@
 import { AdminPageHeading } from '@/components/admin/page-heading';
 import { AdminRecordPreview } from '@/components/admin/record-preview';
 import { AdminResultsTable } from '@/components/admin/results-table';
+import { listingEditIsDirty, listingEditPatch, reconcileListingEdit, type ListingDraft, type ListingEdit } from '@/components/admin/listing-edits';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { formatMarketplaceCategory, marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
 import { CategoryOptionSelect } from '@/components/category-option-select';
 import { CarModelSelect } from '@/components/car-model-select';
@@ -58,6 +60,7 @@ type AdminListing = {
   views: number;
   messageCount: number;
   favoriteCount: number;
+  updatedAt?: string;
   images: Array<{ id: string; originalUrl?: string; displayUrl?: string; thumbnailUrl: string; isPrimary: boolean }>;
 };
 
@@ -67,19 +70,6 @@ type PaginationMeta = {
   hasMore: boolean;
   nextPage: number | null;
   total: number;
-};
-
-type ListingDraft = {
-  carModel: string;
-  categoryOption: string;
-  title: string;
-  description: string;
-  category: string;
-  city: string;
-  condition: Exclude<AdminListing['condition'], null> | '';
-  price: string;
-  priceMode: 'fixed' | 'bid' | 'negotiable';
-  status: AdminListing['status'];
 };
 
 type AdminListingActionNotice = {
@@ -171,6 +161,7 @@ function AdminListingCard({
   onDelete,
   onPermanentDelete,
   pendingAction,
+  saveBlocked,
 }: Readonly<{
   listing: AdminListing;
   draft: ListingDraft;
@@ -180,6 +171,7 @@ function AdminListingCard({
   onDelete: (listingId: string) => void;
   onPermanentDelete: (listingId: string) => void;
   pendingAction: PendingAdminListingAction | null;
+  saveBlocked: boolean;
 }>) {
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const activeImage = listing.images.find(image => image.id === activeImageId) ?? listing.images.find(image => image.isPrimary) ?? listing.images[0];
@@ -191,6 +183,7 @@ function AdminListingCard({
     pendingAction?.listingId === listing.id &&
     pendingAction.action === 'permanent_delete';
   const isActionPending = Boolean(pendingAction);
+  const isEditingDisabled = !canManageListings || isActionPending;
 
   return (
     <article className="admin-record">
@@ -228,23 +221,23 @@ function AdminListingCard({
       )}
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="admin-field">العنوان<Input disabled={!canManageListings} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" /></label>
-        <label className="admin-field">التصنيف<select className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm" disabled={!canManageListings} name={`listing-${listing.id}-category`} value={draft.category} onChange={event => onUpdateDraft(listing.id, { category: event.target.value, categoryOption: '', carModel: '' })}>
+        <label className="admin-field">العنوان<Input disabled={isEditingDisabled} name={`listing-${listing.id}-title`} value={draft.title} onChange={(event) => onUpdateDraft(listing.id, { title: event.target.value })} placeholder="العنوان" /></label>
+        <label className="admin-field">التصنيف<select className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm" disabled={isEditingDisabled} name={`listing-${listing.id}-category`} value={draft.category} onChange={event => onUpdateDraft(listing.id, { category: event.target.value, categoryOption: '', carModel: '' })}>
           {!marketplaceCategoryDefinitions.some(category => category.id === draft.category) && <option value={draft.category}>{formatMarketplaceCategory(draft.category)}</option>}
           {marketplaceCategoryDefinitions.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
         </select></label>
-        <CategoryOptionSelect id={`listing-${listing.id}-category-option`} disabled={!canManageListings} category={draft.category} value={draft.categoryOption}
+        <CategoryOptionSelect id={`listing-${listing.id}-category-option`} disabled={isEditingDisabled} category={draft.category} value={draft.categoryOption}
           onChange={categoryOption => onUpdateDraft(listing.id, { categoryOption, carModel: '' })} className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
-        <CarModelSelect id={`listing-${listing.id}-car-model`} disabled={!canManageListings} category={draft.category} brand={draft.categoryOption} value={draft.carModel}
+        <CarModelSelect id={`listing-${listing.id}-car-model`} disabled={isEditingDisabled} category={draft.category} brand={draft.categoryOption} value={draft.carModel}
           onChange={carModel => onUpdateDraft(listing.id, { carModel })} className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
-        <div className="admin-field"><span>المدينة</span><CitySelector disabled={!canManageListings} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} /></div>
-        <label className="admin-field">السعر<Input disabled={!canManageListings} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" /></label>
+        <div className="admin-field"><span>المدينة</span><CitySelector disabled={isEditingDisabled} name={`listing-${listing.id}-city`} value={draft.city} onValueChange={(city) => onUpdateDraft(listing.id, { city })} /></div>
+        <label className="admin-field">السعر<Input disabled={isEditingDisabled} name={`listing-${listing.id}-price`} value={draft.price} onChange={(event) => onUpdateDraft(listing.id, { price: event.target.value })} placeholder="السعر" type="number" /></label>
       </div>
 
       <div className="admin-field"><label htmlFor={`listing-${listing.id}-description`}>الوصف</label><textarea
         id={`listing-${listing.id}-description`}
         className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
-        disabled={!canManageListings}
+        disabled={isEditingDisabled}
         name={`listing-${listing.id}-description`}
         value={draft.description}
         onChange={(event) =>
@@ -256,7 +249,7 @@ function AdminListingCard({
       <div className="grid gap-2 md:grid-cols-3">
         <label className="admin-field">حالة المنتج<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
-          disabled={!canManageListings}
+          disabled={isEditingDisabled}
           name={`listing-${listing.id}-condition`}
           value={draft.condition}
           onChange={(event) =>
@@ -273,7 +266,7 @@ function AdminListingCard({
         </select></label>
         <label className="admin-field">طريقة السعر<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
-          disabled={!canManageListings}
+          disabled={isEditingDisabled}
           name={`listing-${listing.id}-priceMode`}
           value={draft.priceMode}
           onChange={(event) =>
@@ -288,7 +281,7 @@ function AdminListingCard({
         </select></label>
         <label className="admin-field">حالة الإعلان<select
           className="h-10 rounded-md border bg-background px-3 text-sm"
-          disabled={!canManageListings}
+          disabled={isEditingDisabled}
           name={`listing-${listing.id}-status`}
           value={draft.status}
           onChange={(event) =>
@@ -312,7 +305,7 @@ function AdminListingCard({
         <Button asChild variant="outline"><Link href={`/listings/${encodeURIComponent(listing.id)}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-4" />فتح صفحة الإعلان</Link></Button>
         <Button
           className="rounded-md bg-blue-600 hover:bg-blue-700"
-          disabled={isActionPending && !isSaving}
+          disabled={saveBlocked || (isActionPending && !isSaving)}
           loading={isSaving}
           loadingText="جاري الحفظ..."
           onClick={() => onSave(listing.id)}
@@ -383,12 +376,13 @@ function AdminListingsPageContent() {
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(focusedListingId || null);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, ListingDraft>>({});
+  const [edits, setEdits] = useState<Record<string, ListingEdit>>({});
   const [query, setQuery] = useState(searchParams.get('query')?.trim() ?? '');
   const [status, setStatus] = useState<AdminListing['status'] | 'all'>(() => statusOptions.find(option => option.value === searchParams.get('status'))?.value ?? 'all');
   const [category, setCategory] = useState('');
   const [categoryOption, setCategoryOption] = useState('');
   const [carModel, setCarModel] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState(() => ({ query, status, category: '', categoryOption: '', carModel: '' }));
   const [notice, setNotice] = useState('');
   const [actionNotice, setActionNotice] =
     useState<AdminListingActionNotice | null>(null);
@@ -399,22 +393,10 @@ function AdminListingsPageContent() {
     listingId: string;
     permanent: boolean;
   } | null>(null);
-  const queryRef = useRef(query);
-  const statusRef = useRef(status);
-  const categoryRef = useRef({ category, categoryOption, carModel });
-  useEffect(() => { categoryRef.current = { category, categoryOption, carModel }; }, [category, categoryOption, carModel]);
-  const focusedListingIdRef = useRef(focusedListingId);
+  const { begin: beginLoad, invalidate: invalidateLoad } = useAdminRequest(isAdminAccessAllowed,
+    JSON.stringify([appliedFilters, focusedListingId, sellerId]));
 
   useEffect(() => {
-    queryRef.current = query;
-  }, [query]);
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  useEffect(() => {
-    focusedListingIdRef.current = focusedListingId;
     let cancelled = false;
     queueMicrotask(() => { if (!cancelled && focusedListingId) setSelectedId(focusedListingId); });
     return () => { cancelled = true; };
@@ -422,36 +404,39 @@ function AdminListingsPageContent() {
 
   const loadListings = useCallback(
     async (page = 1) => {
+      const request = beginLoad();
       setIsLoading(true);
       setNotice('');
 
       try {
         if (!(await verifyAdminAccess())) {
+          if (!request.isCurrent()) return;
           setListings([]);
           setPagination(null);
-          setDrafts({});
+          setEdits({});
           return;
         }
+        if (!request.isCurrent()) return;
 
         const params = new URLSearchParams({
           page: String(page),
           limit: '24',
-          status: statusRef.current,
         });
-        if (sellerId) params.set('sellerId', sellerId);
-        if (categoryRef.current.category) params.set('category', categoryRef.current.category);
-        if (categoryRef.current.categoryOption) params.set('categoryOption', categoryRef.current.categoryOption);
-        if (categoryRef.current.carModel) params.set('carModel', categoryRef.current.carModel);
-
-        if (focusedListingIdRef.current) {
-          params.set('listingId', focusedListingIdRef.current);
-        } else if (queryRef.current.trim()) {
-          params.set('query', queryRef.current.trim());
+        if (focusedListingId) {
+          params.set('listingId', focusedListingId);
+        } else {
+          params.set('status', appliedFilters.status);
+          if (sellerId) params.set('sellerId', sellerId);
+          for (const key of ['query', 'category', 'categoryOption', 'carModel'] as const) {
+            if (appliedFilters[key].trim()) params.set(key, appliedFilters[key].trim());
+          }
         }
 
         const response = await fetch(`/api/admin/listings?${params}`, {
           cache: 'no-store',
+          signal: request.signal,
         });
+        if (!request.isCurrent()) return;
 
         if (response.status === 401) {
           router.push('/api/auth/google/start');
@@ -472,31 +457,35 @@ function AdminListingsPageContent() {
           listings: AdminListing[];
           pagination: PaginationMeta;
         };
+        if (!request.isCurrent()) return;
 
         setListings((current) =>
-          page === 1 ? payload.listings : [...current, ...payload.listings],
+          page === 1 ? payload.listings : [...current, ...payload.listings.filter(listing => !current.some(row => row.id === listing.id))],
         );
         setPagination(payload.pagination);
-        setDrafts((current) => ({
+        setEdits((current) => ({
           ...current,
           ...Object.fromEntries(
             payload.listings.map((listing) => [
               listing.id,
-              current[listing.id] ?? createDraft(listing),
+              reconcileListingEdit(current[listing.id], createDraft(listing)),
             ]),
           ),
         }));
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل الإعلانات. حاول مجددًا.');
       } finally {
-        setIsLoading(false);
+        if (request.isCurrent()) setIsLoading(false);
       }
     },
-    [router, verifyAdminAccess, sellerId],
+    [router, verifyAdminAccess, sellerId, focusedListingId, appliedFilters, beginLoad, setIsLoading, setNotice, setListings, setPagination, setEdits],
   );
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
 
+    if (!isAdminAccessAllowed) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -507,7 +496,7 @@ function AdminListingsPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [loadListings, status, focusedListingId]);
+  }, [isAdminAccessAllowed, loadListings]);
 
   useSmartstoreRealtime({
     enabled: isAdminAccessAllowed,
@@ -544,41 +533,39 @@ function AdminListingsPageContent() {
     adminAccessRole === 'moderator';
   const selectedIndex = listings.findIndex(listing => listing.id === selectedId);
   const selectedListing = listings[selectedIndex];
-  const listingIsDirty = (listing: AdminListing) => Boolean(drafts[listing.id] && JSON.stringify(drafts[listing.id]) !== JSON.stringify(createDraft(listing)));
+  const listingIsDirty = (listing: AdminListing) => listingEditIsDirty(edits[listing.id]);
+  const clearFilters = () => {
+    setQuery(''); setStatus('all'); setCategory(''); setCategoryOption(''); setCarModel('');
+    setAppliedFilters({ query: '', status: 'all', category: '', categoryOption: '', carModel: '' });
+  };
 
   const updateDraft = useCallback(
     (listingId: string, updates: Partial<ListingDraft>) => {
-      setDrafts((current) => ({
+      setEdits((current) => ({
         ...current,
         [listingId]: {
           ...current[listingId],
-          ...updates,
+          draft: { ...current[listingId].draft, ...updates },
+          conflicts: current[listingId].conflicts.filter(field =>
+            (updates[field] ?? current[listingId].draft[field]) !== current[listingId].base[field]),
         },
       }));
     },
-    [],
+    [setEdits],
   );
 
   const saveListing = useCallback(
     async (listingId: string) => {
-      const draft = drafts[listingId];
+      const edit = edits[listingId];
+      const listing = listings.find(row => row.id === listingId);
 
-      if (!draft) {
+      if (!edit || !listing || edit.conflicts.length) {
         return;
       }
 
-      const body = {
-        title: draft.title,
-        description: draft.description,
-        category: draft.category,
-        categoryOption: draft.categoryOption || null,
-        carModel: draft.carModel || null,
-        city: draft.city || null,
-        condition: draft.condition || null,
-        price: draft.priceMode === 'fixed' ? Number(draft.price || 0) : null,
-        priceMode: draft.priceMode === 'fixed' ? null : draft.priceMode,
-        status: draft.status,
-      };
+      const body = listingEditPatch(edit);
+      if (!Object.keys(body).length) return;
+      invalidateLoad();
       setPendingAction({ listingId, action: 'save' });
       setActionNotice(null);
 
@@ -586,8 +573,14 @@ function AdminListingsPageContent() {
         const response = await fetch(`/api/admin/listings/${listingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ ...body, ...(listing.updatedAt ? { expectedUpdatedAt: listing.updatedAt } : {}) }),
         });
+
+        if (response.status === 409) {
+          await loadListings(1);
+          setActionNotice({ tone: 'warning', message: 'تغير الإعلان أثناء التعديل. حُمّلت البيانات الحالية؛ راجع مسودتك قبل الحفظ مجددًا.' });
+          return;
+        }
 
         if (!response.ok) {
           setActionNotice({
@@ -597,25 +590,35 @@ function AdminListingsPageContent() {
           return;
         }
 
+        const payload = await response.json().catch(() => null) as { listing?: Partial<AdminListing> } | null;
+        const saved = { ...listing, ...payload?.listing };
+        // Clear submitted changes before realtime/load rebases against the saved record.
+        setEdits(current => ({ ...current, [listingId]: reconcileListingEdit(undefined,
+          payload?.listing ? createDraft(saved) : edit.draft) }));
+        setListings(current => current.map(row => row.id === listingId ? saved : row));
         setActionNotice({
           tone: 'success',
           title: 'تم حفظ الإعلان',
           message: 'تم تحديث بيانات الإعلان في لوحة الإدارة.',
           statusLabel:
-            statusOptions.find((option) => option.value === draft.status)
-              ?.label ?? draft.status,
+            statusOptions.find((option) => option.value === edit.draft.status)
+              ?.label ?? edit.draft.status,
         });
         await loadListings(1);
+      } catch {
+        setActionNotice({ tone: 'danger', message: 'تعذر الاتصال لحفظ الإعلان. بقيت تعديلاتك في المسودة.' });
       } finally {
         setPendingAction(null);
       }
     },
-    [drafts, loadListings],
+    [edits, listings, loadListings, invalidateLoad, setPendingAction, setActionNotice, setEdits, setListings],
   );
 
   const deleteListing = useCallback(
     async (listingId: string) => {
+      const listing = listings.find(row => row.id === listingId);
       setPendingDeleteAction(null);
+      invalidateLoad();
       setPendingAction({ listingId, action: 'delete' });
       setActionNotice(null);
 
@@ -623,8 +626,14 @@ function AdminListingsPageContent() {
         const response = await fetch(`/api/admin/listings/${listingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'deleted' }),
+          body: JSON.stringify({ status: 'deleted', ...(listing?.updatedAt ? { expectedUpdatedAt: listing.updatedAt } : {}) }),
         });
+
+        if (response.status === 409) {
+          await loadListings(1);
+          setActionNotice({ tone: 'warning', message: 'تغير الإعلان قبل الحذف. راجع البيانات الحالية ثم أعد المحاولة.' });
+          return;
+        }
 
         if (!response.ok) {
           setActionNotice({
@@ -634,6 +643,11 @@ function AdminListingsPageContent() {
           return;
         }
 
+        setEdits(current => {
+          const edit = current[listingId];
+          return edit ? { ...current, [listingId]: { base: { ...edit.base, status: 'deleted' },
+            draft: { ...edit.draft, status: 'deleted' }, conflicts: edit.conflicts.filter(field => field !== 'status') } } : current;
+        });
         setActionNotice({
           tone: 'success',
           title: 'تم حذف الإعلان',
@@ -641,16 +655,19 @@ function AdminListingsPageContent() {
           statusLabel: 'محذوف',
         });
         await loadListings(1);
+      } catch {
+        setActionNotice({ tone: 'danger', message: 'تعذر الاتصال لحذف الإعلان. حاول مجددًا.' });
       } finally {
         setPendingAction(null);
       }
     },
-    [loadListings],
+    [loadListings, listings, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice, setEdits],
   );
 
   const permanentlyDeleteListing = useCallback(
     async (listingId: string) => {
       setPendingDeleteAction(null);
+      invalidateLoad();
       setPendingAction({ listingId, action: 'permanent_delete' });
       setActionNotice(null);
 
@@ -673,11 +690,13 @@ function AdminListingsPageContent() {
           message: 'تم حذف الإعلان وسجلاته المرتبطة من لوحة الإدارة.',
         });
         await loadListings(1);
+      } catch {
+        setActionNotice({ tone: 'danger', message: 'تعذر الاتصال لحذف الإعلان نهائيًا. حاول مجددًا.' });
       } finally {
         setPendingAction(null);
       }
     },
-    [loadListings],
+    [loadListings, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice],
   );
 
   let listingsContent;
@@ -712,10 +731,24 @@ function AdminListingsPageContent() {
           onPrevious={selectedIndex > 0 ? () => setSelectedId(listings[selectedIndex - 1].id) : undefined}
           onNext={selectedIndex < listings.length - 1 ? () => setSelectedId(listings[selectedIndex + 1].id) : undefined}
         >
+          {Boolean(edits[selectedListing.id]?.conflicts.length) && <div role="alert" className="grid gap-3 rounded-md border border-amber-500/40 p-3 text-sm">
+            <p>تغيرت هذه البيانات أثناء تعديلك. راجع القيم الحالية قبل الحفظ:</p>
+            <dl className="grid gap-2">{edits[selectedListing.id].conflicts.map(field => <div key={field}>
+              <dt className="font-semibold">{({ title: 'العنوان', description: 'الوصف', category: 'التصنيف', categoryOption: 'نوع التصنيف', carModel: 'الموديل', city: 'المدينة', condition: 'حالة المنتج', price: 'السعر', priceMode: 'طريقة السعر', status: 'حالة الإعلان' })[field]}</dt>
+              <dd className="whitespace-pre-wrap break-words">{field === 'status' ? statusOptions.find(option => option.value === edits[selectedListing.id].base.status)?.label : edits[selectedListing.id].base[field] || 'غير محدد'}</dd>
+            </div>)}</dl>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                [selectedListing.id]: reconcileListingEdit(undefined, current[selectedListing.id].base) }))}>استخدام البيانات الحالية</Button>
+              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                [selectedListing.id]: { ...current[selectedListing.id], conflicts: [] } }))}>الاحتفاظ بتعديلاتي</Button>
+            </div>
+          </div>}
           <AdminListingCard
             key={selectedListing.id}
             listing={selectedListing}
-            draft={drafts[selectedListing.id] ?? createDraft(selectedListing)}
+            draft={edits[selectedListing.id]?.draft ?? createDraft(selectedListing)}
+            saveBlocked={!listingIsDirty(selectedListing) || Boolean(edits[selectedListing.id]?.conflicts.length)}
             canManageListings={canManageListings}
             onUpdateDraft={updateDraft}
             onSave={(listingId) => void saveListing(listingId)}
@@ -784,7 +817,7 @@ function AdminListingsPageContent() {
       />
       <div className="admin-page">
         <AdminPageHeading title="إدارة الإعلانات" />
-        {sellerId && <div className="admin-notice flex flex-wrap justify-between gap-2"><span>إعلانات الحساب المحدد</span><Link href="/admin/listings" prefetch={false} className="text-primary underline">عرض كل الإعلانات</Link></div>}
+        {sellerId && <div className="admin-notice flex flex-wrap justify-between gap-2"><span>إعلانات الحساب المحدد</span><Link href="/admin/listings" onClick={clearFilters} prefetch={false} className="text-primary underline">عرض كل الإعلانات</Link></div>}
 
         {focusedListingId ? (
           <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
@@ -793,27 +826,36 @@ function AdminListingsPageContent() {
               مراجعة إعلان محدد من البلاغ
             </div>
             <Button asChild variant="outline" className="rounded-md">
-              <Link href="/admin/listings">
+              <Link href="/admin/listings" onClick={clearFilters}>
                 <ArrowRight className="size-4" />
                 عرض كل الإعلانات
               </Link>
             </Button>
           </section>
         ) : (
-          <section className="admin-filterbar grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <form className="admin-filterbar grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={event => {
+            event.preventDefault();
+            const next = { query: query.trim(), status, category, categoryOption, carModel };
+            if (JSON.stringify(next) === JSON.stringify(appliedFilters)) void loadListings(1);
+            else setAppliedFilters(next);
+          }}>
             <Input
               name="listingSearch"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="ابحث برقم الإعلان أو العنوان أو المعلن أو المدينة"
+              aria-label="بحث الإعلانات"
             />
             <select
               className="h-10 rounded-md border bg-background px-3 text-sm"
               name="listingStatusFilter"
+              aria-label="تصفية حالة الإعلان"
               value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as AdminListing['status'] | 'all')
-              }
+              onChange={(event) => {
+                const value = event.target.value as AdminListing['status'] | 'all';
+                setStatus(value);
+                setAppliedFilters(current => ({ ...current, status: value }));
+              }}
             >
               {statusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -832,11 +874,11 @@ function AdminListingsPageContent() {
               className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
             <CarModelSelect id="admin-listing-car-model-filter" category={category} brand={categoryOption} value={carModel} onChange={setCarModel} all
               className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" />
-            <Button className="rounded-md bg-blue-600 hover:bg-blue-700" onClick={() => void loadListings(1)}>
+            <Button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700">
               <Search className="size-4" />
               بحث
             </Button>
-          </section>
+          </form>
         )}
 
         {(adminAccessNotice || notice) && (

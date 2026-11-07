@@ -2,6 +2,7 @@
 
 import { AdminPageHeading } from '@/components/admin/page-heading';
 import { RecordDetails, TechnicalDetails } from '@/components/admin/record-details';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 
 import { useCallback, useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
@@ -44,11 +45,11 @@ const entityLabels: Record<string, string> = {
 };
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  return new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(value));
 }
 
 export default function AdminAuditLogPage() {
-  const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('admin');
+  const { adminAccessNotice, isAdminAccessAllowed, verifyAdminAccess } = useAdminAccess('admin');
   const [records, setRecords] = useState<AuditRecord[]>([]);
   const [query, setQuery] = useState('');
   const [admin, setAdmin] = useState('');
@@ -56,40 +57,51 @@ export default function AdminAuditLogPage() {
   const [targetType, setTargetType] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [filters, setFilters] = useState({ query: '', admin: '', action: '', targetType: '', from: '', to: '' });
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const { begin: beginLoad } = useAdminRequest(isAdminAccessAllowed, JSON.stringify([filters, page]));
 
   const loadRecords = useCallback(async () => {
+    const request = beginLoad();
     setLoading(true);
     setNotice('');
     try {
-      if (!(await verifyAdminAccess())) return;
+      if (!(await verifyAdminAccess()) || !request.isCurrent()) return;
       const params = new URLSearchParams({ page: String(page), limit: '25' });
-      if (query.trim()) params.set('query', query.trim());
-      if (admin.trim()) params.set('admin', admin.trim());
-      if (action) params.set('action', action);
-      if (targetType.trim()) params.set('targetType', targetType.trim());
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
-      const response = await fetch(`/api/admin/audit-log?${params}`, { cache: 'no-store' });
+      for (const key of ['query', 'admin', 'action', 'targetType', 'from', 'to'] as const) {
+        if (filters[key].trim()) params.set(key, filters[key].trim());
+      }
+      const response = await fetch(`/api/admin/audit-log?${params}`, { cache: 'no-store', signal: request.signal });
+      if (!request.isCurrent()) return;
       if (!response.ok) {
-        setNotice(response.status === 403 ? 'لا تملك صلاحية عرض السجل.' : 'تعذر تحميل سجل الإدارة.');
+        setNotice(response.status === 403 ? 'لا تملك صلاحية عرض السجل.' : response.status === 400 ? 'اختر نطاق تاريخ صحيحًا بتوقيت السعودية.' : 'تعذر تحميل سجل الإدارة.');
         return;
       }
       const payload = await response.json() as {
         records: AuditRecord[];
         pagination: { total: number; hasMore: boolean };
       };
+      if (!request.isCurrent()) return;
       setRecords(payload.records);
       setPagination(payload.pagination);
+    } catch {
+      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل سجل الإدارة. حاول مجددًا.');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [action, admin, from, page, query, targetType, to, verifyAdminAccess]);
+  }, [filters, page, verifyAdminAccess, beginLoad]);
 
-  useEffect(() => { void loadRecords(); }, [loadRecords]);
+  useEffect(() => {
+    if (isAdminAccessAllowed) { void loadRecords(); return; }
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) { setRecords([]); setPagination({ total: 0, hasMore: false }); } });
+    return () => { cancelled = true; };
+  }, [isAdminAccessAllowed, loadRecords]);
+
+  if (!isAdminAccessAllowed) return <main dir="rtl"><div className="admin-page"><AdminPageHeading title="سجل الإدارة" /><p role="status">{adminAccessNotice || 'جارٍ التحقق من الصلاحية…'}</p></div></main>;
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -99,18 +111,23 @@ export default function AdminAuditLogPage() {
         {(adminAccessNotice || notice) && <p className="text-sm text-muted-foreground">{adminAccessNotice || notice}</p>}
 
         <section className="admin-filterbar">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="معرف أو نوع الكيان" />
-            <Input value={admin} onChange={(e) => setAdmin(e.target.value)} placeholder="المشرف: اسم أو بريد" />
-            <select className="h-10 rounded-md border bg-background px-3 text-sm" value={action} onChange={(e) => setAction(e.target.value)}>
+          <form className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" onSubmit={event => {
+            event.preventDefault();
+            const next = { query, admin, action, targetType, from, to };
+            if (page === 1 && JSON.stringify(next) === JSON.stringify(filters)) void loadRecords();
+            else { setPage(1); setFilters(next); }
+          }}>
+            <Input aria-label="معرف أو نوع الكيان" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="معرف أو نوع الكيان" />
+            <Input aria-label="المشرف: اسم أو بريد" value={admin} onChange={(e) => setAdmin(e.target.value)} placeholder="المشرف: اسم أو بريد" />
+            <select aria-label="نوع العملية" className="h-10 rounded-md border bg-background px-3 text-sm" value={action} onChange={(e) => setAction(e.target.value)}>
               <option value="">كل العمليات</option>
               {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <Input value={targetType} onChange={(e) => setTargetType(e.target.value)} placeholder="نوع الكيان" />
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="من تاريخ" />
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="إلى تاريخ" />
-            <Button onClick={() => { setPage(1); void loadRecords(); }}><Search className="size-4" />بحث</Button>
-          </div>
+            <Input aria-label="نوع الكيان" value={targetType} onChange={(e) => setTargetType(e.target.value)} placeholder="نوع الكيان" />
+            <label className="admin-field">من تاريخ (توقيت السعودية)<Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label className="admin-field">إلى تاريخ (توقيت السعودية)<Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+            <Button type="submit"><Search className="size-4" />بحث</Button>
+          </form>
         </section>
 
         <div className="min-h-4 text-xs text-muted-foreground">{new Intl.NumberFormat('ar-SA').format(pagination.total)} عملية</div>
@@ -159,8 +176,8 @@ export default function AdminAuditLogPage() {
           )}
         </div>
         <div className="flex justify-between gap-2">
-          <Button variant="outline" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>السابق</Button>
-          <Button variant="outline" disabled={!pagination.hasMore} onClick={() => setPage((value) => value + 1)}>التالي</Button>
+          <Button variant="outline" disabled={loading || page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>السابق</Button>
+          <Button variant="outline" disabled={loading || !pagination.hasMore} onClick={() => setPage((value) => value + 1)}>التالي</Button>
         </div>
       </div>
     </main>

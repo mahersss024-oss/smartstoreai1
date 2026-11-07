@@ -1,4 +1,4 @@
-import type { Listing } from '@prisma/client';
+import type { Listing, ListingImage } from '@prisma/client';
 import { z } from 'zod';
 import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
@@ -22,6 +22,7 @@ import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 const maxAdminListingUpdateRequestBytes = 64 * 1024;
 
 const adminListingUpdateSchema = z.object({
+  expectedUpdatedAt: z.string().datetime().optional(),
   category: z.string().min(2).max(80).optional(),
   categoryOption: z.string().max(80).nullable().optional(),
   carModel: z.string().max(80).nullable().optional(),
@@ -166,6 +167,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (!existing) {
       return { response: Response.json({ error: 'listing_not_found' }, { status: 404 }) };
+    }
+    if (parsed.data.expectedUpdatedAt && existing.updatedAt.getTime() !== new Date(parsed.data.expectedUpdatedAt).getTime()) {
+      return { response: Response.json({ error: 'listing_changed' }, { status: 409 }) };
     }
 
     if (parsed.data.category && parsed.data.category !== existing.category && !isMarketplaceCategory(parsed.data.category)) {
@@ -357,29 +361,31 @@ async function deleteListing(request: Request, context: RouteContext) {
   }
 
   const { listingId } = await context.params;
-  const existing = await prisma.listing.findUnique({
+  const identity = await prisma.listing.findUnique({
     where: { id: listingId },
-    include: {
-      images: true,
-    },
+    select: { sellerId: true },
   });
 
-  if (!existing) {
+  if (!identity) {
     return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
-  if (existing.status !== 'deleted') {
-    return Response.json(
-      { error: 'listing_must_be_deleted_first' },
-      { status: 409 },
-    );
-  }
+  const deletion = await prisma.$transaction(async (tx): Promise<{ response: Response } | { existing: Listing & { images: ListingImage[] } }> => {
+    // Match editors and evidence triggers before locking the listing row. A
+    // restore may have committed since the identity lookup above.
+    for (const key of [`listing:${listingId}`, `user:${identity.sellerId}`].sort()) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
+    }
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const existing = await tx.listing.findUnique({ where: { id: listingId }, include: { images: true } });
+    if (!existing) return { response: Response.json({ error: 'listing_not_found' }, { status: 404 }) };
+    if (existing.status !== 'deleted') {
+      return { response: Response.json({ error: 'listing_must_be_deleted_first' }, { status: 409 }) };
+    }
 
-  // Permanent delete: cascades to images, conversations, favorites, reports
-  // and commissions attached to the listing.
-  await prisma.$transaction([
-    prisma.listing.delete({ where: { id: listingId } }),
-    prisma.adminAuditLog.create({
+    // Permanent deletion cascades to the listing's dependent marketplace rows.
+    await tx.listing.delete({ where: { id: listingId } });
+    await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
         action: 'delete_listing',
@@ -387,8 +393,12 @@ async function deleteListing(request: Request, context: RouteContext) {
         targetId: listingId,
         metadata: { operation: 'admin_listing_delete', mode: 'permanent' },
       },
-    }),
-  ]);
+    });
+    return { existing };
+  }, { isolationLevel: 'ReadCommitted' });
+
+  if ('response' in deletion) return deletion.response;
+  const { existing } = deletion;
 
   await deleteStoredListingImagesBestEffort(existing.images);
 

@@ -121,7 +121,7 @@ test('admin dashboard stays focused on required statistics and administrative na
   assert.doesNotMatch(listingsPage, /\/hamad-market-logo\.webp/);
   assert.doesNotMatch(commissionsPage, /\/hamad-market-logo\.webp/);
   assert.match(dashboard, /إجمالي المستخدمين/);
-  assert.match(dashboard, /المستخدمون النشطون/);
+  assert.match(dashboard, /حسابات نشطة خلال 14 يوماً/);
   assert.match(dashboard, /الإعلانات المنشورة/);
   assert.match(dashboard, /البلاغات المفتوحة/);
   assert.match(usersPage, /className="admin-section"/);
@@ -344,7 +344,8 @@ test('moderators can view admin listings without listing mutation controls', () 
   assert.match(listRoute, /hasVerifiedModeratorAccess/);
   assert.match(page, /useAdminAccess\('moderator'\)/);
   assert.match(page, /const canManageListings/);
-  assert.match(page, /disabled=\{!canManageListings\}/);
+  assert.match(page, /const isEditingDisabled = !canManageListings \|\| isActionPending/);
+  assert.match(page, /disabled=\{isEditingDisabled\}/);
   assert.match(page, /\{canManageListings && \(/);
 });
 
@@ -372,7 +373,7 @@ test('admin listings offer permanent deletion only for deleted listings', () => 
   assert.match(page, /listing\.status === 'deleted'/);
   assert.match(page, /حذف نهائي/);
   assert.match(page, /لا يمكن التراجع عن هذا الإجراء/);
-  assert.match(page, /body: JSON\.stringify\(\{ status: 'deleted' \}\)/);
+  assert.match(page, /body: JSON\.stringify\(\{ status: 'deleted', \.\.\.\(listing\?\.updatedAt \? \{ expectedUpdatedAt: listing\.updatedAt \}/);
   assert.match(page, /method: 'DELETE'/);
 });
 
@@ -671,10 +672,10 @@ test('scoped admin roles are enforced consistently by pages and APIs', () => {
   assert.match(shell, /href: '\/admin\/commissions'/);
   assert.match(shell, /section\.staff \|\| canManage/);
   assert.match(shell, /adminAccessRole === 'admin' \|\| adminAccessRole === 'owner'/);
-  assert.match(commissionsPage, /useAdminAccess\('owner'\)/);
+  assert.match(commissionsPage, /useAdminAccess\('admin'\)/);
   assert.match(commissionsRoute, /hasVerifiedAdminAccess/);
   assert.match(commissionRoute, /hasVerifiedAdminAccess/);
-  assert.match(usersPage, /\.\.\.\(isOwner \? \{ role: draft\.role \} : \{\}\)/);
+  assert.match(usersPage, /isOwner && draft\.role !== normalizeRole\(user\.role\) \? \{ role: draft\.role \}/);
   assert.match(userRoute, /hasOwnerLevelAdminAccess = await hasVerifiedAdminAccess/);
   assert.match(userRoute, /parsed\.data\.role !== undefined && !hasOwnerLevelAdminAccess/);
 });
