@@ -18,6 +18,28 @@ const notificationIsolation = scenario('tests/notification-account-isolation.db-
 
 export const mobileAccountContracts = [
   {
+    id: 'analytics.app-activity', label: 'Record anonymous native application activity independently of web visits',
+    endpoints: ['POST /api/analytics/visit'], mobileFiles: ['src/core/app-usage.ts'],
+    serverEffects: ['Validate anonymous native installation/session receipts without sign-in or browser cookies; atomically deduplicate sessions and daily installations by platform and count distinct installations across reporting windows.'],
+    scenarios: [
+      scenario('tests/app-usage.test.ts', 'analytics contract keeps empty web requests and validates native identities without requiring sign-in',
+        ['Actual POST preserves legacy empty web requests/cookies, rejects malformed JSON and invalid native identities/platforms, and accepts a native receipt without setting a cookie and with no-store headers.']),
+      scenario('tests/app-usage.test.ts', 'native receipts dedupe retries and short resumes, retain daily unique installs and separate platforms',
+        ['Controlled transaction state verifies retry/short-resume deduplication, delayed old receipt suppression, daily/platform separation and exclusion of admin web visits.']),
+      scenario('tests/app-usage.test.ts', 'rolling app activity counts distinct installations in each window rather than summing daily uniques',
+        ['Controlled query transport verifies distinct-installation aggregation, Saudi date windows, platform filtering and returned totals.']),
+      scenario('tests/app-usage.db-integration.test.ts', 'PostgreSQL app receipts are atomic under duplicate requests and rolling activity dedupes across days',
+        ['Real repository transactions serialize eight duplicate receipts, suppress short/delayed sessions and count distinct installations across days separately for iOS and Android.'], 'postgres'),
+      scenario('mobile:tests/app-usage.test.cjs', 'anonymous telemetry persists one install id, ignores duplicate starts and remains silent in background',
+        ['Tracker with controlled storage/transport persists one installation identity, deduplicates foreground starts, sends no background traffic and retains a short-resume session.'], 'mobile-node'),
+      scenario('mobile:tests/app-usage.test.cjs', 'long background resumes rotate the session while a Saudi midnight heartbeat retains the install',
+        ['Tracker rotates the session after the idle interval and sends a new Saudi-day receipt without changing the installation identity.'], 'mobile-node'),
+      scenario('mobile:tests/app-usage.test.cjs', 'failed requests retry with the same receipt and storage failure never emits ephemeral identities',
+        ['Tracker retries failed sends with the same receipt and sends nothing when its installation identity cannot be read.'], 'mobile-node'),
+    ],
+    remainingChecks: ['Released native SecureStore/expoFetch lifecycle and delivery to the live analytics endpoint require device evidence; helper transports are controlled and PostgreSQL scenarios call the repository directly.', 'The mapped route scenario does not exercise a database outage or assert its 503 response.'],
+  },
+  {
     id: 'configuration.bootstrap', label: 'Load application catalog, policies, limits and capabilities',
     endpoints: ['GET /api/mobile/bootstrap'], mobileFiles: ['src/core/bootstrap.ts'],
     serverEffects: ['Read authoritative catalog, policy versions, limits, auth availability and current site message; return noncached bootstrap JSON.'],
