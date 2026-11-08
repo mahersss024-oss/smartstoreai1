@@ -78,6 +78,26 @@ switching a dirty record requires confirmation. Drafts remain in page state;
 they are not shared or persisted between sessions. Destructive confirmations
 and protected-owner conditions remain unchanged.
 
+Successful list refreshes rebase user drafts against the latest server fields;
+same-field conflicts require an explicit choice before saving. A listing preview
+from a later result page remains open during a first-page refresh and is verified
+through the existing exact-listing read. Failed verification keeps its draft and
+offers a retry before writes; a confirmed missing listing closes the preview.
+
+Listing-report `reject_listing` and `delete_listing` actions use the existing
+report PATCH endpoint. The report's open-state claim, listing change, evidence
+events and both audit entries commit in one PostgreSQL transaction. A losing
+decision cannot change the listing. Legacy `review` and `dismiss` remain valid.
+Administrative user audits read their previous values under the User row lock.
+Commission write outages return a temporary failure, not a missing-record result.
+The overview refresh button reloads headline/activity counters and workspace data
+while retaining the selected month and chart source.
+
+Regression coverage includes `admin-report-integrity.spec.ts`,
+`admin-draft-continuity.spec.ts`, the workspace browser tests, and the isolated
+PostgreSQL moderation/account audit tests. Controlled browser responses remain
+separate evidence from actual local PostgreSQL transactions.
+
 The existing listing GET route accepts an optional exact `sellerId` filter.
 The existing moderation GET route accepts optional `reportId`/`sourceType`
 filters for direct report navigation. Default pagination and queries remain.

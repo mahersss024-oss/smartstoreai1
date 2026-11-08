@@ -1796,6 +1796,7 @@ export function setListingModerationStatus(
 export function setReportModerationStatus(
   reportId: string,
   status: Extract<ReportRecord['status'], 'reviewed' | 'dismissed'>,
+  listingStatus?: 'rejected' | 'deleted',
 ) {
   seedListings();
   const report = reports.get(reportId);
@@ -1808,13 +1809,28 @@ export function setReportModerationStatus(
   }
 
   if (report.status !== 'open') return { status: 'already_resolved' as const, report };
-  report.status = status;
-  reports.set(report.id, report);
-  persistStore();
+  const listing = listingStatus ? listings.get(report.listingId) : undefined;
+  if (listingStatus && !listing) return { status: 'listing_not_found' as const, report: null };
+  const updatedReport = { ...report, status };
+  const updatedListing = listing && listingStatus ? {
+    ...listing, status: listingStatus, updatedAt: nowIso(),
+    compliance: { ...listing.compliance, humanDecision: 'block' as const },
+  } : undefined;
+  reports.set(report.id, updatedReport);
+  if (updatedListing) listings.set(updatedListing.id, updatedListing);
+  try { persistStore(); }
+  catch (error) {
+    reports.set(report.id, report);
+    if (listing) listings.set(listing.id, listing);
+    throw error;
+  }
+  if (updatedListing) resolveLocalListingReviews(updatedListing.id);
 
   return {
-    status: report.status,
-    report,
+    status: updatedReport.status,
+    report: updatedReport,
+    listing: updatedListing,
+    previousListingStatus: listing?.status,
   };
 }
 

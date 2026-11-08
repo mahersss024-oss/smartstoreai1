@@ -11,7 +11,7 @@ import { prisma } from '@/lib/db/prisma';
 const maxReportModerationActionRequestBytes = 4 * 1024;
 
 const reportActionSchema = z.object({
-  action: z.enum(['review', 'dismiss']),
+  action: z.enum(['review', 'dismiss', 'reject_listing', 'delete_listing']),
 });
 
 type RouteContext = {
@@ -21,7 +21,7 @@ type RouteContext = {
 };
 
 function getReportStatus(action: z.infer<typeof reportActionSchema>['action']) {
-  return action === 'review' ? 'reviewed' : 'dismissed';
+  return action === 'dismiss' ? 'dismissed' : 'reviewed';
 }
 
 async function enforceModerationReportMutationRateLimit(
@@ -89,6 +89,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     reportId,
     getReportStatus(parsed.data.action),
     session.user,
+    parsed.data.action === 'delete_listing' ? 'deleted' : parsed.data.action === 'reject_listing' ? 'rejected' : undefined,
   );
 
   if (result.status === 'not_found') {
@@ -96,6 +97,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
   if (result.status === 'already_resolved') {
     return Response.json({ error: 'report_already_resolved' }, { status: 409 });
+  }
+  if (result.status === 'listing_not_found') {
+    return Response.json({ error: 'listing_not_found' }, { status: 404 });
   }
 
   return Response.json(result);

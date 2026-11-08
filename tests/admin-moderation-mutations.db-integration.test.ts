@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import type { Prisma } from '@prisma/client';
 import { DELETE as deleteListing } from '@/app/api/admin/listings/[listingId]/route';
+import { PATCH as resolveReport } from '@/app/api/admin/moderation/reports/[reportId]/route';
 import { addConversationMessage, blockConversationUser, setReportModerationStatus, setUserReportModerationStatus, unblockConversationUser } from '@/agent/marketplace/repository';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
@@ -83,6 +84,78 @@ test('PostgreSQL concurrent report resolutions preserve one decision and one aud
   const audits = await prisma.adminAuditLog.findMany({ where: { targetType: 'report', targetId: report.id } });
   assert.equal(audits.length, 1);
   assert.deepEqual(audits[0].metadata, { previousStatus: 'open', nextStatus: saved.status, listingId: listing.id, reporterId: f.buyer.id });
+});
+
+test('PostgreSQL report listing actions commit the decision listing and both audits together', { timeout: 20_000 }, async t => {
+  if (!enabled()) return t.skip('Requires the disposable loopback PostgreSQL test database.');
+  const f = await fixture(t);
+  const firstPublishedAt = new Date('2026-01-01T12:00:00Z');
+  for (const [action, status] of [['reject_listing', 'rejected'], ['delete_listing', 'deleted']] as const) {
+    const listing = await prisma.listing.create({ data: {
+      sellerId: f.seller.id, category: 'furniture', title: 'Atomic report target', status: 'published', firstPublishedAt,
+    } });
+    const report = await prisma.report.create({ data: { listingId: listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+    const response = await resolveReport(new Request(`https://example.test/api/admin/moderation/reports/${report.id}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${f.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+    }), { params: Promise.resolve({ reportId: report.id }) });
+    assert.equal(response.status, 200);
+    const savedListing = await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } });
+    assert.equal(savedListing.status, status);
+    assert.equal((savedListing.compliance as { humanDecision?: string }).humanDecision, 'block');
+    assert.equal(savedListing.firstPublishedAt?.getTime(), firstPublishedAt.getTime());
+    assert.equal((await prisma.report.findUniqueOrThrow({ where: { id: report.id } })).status, 'reviewed');
+    assert.equal(await prisma.adminAuditLog.count({ where: { targetId: { in: [listing.id, report.id] }, adminId: f.owner.id } }), 2);
+    assert.equal((await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } })).status, 'closed');
+  }
+});
+
+test('PostgreSQL concurrent dismiss and listing deletion cannot apply a losing report decision', { timeout: 20_000 }, async t => {
+  if (!enabled()) return t.skip('Requires the disposable loopback PostgreSQL test database.');
+  const f = await fixture(t);
+  const listing = await prisma.listing.create({ data: { sellerId: f.seller.id, category: 'furniture', title: 'Concurrent report target', status: 'published' } });
+  const report = await prisma.report.create({ data: { listingId: listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+  const decide = (action: string) => resolveReport(new Request(`https://example.test/api/admin/moderation/reports/${report.id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${f.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+  }), { params: Promise.resolve({ reportId: report.id }) });
+  const responses = await Promise.all([decide('dismiss'), decide('delete_listing')]);
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+  const winner = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+  const expectedListingStatus = winner.status === 'dismissed' ? 'published' : 'deleted';
+  assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status, expectedListingStatus);
+  assert.equal(await prisma.adminAuditLog.count({ where: { targetId: report.id, targetType: 'report' } }), 1);
+  assert.equal(await prisma.adminAuditLog.count({ where: { targetId: listing.id, targetType: 'listing' } }), expectedListingStatus === 'deleted' ? 1 : 0);
+  const later = await decide('reject_listing');
+  assert.equal(later.status, 409);
+  assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status, expectedListingStatus);
+});
+
+test('PostgreSQL a failed report audit rolls back its listing decision and evidence changes', { timeout: 20_000 }, async t => {
+  if (!enabled()) return t.skip('Requires the disposable loopback PostgreSQL test database.');
+  const f = await fixture(t);
+  const listing = await prisma.listing.create({ data: { sellerId: f.seller.id, category: 'furniture', title: 'Rollback report target', status: 'published' } });
+  const report = await prisma.report.create({ data: { listingId: listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
+  const transaction = prisma.$transaction.bind(prisma);
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(async tx => {
+    const audit = new Proxy(tx.adminAuditLog, { get(target, key, receiver) {
+      if (key !== 'create') return Reflect.get(target, key, receiver);
+      return async (args: Prisma.AdminAuditLogCreateArgs) => {
+        if (args.data.targetType === 'report') throw new Error('injected_report_audit_failure');
+        return tx.adminAuditLog.create(args);
+      };
+    } });
+    return work(new Proxy(tx, { get(target, key, receiver) {
+      return key === 'adminAuditLog' ? audit : Reflect.get(target, key, receiver);
+    } }));
+  }));
+  await assert.rejects(() => resolveReport(new Request(`https://example.test/api/admin/moderation/reports/${report.id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${f.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_listing' }),
+  }), { params: Promise.resolve({ reportId: report.id }) }), /injected_report_audit_failure/);
+  assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status, 'published');
+  assert.equal((await prisma.report.findUniqueOrThrow({ where: { id: report.id } })).status, 'open');
+  assert.equal(await prisma.adminAuditLog.count({ where: { targetId: { in: [listing.id, report.id] } } }), 0);
+  const evidence = await prisma.evidenceCase.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'Report', sourceId: report.id } } });
+  assert.equal(evidence.status, 'open');
+  assert.equal(await prisma.evidenceEvent.count({ where: { caseId: evidence.id, action: { in: ['Report.update', 'Listing.update'] } } }), 0);
 });
 
 test('PostgreSQL moderation waits for another conversation send and customers cannot remove the restriction', { timeout: 30_000 }, async t => {

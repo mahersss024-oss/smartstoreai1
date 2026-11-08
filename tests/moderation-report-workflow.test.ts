@@ -12,9 +12,14 @@ test('admin moderation exposes a complete listing report workflow', async () => 
   assert.match(source, /رفض البلاغ/);
   assert.match(source, /إيقاف الإعلان/);
   assert.match(source, /حذف الإعلان/);
-  assert.match(source, /action === 'delete_listing' \? 'delete' : 'reject'/);
-  assert.match(source, /action === 'dismiss' \? 'dismiss' : 'review'/);
-  assert.match(source, /بقي البلاغ مفتوحًا/);
+  // Listing/report decisions now use one report request. Behavioral route,
+  // PostgreSQL and browser cases verify its commit/rollback and stale conflict.
+  assert.match(source, /await moderateReport\(report\.id, action\)/);
+  const reportRoute = await readFile(
+    new URL('../app/api/admin/moderation/reports/[reportId]/route.ts', import.meta.url), 'utf8',
+  );
+  assert.match(reportRoute, /'review', 'dismiss', 'reject_listing', 'delete_listing'/);
+  assert.match(reportRoute, /report_already_resolved/);
   assert.match(source, /<ActionConfirmDialog/);
   assert.match(source, /pendingModerationConfirm/);
   assert.match(source, /setPendingModerationConfirm\(\{/);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { setCommissionStatusForAdmin } from '@/agent/marketplace/repository';
@@ -8,8 +9,18 @@ import { hasVerifiedAdminAccess } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
+import { noStoreHeaders } from '@/lib/api/no-store';
 
 const maxAdminCommissionStatusRequestBytes = 4 * 1024;
+
+function transientDatabaseErrorCode(error: unknown) {
+  const code = error instanceof Prisma.PrismaClientKnownRequestError ? error.code
+    : error instanceof Prisma.PrismaClientInitializationError ? error.errorCode : undefined;
+  // P2028 also covers transaction API misuse. Only its explicit timeout form
+  // is retryable; unexpected transaction/programming failures must propagate.
+  if (code === 'P2028' && error instanceof Error) return /timeout|timed out|expired/i.test(error.message) ? code : null;
+  return code && ['P1001', 'P1002', 'P1008', 'P1017', 'P2024', 'P2034'].includes(code) ? code : null;
+}
 
 const commissionStatusSchema = z.object({
   status: z.enum(['due', 'paid', 'waived', 'disputed']),
@@ -80,11 +91,21 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { commissionId } = await context.params;
-  const result = await setCommissionStatusForAdmin(
-    commissionId,
-    parsed.data.status,
-    session.user,
-  );
+  let result: Awaited<ReturnType<typeof setCommissionStatusForAdmin>>;
+  try {
+    result = await setCommissionStatusForAdmin(
+      commissionId,
+      parsed.data.status,
+      session.user,
+    );
+  } catch (error) {
+    const code = transientDatabaseErrorCode(error);
+    if (!code) throw error;
+    console.warn(`[admin_commission_update] failure=database_unavailable code=${code}`);
+    return Response.json({ error: 'commission_update_unavailable', message: 'تعذر تحديث الرسوم مؤقتًا. حاول مجددًا.' }, {
+      status: 503, headers: { ...noStoreHeaders, 'Retry-After': '3' },
+    });
+  }
 
   if (result.status === 'not_found') {
     return Response.json({ error: 'commission_not_found' }, { status: 404 });

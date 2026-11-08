@@ -5407,11 +5407,27 @@ export async function setReportModerationStatus(
   reportId: string,
   status: Extract<ReportRecord['status'], 'reviewed' | 'dismissed'>,
   admin?: Actor,
+  listingStatus?: 'rejected' | 'deleted',
 ) {
+  const publishListingDecision = (listing: memoryStore.ListingRecord, previousStatus: ListingStatus) => {
+    safelyPublishRealtimeEvent({
+      type: 'moderation_updated', payload: { entity: 'listing', entityId: listing.id, status: listing.status },
+      visibility: { includeAdmins: true, userIds: [listing.sellerId] },
+    });
+    safelyPublishRealtimeEvent({
+      type: 'ad_status_changed',
+      payload: { listingId: listing.id, sellerId: listing.sellerId, previousStatus, status: listing.status },
+      visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
+    });
+    if (listing.status === 'deleted') safelyPublishRealtimeEvent({
+      type: 'ad_deleted', payload: { listingId: listing.id, sellerId: listing.sellerId },
+      visibility: { includePublic: true, includeAdmins: true, userIds: [listing.sellerId] },
+    });
+  };
   if (!shouldUseDatabaseStore()) {
-    const result = memoryStore.setReportModerationStatus(reportId, status);
+    const result = memoryStore.setReportModerationStatus(reportId, status, listingStatus);
 
-    if (result.report) {
+    if (result.report && result.status !== 'already_resolved') {
       safelyPublishRealtimeEvent({
         type: 'moderation_updated',
         payload: {
@@ -5424,20 +5440,50 @@ export async function setReportModerationStatus(
         },
       });
     }
+    if ('listing' in result && result.listing && result.previousListingStatus) {
+      publishListingDecision(result.listing, result.previousListingStatus);
+    }
 
-    return result;
+    return { status: result.status, report: result.report };
   }
 
   const adminId = await getAdminAuditActorId(admin);
   const report = await prisma.$transaction(async (tx) => {
-    const existing = await tx.report.findUnique({ where: { id: reportId }, select: { status: true } });
+    const existing = await tx.report.findUnique({ where: { id: reportId }, select: {
+      status: true, listingId: true, reporterId: true, listing: { select: { sellerId: true } },
+    } });
     if (!existing) return null;
     if (existing.status !== 'open') return 'already_resolved' as const;
+    // A Report update's evidence trigger needs the listing and participant keys.
+    // Acquire them in the same sorted order as listing/account writes BEFORE
+    // any row lock; taking the Report row first can deadlock with a listing edit.
+    const keys = [`listing:${existing.listingId}`, `user:${existing.reporterId}`,
+      ...(existing.listing ? [`user:${existing.listing.sellerId}`] : [])];
+    for (const key of [...new Set(keys)].sort()) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${key}))`;
+    }
+    if (listingStatus) await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${existing.listingId} FOR UPDATE`;
+    const currentListing = listingStatus ? await tx.listing.findUnique({
+      where: { id: existing.listingId }, include: { images: true },
+    }) : null;
+    if (listingStatus && !currentListing) return 'listing_not_found' as const;
     const claimed = await tx.report.updateMany({
       where: { id: reportId, status: 'open' },
       data: { status },
     });
     if (!claimed.count) return 'already_resolved' as const;
+    // Claiming the report, mutating the listing and both audit records commit
+    // together. A stale decision or a failure below cannot partially change it.
+    const updatedListing = listingStatus && currentListing ? await tx.listing.update({
+      where: { id: currentListing.id },
+      data: { status: listingStatus, compliance: toPrismaJsonObject({ ...toListingRecord(currentListing).compliance, humanDecision: 'block' }) },
+      include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
+    }) : null;
+    if (updatedListing && currentListing) await createAdminAuditLog(tx, {
+      adminId, action: listingStatus === 'deleted' ? 'delete_listing' : 'reject_listing',
+      targetType: 'listing', targetId: currentListing.id,
+      metadata: { previousStatus: currentListing.status, nextStatus: listingStatus, sellerId: currentListing.sellerId, reportId },
+    });
     const updatedReport = await tx.report.findUniqueOrThrow({
       where: { id: reportId },
       include: {
@@ -5464,8 +5510,8 @@ export async function setReportModerationStatus(
       },
     });
 
-    return updatedReport;
-  });
+    return { report: updatedReport, listing: updatedListing, previousListingStatus: currentListing?.status };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 
   if (!report) {
     return {
@@ -5474,8 +5520,12 @@ export async function setReportModerationStatus(
     };
   }
   if (report === 'already_resolved') return { status: 'already_resolved' as const, report: null };
+  if (report === 'listing_not_found') return { status: 'listing_not_found' as const, report: null };
 
-  const mappedReport = toReportRecord(report);
+  const mappedReport = toReportRecord(report.report);
+  if (report.listing && report.previousListingStatus) {
+    publishListingDecision(toListingRecord(report.listing), report.previousListingStatus);
+  }
 
   safelyPublishRealtimeEvent({
     type: 'moderation_updated',
@@ -5721,7 +5771,7 @@ export async function setCommissionStatusForAdmin(
       where: { id: commissionId },
       select: { status: true },
     });
-    if (!existing) throw new Error('commission_not_found');
+    if (!existing) return null;
 
     const commission = await tx.commission.update({
       where: { id: commissionId },
@@ -5738,7 +5788,13 @@ export async function setCommissionStatusForAdmin(
           },
         },
       },
+    }).catch((error: unknown) => {
+      // Only a target removed before this UPDATE is a missing commission.
+      // Connection, transaction and audit failures must retain their cause.
+      if (isPrismaKnownRequestError(error, 'P2025')) return null;
+      throw error;
     });
+    if (!commission) return null;
 
     await createAdminAuditLog(tx, {
       adminId,
@@ -5754,7 +5810,7 @@ export async function setCommissionStatusForAdmin(
     });
 
     return commission;
-  }).catch(() => null);
+  });
 
   if (!updated) {
     return {

@@ -256,6 +256,12 @@ export async function PATCH(request: Request, context: RouteContext) {
   const now = new Date();
   const updated = await prisma.$transaction(async (tx) => {
     await lockUserEvidenceEntities(tx, userId);
+    await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    const previous = await tx.user.findUnique({
+      where: { id: userId },
+      select: { role: true, phoneNumber: true },
+    });
+    if (!previous) return null;
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -280,8 +286,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         metadata: {
           operation: 'admin_user_update',
           previous: {
-            role: existing.role,
-            phoneNumber: existing.phoneNumber,
+            role: previous.role,
+            phoneNumber: previous.phoneNumber,
           },
           updates: {
             role: parsed.data.role,
@@ -324,6 +330,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   });
 
+  if (!updated) {
+    return Response.json({ error: 'user_not_found' }, { status: 404, headers: noStoreHeaders });
+  }
   return Response.json({ user: mapUpdatedUser(updated) }, { headers: noStoreHeaders });
 }
 

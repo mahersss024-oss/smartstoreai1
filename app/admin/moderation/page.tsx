@@ -20,6 +20,7 @@ import {
 
 import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -656,6 +657,12 @@ function AdminModerationPageContent() {
     tone?: 'default' | 'danger' | 'success';
     onConfirm: () => void;
   } | null>(null);
+  const { begin: beginQueueLoad, invalidate: invalidateQueueLoad } = useAdminRequest(
+    isAdminAccessAllowed, JSON.stringify([focusedReportId, focusedSource]),
+  );
+  const { begin: beginReportMutation } = useAdminRequest(
+    isAdminAccessAllowed, JSON.stringify([focusedReportId, focusedSource]),
+  );
 
   const openReportsCount = useMemo(
     () =>
@@ -673,19 +680,24 @@ function AdminModerationPageContent() {
     adminAccessRole === 'moderator';
 
   const refreshQueue = useCallback(async (page = 1) => {
+    const request = beginQueueLoad();
     setIsLoading(true);
     setNotice('');
 
     try {
       if (!(await verifyAdminAccess())) {
+        if (!request.isCurrent()) return;
         setQueue({ listings: [], reports: [], userReports: [] });
         return;
       }
+      if (!request.isCurrent()) return;
 
       const focusQuery = focusedReportId ? `&reportId=${encodeURIComponent(focusedReportId)}&sourceType=${encodeURIComponent(focusedSource)}` : '';
       const response = await fetch(`/api/admin/moderation?page=${page}&limit=20${focusQuery}`, {
         cache: 'no-store',
+        signal: request.signal,
       });
+      if (!request.isCurrent()) return;
 
       if (response.status === 401) {
         router.push('/api/auth/google/start');
@@ -704,25 +716,28 @@ function AdminModerationPageContent() {
       }
 
       const payload = (await response.json()) as ModerationQueue;
+      if (!request.isCurrent()) return;
 
       setQueue((currentQueue) =>
         page === 1
           ? payload
           : {
               ...payload,
-              listings: [...currentQueue.listings, ...payload.listings],
-              reports: [...currentQueue.reports, ...payload.reports],
+              listings: [...currentQueue.listings, ...payload.listings.filter(row => !currentQueue.listings.some(existing => existing.id === row.id))],
+              reports: [...currentQueue.reports, ...payload.reports.filter(row => !currentQueue.reports.some(existing => existing.id === row.id))],
               userReports: [
                 ...currentQueue.userReports,
-                ...(payload.userReports ?? []),
+                ...(payload.userReports ?? []).filter(row => !currentQueue.userReports.some(existing => existing.id === row.id)),
               ],
             },
       );
       setNextPage(page + 1);
+    } catch {
+      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل البلاغات. حاول مجددًا.');
     } finally {
-      setIsLoading(false);
+      if (request.isCurrent()) setIsLoading(false);
     }
-  }, [router, verifyAdminAccess, focusedReportId, focusedSource]);
+  }, [router, verifyAdminAccess, focusedReportId, focusedSource, beginQueueLoad, setIsLoading, setNotice, setQueue, setNextPage]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
@@ -730,15 +745,20 @@ function AdminModerationPageContent() {
 
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) {
-        void refreshQueue();
+      if (cancelled) return;
+      setPendingModerationConfirm(null);
+      setProcessingReportId(null);
+      if (isAdminAccessAllowed) void refreshQueue();
+      else {
+        setQueue({ listings: [], reports: [], userReports: [] });
+        setNextPage(1);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshQueue]);
+  }, [isAdminAccessAllowed, refreshQueue]);
 
   useSmartstoreRealtime({
     enabled: isAdminAccessAllowed,
@@ -788,28 +808,41 @@ function AdminModerationPageContent() {
 
       void refreshQueue(1);
     },
-    [refreshQueue],
+    [refreshQueue, setNotice],
   );
 
   const moderateReport = useCallback(
-    async (reportId: string, action: 'review' | 'dismiss') => {
-      const response = await fetch(
-        `/api/admin/moderation/reports/${reportId}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+    async (reportId: string, action: ListingReportAction) => {
+      const request = beginReportMutation();
+      invalidateQueueLoad();
+      setProcessingReportId(reportId);
+      setNotice('');
+      try {
+        const response = await fetch(`/api/admin/moderation/reports/${reportId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action }),
-        },
-      );
-
-      if (!response.ok) {
-        setNotice('تعذر تحديث البلاغ.');
-        return;
+        });
+        if (!request.isCurrent()) return;
+        if (!response.ok) {
+          if (response.status === 409) {
+            await refreshQueue(1);
+            if (request.isCurrent()) setNotice('عولج هذا البلاغ مسبقًا. لم يُنفذ الإجراء على الإعلان.');
+          } else {
+            setNotice(response.status === 404
+              ? 'البلاغ أو الإعلان المرتبط به لم يعد متاحًا. حدّث القائمة.'
+              : 'تعذر تنفيذ إجراء البلاغ. حاول مجددًا.');
+          }
+          return;
+        }
+        await refreshQueue(1);
+        if (request.isCurrent()) setNotice('تم تنفيذ إجراء البلاغ.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر تأكيد نتيجة الإجراء. حدّث القائمة للتحقق قبل المحاولة مجددًا.');
+      } finally {
+        if (request.isCurrent()) setProcessingReportId(null);
       }
-
-      void refreshQueue(1);
     },
-    [refreshQueue],
+    [refreshQueue, beginReportMutation, invalidateQueueLoad, setProcessingReportId, setNotice],
   );
 
   const moderateUserReport = useCallback(
@@ -931,35 +964,9 @@ function AdminModerationPageContent() {
         return;
       }
 
-      setProcessingReportId(report.id);
-      setNotice('');
-
-      try {
-        if (action !== 'dismiss' && report.listing) {
-          const listingResponse = await fetch(
-            `/api/admin/moderation/listings/${report.listing.id}`,
-            {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: action === 'delete_listing' ? 'delete' : 'reject',
-              }),
-            },
-          );
-
-          if (!listingResponse.ok) {
-            setNotice('تعذر تنفيذ الإجراء على الإعلان، لذلك بقي البلاغ مفتوحًا.');
-            return;
-          }
-        }
-
-        await moderateReport(
-          report.id,
-          action === 'dismiss' ? 'dismiss' : 'review',
-        );
-      } finally {
-        setProcessingReportId(null);
-      }
+      // The existing report endpoint commits its decision and any listing
+      // action together; never mutate the listing before claiming the report.
+      await moderateReport(report.id, action);
     },
     [moderateReport],
   );

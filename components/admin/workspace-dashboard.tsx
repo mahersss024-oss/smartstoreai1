@@ -51,7 +51,11 @@ const number = (value: number | string) =>
     Number(value),
   );
 
-export function WorkspaceDashboard({ appUsage }: { appUsage?: AppUsageStats }) {
+export function WorkspaceDashboard({ appUsage, overviewLoading = false, onRefreshOverview }: {
+  appUsage?: AppUsageStats;
+  overviewLoading?: boolean;
+  onRefreshOverview?: () => Promise<void>;
+}) {
   const params = useSearchParams();
   const calendar = params.get('view') === 'calendar';
   const [month, setMonth] = useState(() =>
@@ -68,13 +72,15 @@ export function WorkspaceDashboard({ appUsage }: { appUsage?: AppUsageStats }) {
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
-  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const refresh = useCallback(() => {
+    setRevision((value) => value + 1);
+    void onRefreshOverview?.();
+  }, [onRefreshOverview]);
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
       setLoading(true);
       setError('');
-      setData(null);
       try {
         const response = await fetch(
           `/api/admin/overview?view=workspace&month=${encodeURIComponent(month)}`,
@@ -153,14 +159,14 @@ export function WorkspaceDashboard({ appUsage }: { appUsage?: AppUsageStats }) {
             size="icon"
             aria-label="تحديث المؤشرات والمواعيد"
             title="تحديث المؤشرات والمواعيد"
-            disabled={loading}
+            disabled={loading || overviewLoading}
             onClick={refresh}
           >
             <RefreshCw className="size-4" />
           </Button>
         </div>
       </div>
-      {loading && (
+      {loading && !data && (
         <div
           className="grid min-h-72 place-items-center text-sm text-muted-foreground"
           role="status"
@@ -174,7 +180,7 @@ export function WorkspaceDashboard({ appUsage }: { appUsage?: AppUsageStats }) {
           className="flex flex-wrap items-center gap-3 py-8 text-sm"
         >
           <p>{error}</p>
-          <Button variant="outline" onClick={refresh}>
+          <Button variant="outline" disabled={loading || overviewLoading} onClick={refresh}>
             <RefreshCw className="size-4" />
             إعادة المحاولة
           </Button>

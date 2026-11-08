@@ -6,7 +6,7 @@ import { AdminResultsTable } from '@/components/admin/results-table';
 import { listingEditIsDirty, listingEditPatch, reconcileListingEdit, type ListingDraft, type ListingEdit } from '@/components/admin/listing-edits';
 import { useAdminRequest } from '@/components/admin/use-admin-request';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { formatMarketplaceCategory, marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
 import { CategoryOptionSelect } from '@/components/category-option-select';
 import { CarModelSelect } from '@/components/car-model-select';
@@ -162,6 +162,7 @@ function AdminListingCard({
   onPermanentDelete,
   pendingAction,
   saveBlocked,
+  readOnly = false,
 }: Readonly<{
   listing: AdminListing;
   draft: ListingDraft;
@@ -172,6 +173,7 @@ function AdminListingCard({
   onPermanentDelete: (listingId: string) => void;
   pendingAction: PendingAdminListingAction | null;
   saveBlocked: boolean;
+  readOnly?: boolean;
 }>) {
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const activeImage = listing.images.find(image => image.id === activeImageId) ?? listing.images.find(image => image.isPrimary) ?? listing.images[0];
@@ -182,7 +184,7 @@ function AdminListingCard({
   const isPermanentlyDeleting =
     pendingAction?.listingId === listing.id &&
     pendingAction.action === 'permanent_delete';
-  const isActionPending = Boolean(pendingAction);
+  const isActionPending = Boolean(pendingAction) || readOnly;
   const isEditingDisabled = !canManageListings || isActionPending;
 
   return (
@@ -375,6 +377,9 @@ function AdminListingsPageContent() {
   } = useAdminAccess('moderator');
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(focusedListingId || null);
+  const selectedIdRef = useRef<string | null>(focusedListingId || null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<AdminListing | null>(null);
+  const [previewReadError, setPreviewReadError] = useState('');
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [edits, setEdits] = useState<Record<string, ListingEdit>>({});
   const [query, setQuery] = useState(searchParams.get('query')?.trim() ?? '');
@@ -396,9 +401,29 @@ function AdminListingsPageContent() {
   const { begin: beginLoad, invalidate: invalidateLoad } = useAdminRequest(isAdminAccessAllowed,
     JSON.stringify([appliedFilters, focusedListingId, sellerId]));
 
+  const closeListing = useCallback(() => {
+    selectedIdRef.current = null;
+    setSelectedId(null);
+    setSelectedSnapshot(null);
+    setPreviewReadError('');
+  }, [setSelectedId, setSelectedSnapshot, setPreviewReadError]);
+  const openListing = useCallback((id: string) => {
+    selectedIdRef.current = id;
+    setSelectedId(id);
+    setSelectedSnapshot(listings.find(row => row.id === id) ?? null);
+    setPreviewReadError('');
+  }, [listings, setSelectedId, setSelectedSnapshot, setPreviewReadError]);
+
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled && focusedListingId) setSelectedId(focusedListingId); });
+    queueMicrotask(() => {
+      if (!cancelled && focusedListingId) {
+        selectedIdRef.current = focusedListingId;
+        setSelectedId(focusedListingId);
+        setSelectedSnapshot(null);
+        setPreviewReadError('');
+      }
+    });
     return () => { cancelled = true; };
   }, [focusedListingId]);
 
@@ -472,13 +497,54 @@ function AdminListingsPageContent() {
             ]),
           ),
         }));
+        const activeId = selectedIdRef.current;
+        if (activeId) {
+          const selected = payload.listings.find(row => row.id === activeId);
+          if (selected) {
+            setSelectedSnapshot(selected);
+            setPreviewReadError('');
+          } else if (page === 1) {
+            // The selected record may belong to a later page. Keep its editor
+            // separate from pagination and verify it through the existing read
+            // endpoint, rather than appending an unverified row to the results.
+            const noLongerAvailable = () => {
+              closeListing();
+              setActionNotice({ tone: 'warning', message: 'الإعلان المفتوح لم يعد متاحًا. حُدّثت قائمة الإعلانات.' });
+            };
+            if (focusedListingId === activeId) {
+              noLongerAvailable();
+            } else {
+              try {
+                const selectionParams = new URLSearchParams({ listingId: activeId, limit: '1' });
+                const selectionResponse = await fetch(`/api/admin/listings?${selectionParams}`, {
+                  cache: 'no-store', signal: request.signal,
+                });
+                if (!request.isCurrent() || selectedIdRef.current !== activeId) return;
+                if (!selectionResponse.ok) {
+                  setPreviewReadError('تعذر التحقق من بيانات الإعلان المفتوح. بقيت مسودتك؛ أعد المحاولة قبل تنفيذ إجراء.');
+                  return;
+                }
+                const selectionPayload = await selectionResponse.json() as { listings: AdminListing[] };
+                if (!request.isCurrent() || selectedIdRef.current !== activeId) return;
+                const latest = selectionPayload.listings.find(row => row.id === activeId);
+                if (!latest) { noLongerAvailable(); return; }
+                setSelectedSnapshot(latest);
+                setPreviewReadError('');
+                setEdits(current => ({ ...current, [activeId]: reconcileListingEdit(current[activeId], createDraft(latest)) }));
+              } catch {
+                if (request.isCurrent() && selectedIdRef.current === activeId)
+                  setPreviewReadError('تعذر التحقق من بيانات الإعلان المفتوح. بقيت مسودتك؛ أعد المحاولة قبل تنفيذ إجراء.');
+              }
+            }
+          }
+        }
       } catch {
         if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل الإعلانات. حاول مجددًا.');
       } finally {
         if (request.isCurrent()) setIsLoading(false);
       }
     },
-    [router, verifyAdminAccess, sellerId, focusedListingId, appliedFilters, beginLoad, setIsLoading, setNotice, setListings, setPagination, setEdits],
+    [router, verifyAdminAccess, sellerId, focusedListingId, appliedFilters, beginLoad, closeListing, setIsLoading, setNotice, setListings, setPagination, setEdits, setSelectedSnapshot, setPreviewReadError, setActionNotice],
   );
 
   useEffect(() => {
@@ -532,7 +598,7 @@ function AdminListingsPageContent() {
     adminAccessRole === 'admin' ||
     adminAccessRole === 'moderator';
   const selectedIndex = listings.findIndex(listing => listing.id === selectedId);
-  const selectedListing = listings[selectedIndex];
+  const selectedListing = listings[selectedIndex] ?? (selectedSnapshot?.id === selectedId ? selectedSnapshot : undefined);
   const listingIsDirty = (listing: AdminListing) => listingEditIsDirty(edits[listing.id]);
   const clearFilters = () => {
     setQuery(''); setStatus('all'); setCategory(''); setCategoryOption(''); setCarModel('');
@@ -557,9 +623,9 @@ function AdminListingsPageContent() {
   const saveListing = useCallback(
     async (listingId: string) => {
       const edit = edits[listingId];
-      const listing = listings.find(row => row.id === listingId);
+      const listing = listings.find(row => row.id === listingId) ?? (selectedSnapshot?.id === listingId ? selectedSnapshot : undefined);
 
-      if (!edit || !listing || edit.conflicts.length) {
+      if (!edit || !listing || edit.conflicts.length || previewReadError) {
         return;
       }
 
@@ -596,6 +662,7 @@ function AdminListingsPageContent() {
         setEdits(current => ({ ...current, [listingId]: reconcileListingEdit(undefined,
           payload?.listing ? createDraft(saved) : edit.draft) }));
         setListings(current => current.map(row => row.id === listingId ? saved : row));
+        setSelectedSnapshot(current => current?.id === listingId ? saved : current);
         setActionNotice({
           tone: 'success',
           title: 'تم حفظ الإعلان',
@@ -611,12 +678,13 @@ function AdminListingsPageContent() {
         setPendingAction(null);
       }
     },
-    [edits, listings, loadListings, invalidateLoad, setPendingAction, setActionNotice, setEdits, setListings],
+    [edits, listings, selectedSnapshot, previewReadError, loadListings, invalidateLoad, setPendingAction, setActionNotice, setEdits, setListings, setSelectedSnapshot],
   );
 
   const deleteListing = useCallback(
     async (listingId: string) => {
-      const listing = listings.find(row => row.id === listingId);
+      if (previewReadError) return;
+      const listing = listings.find(row => row.id === listingId) ?? (selectedSnapshot?.id === listingId ? selectedSnapshot : undefined);
       setPendingDeleteAction(null);
       invalidateLoad();
       setPendingAction({ listingId, action: 'delete' });
@@ -661,11 +729,12 @@ function AdminListingsPageContent() {
         setPendingAction(null);
       }
     },
-    [loadListings, listings, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice, setEdits],
+    [loadListings, listings, selectedSnapshot, previewReadError, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice, setEdits],
   );
 
   const permanentlyDeleteListing = useCallback(
     async (listingId: string) => {
+      if (previewReadError) return;
       setPendingDeleteAction(null);
       invalidateLoad();
       setPendingAction({ listingId, action: 'permanent_delete' });
@@ -684,6 +753,7 @@ function AdminListingsPageContent() {
           return;
         }
 
+        if (selectedIdRef.current === listingId) closeListing();
         setActionNotice({
           tone: 'success',
           title: 'تم حذف الإعلان نهائيًا',
@@ -696,7 +766,7 @@ function AdminListingsPageContent() {
         setPendingAction(null);
       }
     },
-    [loadListings, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice],
+    [loadListings, previewReadError, closeListing, invalidateLoad, setPendingDeleteAction, setPendingAction, setActionNotice],
   );
 
   let listingsContent;
@@ -719,48 +789,13 @@ function AdminListingsPageContent() {
         <AdminResultsTable
           columns={['الإعلان', 'المعلن', 'المدينة', 'السعر', 'الحالة']}
           selectedId={selectedId}
-          onOpen={setSelectedId}
+          onOpen={openListing}
           rows={listings.map(listing => ({
             id: listing.id, label: listing.title ?? 'إعلان بدون عنوان', dirty: listingIsDirty(listing),
             cells: [<span key="title" className="admin-listing-identity">{listing.images[0] ? <ResilientImage alt="" src={listing.images[0].thumbnailUrl} className="admin-result-image" /> : <ImageIcon className="size-8 shrink-0 text-muted-foreground" />}<strong>{listing.title ?? 'إعلان بدون عنوان'}</strong></span>, listing.seller?.name ?? listing.seller?.email ?? 'غير متوفر', listing.city ?? 'غير محددة', typeof listing.price === 'number' ? `${formatNumber(listing.price)} ر.س` : listing.price === 'bid' || listing.priceMode === 'bid' ? 'على السوم' : listing.price === 'negotiable' || listing.priceMode === 'negotiable' ? 'قابل للتفاوض' : 'غير محدد', <span key="status" className="admin-status">{statusOptions.find(option => option.value === listing.status)?.label ?? listing.status}</span>],
           }))}
         />
-        {selectedListing && <AdminRecordPreview
-          open title="معاينة الإعلان" dirty={listingIsDirty(selectedListing)} busy={Boolean(pendingAction) || Boolean(pendingDeleteAction)}
-          onClose={() => setSelectedId(null)}
-          onPrevious={selectedIndex > 0 ? () => setSelectedId(listings[selectedIndex - 1].id) : undefined}
-          onNext={selectedIndex < listings.length - 1 ? () => setSelectedId(listings[selectedIndex + 1].id) : undefined}
-        >
-          {Boolean(edits[selectedListing.id]?.conflicts.length) && <div role="alert" className="grid gap-3 rounded-md border border-amber-500/40 p-3 text-sm">
-            <p>تغيرت هذه البيانات أثناء تعديلك. راجع القيم الحالية قبل الحفظ:</p>
-            <dl className="grid gap-2">{edits[selectedListing.id].conflicts.map(field => <div key={field}>
-              <dt className="font-semibold">{({ title: 'العنوان', description: 'الوصف', category: 'التصنيف', categoryOption: 'نوع التصنيف', carModel: 'الموديل', city: 'المدينة', condition: 'حالة المنتج', price: 'السعر', priceMode: 'طريقة السعر', status: 'حالة الإعلان' })[field]}</dt>
-              <dd className="whitespace-pre-wrap break-words">{field === 'status' ? statusOptions.find(option => option.value === edits[selectedListing.id].base.status)?.label : edits[selectedListing.id].base[field] || 'غير محدد'}</dd>
-            </div>)}</dl>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
-                [selectedListing.id]: reconcileListingEdit(undefined, current[selectedListing.id].base) }))}>استخدام البيانات الحالية</Button>
-              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
-                [selectedListing.id]: { ...current[selectedListing.id], conflicts: [] } }))}>الاحتفاظ بتعديلاتي</Button>
-            </div>
-          </div>}
-          <AdminListingCard
-            key={selectedListing.id}
-            listing={selectedListing}
-            draft={edits[selectedListing.id]?.draft ?? createDraft(selectedListing)}
-            saveBlocked={!listingIsDirty(selectedListing) || Boolean(edits[selectedListing.id]?.conflicts.length)}
-            canManageListings={canManageListings}
-            onUpdateDraft={updateDraft}
-            onSave={(listingId) => void saveListing(listingId)}
-            onDelete={(listingId) =>
-              setPendingDeleteAction({ listingId, permanent: false })
-            }
-            onPermanentDelete={(listingId) =>
-              setPendingDeleteAction({ listingId, permanent: true })
-            }
-            pendingAction={pendingAction}
-          />
-        </AdminRecordPreview>}
+
 
         {!focusedListingId && pagination?.hasMore && (
           <div>
@@ -899,6 +934,47 @@ function AdminListingsPageContent() {
           </div>
 
           {listingsContent}
+        {selectedListing && <AdminRecordPreview
+          open title="معاينة الإعلان" dirty={listingIsDirty(selectedListing)} busy={Boolean(pendingAction) || Boolean(pendingDeleteAction)}
+          onClose={closeListing}
+          onPrevious={selectedIndex > 0 ? () => openListing(listings[selectedIndex - 1].id) : undefined}
+          onNext={selectedIndex >= 0 && selectedIndex < listings.length - 1 ? () => openListing(listings[selectedIndex + 1].id) : undefined}
+        >
+          {previewReadError && <div role="alert" className="grid gap-3 rounded-md border border-amber-500/40 p-3 text-sm">
+            <p>{previewReadError}</p>
+            <Button variant="outline" disabled={isLoading} onClick={() => void loadListings(1)}>إعادة التحقق من الإعلان</Button>
+          </div>}
+          {Boolean(edits[selectedListing.id]?.conflicts.length) && <div role="alert" className="grid gap-3 rounded-md border border-amber-500/40 p-3 text-sm">
+            <p>تغيرت هذه البيانات أثناء تعديلك. راجع القيم الحالية قبل الحفظ:</p>
+            <dl className="grid gap-2">{edits[selectedListing.id].conflicts.map(field => <div key={field}>
+              <dt className="font-semibold">{({ title: 'العنوان', description: 'الوصف', category: 'التصنيف', categoryOption: 'نوع التصنيف', carModel: 'الموديل', city: 'المدينة', condition: 'حالة المنتج', price: 'السعر', priceMode: 'طريقة السعر', status: 'حالة الإعلان' })[field]}</dt>
+              <dd className="whitespace-pre-wrap break-words">{field === 'status' ? statusOptions.find(option => option.value === edits[selectedListing.id].base.status)?.label : edits[selectedListing.id].base[field] || 'غير محدد'}</dd>
+            </div>)}</dl>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                [selectedListing.id]: reconcileListingEdit(undefined, current[selectedListing.id].base) }))}>استخدام البيانات الحالية</Button>
+              <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                [selectedListing.id]: { ...current[selectedListing.id], conflicts: [] } }))}>الاحتفاظ بتعديلاتي</Button>
+            </div>
+          </div>}
+          <AdminListingCard
+            key={selectedListing.id}
+            listing={selectedListing}
+            draft={edits[selectedListing.id]?.draft ?? createDraft(selectedListing)}
+            saveBlocked={!listingIsDirty(selectedListing) || Boolean(edits[selectedListing.id]?.conflicts.length)}
+            canManageListings={canManageListings}
+            readOnly={Boolean(previewReadError)}
+            onUpdateDraft={updateDraft}
+            onSave={(listingId) => void saveListing(listingId)}
+            onDelete={(listingId) =>
+              setPendingDeleteAction({ listingId, permanent: false })
+            }
+            onPermanentDelete={(listingId) =>
+              setPendingDeleteAction({ listingId, permanent: true })
+            }
+            pendingAction={pendingAction}
+          />
+        </AdminRecordPreview>}
         </section>
       </div>
     </main>

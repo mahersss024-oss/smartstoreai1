@@ -5,6 +5,7 @@ import { AdminRecordPreview } from '@/components/admin/record-preview';
 import { AdminResultsTable } from '@/components/admin/results-table';
 import { TechnicalDetails } from '@/components/admin/record-details';
 import { useAdminRequest } from '@/components/admin/use-admin-request';
+import { commitUserEdit, createUserDraft, reconcileUserEdit, userEditIsDirty, type UserDraft, type UserEdit } from '@/components/admin/user-edits';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -62,11 +63,6 @@ type PaginationMeta = {
   total?: number;
 };
 
-type UserDraft = {
-  role: 'user' | 'moderator' | 'admin';
-  phoneNumber: string;
-};
-
 const roleLabels: Record<string, string> = {
   user: 'عميل',
   moderator: 'مشرف',
@@ -104,7 +100,7 @@ export default function AdminUsersPage() {
   const isOwner = adminAccessRole === 'owner' || adminAccessRole === 'admin';
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
+  const [edits, setEdits] = useState<Record<string, UserEdit>>({});
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [query, setQuery] = useState('');
   const [appliedQuery, setAppliedQuery] = useState('');
@@ -128,7 +124,7 @@ export default function AdminUsersPage() {
     [users],
   );
   const selectedIndex = users.findIndex(user => user.id === selectedId);
-  const userIsDirty = (user: AdminUserRecord) => Boolean(drafts[user.id] && (drafts[user.id].role !== normalizeRole(user.role) || drafts[user.id].phoneNumber !== (user.phoneNumber ?? '')));
+  const userIsDirty = (user: AdminUserRecord) => userEditIsDirty(edits[user.id]);
 
   const refreshUsers = useCallback(
     async (page = 1) => {
@@ -191,18 +187,10 @@ export default function AdminUsersPage() {
         setUsers((currentUsers) =>
           page === 1 ? nextUsers : [...currentUsers, ...nextUsers.filter(user => !currentUsers.some(row => row.id === user.id))],
         );
-        setDrafts((currentDrafts) => {
-          const nextDrafts = { ...currentDrafts };
-
-          for (const user of nextUsers) {
-            nextDrafts[user.id] = {
-              role: normalizeRole(user.role),
-              phoneNumber: user.phoneNumber ?? '',
-            };
-          }
-
-          return page === 1 ? nextDrafts : nextDrafts;
-        });
+        setEdits((current) => ({
+          ...current,
+          ...Object.fromEntries(nextUsers.map(user => [user.id, reconcileUserEdit(current[user.id], createUserDraft(user))])),
+        }));
         setPagination(payload.pagination ?? null);
       } catch {
         if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل المستخدمين. حاول مجددًا.');
@@ -242,7 +230,7 @@ export default function AdminUsersPage() {
       let cancelled = false;
       queueMicrotask(() => {
         if (cancelled) return;
-        setUsers([]); setDrafts({}); setPagination(null); setSelectedId(null); setPendingUserConfirm(null);
+        setUsers([]); setEdits({}); setPagination(null); setSelectedId(null); setPendingUserConfirm(null);
         setSavingUserId(null); setDeletingUserId(null); setUserAction(null);
       });
       void verifyAdminAccess();
@@ -271,24 +259,24 @@ export default function AdminUsersPage() {
 
   const updateDraft = useCallback(
     (userId: string, updates: Partial<UserDraft>) => {
-      setDrafts((currentDrafts) => ({
-        ...currentDrafts,
-        [userId]: {
-          role: currentDrafts[userId]?.role ?? 'user',
-          phoneNumber: currentDrafts[userId]?.phoneNumber ?? '',
-          ...updates,
-        },
-      }));
+      setEdits((current) => {
+        const edit = current[userId];
+        if (!edit) return current;
+        const draft = { ...edit.draft, ...updates };
+        return { ...current, [userId]: { ...edit, draft,
+          conflicts: edit.conflicts.filter(field => draft[field] !== edit.base[field]) } };
+      });
     },
     [],
   );
 
   const saveUser = useCallback(
     async (userId: string, phoneOverride?: string) => {
-      const draft = drafts[userId];
+      const edit = edits[userId];
+      const draft = edit?.draft;
       const user = users.find(row => row.id === userId);
 
-      if (!draft || !user) {
+      if (!draft || !user || edit.conflicts.length) {
         return;
       }
       const phoneNumber = phoneOverride ?? draft.phoneNumber;
@@ -337,12 +325,8 @@ export default function AdminUsersPage() {
             user.id === updatedUser.id ? updatedUser : user,
           ),
         );
-        setDrafts((currentDrafts) => ({
-          ...currentDrafts,
-          [updatedUser.id]: {
-            role: normalizeRole(updatedUser.role),
-            phoneNumber: updatedUser.phoneNumber ?? '',
-          },
+        setEdits((current) => ({ ...current,
+          [updatedUser.id]: commitUserEdit(current[updatedUser.id], body, createUserDraft(updatedUser)),
         }));
         setNotice('تم تحديث بيانات المستخدم.');
       } catch {
@@ -351,7 +335,7 @@ export default function AdminUsersPage() {
         if (request.isCurrent()) setSavingUserId(null);
       }
     },
-    [drafts, users, isOwner, router, beginMutation, invalidateLoad],
+    [edits, users, isOwner, router, beginMutation, invalidateLoad],
   );
 
   const deleteUser = useCallback(
@@ -399,10 +383,10 @@ export default function AdminUsersPage() {
               )
             : currentUsers.filter((currentUser) => currentUser.id !== user.id),
         );
-        setDrafts((currentDrafts) => {
-          const nextDrafts = { ...currentDrafts };
-          delete nextDrafts[user.id];
-          return nextDrafts;
+        setEdits((current) => {
+          const next = { ...current };
+          delete next[user.id];
+          return next;
         });
         setNotice(
           isPermanent
@@ -450,6 +434,7 @@ export default function AdminUsersPage() {
             currentUser.id === user.id ? payload.user! : currentUser,
           ),
         );
+        setEdits(current => ({ ...current, [user.id]: reconcileUserEdit(current[user.id], createUserDraft(payload.user!)) }));
         setNotice('تمت إعادة تفعيل حساب المستخدم.');
       } catch {
         if (request.isCurrent()) setNotice('تعذر الاتصال لإعادة تفعيل الحساب. حاول مجددًا.');
@@ -602,10 +587,9 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             users.filter(user => user.id === selectedId).map((user) => {
-              const draft = drafts[user.id] ?? {
-                role: normalizeRole(user.role),
-                phoneNumber: user.phoneNumber ?? '',
-              };
+              const edit = edits[user.id];
+              const draft = edit?.draft ?? createUserDraft(user);
+              const hasConflicts = Boolean(edit?.conflicts.length);
               const isSaving = savingUserId === user.id;
               const isDeleting = deletingUserId === user.id;
               const isOwnerAccount = user.role === 'owner';
@@ -622,6 +606,19 @@ export default function AdminUsersPage() {
                   onClose={() => setSelectedId(null)}
                   onPrevious={selectedIndex > 0 ? () => setSelectedId(users[selectedIndex - 1].id) : undefined}
                   onNext={selectedIndex < users.length - 1 ? () => setSelectedId(users[selectedIndex + 1].id) : undefined}>
+                {hasConflicts && <div role="alert" className="grid gap-3 rounded-md border border-amber-500/40 p-3 text-sm">
+                  <p>تغيرت بيانات هذا المستخدم أثناء التعديل. راجع البيانات الحالية قبل الحفظ.</p>
+                  <dl className="grid gap-2">{edit.conflicts.map(field => <div key={field}>
+                    <dt className="font-semibold">{field === 'role' ? 'الصلاحية الحالية' : 'رقم التواصل الحالي'}</dt>
+                    <dd>{field === 'role' ? roleLabels[edit.base.role] : edit.base.phoneNumber || 'غير محفوظ'}</dd>
+                  </div>)}</dl>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                      [user.id]: reconcileUserEdit(undefined, current[user.id].base) }))}>استخدام البيانات الحالية</Button>
+                    <Button variant="outline" onClick={() => setEdits(current => ({ ...current,
+                      [user.id]: { ...current[user.id], conflicts: [] } }))}>الاحتفاظ بتعديلاتي</Button>
+                  </div>
+                </div>}
                 <article className="admin-record">
                   <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                     <Link
@@ -695,7 +692,7 @@ export default function AdminUsersPage() {
                         />
                         <Button
                           className="rounded-md"
-                          disabled={isBusy || isOwnerAccount || !draft.phoneNumber}
+                          disabled={isBusy || isOwnerAccount || hasConflicts || !draft.phoneNumber}
                           onClick={() => void saveUser(user.id, '')}
                           type="button"
                           variant="outline"
@@ -798,7 +795,7 @@ export default function AdminUsersPage() {
                     </div></details>
                     <Button
                       className="rounded-md bg-blue-600 hover:bg-blue-700"
-                      disabled={isBusy || isOwnerAccount}
+                      disabled={isBusy || isOwnerAccount || hasConflicts}
                       onClick={() => void saveUser(user.id)}
                       type="button"
                     >

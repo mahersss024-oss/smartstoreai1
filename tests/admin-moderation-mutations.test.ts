@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { DELETE as deleteListing, PATCH as editListing } from '@/app/api/admin/listings/[listingId]/route';
 import { PATCH as resolveReport } from '@/app/api/admin/moderation/reports/[reportId]/route';
 import { setReportModerationStatus } from '@/agent/marketplace/repository';
+import * as memoryStore from '@/agent/marketplace/store';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
@@ -88,8 +89,9 @@ test('concurrent listing-report decisions claim the open report once and audit o
   const bothRead = new Promise<void>(resolve => { release = resolve; });
   const audits: Array<{ metadata: { previousStatus: string; nextStatus: string } }> = [];
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async () => 1,
     report: {
-      findUnique: async () => { reads++; if (reads === 2) release(); await bothRead; return { status: 'open' }; },
+      findUnique: async () => { reads++; if (reads === 2) release(); await bothRead; return { status: 'open', listingId: report.listingId, reporterId: report.reporterId, listing: { sellerId: 'seller' } }; },
       updateMany: async ({ where, data }: { where: { status: string }; data: { status: string } }) => {
         if (report.status !== where.status) return { count: 0 };
         report.status = data.status; return { count: 1 };
@@ -118,4 +120,73 @@ test('the listing-report route returns 409 when another moderator already resolv
   });
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, 'report_already_resolved');
+});
+
+test('one report request changes its listing and decision while stale closed reports cannot change the listing', async t => {
+  const request = environment(t);
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
+  for (const [action, expected] of [['delete_listing', 'deleted'], ['reject_listing', 'rejected']] as const) {
+    const listing = memoryStore.createListingDraft({ sellerId: `atomic-seller-${randomUUID()}`, category: 'furniture', title: 'Atomic report fixture' });
+    memoryStore.setListingModerationStatus(listing.id, 'published');
+    const publishedAt = memoryStore.getListing(listing.id)!.firstPublishedAt;
+    const report = memoryStore.reportListing(listing.id, `atomic-buyer-${randomUUID()}`, 'fraud').report!;
+    const response = await resolveReport(request(`/api/admin/moderation/reports/${report.id}`, 'PATCH', { action }), {
+      params: Promise.resolve({ reportId: report.id }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).report.status, 'reviewed');
+    assert.equal(memoryStore.getListing(listing.id)!.status, expected);
+    assert.equal(memoryStore.getListing(listing.id)!.compliance.humanDecision, 'block');
+    assert.equal(memoryStore.getListing(listing.id)!.firstPublishedAt, publishedAt);
+    const stale = await resolveReport(request(`/api/admin/moderation/reports/${report.id}`, 'PATCH', { action: 'delete_listing' }), {
+      params: Promise.resolve({ reportId: report.id }),
+    });
+    assert.equal(stale.status, 409);
+    assert.equal(memoryStore.getListing(listing.id)!.status, expected);
+  }
+  const listing = memoryStore.createListingDraft({ sellerId: `dismissed-seller-${randomUUID()}`, category: 'furniture' });
+  memoryStore.setListingModerationStatus(listing.id, 'published');
+  const report = memoryStore.reportListing(listing.id, `dismissed-buyer-${randomUUID()}`, 'fraud').report!;
+  memoryStore.setReportModerationStatus(report.id, 'dismissed');
+  const stale = await resolveReport(request(`/api/admin/moderation/reports/${report.id}`, 'PATCH', { action: 'delete_listing' }), {
+    params: Promise.resolve({ reportId: report.id }),
+  });
+  assert.equal(stale.status, 409);
+  assert.equal(memoryStore.getListing(listing.id)!.status, 'published');
+});
+
+test('a missing report target leaves its open decision untouched and locks evidence keys before the listing row', async t => {
+  const request = environment(t);
+  const locks: Array<{ sql: string; values: unknown[] }> = [];
+  mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => { locks.push({ sql: sql.join('?'), values }); return 1; },
+    report: {
+      findUnique: async () => ({ status: 'open', listingId: 'missing-listing', reporterId: 'reporter', listing: { sellerId: 'seller' } }),
+      updateMany: async () => assert.fail('an absent target must not close the report'),
+    },
+    listing: { findUnique: async () => null, update: async () => assert.fail('an absent target must not be written') },
+    adminAuditLog: { create: async () => assert.fail('no decision was made') },
+  }));
+  const response = await resolveReport(request('/api/admin/moderation/reports/report', 'PATCH', { action: 'delete_listing' }), {
+    params: Promise.resolve({ reportId: 'report' }),
+  });
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error, 'listing_not_found');
+  assert.deepEqual(locks.slice(0, 3).map(lock => lock.values[0]), ['listing:missing-listing', 'user:reporter', 'user:seller']);
+  assert.ok(locks.slice(0, 3).every(lock => lock.sql.includes('pg_advisory_xact_lock')));
+  assert.match(locks[3].sql, /FOR UPDATE/);
+});
+
+test('report listing actions reject guests and ordinary customers before persistence', async t => {
+  environment(t);
+  process.env.SMARTSTORE_MARKETPLACE_STORE = 'file';
+  mockDatabaseMethod(t, prisma, '$transaction', async () => assert.fail('unauthorized request must not start a transaction'));
+  const customerToken = createSignedSession({ id: 'ordinary-customer', email: 'ordinary@example.test', role: 'user' });
+  for (const token of [undefined, customerToken]) {
+    const response = await resolveReport(new Request('https://example.test/api/admin/moderation/reports/report', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'delete_listing' }),
+    }), { params: Promise.resolve({ reportId: 'report' }) });
+    assert.equal(response.status, token ? 403 : 401);
+  }
 });

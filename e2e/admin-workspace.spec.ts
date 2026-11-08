@@ -134,6 +134,101 @@ test('activity defaults to native app usage and keeps website traffic and rollin
   await expect(metrics).toHaveText(['١١', '١٧', '٣٥']);
 });
 
+test('explicit dashboard refresh reloads headline and rolling activity counters without resetting chart choices', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!);
+  let increment = 0, overviewRequests = 0, workspaceRequests = 0;
+  const number = (value: number) => new Intl.NumberFormat('ar-SA').format(value);
+  await page.route('**/api/admin/overview**', route => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get('view') === 'workspace') {
+      workspaceRequests++;
+      const month = params.get('month')!;
+      return route.fulfill({ json: {
+        month, listings: [{ status: 'pending', count: 3 + increment }], commissions: [], evidence: [], events: [], hasMoreEvents: false,
+        visits: [{ day: `${month}-07`, platform: 'ios', visits: 12 + increment, uniqueVisitors: 8 + increment }],
+      } });
+    }
+    overviewRequests++;
+    return route.fulfill({ json: {
+      totalUsers: 25 + increment, activeUsers: 7 + increment, publishedListings: 15 + increment, openReports: 4 + increment,
+      appUsage: { today: 11 + increment, last7Days: 17 + increment, last30Days: 35 + increment,
+        platforms: { ios: { today: 8 + increment, last7Days: 12 + increment, last30Days: 20 + increment },
+          android: { today: 3, last7Days: 5, last30Days: 15 } } },
+    } });
+  });
+  await page.goto('/admin');
+  const headline = page.getByRole('region', { name: 'إحصائيات الإدارة', exact: true });
+  await expect(headline.getByRole('link', { name: /إجمالي المستخدمين/ })).toContainText(number(25));
+  const activity = page.getByRole('region', { name: 'نشاط التطبيق والموقع', exact: true });
+  const source = activity.getByRole('combobox', { name: 'مصدر النشاط' });
+  await source.selectOption('ios');
+  await page.locator('#admin-month').fill('2026-06');
+  await expect.poll(() => workspaceRequests).toBe(2);
+  await expect(page.getByRole('button', { name: 'تحديث المؤشرات والمواعيد', exact: true })).toBeEnabled();
+  await expect(source).toHaveValue('ios');
+  await activity.getByText('عرض أرقام النشاط', { exact: true }).click();
+  await expect(activity.getByRole('table').locator('tbody td')).toHaveText([number(12), number(8)]);
+  increment = 10;
+  await page.getByRole('button', { name: 'تحديث المؤشرات والمواعيد', exact: true }).click();
+  for (const [label, value] of [['إجمالي المستخدمين', 35], ['حسابات نشطة خلال 14 يوماً', 17], ['الإعلانات المنشورة', 25], ['البلاغات المفتوحة', 14]] as const) {
+    await expect(headline.getByRole('link', { name: new RegExp(label) })).toContainText(number(value));
+  }
+  await expect(activity.getByRole('definition')).toHaveText([21, 27, 45].map(number));
+  await expect(activity.getByRole('table').locator('tbody td')).toHaveText([number(22), number(18)]);
+  await expect(source).toHaveValue('ios');
+  await expect(page.locator('#admin-month')).toHaveValue('2026-06');
+  expect(overviewRequests).toBe(2);
+  expect(workspaceRequests).toBe(3);
+});
+
+test('headline overview failures offer an independent retry on the existing endpoint', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!);
+  let fail = true;
+  await page.route('**/api/admin/overview', route => fail
+    ? route.fulfill({ status: 503, json: { error: 'unavailable' } }) : route.fallback());
+  await page.goto('/admin');
+  await expect(page.getByRole('alert').filter({ hasText: 'تعذر تحميل الإحصائيات الآن.' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'تنبيهات إدارية', exact: true })).toBeVisible();
+  fail = false;
+  await page.getByRole('button', { name: 'إعادة تحميل الإحصائيات', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'إحصائيات الإدارة', exact: true }).getByRole('link', { name: /إجمالي المستخدمين/ })).toContainText('٢٥');
+  await expect(page.getByRole('region', { name: 'نشاط التطبيق والموقع', exact: true }).getByRole('definition')).toHaveText(['١١', '١٧', '٣٥']);
+  await expect(page.getByRole('alert').filter({ hasText: 'تعذر تحميل الإحصائيات الآن.' })).toHaveCount(0);
+});
+
+test('an overview response started before demotion cannot replace a later authorized overview', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!);
+  let role = 'admin', requests = 0;
+  let release!: () => void, started!: () => void, settled!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const firstRequest = new Promise<void>(resolve => { started = resolve; });
+  const firstSettled = new Promise<void>(resolve => { settled = resolve; });
+  await page.route('**/api/auth/session', route => route.fulfill({ json: {
+    authenticated: true, user: { id: 'workspace-admin', email: 'workspace-admin@example.test', role },
+  } }));
+  await page.route('**/api/admin/overview', async route => {
+    const current = ++requests;
+    if (current === 1) { started(); await blocked; }
+    await route.fulfill({ json: { totalUsers: current === 1 ? 25 : 99, activeUsers: 7, publishedListings: 15, openReports: 4 } }).catch(() => {});
+    if (current === 1) settled();
+  });
+  try {
+    await page.goto('/admin');
+    await firstRequest;
+    role = 'moderator';
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.getByText('المؤشرات العامة متاحة لإدارة المنصة فقط.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'إحصائيات الإدارة', exact: true })).toHaveCount(0);
+    role = 'admin';
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    const total = page.getByRole('region', { name: 'إحصائيات الإدارة', exact: true }).getByRole('link', { name: /إجمالي المستخدمين/ });
+    await expect(total).toContainText('٩٩');
+    release();
+    await firstSettled;
+    await expect(total).toContainText('٩٩');
+  } finally { release(); }
+});
+
 test('calendar keeps seven aligned columns on narrow screens', async ({ page, baseURL }, testInfo) => {
   await prepare(page, baseURL!);
   for (const width of [360, 768]) {

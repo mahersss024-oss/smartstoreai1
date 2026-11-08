@@ -1,10 +1,12 @@
 ﻿'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Activity, Megaphone, Flag, Users } from 'lucide-react';
 import { useAdminAccess } from './use-admin-access';
 import { WorkspaceDashboard } from '@/components/admin/workspace-dashboard';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
+import { Button } from '@ui/button';
 import type { AppUsageStats } from '@/lib/analytics/site-visits';
 
 export default function AdminHomePage() {
@@ -16,6 +18,7 @@ export default function AdminHomePage() {
     appUsage?: AppUsageStats;
   } | null>(null);
   const [overviewNotice, setOverviewNotice] = useState('');
+  const [overviewLoading, setOverviewLoading] = useState(false);
   const {
     adminAccessNotice,
     adminAccessRole,
@@ -30,24 +33,33 @@ export default function AdminHomePage() {
   }, [verifyAdminAccess]);
   const canManageUsers =
     adminAccessRole === 'owner' || adminAccessRole === 'admin';
+  const canViewOverview = isAdminAccessAllowed && canManageUsers;
+  const { begin: beginOverview, invalidate: invalidateOverview } = useAdminRequest(canViewOverview);
+  const loadOverview = useCallback(async () => {
+    if (!canViewOverview) return;
+    const request = beginOverview();
+    setOverviewLoading(true);
+    setOverviewNotice('');
+    try {
+      const response = await fetch('/api/admin/overview', { cache: 'no-store', signal: request.signal });
+      if (!response.ok) throw new Error('overview_failed');
+      const payload = await response.json();
+      if (request.isCurrent()) setOverview(payload);
+    } catch {
+      if (request.isCurrent()) setOverviewNotice('تعذر تحميل الإحصائيات الآن.');
+    } finally {
+      if (request.isCurrent()) setOverviewLoading(false);
+    }
+  }, [canViewOverview, beginOverview]);
   useEffect(() => {
-    if (!canManageUsers) return;
+    if (!canViewOverview) return;
     let cancelled = false;
-    fetch('/api/admin/overview', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('overview_failed');
-        return response.json();
-      })
-      .then((payload) => {
-        if (!cancelled) setOverview(payload);
-      })
-      .catch(() => {
-        if (!cancelled) setOverviewNotice('تعذر تحميل الإحصائيات الآن.');
-      });
+    queueMicrotask(() => { if (!cancelled) void loadOverview(); });
     return () => {
       cancelled = true;
+      invalidateOverview();
     };
-  }, [canManageUsers]);
+  }, [canViewOverview, loadOverview, invalidateOverview]);
   const statisticCards = [
     {
       label: 'إجمالي المستخدمين',
@@ -97,6 +109,7 @@ export default function AdminHomePage() {
               <>
                 <section
                   aria-label="إحصائيات الإدارة"
+                  aria-busy={overviewLoading}
                   className="admin-statistics relative grid-cols-2 lg:grid-cols-4"
                 >
                   {statisticCards.map(({ label, value, icon: Icon, href }) => (
@@ -132,12 +145,12 @@ export default function AdminHomePage() {
                     </p>
                   )}
                   {overviewNotice && (
-                    <p
-                      role="alert"
-                      className="col-span-full text-sm text-destructive"
-                    >
-                      {overviewNotice}
-                    </p>
+                    <div className="col-span-full flex flex-wrap items-center gap-3 text-sm">
+                      <p role="alert" className="text-destructive">{overviewNotice}</p>
+                      <Button variant="outline" disabled={overviewLoading} onClick={() => void loadOverview()}>
+                        إعادة تحميل الإحصائيات
+                      </Button>
+                    </div>
                   )}
                 </section>
                 <Suspense
@@ -147,7 +160,7 @@ export default function AdminHomePage() {
                     </p>
                   }
                 >
-                  <WorkspaceDashboard appUsage={overview?.appUsage} />
+                  <WorkspaceDashboard appUsage={overview?.appUsage} overviewLoading={overviewLoading} onRefreshOverview={loadOverview} />
                 </Suspense>
               </>
             ) : (
