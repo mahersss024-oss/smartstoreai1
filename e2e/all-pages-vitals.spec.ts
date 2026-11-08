@@ -107,7 +107,6 @@ for (const entry of pages) {
         await page.waitForTimeout(60);
       }
       await page.waitForTimeout(250);
-      await expect.poll(() => analyticsVisits).toContain(path);
       const vitals = await readPageVitals(page);
       const result = { route: entry.path, path, viewport, role, status: response?.status(),
         finalUrl: page.url(), fixtureMode: 'local production build; mocked client data; seeded SSR listing/seller',
@@ -115,6 +114,10 @@ for (const entry of pages) {
       console.log(JSON.stringify({ allPageVitals: result }));
       await info.attach('page-vitals', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
       await page.screenshot({ path: info.outputPath('page.png'), fullPage: false });
+      // The application is the primary activity source. Administrative browsing
+      // must stay out of customer website counters, including after hydration
+      // and the trusted interactions exercised above.
+      expect(analyticsVisits, 'admin navigation must not emit customer visit receipts').toEqual([]);
       expect.soft(response?.status()).toBe(200);
       expect.soft(errors).toEqual([]);
       expect.soft(failedApis).toEqual([]);

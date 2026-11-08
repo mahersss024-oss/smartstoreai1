@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { marketplaceCategoryOptionAttribute as brandAttr } from '@/lib/marketplace/category-options';
+import { marketplaceCategoryOptionAttribute as brandAttr, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { marketplaceCarModelAttribute as modelAttr } from '@/lib/marketplace/car-models';
 import { createSessionCookie } from '@/lib/auth/session';
 
@@ -20,15 +20,27 @@ test('administration uses the same car choices for filtering and audited editing
   await page.context().addCookies([{ name, value, url: baseURL! }]);
   await page.route('**/api/auth/session', route => route.fulfill({ json: { authenticated: true, user: admin } }));
   await page.route('**/api/admin/moderation?**', route => route.fulfill({ json: { notifications: [], pagination: { page: 1, hasMore: false } } }));
+  let storedListing: Omit<typeof listing, 'attributes'> & { attributes: Record<string, unknown> } = structuredClone(listing);
   const requests: URLSearchParams[] = [];
   await page.route('**/api/admin/listings?**', route => {
-    requests.push(new URL(route.request().url()).searchParams);
-    return route.fulfill({ json: { listings: [listing], pagination: { page: 1, hasMore: false, total: 1 } } });
+    const filters = new URL(route.request().url()).searchParams;
+    requests.push(filters);
+    const matches = (!filters.get('category') || filters.get('category') === storedListing.category) &&
+      (!filters.get('categoryOption') || filters.get('categoryOption') === storedListing.attributes[brandAttr]) &&
+      (!filters.get('carModel') || filters.get('carModel') === storedListing.attributes[modelAttr]);
+    return route.fulfill({ json: { listings: matches ? [storedListing] : [], pagination: { page: 1, hasMore: false, total: matches ? 1 : 0 } } });
   });
   let patch: Record<string, unknown> | undefined;
   await page.route('**/api/admin/listings/car-model-edit', route => {
     patch = route.request().postDataJSON();
-    return route.fulfill({ json: { listing: { ...listing, ...patch } } });
+    // The real PATCH preserves omitted classification fields and stores the
+    // model inside attributes; it does not return request-only top-level fields.
+    storedListing = { ...storedListing, attributes: mergeMarketplaceCategoryAttributes(storedListing.category,
+      {
+        ...(patch?.categoryOption !== undefined ? { [brandAttr]: patch.categoryOption } : {}),
+        ...(patch?.carModel !== undefined ? { [modelAttr]: patch.carModel } : {}),
+      }, { category: storedListing.category, attributes: storedListing.attributes }) };
+    return route.fulfill({ json: { listing: storedListing } });
   });
   await page.goto('/admin/listings');
   await page.locator('select[name="listingCategoryFilter"]').selectOption('cars');
@@ -46,5 +58,12 @@ test('administration uses the same car choices for filtering and audited editing
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'حفظ', exact: true }).click();
   await expect.poll(() => patch?.carModel).toBe('corolla');
-  expect(patch?.categoryOption).toBe('toyota');
+  expect(patch).toEqual({ carModel: 'corolla' });
+  expect(storedListing).toMatchObject({ category: 'cars', attributes: { [brandAttr]: 'toyota', [modelAttr]: 'corolla' } });
+  await expect(page.getByText('تم تحديث بيانات الإعلان في لوحة الإدارة.', { exact: true })).toBeVisible();
+  // Read the saved record afresh without the old Camry search filter.
+  await page.goto('/admin/listings');
+  await page.getByRole('button', { name: 'فتح تويوتا كامري', exact: true }).click();
+  await expect(page.locator('#listing-car-model-edit-category-option')).toHaveValue('toyota');
+  await expect(page.locator('#listing-car-model-edit-car-model')).toHaveValue('corolla');
 });
