@@ -235,3 +235,121 @@ test('a slow previous user search cannot replace the latest search results', asy
     await expect(page.locator('.admin-result-row')).not.toContainText('قديم');
   } finally { release.resolve(); }
 });
+
+test('site message waits for its initial read and freezes the submitted draft until save completes', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!, 'owner');
+  const readStarted = deferred(), releaseRead = deferred(), saveStarted = deferred(), releaseSave = deferred();
+  const writes: Array<Record<string, unknown>> = [];
+  let reads = 0;
+  await page.route('**/api/admin/site-message', async route => {
+    if (route.request().method() === 'GET') {
+      reads++;
+      readStarted.resolve(); await releaseRead.promise;
+      return route.fulfill({ json: { siteMessage: {
+        message: 'الرسالة المحفوظة', type: 'info', isEnabled: false, expiresAt: null,
+      } } }).catch(() => {});
+    }
+    const body = route.request().postDataJSON();
+    writes.push(body);
+    saveStarted.resolve(); await releaseSave.promise;
+    return route.fulfill({ json: { siteMessage: { ...body, message: String(body.message).trim() } } }).catch(() => {});
+  });
+  try {
+    await page.goto('/admin/site-message');
+    await readStarted.promise;
+    const message = page.getByLabel('نص رسالة الموقع', { exact: true });
+    const type = page.getByRole('combobox', { name: 'نوع الرسالة', exact: true });
+    const expiry = page.locator('input[type="datetime-local"]');
+    const enabled = page.getByRole('checkbox', { name: 'تفعيل الرسالة على الموقع', exact: true });
+    const save = page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true });
+    for (const field of [message, type, expiry, enabled, save]) await expect(field).toBeDisabled();
+    releaseRead.resolve();
+    await expect(message).toHaveValue('الرسالة المحفوظة');
+    await expect(message).toBeEnabled();
+    await message.fill('  رسالة جديدة للحفظ  ');
+    await save.click(); await saveStarted.promise;
+    for (const field of [message, type, expiry, enabled]) await expect(field).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'تحديث', exact: true })).toBeDisabled();
+    releaseSave.resolve();
+    await expect(message).toHaveValue('رسالة جديدة للحفظ');
+    await expect(message).toBeEnabled();
+    expect(writes).toEqual([{ message: '  رسالة جديدة للحفظ  ', type: 'info', isEnabled: false, expiresAt: null }]);
+    expect(reads).toBe(1);
+  } finally { releaseRead.resolve(); releaseSave.resolve(); }
+});
+
+test('site message refresh and failed save retain every unsaved field and allow retry', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!, 'owner');
+  const refreshStarted = deferred(), releaseRefresh = deferred();
+  let reads = 0, saves = 0;
+  const writes: Array<Record<string, unknown>> = [];
+  await page.route('**/api/admin/site-message', async route => {
+    if (route.request().method() === 'GET') {
+      if (++reads > 1) { refreshStarted.resolve(); await releaseRefresh.promise; }
+      return route.fulfill({ json: { siteMessage: {
+        message: reads === 1 ? 'رسالة البداية' : 'رسالة أخرى من السيرفر',
+        type: 'info', isEnabled: false, expiresAt: null,
+      } } }).catch(() => {});
+    }
+    const body = route.request().postDataJSON();
+    writes.push(body);
+    if (++saves === 1) return route.fulfill({ status: 503, json: { error: 'temporarily_unavailable' } });
+    return route.fulfill({ json: { siteMessage: body } });
+  });
+  try {
+    await page.goto('/admin/site-message');
+    const message = page.getByLabel('نص رسالة الموقع', { exact: true });
+    const type = page.getByRole('combobox', { name: 'نوع الرسالة', exact: true });
+    const expiry = page.locator('input[type="datetime-local"]');
+    const enabled = page.getByRole('checkbox', { name: 'تفعيل الرسالة على الموقع', exact: true });
+    await expect(message).toHaveValue('رسالة البداية');
+    await message.fill('مسودة المالك');
+    await type.selectOption('warning');
+    await expiry.fill('2035-06-01T12:30');
+    await enabled.check();
+    await page.getByRole('button', { name: 'تحديث', exact: true }).click();
+    await refreshStarted.promise;
+    await expect(message).toBeDisabled();
+    await expect(message).toHaveValue('مسودة المالك');
+    releaseRefresh.resolve();
+    await expect(message).toBeEnabled();
+    await expect(message).toHaveValue('مسودة المالك');
+    await expect(type).toHaveValue('warning');
+    await expect(expiry).toHaveValue('2035-06-01T12:30');
+    await expect(enabled).toBeChecked();
+    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
+    const save = page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true });
+    await save.click();
+    await expect(page.getByRole('alert').getByText('تعذر حفظ رسالة الموقع.', { exact: true })).toBeVisible();
+    await expect(save).toBeEnabled();
+    await expect(message).toHaveValue('مسودة المالك');
+    await expect(type).toHaveValue('warning');
+    await expect(expiry).toHaveValue('2035-06-01T12:30');
+    await expect(enabled).toBeChecked();
+    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
+    await save.click();
+    await expect.poll(() => writes.length).toBe(2);
+    expect(writes[1]).toEqual(writes[0]);
+    await expect(message).toBeEnabled();
+    expect(reads).toBe(2);
+  } finally { releaseRefresh.resolve(); }
+});
+
+test('site message initial read failure requires a retry before editing or saving', async ({ page, baseURL }) => {
+  await prepare(page, baseURL!, 'owner');
+  let reads = 0, writes = 0;
+  await page.route('**/api/admin/site-message', async route => {
+    if (route.request().method() !== 'GET') { writes++; return route.fulfill({ status: 500, json: {} }); }
+    if (++reads === 1) return route.fulfill({ status: 503, json: { error: 'database_unavailable' } });
+    return route.fulfill({ json: { siteMessage: { message: 'نجح التحميل', type: 'info', isEnabled: false, expiresAt: null } } });
+  });
+  await page.goto('/admin/site-message');
+  await expect(page.getByRole('alert').getByText('تخزين بيانات الموقع غير متاح حاليًا.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
+  await page.getByRole('button', { name: 'تحديث', exact: true }).click();
+  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toHaveValue('نجح التحميل');
+  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toBeEnabled();
+  expect(writes).toBe(0);
+});

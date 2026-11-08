@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Megaphone, RefreshCw } from 'lucide-react';
 
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { AdminPageHeading } from '@/components/admin/page-heading';
+import { useAdminRequest } from '@/components/admin/use-admin-request';
 import { useAdminAccess } from '@/app/admin/use-admin-access';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
@@ -25,18 +26,35 @@ const emptyDraft: SiteMessageDraft = {
   expiresAt: '',
 };
 
+type SavedSiteMessage = Omit<SiteMessageDraft, 'expiresAt'> & { expiresAt: string | null };
+
+function toDraft(message: SavedSiteMessage | null): SiteMessageDraft {
+  return message ? {
+    message: message.message, type: message.type, isEnabled: message.isEnabled,
+    expiresAt: toLocalDateTimeInput(message.expiresAt),
+  } : emptyDraft;
+}
+
 export default function AdminSiteMessagePage() {
-  const { adminAccessNotice, verifyAdminAccess } = useAdminAccess('owner');
+  const { adminAccessNotice, isAdminAccessAllowed, verifyAdminAccess } = useAdminAccess('owner');
   const [siteMessage, setSiteMessage] = useState<SiteMessageDraft>(emptyDraft);
+  const dirty = useRef(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const { begin: beginRequest } = useAdminRequest(isAdminAccessAllowed);
 
   const loadSiteMessage = useCallback(async () => {
+    if (!isAdminAccessAllowed) return;
+    const request = beginRequest();
     setIsLoading(true);
+    setNotice('');
     try {
       if (!(await verifyAdminAccess())) return;
-      const response = await fetch('/api/admin/site-message', { cache: 'no-store' });
+      if (!request.isCurrent()) return;
+      const response = await fetch('/api/admin/site-message', { cache: 'no-store', signal: request.signal });
+      if (!request.isCurrent()) return;
       if (!response.ok) {
         setNotice(response.status === 503
           ? 'تخزين بيانات الموقع غير متاح حاليًا.'
@@ -44,39 +62,44 @@ export default function AdminSiteMessagePage() {
         return;
       }
 
-      const payload = await response.json() as {
-        siteMessage: {
-          message: string;
-          type: SiteMessageDraft['type'];
-          isEnabled: boolean;
-          expiresAt: string | null;
-        } | null;
-      };
-      if (!payload.siteMessage) {
-        setSiteMessage(emptyDraft);
-        return;
-      }
-      setSiteMessage({
-        message: payload.siteMessage.message,
-        type: payload.siteMessage.type,
-        isEnabled: payload.siteMessage.isEnabled,
-        expiresAt: toLocalDateTimeInput(payload.siteMessage.expiresAt),
-      });
+      const payload = await response.json() as { siteMessage: SavedSiteMessage | null };
+      if (!request.isCurrent()) return;
+      setHasLoaded(true);
+      if (dirty.current) setNotice('تم التحديث مع الاحتفاظ بتعديلاتك غير المحفوظة.');
+      else setSiteMessage(toDraft(payload.siteMessage));
     } catch {
-      setNotice('تعذر الاتصال لتحميل رسالة الموقع.');
+      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل رسالة الموقع.');
     } finally {
-      setIsLoading(false);
+      if (request.isCurrent()) setIsLoading(false);
     }
-  }, [verifyAdminAccess]);
+  }, [isAdminAccessAllowed, beginRequest, verifyAdminAccess]);
 
   useEffect(() => {
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';
-    void loadSiteMessage();
-  }, [loadSiteMessage]);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (isAdminAccessAllowed) void loadSiteMessage();
+      else {
+        dirty.current = false;
+        setSiteMessage(emptyDraft);
+        setHasLoaded(false);
+        setIsLoading(false);
+        setIsSaving(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [isAdminAccessAllowed, loadSiteMessage]);
+
+  const updateDraft = (changes: Partial<SiteMessageDraft>) => {
+    dirty.current = true;
+    setSiteMessage(current => ({ ...current, ...changes }));
+  };
 
   const saveSiteMessage = async () => {
-    if (isSaving || !siteMessage.message.trim()) return;
+    if (!isAdminAccessAllowed || !hasLoaded || isLoading || isSaving || !siteMessage.message.trim()) return;
+    const request = beginRequest();
     setIsSaving(true);
     setNotice('');
     try {
@@ -90,23 +113,30 @@ export default function AdminSiteMessagePage() {
             : null,
         }),
       });
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      const payload = await response.json().catch(() => null) as { error?: string; siteMessage?: SavedSiteMessage } | null;
+      if (!request.isCurrent()) return;
       if (!response.ok) {
         setNotice(payload?.error === 'expiration_must_be_future'
           ? 'وقت انتهاء الرسالة يجب أن يكون في المستقبل.'
           : 'تعذر حفظ رسالة الموقع.');
         return;
       }
-      setNotice(siteMessage.isEnabled
+      if (!payload?.siteMessage) {
+        setNotice('تعذر تأكيد بيانات الرسالة المحفوظة. بقيت تعديلاتك؛ حدّث البيانات للتحقق.');
+        return;
+      }
+      dirty.current = false;
+      setSiteMessage(toDraft(payload.siteMessage));
+      setNotice(payload.siteMessage.isEnabled
         ? 'تم حفظ رسالة الموقع وتفعيلها.'
         : 'تم حفظ رسالة الموقع وإيقافها.');
-      await loadSiteMessage();
     } catch {
-      setNotice('تعذر الاتصال لحفظ رسالة الموقع.');
+      if (request.isCurrent()) setNotice('تعذر الاتصال لحفظ رسالة الموقع. بقيت تعديلاتك ويمكن إعادة المحاولة.');
     } finally {
-      setIsSaving(false);
+      if (request.isCurrent()) setIsSaving(false);
     }
   };
+  const fieldsDisabled = !isAdminAccessAllowed || !hasLoaded || isLoading || isSaving;
 
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
@@ -125,7 +155,7 @@ export default function AdminSiteMessagePage() {
           </p>
         )}
 
-        <section className="admin-section grid gap-4">
+        <section className="admin-section grid gap-4" hidden={!isAdminAccessAllowed} aria-busy={isLoading || isSaving}>
           <div className="flex items-start gap-3">
             <Megaphone className="mt-0.5 size-5 text-blue-700 dark:text-blue-300" />
             <div>
@@ -135,8 +165,9 @@ export default function AdminSiteMessagePage() {
           </div>
 
           <Textarea
+            disabled={fieldsDisabled}
             value={siteMessage.message}
-            onChange={(event) => setSiteMessage((current) => ({ ...current, message: event.target.value }))}
+            onChange={(event) => updateDraft({ message: event.target.value })}
             maxLength={500}
             placeholder="اكتب رسالة واضحة ومختصرة"
             aria-label="نص رسالة الموقع"
@@ -145,9 +176,10 @@ export default function AdminSiteMessagePage() {
             <label className="grid gap-1 text-xs">
               نوع الرسالة
               <select
+                disabled={fieldsDisabled}
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={siteMessage.type}
-                onChange={(event) => setSiteMessage((current) => ({ ...current, type: event.target.value as SiteMessageDraft['type'] }))}
+                onChange={(event) => updateDraft({ type: event.target.value as SiteMessageDraft['type'] })}
               >
                 <option value="info">معلومة</option>
                 <option value="warning">تنبيه</option>
@@ -157,25 +189,27 @@ export default function AdminSiteMessagePage() {
             <label className="grid gap-1 text-xs">
               وقت الانتهاء الاختياري
               <Input
+                disabled={fieldsDisabled}
                 type="datetime-local"
                 value={siteMessage.expiresAt}
-                onChange={(event) => setSiteMessage((current) => ({ ...current, expiresAt: event.target.value }))}
+                onChange={(event) => updateDraft({ expiresAt: event.target.value })}
               />
             </label>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input
+              disabled={fieldsDisabled}
               type="checkbox"
               checked={siteMessage.isEnabled}
-              onChange={(event) => setSiteMessage((current) => ({ ...current, isEnabled: event.target.checked }))}
+              onChange={(event) => updateDraft({ isEnabled: event.target.checked })}
             />
             تفعيل الرسالة على الموقع
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <Button className="w-fit" disabled={isSaving || isLoading || !siteMessage.message.trim()} onClick={() => void saveSiteMessage()}>
+            <Button className="w-fit" disabled={fieldsDisabled || !siteMessage.message.trim()} onClick={() => void saveSiteMessage()}>
               {isSaving ? 'جارٍ الحفظ…' : 'حفظ رسالة الموقع'}
             </Button>
-            <Button variant="outline" className="w-fit" disabled={isLoading || isSaving} onClick={() => void loadSiteMessage()}>
+            <Button variant="outline" className="w-fit" disabled={!isAdminAccessAllowed || isLoading || isSaving} onClick={() => void loadSiteMessage()}>
               <RefreshCw className="size-4" /> تحديث
             </Button>
             {isLoading && <span role="status" className="text-xs text-muted-foreground">جارٍ تحميل الإعداد الحالي…</span>}

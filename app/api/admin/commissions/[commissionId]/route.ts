@@ -147,9 +147,12 @@ async function deleteCommission(request: Request, context: RouteContext) {
     return Response.json({ error: 'commission_not_found' }, { status: 404 });
   }
 
-  await prisma.$transaction([
-    prisma.commission.delete({ where: { id: commissionId } }),
-    prisma.adminAuditLog.create({
+  const deleted = await prisma.$transaction(async tx => {
+    // Keep the same evidence-key-before-row order as seller and admin updates.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'listing:' + existing.listingId}))`;
+    if (!(await tx.commission.findUnique({ where: { id: commissionId }, select: { id: true } }))) return false;
+    await tx.commission.delete({ where: { id: commissionId } });
+    await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
         action: 'update_commission',
@@ -157,8 +160,10 @@ async function deleteCommission(request: Request, context: RouteContext) {
         targetId: commissionId,
         metadata: { operation: 'delete_commission' },
       },
-    }),
-  ]);
+    });
+    return true;
+  }, { isolationLevel: 'ReadCommitted' });
+  if (!deleted) return Response.json({ error: 'commission_not_found' }, { status: 404 });
 
   try {
     publishRealtimeEvent({

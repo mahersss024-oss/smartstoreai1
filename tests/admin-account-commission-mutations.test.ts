@@ -106,8 +106,9 @@ for (const stage of ['read', 'update'] as const) {
   test(`admin commission returns 404 only when its target is missing at ${stage}`, async t => {
     const request = environment(t);
     mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+      $executeRaw: async () => 1,
       commission: {
-        findUnique: async () => stage === 'read' ? null : { status: 'due' },
+        findUnique: async () => stage === 'read' ? null : { status: 'due', listingId: 'listing' },
         update: async () => { if (stage === 'read') assert.fail('a missing target must not be updated'); throw knownError('P2025'); },
       },
       adminAuditLog: { create: async () => assert.fail('missing commission must not be audited') },
@@ -126,7 +127,11 @@ test('existing commission write outages and conflicts return retryable 503 inste
   let code = '';
   let reads = 0;
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    commission: { findUnique: async () => { reads++; return { status: 'due' }; },
+    $executeRaw: async () => 1,
+    commission: { findUnique: async ({ select }: { select: { listingId?: boolean } }) => {
+      if (select.listingId) return { listingId: 'listing' };
+      reads++; return { status: 'due' };
+    },
       update: async () => { throw knownError(code, code === 'P2028' ? 'Synthetic transaction expired after timeout' : undefined); } },
     adminAuditLog: { create: async () => assert.fail('failed update must not be audited') },
   }));
@@ -163,8 +168,9 @@ test('unexpected commission write and audit errors are not disguised as missing 
   const transactionFailure = knownError('P2028', 'Unexpected transaction API misuse');
   let stage: 'write' | 'audit' | 'transaction-api' = 'write';
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async () => 1,
     commission: {
-      findUnique: async () => ({ status: 'due' }),
+      findUnique: async () => ({ status: 'due', listingId: 'listing' }),
       update: async () => {
         if (stage === 'write') throw writeFailure;
         if (stage === 'transaction-api') throw transactionFailure;
@@ -187,8 +193,9 @@ test('successful administrative commission status update retains its response an
   let current = { id: 'existing', listingId: 'listing', sellerId: 'seller', productValue: 1000, commissionAmount: 10,
     status: 'due', paidAt: null as Date | null, createdAt: new Date(0), updatedAt: new Date(0), listing: null };
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+    $executeRaw: async () => 1,
     commission: {
-      findUnique: async () => ({ status: current.status }),
+      findUnique: async () => ({ status: current.status, listingId: current.listingId }),
       update: async ({ data }: { data: { status: string; paidAt: Date } }) => { current = { ...current, ...data }; return current; },
     },
     adminAuditLog: { create: async ({ data }: { data: typeof audits[number] }) => { audits.push(data); return {}; } },

@@ -93,6 +93,15 @@ Commission write outages return a temporary failure, not a missing-record result
 The overview refresh button reloads headline/activity counters and workspace data
 while retaining the selected month and chart source.
 
+All moderation mutations ignore completions from a previous focused record and
+report lost network responses as an uncertain outcome. Conversation-report
+conflicts refresh the current state instead of claiming the report remains open.
+Commission decisions and the singleton site message serialize their audit
+baseline with their write. Commission amount edits and deletion use the same
+evidence-lock order, preserving paid/waived decisions and evidence protection.
+The site-message form freezes fields during loading/saving, retains an unsaved
+draft on manual refresh, and adopts the persisted PATCH result after a save.
+
 Regression coverage includes `admin-report-integrity.spec.ts`,
 `admin-draft-continuity.spec.ts`, the workspace browser tests, and the isolated
 PostgreSQL moderation/account audit tests. Controlled browser responses remain

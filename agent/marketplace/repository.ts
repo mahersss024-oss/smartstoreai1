@@ -5681,28 +5681,33 @@ export async function updateCommissionSaleAmountForSeller(
     };
   }
 
-  const updated = await prisma.commission.update({
-    // The database must recheck the lock at the write, including after waiting
-    // for an administrator's concurrently committed paid/waived decision.
-    where: { id: commissionId, sellerId, status: { notIn: ['paid', 'waived'] } },
-    data: {
-      productValue,
-      commissionAmount: calculateCommissionAmount(productValue),
-      status: 'due',
-    },
-    include: {
-      listing: {
-        include: {
-          images: {
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  const updated = await prisma.$transaction(async tx => {
+    // Match administrative status changes and listing/evidence operations:
+    // take the listing evidence key before the Commission row is written.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'listing:' + commission.listingId}))`;
+    return tx.commission.update({
+      // The database must recheck the lock at the write, including after waiting
+      // for an administrator's concurrently committed paid/waived decision.
+      where: { id: commissionId, sellerId, status: { notIn: ['paid', 'waived'] } },
+      data: {
+        productValue,
+        commissionAmount: calculateCommissionAmount(productValue),
+        status: 'due',
+      },
+      include: {
+        listing: {
+          include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
           },
         },
       },
-    },
-  }).catch((error: unknown) => {
-    if (isPrismaKnownRequestError(error, 'P2025')) return null;
-    throw error;
-  });
+    }).catch((error: unknown) => {
+      if (isPrismaKnownRequestError(error, 'P2025')) return null;
+      throw error;
+    });
+  }, { isolationLevel: 'ReadCommitted' });
 
   if (!updated) {
     const current = await prisma.commission.findFirst({
@@ -5767,6 +5772,14 @@ export async function setCommissionStatusForAdmin(
 
   const adminId = await getAdminAuditActorId(admin);
   const updated = await prisma.$transaction(async (tx) => {
+    const identity = await tx.commission.findUnique({
+      where: { id: commissionId }, select: { listingId: true },
+    });
+    if (!identity) return null;
+    // Evidence capture/deletion also locks this listing key. Acquire it before
+    // the row, then read the audit baseline only after the row lock is granted.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'listing:' + identity.listingId}))`;
+    await tx.$executeRaw`SELECT 1 FROM "Commission" WHERE id = ${commissionId} FOR UPDATE`;
     const existing = await tx.commission.findUnique({
       where: { id: commissionId },
       select: { status: true },
@@ -5810,7 +5823,7 @@ export async function setCommissionStatusForAdmin(
     });
 
     return commission;
-  });
+  }, { isolationLevel: 'ReadCommitted' });
 
   if (!updated) {
     return {

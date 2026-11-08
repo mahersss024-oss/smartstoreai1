@@ -187,7 +187,7 @@ test('database seller amount writes cannot reverse concurrent paid or waived adm
   const { prisma } = await import('@/lib/db/prisma');
   const repository = await import('@/agent/marketplace/repository');
   const sellerId = `commission-lock-${crypto.randomUUID()}`;
-  const savedUpdate = prisma.commission.update;
+  const savedTransaction = prisma.$transaction;
   const previous = process.env.SMARTSTORE_MARKETPLACE_STORE;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
   try {
@@ -196,22 +196,29 @@ test('database seller amount writes cannot reverse concurrent paid or waived adm
     const commission = await prisma.commission.create({ data: { sellerId, listingId: listing.id, productValue: 100, commissionAmount: 1, status: 'due' } });
     for (const decision of ['paid', 'waived'] as const) {
       await prisma.commission.update({ where: { id: commission.id }, data: { status: 'due', productValue: 100, commissionAmount: 1, paidAt: null } });
-      const originalUpdate = prisma.commission.update.bind(prisma.commission);
+      const originalTransaction = prisma.$transaction.bind(prisma);
       let notifyWaiting!: () => void;
       let releaseWrite!: () => void;
       const waiting = new Promise<void>(resolve => { notifyWaiting = resolve; });
       const released = new Promise<void>(resolve => { releaseWrite = resolve; });
-      prisma.commission.update = (async (args: Parameters<typeof prisma.commission.update>[0]) => {
-        if (args.data.productValue !== undefined) { notifyWaiting(); await released; }
-        return originalUpdate(args);
-      }) as unknown as typeof prisma.commission.update;
+      let sellerTransactionPending = true;
+      prisma.$transaction = (async (...args: Parameters<typeof prisma.$transaction>) => {
+        // Hold the seller before its evidence key is acquired, allowing the
+        // administrative decision to commit before the conditional amount write.
+        if (sellerTransactionPending) {
+          sellerTransactionPending = false;
+          notifyWaiting();
+          await released;
+        }
+        return originalTransaction(...args);
+      }) as typeof prisma.$transaction;
       const pending = repository.updateCommissionSaleAmountForSeller(commission.id, sellerId, 200);
       try {
         await waiting;
         assert.equal((await repository.setCommissionStatusForAdmin(commission.id, decision)).status, decision);
       } finally { releaseWrite(); }
       const result = await pending;
-      prisma.commission.update = savedUpdate;
+      prisma.$transaction = savedTransaction;
       assert.equal(result.status, 'locked');
       const saved = await prisma.commission.findUniqueOrThrow({ where: { id: commission.id } });
       assert.equal(saved.status, decision);
@@ -221,7 +228,7 @@ test('database seller amount writes cannot reverse concurrent paid or waived adm
     }
     assert.equal((await repository.updateCommissionSaleAmountForSeller(commission.id, 'another-seller', 300)).status, 'not_found');
   } finally {
-    prisma.commission.update = savedUpdate;
+    prisma.$transaction = savedTransaction;
     await prisma.listing.deleteMany({ where: { sellerId } });
     await prisma.user.deleteMany({ where: { id: sellerId } });
     await prisma.$disconnect();

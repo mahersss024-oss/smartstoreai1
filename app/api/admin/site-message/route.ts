@@ -68,6 +68,9 @@ export async function PATCH(request: Request) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // The singleton may not exist on first use, so a row lock alone cannot
+    // serialize creation. Lock its identity before reading the audit baseline.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(771209, hashtext(${primarySiteMessageId}))`;
     const previous = await tx.siteMessage.findUnique({
       where: { id: primarySiteMessageId },
     });
@@ -113,7 +116,7 @@ export async function PATCH(request: Request) {
     });
 
     return siteMessage;
-  });
+  }, { isolationLevel: 'ReadCommitted' });
 
   return Response.json({ siteMessage: result }, { headers: noStoreHeaders });
 }

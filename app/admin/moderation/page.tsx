@@ -205,10 +205,12 @@ function getListingReportConfirmMessage(action: ListingReportAction) {
 function SensitiveListingsSection({
   listings,
   isLoading,
+  isProcessing,
   onModerate,
 }: Readonly<{
   listings: ListingRecord[];
   isLoading: boolean;
+  isProcessing: boolean;
   onModerate: (listingId: string, action: ListingModerationAction) => void;
 }>) {
   let content;
@@ -254,6 +256,7 @@ function SensitiveListingsSection({
               <Button
                 variant="outline"
                 className="rounded-md"
+                disabled={isProcessing}
                 onClick={() => onModerate(listing.id, 'approve')}
               >
                 <CheckCircle2 className="size-4" />
@@ -262,6 +265,7 @@ function SensitiveListingsSection({
               <Button
                 variant="outline"
                 className="rounded-md"
+                disabled={isProcessing}
                 onClick={() => onModerate(listing.id, 'reject')}
               >
                 <Ban className="size-4" />
@@ -270,6 +274,7 @@ function SensitiveListingsSection({
               <Button
                 variant="outline"
                 className="rounded-md"
+                disabled={isProcessing}
                 onClick={() => onModerate(listing.id, 'delete')}
               >
                 <Trash2 className="size-4" />
@@ -296,7 +301,7 @@ function SensitiveListingsSection({
 function ListingReportsSection({
   reports,
   isLoading,
-  processingReportId,
+  processingTargetId,
   canDeleteReports,
   canManageEvidence,
   onResolve,
@@ -304,7 +309,7 @@ function ListingReportsSection({
 }: Readonly<{
   reports: ReportRecord[];
   isLoading: boolean;
-  processingReportId: string | null;
+  processingTargetId: string | null;
   canDeleteReports: boolean;
   canManageEvidence: boolean;
   onResolve: (report: ReportRecord, action: ListingReportAction) => void;
@@ -367,7 +372,7 @@ function ListingReportsSection({
                   <Button
                     variant="outline"
                     className="rounded-md"
-                    disabled={processingReportId === report.id}
+                    disabled={Boolean(processingTargetId)}
                     onClick={() => onResolve(report, 'dismiss')}
                   >
                     <BadgeCheck className="size-4" />
@@ -377,7 +382,7 @@ function ListingReportsSection({
                     <Button
                       variant="outline"
                       className="rounded-md"
-                      disabled={processingReportId === report.id}
+                      disabled={Boolean(processingTargetId)}
                       onClick={() => onResolve(report, 'reject_listing')}
                     >
                       <Ban className="size-4" />
@@ -388,7 +393,7 @@ function ListingReportsSection({
                     <Button
                       variant="outline"
                       className="rounded-md text-red-600 hover:text-red-700"
-                      disabled={processingReportId === report.id}
+                      disabled={Boolean(processingTargetId)}
                       onClick={() => onResolve(report, 'delete_listing')}
                     >
                       <Trash2 className="size-4" />
@@ -402,7 +407,7 @@ function ListingReportsSection({
                   <Button
                     variant="outline"
                     className="rounded-md text-red-600 hover:text-red-700"
-                    disabled={processingReportId === report.id}
+                    disabled={Boolean(processingTargetId)}
                     onClick={() => onDelete(report.id)}
                   >
                     <Trash2 className="size-4" />
@@ -431,14 +436,14 @@ function ListingReportsSection({
 
 function UserReportsSection({
   userReports,
-  processingReportId,
+  processingTargetId,
   canViewAccounts,
   canDeleteReports,
   onModerate,
   onDelete,
 }: Readonly<{
   userReports: UserReportRecord[];
-  processingReportId: string | null;
+  processingTargetId: string | null;
   canViewAccounts: boolean;
   canDeleteReports: boolean;
   onModerate: (reportId: string, action: UserReportResolution) => void;
@@ -508,7 +513,7 @@ function UserReportsSection({
                   size="sm"
                   variant="outline"
                   className="rounded-md text-red-600 hover:text-red-700"
-                  disabled={processingReportId === report.id}
+                  disabled={Boolean(processingTargetId)}
                   onClick={() => onDelete(report.id)}
                 >
                   <Trash2 className="size-3.5" />
@@ -569,7 +574,7 @@ function UserReportsSection({
                 <Button
                   variant="outline"
                   className="rounded-md"
-                  disabled={processingReportId === report.id}
+                  disabled={Boolean(processingTargetId)}
                   onClick={() => onModerate(report.id, 'dismiss')}
                 >
                   <BadgeCheck className="size-4" />
@@ -578,7 +583,7 @@ function UserReportsSection({
                 <Button
                   variant="outline"
                   className="rounded-md"
-                  disabled={processingReportId === report.id}
+                  disabled={Boolean(processingTargetId)}
                   onClick={() => onModerate(report.id, 'review')}
                 >
                   <ShieldCheck className="size-4" />
@@ -587,7 +592,7 @@ function UserReportsSection({
                 <Button
                   variant="outline"
                   className="rounded-md text-amber-700 hover:text-amber-800 dark:text-amber-200"
-                  disabled={processingReportId === report.id}
+                  disabled={Boolean(processingTargetId)}
                   onClick={() => onModerate(report.id, 'warn')}
                 >
                   <Flag className="size-4" />
@@ -596,7 +601,7 @@ function UserReportsSection({
                 <Button
                   variant="outline"
                   className="rounded-md text-red-600 hover:text-red-700"
-                  disabled={processingReportId === report.id || !report.conversation}
+                  disabled={Boolean(processingTargetId) || !report.conversation}
                   onClick={() => onModerate(report.id, 'restrict')}
                 >
                   <Ban className="size-4" />
@@ -605,7 +610,7 @@ function UserReportsSection({
                 <Button
                   variant="outline"
                   className="rounded-md text-red-600 hover:text-red-700"
-                  disabled={processingReportId === report.id || !report.conversation}
+                  disabled={Boolean(processingTargetId) || !report.conversation}
                   onClick={() => onModerate(report.id, 'close_conversation')}
                 >
                   <Ban className="size-4" />
@@ -650,7 +655,7 @@ function AdminModerationPageContent() {
   const [nextPage, setNextPage] = useState(1);
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
+  const [processingTargetId, setProcessingTargetId] = useState<string | null>(null);
   const [pendingModerationConfirm, setPendingModerationConfirm] = useState<{
     title: string;
     description: string;
@@ -660,7 +665,7 @@ function AdminModerationPageContent() {
   const { begin: beginQueueLoad, invalidate: invalidateQueueLoad } = useAdminRequest(
     isAdminAccessAllowed, JSON.stringify([focusedReportId, focusedSource]),
   );
-  const { begin: beginReportMutation } = useAdminRequest(
+  const { begin: beginModerationMutation } = useAdminRequest(
     isAdminAccessAllowed, JSON.stringify([focusedReportId, focusedSource]),
   );
 
@@ -747,7 +752,7 @@ function AdminModerationPageContent() {
     queueMicrotask(() => {
       if (cancelled) return;
       setPendingModerationConfirm(null);
-      setProcessingReportId(null);
+      setProcessingTargetId(null);
       if (isAdminAccessAllowed) void refreshQueue();
       else {
         setQueue({ listings: [], reports: [], userReports: [] });
@@ -792,30 +797,44 @@ function AdminModerationPageContent() {
 
   const moderateListing = useCallback(
     async (listingId: string, action: ListingModerationAction) => {
-      const response = await fetch(
-        `/api/admin/moderation/listings/${listingId}`,
-        {
+      const request = beginModerationMutation();
+      invalidateQueueLoad();
+      setIsLoading(false);
+      setProcessingTargetId(listingId);
+      setNotice('');
+      try {
+        const response = await fetch(`/api/admin/moderation/listings/${listingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action }),
-        },
-      );
-
-      if (!response.ok) {
-        setNotice('تعذر تنفيذ إجراء المراجعة على الإعلان.');
-        return;
+        });
+        if (!request.isCurrent()) return;
+        if (!response.ok) {
+          if (response.status === 404) {
+            await refreshQueue(1);
+            if (request.isCurrent()) setNotice('الإعلان لم يعد متاحًا. حُدّثت قائمة المراجعة.');
+          } else {
+            setNotice('تعذر تنفيذ إجراء المراجعة على الإعلان.');
+          }
+          return;
+        }
+        await refreshQueue(1);
+        if (request.isCurrent()) setNotice('تم تنفيذ إجراء المراجعة على الإعلان.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر تأكيد نتيجة الإجراء. حدّث القائمة للتحقق قبل المحاولة مجددًا.');
+      } finally {
+        if (request.isCurrent()) setProcessingTargetId(null);
       }
-
-      void refreshQueue(1);
     },
-    [refreshQueue, setNotice],
+    [refreshQueue, beginModerationMutation, invalidateQueueLoad, setProcessingTargetId, setIsLoading, setNotice],
   );
 
   const moderateReport = useCallback(
     async (reportId: string, action: ListingReportAction) => {
-      const request = beginReportMutation();
+      const request = beginModerationMutation();
       invalidateQueueLoad();
-      setProcessingReportId(reportId);
+      setIsLoading(false);
+      setProcessingTargetId(reportId);
       setNotice('');
       try {
         const response = await fetch(`/api/admin/moderation/reports/${reportId}`, {
@@ -839,10 +858,10 @@ function AdminModerationPageContent() {
       } catch {
         if (request.isCurrent()) setNotice('تعذر تأكيد نتيجة الإجراء. حدّث القائمة للتحقق قبل المحاولة مجددًا.');
       } finally {
-        if (request.isCurrent()) setProcessingReportId(null);
+        if (request.isCurrent()) setProcessingTargetId(null);
       }
     },
-    [refreshQueue, beginReportMutation, invalidateQueueLoad, setProcessingReportId, setNotice],
+    [refreshQueue, beginModerationMutation, invalidateQueueLoad, setProcessingTargetId, setIsLoading, setNotice],
   );
 
   const moderateUserReport = useCallback(
@@ -867,7 +886,10 @@ function AdminModerationPageContent() {
         return;
       }
 
-      setProcessingReportId(reportId);
+      const request = beginModerationMutation();
+      invalidateQueueLoad();
+      setIsLoading(false);
+      setProcessingTargetId(reportId);
       setNotice('');
       try {
         const response = await fetch(
@@ -878,16 +900,27 @@ function AdminModerationPageContent() {
             body: JSON.stringify({ action }),
           },
         );
+        if (!request.isCurrent()) return;
         if (!response.ok) {
-          setNotice('تعذر معالجة بلاغ المحادثة، وبقي البلاغ مفتوحًا.');
+          if (response.status === 409 || response.status === 404) {
+            await refreshQueue(1);
+            if (request.isCurrent()) setNotice(response.status === 409
+              ? 'عولج بلاغ المحادثة مسبقًا. لم يُنفذ إجراء جديد.'
+              : 'بلاغ المحادثة لم يعد متاحًا. حُدّثت القائمة.');
+          } else {
+            setNotice('تعذر تنفيذ إجراء بلاغ المحادثة. حاول مجددًا.');
+          }
           return;
         }
-        void refreshQueue(1);
+        await refreshQueue(1);
+        if (request.isCurrent()) setNotice('تم تنفيذ إجراء بلاغ المحادثة.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر تأكيد نتيجة الإجراء. حدّث القائمة للتحقق قبل المحاولة مجددًا.');
       } finally {
-        setProcessingReportId(null);
+        if (request.isCurrent()) setProcessingTargetId(null);
       }
     },
-    [refreshQueue],
+    [refreshQueue, beginModerationMutation, invalidateQueueLoad, setProcessingTargetId, setIsLoading, setNotice],
   );
 
   const deleteClosedReport = useCallback(
@@ -909,7 +942,10 @@ function AdminModerationPageContent() {
         return;
       }
 
-      setProcessingReportId(reportId);
+      const request = beginModerationMutation();
+      invalidateQueueLoad();
+      setIsLoading(false);
+      setProcessingTargetId(reportId);
       setNotice('');
       try {
         const reportPath =
@@ -918,10 +954,18 @@ function AdminModerationPageContent() {
           `/api/admin/moderation/${reportPath}/${reportId}`,
           { method: 'DELETE' },
         );
+        if (!request.isCurrent()) return;
 
         if (response.status === 409) {
           const payload = await response.json().catch(() => null) as { message?: string } | null;
+          if (!request.isCurrent()) return;
           setNotice(payload?.message ?? 'لا يمكن حذف البلاغ قبل إغلاقه.');
+          return;
+        }
+
+        if (response.status === 404) {
+          await refreshQueue(1);
+          if (request.isCurrent()) setNotice('البلاغ لم يعد متاحًا. حُدّثت القائمة.');
           return;
         }
 
@@ -930,12 +974,15 @@ function AdminModerationPageContent() {
           return;
         }
 
-        void refreshQueue(1);
+        await refreshQueue(1);
+        if (request.isCurrent()) setNotice('تم حذف البلاغ.');
+      } catch {
+        if (request.isCurrent()) setNotice('تعذر تأكيد نتيجة الإجراء. حدّث القائمة للتحقق قبل المحاولة مجددًا.');
       } finally {
-        setProcessingReportId(null);
+        if (request.isCurrent()) setProcessingTargetId(null);
       }
     },
-    [refreshQueue],
+    [refreshQueue, beginModerationMutation, invalidateQueueLoad, setProcessingTargetId, setIsLoading, setNotice],
   );
 
   const resolveReport = useCallback(
@@ -983,7 +1030,7 @@ function AdminModerationPageContent() {
       <ActionConfirmDialog
         confirmLabel="تنفيذ الإجراء"
         description={pendingModerationConfirm?.description ?? ''}
-        loading={Boolean(processingReportId)}
+        loading={Boolean(processingTargetId)}
         loadingText="جاري التنفيذ..."
         onCancel={() => setPendingModerationConfirm(null)}
         onConfirm={() => pendingModerationConfirm?.onConfirm()}
@@ -1024,7 +1071,7 @@ function AdminModerationPageContent() {
           <ListingReportsSection
             reports={queue.reports}
             isLoading={isLoading}
-            processingReportId={processingReportId}
+            processingTargetId={processingTargetId}
             canDeleteReports={canDeleteReports}
             canManageEvidence={adminAccessRole === 'owner' || adminAccessRole === 'admin'}
             onResolve={(report, action) => void resolveReport(report, action)}
@@ -1035,7 +1082,7 @@ function AdminModerationPageContent() {
         </div>
         <UserReportsSection
           userReports={queue.userReports}
-          processingReportId={processingReportId}
+          processingTargetId={processingTargetId}
           canViewAccounts={
             adminAccessRole === 'owner' || adminAccessRole === 'admin'
           }
@@ -1048,6 +1095,7 @@ function AdminModerationPageContent() {
         <SensitiveListingsSection
           listings={queue.listings}
           isLoading={isLoading}
+          isProcessing={Boolean(processingTargetId)}
           onModerate={(listingId, action) => void moderateListing(listingId, action)}
         />
         {hasMoreQueue && (
