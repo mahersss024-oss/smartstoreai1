@@ -77,7 +77,7 @@ export async function getAdminWorkspace(
   ) {
     events.push({
       id: 'site-message-expiry',
-      title: 'انتهاء رسالة الموقع',
+      title: 'انتهاء رسائل التطبيق',
       date: getSaudiDay(siteMessage.expiresAt),
       href: '/admin/site-message',
     });

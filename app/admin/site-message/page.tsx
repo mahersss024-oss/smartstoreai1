@@ -57,8 +57,8 @@ export default function AdminSiteMessagePage() {
       if (!request.isCurrent()) return;
       if (!response.ok) {
         setNotice(response.status === 503
-          ? 'تخزين بيانات الموقع غير متاح حاليًا.'
-          : 'تعذر تحميل رسالة الموقع.');
+          ? 'تخزين بيانات التطبيق غير متاح حاليًا.'
+          : 'تعذر تحميل رسائل التطبيق.');
         return;
       }
 
@@ -68,7 +68,7 @@ export default function AdminSiteMessagePage() {
       if (dirty.current) setNotice('تم التحديث مع الاحتفاظ بتعديلاتك غير المحفوظة.');
       else setSiteMessage(toDraft(payload.siteMessage));
     } catch {
-      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل رسالة الموقع.');
+      if (request.isCurrent()) setNotice('تعذر الاتصال لتحميل رسائل التطبيق.');
     } finally {
       if (request.isCurrent()) setIsLoading(false);
     }
@@ -118,7 +118,7 @@ export default function AdminSiteMessagePage() {
       if (!response.ok) {
         setNotice(payload?.error === 'expiration_must_be_future'
           ? 'وقت انتهاء الرسالة يجب أن يكون في المستقبل.'
-          : 'تعذر حفظ رسالة الموقع.');
+          : 'تعذر حفظ رسائل التطبيق.');
         return;
       }
       if (!payload?.siteMessage) {
@@ -128,10 +128,10 @@ export default function AdminSiteMessagePage() {
       dirty.current = false;
       setSiteMessage(toDraft(payload.siteMessage));
       setNotice(payload.siteMessage.isEnabled
-        ? 'تم حفظ رسالة الموقع وتفعيلها.'
-        : 'تم حفظ رسالة الموقع وإيقافها.');
+        ? 'تم حفظ رسائل التطبيق وتفعيلها.'
+        : 'تم حفظ رسائل التطبيق وإيقافها.');
     } catch {
-      if (request.isCurrent()) setNotice('تعذر الاتصال لحفظ رسالة الموقع. بقيت تعديلاتك ويمكن إعادة المحاولة.');
+      if (request.isCurrent()) setNotice('تعذر الاتصال لحفظ رسائل التطبيق. بقيت تعديلاتك ويمكن إعادة المحاولة.');
     } finally {
       if (request.isCurrent()) setIsSaving(false);
     }
@@ -141,14 +141,14 @@ export default function AdminSiteMessagePage() {
   return (
     <main className="min-h-screen bg-[#e8edf3] text-[#142033] dark:bg-[#0a111c] dark:text-foreground" dir="rtl">
       <FloatingActionNotice
-        closeLabel="إغلاق نتيجة إجراء رسالة الموقع"
+        closeLabel="إغلاق نتيجة إجراء رسائل التطبيق"
         message={notice}
         onDismiss={() => setNotice('')}
         open={Boolean(notice)}
         tone={notice.startsWith('تم') ? 'success' : 'danger'}
       />
       <div className="admin-page">
-        <AdminPageHeading title="رسالة الموقع" />
+        <AdminPageHeading title="رسائل التطبيق" />
         {adminAccessNotice && (
           <p role="status" className="rounded-md border bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm dark:bg-card">
             {adminAccessNotice}
@@ -159,8 +159,8 @@ export default function AdminSiteMessagePage() {
           <div className="flex items-start gap-3">
             <Megaphone className="mt-0.5 size-5 text-blue-700 dark:text-blue-300" />
             <div>
-              <h2 className="text-sm font-bold">رسالة الموقع</h2>
-              <p className="mt-1 text-xs text-muted-foreground">شريط عام أعلى الموقع دون إيقاف عمل المنصة.</p>
+              <h2 className="text-sm font-bold">رسائل التطبيق</h2>
+              <p className="mt-1 text-xs text-muted-foreground">رسالة عامة تظهر داخل التطبيق دون إيقاف عمله.</p>
             </div>
           </div>
 
@@ -170,7 +170,7 @@ export default function AdminSiteMessagePage() {
             onChange={(event) => updateDraft({ message: event.target.value })}
             maxLength={500}
             placeholder="اكتب رسالة واضحة ومختصرة"
-            aria-label="نص رسالة الموقع"
+            aria-label="نص رسائل التطبيق"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-xs">
@@ -203,11 +203,11 @@ export default function AdminSiteMessagePage() {
               checked={siteMessage.isEnabled}
               onChange={(event) => updateDraft({ isEnabled: event.target.checked })}
             />
-            تفعيل الرسالة على الموقع
+            تفعيل رسائل التطبيق
           </label>
           <div className="flex flex-wrap items-center gap-3">
             <Button className="w-fit" disabled={fieldsDisabled || !siteMessage.message.trim()} onClick={() => void saveSiteMessage()}>
-              {isSaving ? 'جارٍ الحفظ…' : 'حفظ رسالة الموقع'}
+              {isSaving ? 'جارٍ الحفظ…' : 'حفظ رسائل التطبيق'}
             </Button>
             <Button variant="outline" className="w-fit" disabled={!isAdminAccessAllowed || isLoading || isSaving} onClick={() => void loadSiteMessage()}>
               <RefreshCw className="size-4" /> تحديث

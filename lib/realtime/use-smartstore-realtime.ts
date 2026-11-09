@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { scheduleIdleTask } from '@/lib/client-idle-task';
 import type { RealtimeEvent, RealtimeEventType } from './events';
 
-type RealtimeResyncReason = 'event' | 'fallback' | 'online' | 'visible';
+type RealtimeResyncReason = 'event' | 'fallback' | 'online' | 'visible' | 'connected' | 'reconcile';
 
 type UseSmartstoreRealtimeOptions = {
   connectDelayMs?: number;
@@ -116,7 +116,7 @@ export function useSmartstoreRealtime({
       reason: RealtimeResyncReason,
       event?: RealtimeEvent,
     ) => {
-      if (!onResyncRef.current || resyncInFlight) {
+      if (disposed || !navigator.onLine || document.visibilityState !== 'visible' || !onResyncRef.current || resyncInFlight) {
         return;
       }
 
@@ -124,6 +124,8 @@ export function useSmartstoreRealtime({
 
       try {
         await onResyncRef.current({ reason, event });
+      } catch {
+        // A later event/reconciliation retries a temporarily unavailable read.
       } finally {
         resyncInFlight = false;
       }
@@ -197,6 +199,9 @@ export function useSmartstoreRealtime({
 
         setConnectionState('connected');
         stopFallbackPolling();
+        // Events are retained per process. A reconnect can land on another
+        // instance or follow a restart with a fresh event sequence.
+        void runResync('connected');
       };
 
       eventSource.onerror = () => {
@@ -268,6 +273,11 @@ export function useSmartstoreRealtime({
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('online', onOnline);
+    // A healthy SSE connection cannot observe mutations on other instances.
+    // Reconcile visible pages at a bounded interval even while it is healthy.
+    const reconciliationTimerId = window.setInterval(() => {
+      void runResync('reconcile');
+    }, 30_000);
 
     if (connectDelayMs > 0) {
       cancelDeferredConnect = scheduleIdleTask(connect, connectDelayMs);
@@ -280,6 +290,7 @@ export function useSmartstoreRealtime({
       cancelDeferredConnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('online', onOnline);
+      window.clearInterval(reconciliationTimerId);
       stopFallbackPolling();
       closeConnection();
     };

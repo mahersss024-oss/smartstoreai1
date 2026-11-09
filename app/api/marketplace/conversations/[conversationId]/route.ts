@@ -14,6 +14,7 @@ import {
   unblockConversationUser,
 } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { completeConversationResponse, replayConversationResponse } from '@/lib/api/conversation-replay';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -194,7 +195,7 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   if (idempotency?.response) {
-    return idempotency.response;
+    return replayConversationResponse(idempotency.response, session.user.id, conversationId);
   }
 
   let result:
@@ -245,9 +246,7 @@ export async function POST(request: Request, context: RouteContext) {
   if (result.status === 'not_found') {
     const responseBody = { error: 'conversation_not_found' };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 404)
-      : Response.json(responseBody, { status: 404 });
+    return completeConversationResponse(idempotency, responseBody, 404);
   }
 
   if (result.status === 'conversation_closed') {
@@ -256,9 +255,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation: result.conversation,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   if (result.status === 'conversation_blocked') {
@@ -269,9 +266,7 @@ export async function POST(request: Request, context: RouteContext) {
       blockStatus: result.blockStatus,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   if (result.status === 'not_allowed') {
@@ -280,9 +275,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation: result.conversation,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 403)
-      : Response.json(responseBody, { status: 403 });
+    return completeConversationResponse(idempotency, responseBody, 403);
   }
 
   if (result.status === 'missing_phone') {
@@ -292,9 +285,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation: result.conversation,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   if (result.status === 'message_blocked') {
@@ -306,9 +297,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation: result.conversation,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 422)
-      : Response.json(responseBody, { status: 422 });
+    return completeConversationResponse(idempotency, responseBody, 422);
   }
 
   if (result.status === 'already_reported') {
@@ -319,9 +308,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation: result.conversation,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   if (result.status === 'blocked') {
@@ -335,9 +322,7 @@ export async function POST(request: Request, context: RouteContext) {
       },
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 201)
-      : Response.json(responseBody, { status: 201 });
+    return completeConversationResponse(idempotency, responseBody, 201);
   }
 
   if (result.status === 'not_blocked') {
@@ -348,9 +333,7 @@ export async function POST(request: Request, context: RouteContext) {
       blockStatus: result.blockStatus,
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   if (result.status === 'unblocked') {
@@ -362,9 +345,7 @@ export async function POST(request: Request, context: RouteContext) {
       },
     };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 200)
-      : Response.json(responseBody, { status: 200 });
+    return completeConversationResponse(idempotency, responseBody, 200);
   }
 
   if (
@@ -384,7 +365,5 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
-  return idempotency
-    ? idempotency.complete(result, 201)
-    : Response.json(result, { status: 201 });
+  return completeConversationResponse(idempotency, result, 201);
 }

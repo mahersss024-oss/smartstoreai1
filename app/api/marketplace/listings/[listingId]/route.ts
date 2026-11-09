@@ -22,11 +22,11 @@ const maxUpdateListingRequestBytes = 64 * 1024;
 
 const updateListingSchema = z.object({
   title: z.string().min(2).max(140).optional(),
-  description: z.string().min(2).max(4000).optional(),
+  description: z.string().min(2).max(4000).nullable().optional(),
   price: z
     .union([marketplaceAmountSchema, z.enum(['bid', 'negotiable'])])
-    .optional(),
-  city: z.string().min(2).max(80).optional(),
+    .nullable().optional(),
+  city: z.string().min(2).max(80).nullable().optional(),
   category: z.string().min(2).max(80).optional(),
   condition: z.enum(['new', 'used', 'like_new', 'damaged']).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),

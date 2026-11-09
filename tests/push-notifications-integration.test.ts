@@ -80,7 +80,7 @@ test('conversation messages trigger push notifications after successful send', (
 
   const successIndex = route.indexOf("result.status === 'sent'");
   const notifyIndex = route.lastIndexOf('notifyConversationMessage');
-  const responseIndex = route.lastIndexOf('Response.json(result');
+  const responseIndex = route.lastIndexOf('return completeConversationResponse(idempotency, result');
 
   assert.ok(successIndex > -1, 'route should check for a sent message');
   assert.ok(notifyIndex > successIndex, 'notification should run after send success');

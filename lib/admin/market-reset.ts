@@ -37,7 +37,7 @@ export const marketResetModels = [
   { kind: 'ApiIdempotencyKey', label: 'سجل الطلبات', mode: 'delete' },
   { kind: 'SiteVisitDaily', label: 'إحصاءات الزيارات', mode: 'delete' },
   { kind: 'SiteVisitUnique', label: 'الزيارات الفريدة', mode: 'delete' },
-  { kind: 'SiteMessage', label: 'رسالة الموقع', mode: 'delete' },
+  { kind: 'SiteMessage', label: 'رسائل التطبيق', mode: 'delete' },
   { kind: 'AdminAuditLog', label: 'سجل الإدارة السابق', mode: 'cleanup' },
 ] as const;
 

@@ -258,6 +258,8 @@ enum MobilePushPlatform {
 }
 
 model MobilePushToken {
+  sessionExpiresAt DateTime?
+  registrationKey String? @db.VarChar(36)
   id         String             @id @default(cuid())
   userId     String
   token      String             @unique

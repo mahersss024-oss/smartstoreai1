@@ -49,6 +49,7 @@ function fixture(t: TestContext) {
     createdAt: new Date(0), updatedAt: new Date(), listing: null });
   mockDatabaseMethod(t, prisma.conversation, 'findFirst', async () => conversation());
   mockDatabaseMethod(t, prisma.userBlock, 'findFirst', async () => null);
+  mockDatabaseMethod(t, prisma.userBlock, 'findMany', async () => []);
   mockDatabaseMethod(t, prisma.user, 'upsert', async () => ({ id: 'retry-buyer' }));
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
     $executeRaw: async () => 1,
@@ -93,4 +94,28 @@ test('message operation identities isolate actors and keys and leave separately 
   assert.equal((await f.request('same-key', 'Seller response', 'retry-seller')).status, 201);
   assert.equal((await f.request('another-key')).status, 201);
   assert.equal(f.messages.size, 3); assert.equal(f.jobs.size, 3);
+});
+
+test('replaying a stored response uses current deletion state and stores no private conversation snapshot', async t => {
+  const f = fixture(t);
+  f.messages.set('shared-contact', { id: 'shared-contact', conversationId: 'retry-conversation',
+    senderId: 'retry-seller', body: 'Private contact', status: 'sent', type: 'contact_share',
+    metadata: { phoneNumber: '0501234567' }, reasons: [], createdAt: new Date() });
+  const response = await f.request('private-replay');
+  const first = await response.json();
+  assert.ok(JSON.stringify(first).includes('0501234567'));
+  const receipt = [...f.receipts.values()][0];
+  assert.equal(JSON.stringify(receipt.response).includes('0501234567'), false);
+  // Also check historical receipts written before this fix.
+  receipt.response = first;
+  const live = f.messages.get('shared-contact')!;
+  live.type = 'message_deleted'; live.body = ''; live.metadata = {};
+  const replay = await f.request('private-replay');
+  assert.equal(replay.status, 201);
+  const body = await replay.json();
+  assert.equal(JSON.stringify(body).includes('0501234567'), false);
+  assert.equal(body.conversation.messages.find((message: { id: string }) => message.id === live.id).type, 'message_deleted');
+  f.messages.delete(first.message.id);
+  assert.equal((await (await f.request('private-replay')).json()).message, null, 'hidden/deleted message is never restored from a receipt');
+  assert.equal(f.jobs.size, 1);
 });

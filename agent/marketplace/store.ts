@@ -1113,11 +1113,10 @@ export function getConversationBlockStatus(
     return null;
   }
 
-  const block = [...userBlocks.values()].find(
-    (candidate) =>
-      (candidate.blockerId === userId && candidate.blockedId === otherUserId) ||
-      (candidate.blockerId === otherUserId && candidate.blockedId === userId),
-  );
+  const blocks = [...userBlocks.values()];
+  const ownBlock = blocks.find(candidate => candidate.blockerId === userId && candidate.blockedId === otherUserId);
+  const otherBlock = blocks.find(candidate => candidate.blockerId === otherUserId && candidate.blockedId === userId);
+  const block = ownBlock ?? otherBlock;
 
   if (!block) {
     return { blocked: false, blockedByMe: false };
@@ -1125,7 +1124,7 @@ export function getConversationBlockStatus(
 
   return {
     blocked: true,
-    blockedByMe: block.blockerId === userId,
+    blockedByMe: Boolean(ownBlock),
     blockerId: block.blockerId,
     blockedUserId: block.blockedId,
   };

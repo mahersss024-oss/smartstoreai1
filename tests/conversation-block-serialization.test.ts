@@ -45,6 +45,7 @@ function fixture(t: TestContext) {
   replace(prisma.conversation, 'findFirst', async () => structuredClone(record));
   replace(prisma.conversation, 'update', async () => record);
   replace(prisma.userBlock, 'findFirst', async () => { const snapshot = block; await beforeBlockRead?.(); return snapshot; });
+  replace(prisma.userBlock, 'findMany', async () => { const snapshot = block; await beforeBlockRead?.(); return snapshot ? [snapshot] : []; });
   replace(prisma.userBlock, 'upsert', upsertBlock);
   replace(prisma.conversationMessage, 'create', insertMessage);
   replace(prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => {

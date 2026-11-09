@@ -257,11 +257,11 @@ test('site message waits for its initial read and freezes the submitted draft un
   try {
     await page.goto('/admin/site-message');
     await readStarted.promise;
-    const message = page.getByLabel('نص رسالة الموقع', { exact: true });
+    const message = page.getByLabel('نص رسائل التطبيق', { exact: true });
     const type = page.getByRole('combobox', { name: 'نوع الرسالة', exact: true });
     const expiry = page.locator('input[type="datetime-local"]');
-    const enabled = page.getByRole('checkbox', { name: 'تفعيل الرسالة على الموقع', exact: true });
-    const save = page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true });
+    const enabled = page.getByRole('checkbox', { name: 'تفعيل رسائل التطبيق', exact: true });
+    const save = page.getByRole('button', { name: 'حفظ رسائل التطبيق', exact: true });
     for (const field of [message, type, expiry, enabled, save]) await expect(field).toBeDisabled();
     releaseRead.resolve();
     await expect(message).toHaveValue('الرسالة المحفوظة');
@@ -298,10 +298,10 @@ test('site message refresh and failed save retain every unsaved field and allow 
   });
   try {
     await page.goto('/admin/site-message');
-    const message = page.getByLabel('نص رسالة الموقع', { exact: true });
+    const message = page.getByLabel('نص رسائل التطبيق', { exact: true });
     const type = page.getByRole('combobox', { name: 'نوع الرسالة', exact: true });
     const expiry = page.locator('input[type="datetime-local"]');
-    const enabled = page.getByRole('checkbox', { name: 'تفعيل الرسالة على الموقع', exact: true });
+    const enabled = page.getByRole('checkbox', { name: 'تفعيل رسائل التطبيق', exact: true });
     await expect(message).toHaveValue('رسالة البداية');
     await message.fill('مسودة المالك');
     await type.selectOption('warning');
@@ -317,16 +317,16 @@ test('site message refresh and failed save retain every unsaved field and allow 
     await expect(type).toHaveValue('warning');
     await expect(expiry).toHaveValue('2035-06-01T12:30');
     await expect(enabled).toBeChecked();
-    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
-    const save = page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true });
+    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسائل التطبيق', exact: true }).click();
+    const save = page.getByRole('button', { name: 'حفظ رسائل التطبيق', exact: true });
     await save.click();
-    await expect(page.getByRole('alert').getByText('تعذر حفظ رسالة الموقع.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('alert').getByText('تعذر حفظ رسائل التطبيق.', { exact: true })).toBeVisible();
     await expect(save).toBeEnabled();
     await expect(message).toHaveValue('مسودة المالك');
     await expect(type).toHaveValue('warning');
     await expect(expiry).toHaveValue('2035-06-01T12:30');
     await expect(enabled).toBeChecked();
-    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
+    await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسائل التطبيق', exact: true }).click();
     await save.click();
     await expect.poll(() => writes.length).toBe(2);
     expect(writes[1]).toEqual(writes[0]);
@@ -344,12 +344,12 @@ test('site message initial read failure requires a retry before editing or savin
     return route.fulfill({ json: { siteMessage: { message: 'نجح التحميل', type: 'info', isEnabled: false, expiresAt: null } } });
   });
   await page.goto('/admin/site-message');
-  await expect(page.getByRole('alert').getByText('تخزين بيانات الموقع غير متاح حاليًا.', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'حفظ رسالة الموقع', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسالة الموقع', exact: true }).click();
+  await expect(page.getByRole('alert').getByText('تخزين بيانات التطبيق غير متاح حاليًا.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('نص رسائل التطبيق', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'حفظ رسائل التطبيق', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'إغلاق نتيجة إجراء رسائل التطبيق', exact: true }).click();
   await page.getByRole('button', { name: 'تحديث', exact: true }).click();
-  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toHaveValue('نجح التحميل');
-  await expect(page.getByLabel('نص رسالة الموقع', { exact: true })).toBeEnabled();
+  await expect(page.getByLabel('نص رسائل التطبيق', { exact: true })).toHaveValue('نجح التحميل');
+  await expect(page.getByLabel('نص رسائل التطبيق', { exact: true })).toBeEnabled();
   expect(writes).toBe(0);
 });

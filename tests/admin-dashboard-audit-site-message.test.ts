@@ -123,7 +123,7 @@ test('site message updates require the configured owner, are transactional and a
   assert.match(homeOnly, /pathname !== '\/'/);
   assert.doesNotMatch(layout, /<SiteMessageHomeOnly>/, 'the app download gateway does not mount the retired market home message');
   assert.doesNotMatch(layout, /<SiteMessageBanner/);
-  assert.match(siteMessagePage, /رسالة الموقع/);
+  assert.match(siteMessagePage, /رسائل التطبيق/);
   assert.match(siteMessagePage, /useAdminAccess\('owner'\)/);
   assert.match(siteMessageLayout, /isPlatformOwner/);
   assert.match(siteMessageLayout, /notFound/);

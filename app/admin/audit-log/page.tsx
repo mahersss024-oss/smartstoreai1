@@ -35,13 +35,13 @@ const actionLabels: Record<string, string> = {
   warn_user: 'تحذير مستخدم',
   restrict_conversation: 'تقييد محادثة',
   maintenance_cleanup: 'تنظيف وصيانة',
-  update_site_message: 'تحديث رسالة الموقع',
+  update_site_message: 'تحديث رسائل التطبيق',
 };
 
 const entityLabels: Record<string, string> = {
   evidence_case: 'أدلة قضية',
   listing: 'إعلان', report: 'بلاغ إعلان', user_report: 'بلاغ محادثة',
-  user: 'مستخدم', commission: 'رسوم', maintenance: 'صيانة', site_message: 'رسالة الموقع',
+  user: 'مستخدم', commission: 'رسوم', maintenance: 'صيانة', site_message: 'رسائل التطبيق',
 };
 
 function formatDate(value: string) {

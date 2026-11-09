@@ -19,7 +19,7 @@ const labels: Record<string, string> = {
   PushSubscription: 'اشتراكات إشعارات الويب', MobilePushToken: 'رموز إشعارات الجوال',
   NotificationDeliveryJob: 'مهام إرسال الإشعارات', MarketplaceSearchState: 'حالة البحث',
   ApiIdempotencyKey: 'مفاتيح منع تكرار الطلبات', SiteVisitDaily: 'زيارات الموقع اليومية',
-  SiteVisitUnique: 'الزوار الفريدون', AdminAuditLog: 'سجل الإدارة', SiteMessage: 'رسائل الموقع',
+  SiteVisitUnique: 'الزوار الفريدون', AdminAuditLog: 'سجل الإدارة', SiteMessage: 'رسائل التطبيق',
 };
 
 const secretField = /(?:token|secret|password|authorization|endpoint|p256dh|lease|objectkey|sourceurl|rawresponse|fingerprint|snapshot|payload|metadata|privatekey|idempotencykey|ownerkey|^key$|(?:^|_)state$|url$|hash$)/i;

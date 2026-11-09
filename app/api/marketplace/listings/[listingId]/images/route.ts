@@ -105,6 +105,16 @@ export async function POST(request: Request, context: RouteContext) {
     return idempotency.response;
   }
 
+  // The image itself retains the operation identity if saving the HTTP receipt
+  // fails after attachment. Recover before capacity checks or object writes.
+  const imageId = idempotency ? `legacy-image-${idempotency.operationKey}` : randomUUID();
+  const committedImage = existingListing.images.find(image => image.id === imageId);
+  if (committedImage) {
+    const body = { image: committedImage, quality: analyzeImageQuality({}),
+      compliance: null, contentCheck: 'not_checked', listing: existingListing };
+    return idempotency ? idempotency.complete(body, 201) : Response.json(body, { status: 201 });
+  }
+
   const maxImages = getMaxListingImagesPerListing();
 
   if (hasReachedListingImageLimit(existingListing.images)) {
@@ -202,7 +212,6 @@ export async function POST(request: Request, context: RouteContext) {
     // Image understanding belongs to Hamad chat. Manual uploads retain only
     // authoritative ownership, limits, decoder and storage validation.
 
-    const imageId = randomUUID();
     let imageUrls: Awaited<ReturnType<typeof storeListingImageDelivery>>;
 
     try {
@@ -272,8 +281,13 @@ export async function POST(request: Request, context: RouteContext) {
       return idempotency ? await idempotency.complete(body, status) : Response.json(body, { status });
     }
 
+    const savedImage = listing.images.find(saved => saved.id === image.id)!;
+    // Another stale retry may have attached this logical image while its own
+    // storage attempt was in flight. Only discard this attempt's unused URLs.
+    if (savedImage.displayUrl !== image.displayUrl || savedImage.thumbnailUrl !== image.thumbnailUrl)
+      await discardUnattachedListingImage(image);
     const responseBody = {
-      image,
+      image: savedImage,
       quality,
       compliance: null,
       contentCheck: 'not_checked',

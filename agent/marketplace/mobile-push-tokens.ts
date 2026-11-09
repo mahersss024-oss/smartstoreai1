@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { sessionMaxAgeSeconds } from '@/lib/auth/session';
+import { createMobilePushRemovalToken } from '@/lib/push/mobile-registration';
 
 type MobilePushPlatform = 'ios' | 'android';
 
@@ -11,6 +13,7 @@ export type MobilePushTokenInput = {
   appVersion?: string | null;
   locale?: string | null;
   userAgent?: string | null;
+  sessionExpiresAt?: Date;
 };
 
 type StoredMobilePushToken = {
@@ -25,6 +28,8 @@ type StoredMobilePushToken = {
   lastSeenAt: string;
   createdAt: string;
   updatedAt: string;
+  sessionExpiresAt?: string;
+  registrationKey?: string;
 };
 
 function resolveStoreFilePath() {
@@ -97,6 +102,12 @@ function persistFileStore() {
 }
 
 export async function saveMobilePushToken(input: MobilePushTokenInput) {
+  return (await saveMobilePushRegistration(input)).id;
+}
+
+export async function saveMobilePushRegistration(input: MobilePushTokenInput) {
+  const registrationKey = randomUUID();
+  const sessionExpiresAt = input.sessionExpiresAt ?? new Date(Date.now() + sessionMaxAgeSeconds * 1000);
   if (isDatabaseStore()) {
     const { prisma } = await import('@/lib/db/prisma');
 
@@ -110,6 +121,8 @@ export async function saveMobilePushToken(input: MobilePushTokenInput) {
         locale: input.locale ?? null,
         userAgent: input.userAgent ?? null,
         isActive: true,
+        sessionExpiresAt,
+        registrationKey,
       },
       update: {
         userId: input.userId,
@@ -118,11 +131,13 @@ export async function saveMobilePushToken(input: MobilePushTokenInput) {
         locale: input.locale ?? null,
         userAgent: input.userAgent ?? null,
         isActive: true,
+        sessionExpiresAt,
+        registrationKey,
         lastSeenAt: new Date(),
       },
     });
 
-    return record.id;
+    return { id: record.id, removalToken: createMobilePushRemovalToken(input.userId, input.token, registrationKey) };
   }
 
   loadFileStore();
@@ -141,15 +156,17 @@ export async function saveMobilePushToken(input: MobilePushTokenInput) {
     lastSeenAt: timestamp,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
+    sessionExpiresAt: sessionExpiresAt.toISOString(),
+    registrationKey,
   };
 
   tokens.set(record.token, record);
   persistFileStore();
 
-  return record.id;
+  return { id: record.id, removalToken: createMobilePushRemovalToken(input.userId, input.token, registrationKey) };
 }
 
-export async function deactivateMobilePushToken(token: string, userId?: string) {
+export async function deactivateMobilePushToken(token: string, userId?: string, registrationKey?: string) {
   if (isDatabaseStore()) {
     const { prisma } = await import('@/lib/db/prisma');
 
@@ -157,6 +174,7 @@ export async function deactivateMobilePushToken(token: string, userId?: string) 
       where: {
         token,
         ...(userId ? { userId } : {}),
+        ...(registrationKey ? { registrationKey } : {}),
       },
       data: { isActive: false, updatedAt: new Date() },
     });
@@ -168,7 +186,7 @@ export async function deactivateMobilePushToken(token: string, userId?: string) 
 
   const existing = tokens.get(token);
 
-  if (!existing || (userId && existing.userId !== userId)) {
+  if (!existing || (userId && existing.userId !== userId) || (registrationKey && existing.registrationKey !== registrationKey)) {
     return;
   }
 
@@ -183,7 +201,7 @@ export async function listActiveMobilePushTokensForUser(userId: string) {
     const { prisma } = await import('@/lib/db/prisma');
 
     return prisma.mobilePushToken.findMany({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, sessionExpiresAt: { gt: new Date() }, user: { deletedAt: null } },
       select: {
         id: true,
         token: true,
@@ -195,7 +213,8 @@ export async function listActiveMobilePushTokensForUser(userId: string) {
   loadFileStore();
 
   return [...tokens.values()]
-    .filter((record) => record.userId === userId && record.isActive)
+    .filter((record) => record.userId === userId && record.isActive &&
+      Boolean(record.sessionExpiresAt && new Date(record.sessionExpiresAt).getTime() > Date.now()))
     .map((record) => ({
       id: record.id,
       token: record.token,

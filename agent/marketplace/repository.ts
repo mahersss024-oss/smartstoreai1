@@ -363,6 +363,12 @@ export type CreateListingInput = {
   attributes?: Record<string, unknown>;
 };
 
+export type UpdateListingInput = Omit<Partial<CreateListingInput>, 'description' | 'city' | 'price'> & {
+  description?: string | null;
+  city?: string | null;
+  price?: CreateListingInput['price'] | null;
+};
+
 function shouldUseDatabaseStore() {
   return process.env.SMARTSTORE_MARKETPLACE_STORE === 'database';
 }
@@ -2536,22 +2542,29 @@ async function lockSellerListingEvidenceEntities(
 export async function updateListingForSeller(
   listingId: string,
   sellerId: string,
-  updates: Partial<CreateListingInput>,
+  updates: UpdateListingInput,
   options: { draftOnly?: boolean; modelReview?: boolean } = {},
 ) {
+  // An omitted field preserves the saved value; explicit null clears an
+  // optional field. The file store represents cleared fields as undefined.
+  const { description, city, price, ...otherUpdates } = updates;
+  const normalizedUpdates: Partial<CreateListingInput> = { ...otherUpdates };
+  if ('description' in updates) normalizedUpdates.description = description ?? undefined;
+  if ('city' in updates) normalizedUpdates.city = city ?? undefined;
+  if ('price' in updates) normalizedUpdates.price = price ?? undefined;
   const current = await getListing(listingId);
   if (!current || current.sellerId !== sellerId || current.status === 'deleted' || (options.draftOnly && current.status !== 'draft')) return null;
   mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current);
-  const assessmentText = listingSemanticText({ ...current, ...updates, attributes: { ...current.attributes, ...updates.attributes } });
+  const assessmentText = listingSemanticText({ ...current, ...normalizedUpdates, attributes: { ...current.attributes, ...updates.attributes } });
   if (options.modelReview) await marketplaceTextAnalyzer.analyze(assessmentText);
   if (!shouldUseDatabaseStore()) {
     if (options.draftOnly && memoryStore.getListing(listingId)?.status !== 'draft') return null;
     const listing = memoryStore.updateListingForSeller(
       listingId,
       sellerId,
-      updates,
+      normalizedUpdates,
       { compliance: options.modelReview
-        ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...current, ...updates, attributes: mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current) }))
+        ? evaluateSaudiMarketplaceCompliance(listingSemanticText({ ...current, ...normalizedUpdates, attributes: mergeMarketplaceCategoryAttributes(updates.category ?? current.category, updates.attributes, current) }))
         : createUnassessedMarketplaceCompliance() },
     );
 
@@ -2589,9 +2602,9 @@ export async function updateListingForSeller(
     const nextInput: CreateListingInput = {
       category: updates.category ?? existing.category,
       title: updates.title ?? existing.title,
-      description: updates.description ?? existing.description,
-      price: updates.price ?? existing.price,
-      city: updates.city ?? existing.city,
+      description: 'description' in updates ? normalizedUpdates.description : existing.description,
+      price: 'price' in updates ? normalizedUpdates.price : existing.price,
+      city: 'city' in updates ? normalizedUpdates.city : existing.city,
       condition: updates.condition ?? existing.condition,
       attributes: mergeMarketplaceCategoryAttributes(updates.category ?? existing.category, updates.attributes, existing),
     };
@@ -2608,8 +2621,8 @@ export async function updateListingForSeller(
         title: updates.title,
         description: updates.description,
         price:
-          'price' in updates ? toNumericPrice(updates.price) : undefined,
-        priceMode: 'price' in updates ? toPriceMode(updates.price) : undefined,
+          'price' in updates ? toNumericPrice(normalizedUpdates.price) : undefined,
+        priceMode: 'price' in updates ? toPriceMode(normalizedUpdates.price) : undefined,
         city: updates.city,
         condition: updates.condition,
         attributes: toPrismaJsonObject(nextInput.attributes ?? {}),
@@ -2971,22 +2984,17 @@ export async function deleteListingImageForSeller(
     return listing;
   }
 
-  const existing = await prisma.listing.findUnique({
-    where: { id: listingId },
-    include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
-  });
-
-  if (!existing || existing.sellerId !== sellerId) {
-    return null;
-  }
-
-  const imageToDelete = existing.images.find((image) => image.id === imageId);
-
-  if (!imageToDelete) {
-    return null;
-  }
-
   const listing = await prisma.$transaction(async (tx) => {
+    await lockSellerListingEvidenceEntities(tx, listingId, sellerId);
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const existing = await tx.listing.findUnique({
+      where: { id: listingId },
+      include: { images: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] } },
+    });
+    if (!existing || existing.sellerId !== sellerId) return null;
+    const imageToDelete = existing.images.find(image => image.id === imageId);
+    if (!imageToDelete) return null;
+
     await enqueueImageObjectCleanup(tx, { imageId, urls: [
       imageToDelete.originalUrl, imageToDelete.displayUrl, imageToDelete.thumbnailUrl,
     ] });
@@ -3008,6 +3016,7 @@ export async function deleteListingImageForSeller(
       });
 
       if (nextPrimaryImage) {
+        await tx.listingImage.updateMany({ where: { listingId, isPrimary: true }, data: { isPrimary: false } });
         await tx.listingImage.update({
           where: { id: nextPrimaryImage.id },
           data: { isPrimary: true },
@@ -3025,7 +3034,8 @@ export async function deleteListingImageForSeller(
         },
       },
     });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+  if (!listing) return null;
 
   try {
     await processImageObjectCleanup(imageId);
@@ -3081,20 +3091,13 @@ export async function setPrimaryListingImageForSeller(
     return listing;
   }
 
-  const existing = await prisma.listing.findUnique({
-    where: { id: listingId },
-    include: { images: true },
-  });
-
-  if (
-    !existing ||
-    existing.sellerId !== sellerId ||
-    !existing.images.some((image) => image.id === imageId)
-  ) {
-    return null;
-  }
-
   const listing = await prisma.$transaction(async (tx) => {
+    // Add, remove and choose-primary all serialize on this listing before
+    // reading image flags, including ownership changes during account deletion.
+    await lockSellerListingEvidenceEntities(tx, listingId, sellerId);
+    await tx.$executeRaw`SELECT 1 FROM "Listing" WHERE id = ${listingId} FOR UPDATE`;
+    const existing = await tx.listing.findUnique({ where: { id: listingId }, include: { images: true } });
+    if (!existing || existing.sellerId !== sellerId || !existing.images.some(image => image.id === imageId)) return null;
     await tx.listingImage.updateMany({
       where: { listingId },
       data: { isPrimary: false },
@@ -3114,7 +3117,8 @@ export async function setPrimaryListingImageForSeller(
         },
       },
     });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+  if (!listing) return null;
 
   const mappedListing = toListingRecord(listing);
 
@@ -3676,7 +3680,7 @@ export async function getConversationBlockStatus(
     return null;
   }
 
-  const block = await prisma.userBlock.findFirst({
+  const blocks = await prisma.userBlock.findMany({
     where: {
       OR: [
         { blockerId: userId, blockedId: otherUserId },
@@ -3684,14 +3688,18 @@ export async function getConversationBlockStatus(
       ],
     },
   });
-
+  // Both participants may block each other. The existence/order of the other
+  // participant's row must not hide this account's own unblock action.
+  const ownBlock = blocks.find(block => block.blockerId === userId);
+  const otherBlock = blocks.find(block => block.blockerId === otherUserId);
+  const block = ownBlock ?? otherBlock;
   if (!block) {
     return { blocked: false, blockedByMe: false };
   }
 
   return {
     blocked: true,
-    blockedByMe: block.blockerId === userId,
+    blockedByMe: Boolean(ownBlock),
     blockerId: block.blockerId,
     blockedUserId: block.blockedId,
   };

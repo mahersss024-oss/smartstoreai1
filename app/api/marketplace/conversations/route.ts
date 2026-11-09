@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { createConversationForListing } from '@/agent/marketplace/repository';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import { completeConversationResponse, replayConversationResponse } from '@/lib/api/conversation-replay';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   });
 
   if (idempotency?.response) {
-    return idempotency.response;
+    return replayConversationResponse(idempotency.response, session.user.id);
   }
 
   const result = await createConversationForListing(
@@ -79,22 +80,16 @@ export async function POST(request: Request) {
   if (result.status === 'not_found') {
     const responseBody = { error: 'listing_not_found_or_unavailable' };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 404)
-      : Response.json(responseBody, { status: 404 });
+    return completeConversationResponse(idempotency, responseBody, 404);
   }
 
   if (result.status === 'self_contact_blocked') {
     const responseBody = { error: 'self_contact_blocked' };
 
-    return idempotency
-      ? idempotency.complete(responseBody, 409)
-      : Response.json(responseBody, { status: 409 });
+    return completeConversationResponse(idempotency, responseBody, 409);
   }
 
   const responseStatus = result.status === 'created' ? 201 : 200;
 
-  return idempotency
-    ? idempotency.complete(result, responseStatus)
-    : Response.json(result, { status: responseStatus });
+  return completeConversationResponse(idempotency, result, responseStatus);
 }

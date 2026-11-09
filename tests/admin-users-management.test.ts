@@ -508,7 +508,7 @@ test('maintenance pages and destructive controls are removed while the owner sit
   assert.match(shell, /\/admin\/site-message/);
   assert.match(page, /useAdminAccess\('owner'\)/);
   assert.match(page, /\/api\/admin\/site-message/);
-  assert.match(page, /حفظ رسالة الموقع/);
+  assert.match(page, /حفظ رسائل التطبيق/);
   assert.doesNotMatch(page, /MarketResetPanel|DatabaseExplorer|cleanupScope|cleanupConfirmation|marketResetConfirmation|\/api\/admin\/maintenance/);
 });
 
