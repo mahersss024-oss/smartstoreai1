@@ -6,6 +6,13 @@ import { createMobilePushRemovalToken } from '@/lib/push/mobile-registration';
 
 type MobilePushPlatform = 'ios' | 'android';
 
+export type MobilePushDeliveryRegistration = {
+  id: string;
+  token: string;
+  platform: MobilePushPlatform;
+  registrationKey: string | null;
+};
+
 export type MobilePushTokenInput = {
   userId: string;
   token: string;
@@ -206,6 +213,7 @@ export async function listActiveMobilePushTokensForUser(userId: string) {
         id: true,
         token: true,
         platform: true,
+        registrationKey: true,
       },
     });
   }
@@ -219,7 +227,30 @@ export async function listActiveMobilePushTokensForUser(userId: string) {
       id: record.id,
       token: record.token,
       platform: record.platform,
+      registrationKey: record.registrationKey ?? null,
     }));
+}
+
+/** A previously read device token is not a current delivery authorization.
+ * Re-registration, sign-out and session expiry all invalidate that snapshot.
+ */
+export async function isMobilePushRegistrationCurrent(userId: string, registration: MobilePushDeliveryRegistration) {
+  if (isDatabaseStore()) {
+    const { prisma } = await import('@/lib/db/prisma');
+    return Boolean(await prisma.mobilePushToken.findFirst({
+      where: {
+        id: registration.id, token: registration.token, userId,
+        platform: registration.platform, registrationKey: registration.registrationKey,
+        isActive: true, sessionExpiresAt: { gt: new Date() }, user: { deletedAt: null },
+      },
+      select: { id: true },
+    }));
+  }
+  loadFileStore();
+  const current = tokens.get(registration.token);
+  return Boolean(current && current.id === registration.id && current.userId === userId &&
+    current.platform === registration.platform && (current.registrationKey ?? null) === registration.registrationKey &&
+    current.isActive && current.sessionExpiresAt && new Date(current.sessionExpiresAt).getTime() > Date.now());
 }
 
 export function resetMobilePushTokenStoreForTests() {

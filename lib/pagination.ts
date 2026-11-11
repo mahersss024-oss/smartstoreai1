@@ -17,6 +17,13 @@ export type NormalizedPagination = {
   take: number;
 };
 
+// The public feed can outgrow 1,000 pages. Keep its largest possible offset
+// within Prisma/PostgreSQL's signed 32-bit skip range at the repository's
+// existing maximum page size of 80; other lists retain their default cap.
+export const publicMarketplacePaginationOptions = {
+  maxPage: Math.floor(2_147_483_647 / 80) + 1,
+};
+
 function toPositiveInteger(value: unknown) {
   const parsed =
     typeof value === 'string' || typeof value === 'number'

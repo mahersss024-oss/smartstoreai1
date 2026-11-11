@@ -11,7 +11,7 @@ export async function getAdminOverview(
   database: OverviewDatabase = prisma,
 ) {
   const activeSince = new Date(now.getTime() - authenticatedUserActiveWindowMs);
-  const [totalUsers, activeUsers, publishedListings, listingReports, conversationReports, appUsage] =
+  const [totalUsers, activeUsers, publishedListings, listingReports, userReports, appUsage] =
     await Promise.all([
       database.user.count({ where: { deletedAt: null } }),
       database.user.count({
@@ -20,7 +20,7 @@ export async function getAdminOverview(
       database.listing.count({ where: { status: 'published' } }),
       database.report.count({ where: { status: 'open' } }),
       database.userReport.count({
-        where: { status: 'open', conversationId: { not: null } },
+        where: { status: 'open' },
       }),
       getAppUsageStats(now, database),
     ]);
@@ -29,7 +29,7 @@ export async function getAdminOverview(
     totalUsers,
     activeUsers,
     publishedListings,
-    openReports: listingReports + conversationReports,
+    openReports: listingReports + userReports,
     appUsage,
   };
 }

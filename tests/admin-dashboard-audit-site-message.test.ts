@@ -54,7 +54,7 @@ test('admin overview calculates the four required database metrics with actual s
   assert.deepEqual(calls[3], { delegate: 'report', args: { where: { status: 'open' } } });
   assert.deepEqual(calls[4], {
     delegate: 'userReport',
-    args: { where: { status: 'open', conversationId: { not: null } } },
+    args: { where: { status: 'open' } },
   });
 });
 

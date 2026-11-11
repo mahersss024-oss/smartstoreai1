@@ -2,7 +2,9 @@ import { createSign } from 'node:crypto';
 
 import {
   deactivateMobilePushToken,
+  isMobilePushRegistrationCurrent,
   listActiveMobilePushTokensForUser,
+  type MobilePushDeliveryRegistration,
 } from '@/agent/marketplace/mobile-push-tokens';
 
 import { fetchWithTimeout } from '../api/fetch-timeout';
@@ -13,6 +15,7 @@ type NativePushMessage = {
   body: string;
   url?: string;
   tag?: string;
+  privateContent?: boolean;
 };
 
 type FirebaseServiceAccountConfig = {
@@ -178,7 +181,8 @@ async function getFirebaseAccessToken(config: FirebaseServiceAccountConfig) {
 }
 
 async function sendFirebaseMessage(
-  token: string,
+  userId: string,
+  registration: MobilePushDeliveryRegistration,
   message: NativePushMessage,
 ): Promise<NativePushSendResult> {
   const config = getFirebaseServiceAccountConfig();
@@ -191,6 +195,7 @@ async function sendFirebaseMessage(
   let responseDeadline: ReturnType<typeof setTimeout> | undefined;
   try {
     const accessToken = await getFirebaseAccessToken(config);
+    if (!await isMobilePushRegistrationCurrent(userId, registration)) return { ok: true };
     // Keep this signal active while parsing a rejection body as well as while
     // waiting for headers; token cleanup must not hang on a stalled provider.
     responseDeadline = setTimeout(() => controller.abort(), getNativePushTimeoutMs());
@@ -207,7 +212,7 @@ async function sendFirebaseMessage(
         },
         body: JSON.stringify({
           message: {
-            token,
+            token: registration.token,
             notification: {
               title: message.title,
               body: message.body,
@@ -215,6 +220,7 @@ async function sendFirebaseMessage(
             data: {
               url: message.url ?? '/',
               tag: message.tag ?? '',
+              recipientId: userId,
             },
             android: {
               notification: {
@@ -294,7 +300,8 @@ function isExpiredApnsReason(reason: string | undefined) {
 }
 
 async function sendApnsMessage(
-  token: string,
+  userId: string,
+  registration: MobilePushDeliveryRegistration,
   message: NativePushMessage,
 ): Promise<NativePushSendResult> {
   const config = getApnsConfig();
@@ -307,10 +314,12 @@ async function sendApnsMessage(
     const host = config.useSandbox
       ? 'https://api.sandbox.push.apple.com'
       : 'https://api.push.apple.com';
+    const authorization = `bearer ${createApnsJwt(config)}`;
+    if (!await isMobilePushRegistrationCurrent(userId, registration)) return { ok: true };
     const response = await postApnsHttp2({
       host,
-      token,
-      authorization: `bearer ${createApnsJwt(config)}`,
+      token: registration.token,
+      authorization,
       topic: config.bundleId,
       payload: {
         aps: {
@@ -323,6 +332,7 @@ async function sendApnsMessage(
         },
         url: message.url ?? '/',
         tag: message.tag ?? '',
+        recipientId: userId,
       },
       timeoutMs: getNativePushTimeoutMs(),
     });
@@ -354,16 +364,22 @@ export async function sendNativePushToUser(
   }
 
   const tokens = await listActiveMobilePushTokensForUser(userId);
+  // A provider-accepted notification can arrive after logout/account switching.
+  // OS-rendered conversation alerts must never carry private preview content.
+  const deliveryMessage = message.privateContent || message.url?.startsWith('/conversations/')
+    ? { ...message, title: 'رسالة جديدة في سوق حمد', body: 'افتح التطبيق للاطلاع على رسائلك.' }
+    : message;
 
   await Promise.all(
     tokens.map(async (record) => {
       const result =
         record.platform === 'ios'
-          ? await sendApnsMessage(record.token, message)
-          : await sendFirebaseMessage(record.token, message);
+          ? await sendApnsMessage(userId, record, deliveryMessage)
+          : await sendFirebaseMessage(userId, record, deliveryMessage);
 
       if (!result.ok && result.expired) {
-        await deactivateMobilePushToken(record.token, userId);
+        // An old provider response must not revoke a newer registration.
+        if (record.registrationKey) await deactivateMobilePushToken(record.token, userId, record.registrationKey);
       } else if (!result.ok) {
         throw new Error('native_push_delivery_failed');
       }
