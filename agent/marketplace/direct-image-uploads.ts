@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
 import { analyzeImageQuality } from './image-quality';
+import { verifyListingImageDelivery } from './listing-image-readiness';
 import { reviewListingImageContent } from './listing-image-content';
 import { getMaxListingImagesPerListing } from './listing-image-limits';
 import { scheduleListingEvidenceCopy } from './evidence';
@@ -37,6 +38,7 @@ export const directImageUploadEffects = {
   createTransfer: createDirectImageTransfer,
   readImage: readProcessedImage,
   promote: promoteProcessedImages,
+  verifyDelivery: verifyListingImageDelivery,
   discard: discardDirectImageObjects,
   review: reviewListingImageContent,
   now: () => Date.now(),
@@ -352,6 +354,7 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     const ownedPromotion = reserved.promotion;
     promotion = ownedPromotion;
     const urls = await directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline);
+    await directImageUploadEffects.verifyDelivery(urls, ownedPromotion.deadline);
     if (Date.now() > ownedPromotion.deadline) throw new Error('image_promotion_deadline');
     const finalized = await serializable(async tx => {
       const current = await tx.listingImageUpload.findUnique({ where: { id: job.id } });

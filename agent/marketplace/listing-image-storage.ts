@@ -9,6 +9,7 @@ import {
   createSanitizedListingImageOriginal,
 } from './listing-image-variants';
 import { createListingImageDeliveryUrls } from './listing-image-delivery';
+import { verifyListingImageDelivery } from './listing-image-readiness';
 import {
   defaultMaxListingImages,
   getMaxListingImagesPerListing,
@@ -194,6 +195,9 @@ export async function storeListingImageDelivery({
   const [displayUrl, thumbnailUrl] = results.map(result =>
     result.status === 'fulfilled' ? result.value! : '',
   );
+  // A failed CDN probe must not delete successfully stored immutable objects.
+  // Unattached prepared receipts retain their existing delayed cleanup policy.
+  await verifyListingImageDelivery({ displayUrl, thumbnailUrl });
   // The database still exposes originalUrl for backwards compatibility. It
   // aliases the largest retained WebP derivative; uploaded/master bytes are
   // never written to public object storage.
