@@ -15,6 +15,7 @@ import { getAuthSession } from '@/lib/auth/session';
 import { InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
 import { isMarketplaceCategory } from '@/lib/marketplace/categories';
 import { DirectImageUploadError } from '@/agent/marketplace/direct-image-upload-policy';
+import { recordPublicListingView } from '@/lib/marketplace/listing-views';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,8 +80,24 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json({ listings: await listSimilarMarketplaceListings(listing) }, { headers: noStoreHeaders });
   }
 
+  let views = listing.views;
+  const visitId = new URL(request.url).searchParams.get('visit');
+  if (visitId && z.string().uuid().safeParse(visitId).success && process.env.SMARTSTORE_MARKETPLACE_STORE === 'database') {
+    const limited = await enforceApiRateLimit(request, {
+      namespace: 'listing_view_count', maxRequests: 120, windowMs: 60_000,
+    });
+    if (!limited) {
+      try {
+        views = await recordPublicListingView(listingId, visitId) ?? views;
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[listing_view] recording_failed=${errorName}`);
+      }
+    }
+  }
+
   return Response.json(
-    { listing: { ...listing, images: listing.images.filter(image => image.status === 'approved') } },
+    { listing: { ...listing, views, images: listing.images.filter(image => image.status === 'approved') } },
     {
       headers: noStoreHeaders,
     },

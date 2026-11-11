@@ -14,7 +14,7 @@ import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
-import { parsePaginationFromRequest } from '@/lib/pagination';
+import { parsePaginationFromRequest, publicMarketplacePaginationOptions } from '@/lib/pagination';
 import { marketplaceCategoryIds } from '@/lib/marketplace/categories';
 import { getMarketplaceCategoryOption, InvalidMarketplaceCategoryOptionError } from '@/lib/marketplace/category-options';
 import { getMarketplaceCarModel } from '@/lib/marketplace/car-models';
@@ -66,6 +66,7 @@ export async function GET(request: Request) {
   });
   if (!parsedSearch.success) return Response.json({ error: 'invalid_search_filters' }, { status: 400, headers: noStoreHeaders });
   const pagination = parsePaginationFromRequest(request, {
+    ...publicMarketplacePaginationOptions,
     defaultLimit: 24,
     maxLimit: 48,
   });

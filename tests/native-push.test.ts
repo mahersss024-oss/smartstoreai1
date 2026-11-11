@@ -7,7 +7,9 @@ import http2, { type ClientHttp2Session, type OutgoingHttpHeaders } from 'node:h
 import {
   listActiveMobilePushTokensForUser,
   resetMobilePushTokenStoreForTests,
+  deactivateMobilePushToken,
   saveMobilePushToken,
+  saveMobilePushRegistration,
 } from '@/agent/marketplace/mobile-push-tokens';
 import { sendNativePushToUser } from '@/lib/push/native-push';
 
@@ -135,14 +137,15 @@ test('native push sends iPhone tokens through APNs', async t => {
     assert.deepEqual(capturedRequest.body, {
       aps: {
         alert: {
-          title: 'رسالة جديدة',
-          body: 'لديك رسالة في سوق حمد',
+          title: 'رسالة جديدة في سوق حمد',
+          body: 'افتح التطبيق للاطلاع على رسائلك.',
         },
         sound: 'default',
         category: 'conversation',
       },
       url: '/conversations/123',
       tag: 'conversation',
+      recipientId: 'user-ios',
     });
   } finally {
     restoreNativePushEnv(originalEnv);
@@ -191,6 +194,87 @@ test('APNs delivery errors keep valid device registrations unless APNs identifie
       } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
     });
   }
+});
+
+function configureFirebaseForTest() {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  process.env.SMARTSTORE_MARKETPLACE_STORE = '';
+  process.env.FIREBASE_PROJECT_ID = 'test-project';
+  process.env.FIREBASE_CLIENT_EMAIL = 'test@example.invalid';
+  process.env.FIREBASE_PRIVATE_KEY = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  delete process.env.APNS_TEAM_ID; delete process.env.APNS_KEY_ID;
+}
+
+function barrier() {
+  let release!: () => void;
+  return { promise: new Promise<void>(resolve => { release = resolve; }), release: () => release() };
+}
+
+test('FCM revalidates the exact registration after OAuth before sending a private notification', async t => {
+  for (const change of ['account-switch', 'sign-out', 'same-account-new-registration', 'session-expired'] as const) {
+    await t.test(change, async child => {
+      const originalEnv = snapshotNativePushEnv();
+      resetMobilePushTokenStoreForTests(); configureFirebaseForTest();
+      const entered = barrier(), resume = barrier();
+      let sends = 0;
+      const expiry = new Date(Date.now() + 60_000);
+      child.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+        if (String(input) === 'https://oauth2.googleapis.com/token') {
+          entered.release(); await resume.promise;
+          return Response.json({ access_token: 'race-test-access', expires_in: 0 });
+        }
+        sends++; return Response.json({ name: 'must-not-send' });
+      });
+      try {
+        await saveMobilePushRegistration({ userId: 'account-a', token: 'device-race', platform: 'android', sessionExpiresAt: expiry });
+        const sending = sendNativePushToUser('account-a', { title: 'Private seller name', body: 'Private message contents', url: '/conversations/private-a' });
+        await entered.promise;
+        if (change === 'account-switch') await saveMobilePushRegistration({ userId: 'account-b', token: 'device-race', platform: 'android' });
+        else if (change === 'sign-out') await deactivateMobilePushToken('device-race', 'account-a');
+        else if (change === 'same-account-new-registration') await saveMobilePushRegistration({ userId: 'account-a', token: 'device-race', platform: 'android' });
+        else child.mock.method(Date, 'now', () => expiry.getTime() + 1);
+        resume.release(); await sending;
+        assert.equal(sends, 0, 'a stale captured token is never sent to the provider');
+      } finally { resume.release(); restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
+    });
+  }
+});
+
+test('native conversation alerts never contain private previews even after a provider has accepted them', async t => {
+  const originalEnv = snapshotNativePushEnv();
+  resetMobilePushTokenStoreForTests(); configureFirebaseForTest();
+  let message: { notification: { title: string; body: string }; data: Record<string, string> } | undefined;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'generic-test-access', expires_in: 0 });
+    message = JSON.parse(String(init?.body)).message;
+    await saveMobilePushRegistration({ userId: 'account-b', token: 'accepted-device', platform: 'android' });
+    return Response.json({ name: 'accepted-before-account-change' });
+  });
+  try {
+    await saveMobilePushRegistration({ userId: 'account-a', token: 'accepted-device', platform: 'android' });
+    await sendNativePushToUser('account-a', { title: 'Private sender', body: 'Private address in a message', url: '/conversations/private-a', tag: 'conversation:private-a' });
+    assert.ok(message);
+    assert.deepEqual(message.notification, { title: 'رسالة جديدة في سوق حمد', body: 'افتح التطبيق للاطلاع على رسائلك.' });
+    assert.equal(message.data.recipientId, 'account-a');
+    assert.equal(message.data.url, '/conversations/private-a');
+    assert.doesNotMatch(JSON.stringify(message), /Private sender|Private address/);
+    assert.equal((await listActiveMobilePushTokensForUser('account-b')).length, 1);
+  } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
+});
+
+test('an expired FCM result cannot deactivate a renewed registration for the same account', async t => {
+  const originalEnv = snapshotNativePushEnv();
+  resetMobilePushTokenStoreForTests(); configureFirebaseForTest();
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    if (String(input) === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'cleanup-test-access', expires_in: 0 });
+    await saveMobilePushRegistration({ userId: 'same-owner', token: 'renewed-device', platform: 'android' });
+    return Response.json({ error: { details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'UNREGISTERED' }] } }, { status: 404 });
+  });
+  try {
+    await saveMobilePushRegistration({ userId: 'same-owner', token: 'renewed-device', platform: 'android' });
+    await sendNativePushToUser('same-owner', { title: 'Public listing', body: 'A listing was published', url: '/listings/one' });
+    assert.equal((await listActiveMobilePushTokensForUser('same-owner')).length, 1);
+  } finally { restoreNativePushEnv(originalEnv); resetMobilePushTokenStoreForTests(); }
 });
 
 test('FCM only deactivates registrations for token-specific failures, not generic HTTP errors', async t => {

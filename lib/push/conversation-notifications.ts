@@ -77,6 +77,6 @@ export async function notifyConversationMessage({
         throw new Error('web_push_delivery_failed');
       }
     }),
-    sendNativePushToUser(recipientId, pushMessage),
+    sendNativePushToUser(recipientId, { ...pushMessage, privateContent: true }),
   ]);
 }

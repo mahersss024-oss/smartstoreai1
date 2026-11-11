@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AuthSessionUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { createListingId } from '@/lib/marketplace/listing-id';
+import { activePublishedFavoriteWhere } from '@/lib/marketplace/favorite-visibility';
 import { getMarketplaceTitleTerms, publicListingFiltersSql, titleSearchNumberSql, titleSearchConditionSql, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
 import { createAdminAuditLog } from '@/lib/admin/audit';
 import { recordModelReview } from '@/lib/admin/model-review';
@@ -10,6 +11,7 @@ import { enqueueFollowDeliveries, enqueueNotificationDelivery, scheduleNotificat
 import {
   type PaginationInput,
   normalizePagination,
+  publicMarketplacePaginationOptions,
   toPaginatedResponse,
 } from '@/lib/pagination';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
@@ -769,8 +771,11 @@ function getPlaceholderEmail(userId: string) {
   return `${userId.replace(/[^a-zA-Z0-9._-]/g, '_')}@smartstore.local`;
 }
 
-function getListingPagination(filters: MarketplaceListingFilters) {
-  const pagination = normalizePagination(filters);
+function getListingPagination(
+  filters: MarketplaceListingFilters,
+  options?: Parameters<typeof normalizePagination>[1],
+) {
+  const pagination = normalizePagination(filters, options);
 
   return {
     limit: pagination.limit,
@@ -1033,7 +1038,7 @@ export async function listPublicMarketplaceListings(filters: PublicMarketplaceLi
     return memoryStore.listPublicMarketplaceListings(filters);
   }
   const terms = getMarketplaceTitleTerms(filters.query);
-  const pagination = getListingPagination(filters);
+  const pagination = getListingPagination(filters, publicMarketplacePaginationOptions);
   const defaultOrder = terms.length || filters.sort === 'newest'
     ? Prisma.sql`"updatedAt" DESC, "id" DESC`
     : Prisma.sql`"firstPublishedAt" DESC NULLS LAST,
@@ -4593,7 +4598,7 @@ export async function listUserFavoritesPage(
   }
 
   const favorites = await prisma.favorite.findMany({
-    where: { userId, listing: { status: 'published' } },
+    where: activePublishedFavoriteWhere(userId),
     include: {
       listing: {
         include: {

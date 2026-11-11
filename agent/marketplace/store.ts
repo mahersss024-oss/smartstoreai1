@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { normalizePagination } from '@/lib/pagination';
+import { normalizePagination, publicMarketplacePaginationOptions } from '@/lib/pagination';
 import { createListingId } from '@/lib/marketplace/listing-id';
 import { hasPendingLocalListingReview, resolveLocalListingReviews } from '@/lib/admin/model-review';
 import { getMarketplaceListingIdLookup, getMarketplaceTitleTerms, matchesMarketplaceTitle, matchesPublicListingFilters, getTitleSearchNumber, titleSearchConditionScore, type PublicMarketplaceListingFilters } from '@/lib/marketplace/title-search';
@@ -160,8 +160,11 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function getListingPagination(filters: MarketplaceListingFilters) {
-  const pagination = normalizePagination(filters);
+function getListingPagination(
+  filters: MarketplaceListingFilters,
+  options?: Parameters<typeof normalizePagination>[1],
+) {
+  const pagination = normalizePagination(filters, options);
 
   return {
     limit: pagination.limit,
@@ -170,8 +173,12 @@ function getListingPagination(filters: MarketplaceListingFilters) {
   };
 }
 
-function paginateListings<T>(listings: T[], filters: MarketplaceListingFilters) {
-  const pagination = getListingPagination(filters);
+function paginateListings<T>(
+  listings: T[],
+  filters: MarketplaceListingFilters,
+  options?: Parameters<typeof normalizePagination>[1],
+) {
+  const pagination = getListingPagination(filters, options);
 
   return listings.slice(pagination.skip, pagination.skip + pagination.take);
 }
@@ -696,7 +703,7 @@ export function listPublicMarketplaceListings(filters: PublicMarketplaceListingF
     }
     return ordered(left, right);
   });
-  return paginateListings(results, filters);
+  return paginateListings(results, filters, publicMarketplacePaginationOptions);
 }
 
 export function listMarketplaceListings(filters: MarketplaceListingFilters = {}) {
