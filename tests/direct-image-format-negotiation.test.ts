@@ -131,6 +131,7 @@ for (const useWrongDisplay of [false, true]) {
       mediaType: variant === 'display' && useWrongDisplay ? 'image/jpeg' : 'image/webp', etag: '"test"',
     }));
     t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('finalization_must_not_request_model_review'); });
+    t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {});
     t.mock.method(directImageUploadEffects, 'promote', async () => { promotions++; return {
       originalUrl: 'https://images.test/listings/ready-webp-display.webp',
       displayUrl: 'https://images.test/listings/ready-webp-display.webp', thumbnailUrl: 'https://images.test/listings/ready-webp-thumbnail.webp',

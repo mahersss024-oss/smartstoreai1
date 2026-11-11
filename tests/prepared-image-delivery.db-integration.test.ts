@@ -46,6 +46,10 @@ test('legacy image delivery journals planned bytes, seals attachment, and recove
   let deletionStarted: (() => void) | undefined;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
+    if (url.hostname === 'legacy-images.example.invalid' && init?.method === 'GET') {
+      assert.ok(remoteObjects.has(`/isolated-fixtures${url.pathname}`));
+      return new Response(data as Uint8Array<ArrayBuffer>, { headers: { 'Content-Type': 'image/webp' } });
+    }
     if (url.hostname === 'api.cloudflare.com') return Response.json({ success: true });
     assert.equal(url.hostname, 'legacy-test.r2.cloudflarestorage.com', 'external requests are forbidden');
     if (init?.method === 'PUT') {

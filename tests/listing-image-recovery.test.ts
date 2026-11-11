@@ -11,6 +11,18 @@ import { addListingImageForSeller, createListingDraft, getListing } from '@/agen
 import { createSessionCookie } from '@/lib/auth/session';
 import { mockImageContentReview } from './helpers/image-content';
 
+// Storage assertions concern signed PUT/DELETE operations. Serve valid public
+// derivatives separately so the actual readiness check still executes.
+const publicPreview = sharp({ create: { width: 16, height: 16, channels: 3, background: '#ffffff' } }).webp().toBuffer();
+function mockStorageFetch(t: TestContext, storage: typeof fetch) {
+  return t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    if (new URL(String(input)).hostname === 'images.example.test' && init?.method === 'GET') {
+      return new Response(new Uint8Array(await publicPreview), { headers: { 'Content-Type': 'image/webp' } });
+    }
+    return storage(input, init);
+  });
+}
+
 function storageEnvironment(t: TestContext) {
   const values = {
     SMARTSTORE_IMAGE_STORAGE: 's3', SMARTSTORE_MARKETPLACE_STORE: 'file',
@@ -41,7 +53,7 @@ for (const failed of ['display', 'thumbnail'] as const) {
     storageEnvironment(t);
     const writes: string[] = [];
     const deletes: string[] = [];
-    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    mockStorageFetch(t, async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (init?.method === 'DELETE') { deletes.push(url); return new Response(null, { status: 204 }); }
       writes.push(url);
@@ -58,7 +70,7 @@ for (const failed of ['display', 'thumbnail'] as const) {
 test('chat continues with later complete images after a display derivative exhausts retries', async t => {
   storageEnvironment(t);
   let firstDisplayPath: string | undefined;
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+  mockStorageFetch(t, async (input: string | URL | Request) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith('-display.webp')) firstDisplayPath ??= path;
     return new Response(null, { status: path === firstDisplayPath ? 503 : 200 });
@@ -73,7 +85,7 @@ test('chat continues with later complete images after a display derivative exhau
 test('transient variant failure recovers without storing original-sized aliases', async t => {
   storageEnvironment(t);
   let displayAttempts = 0;
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+  mockStorageFetch(t, async (input: string | URL | Request) => {
     const display = new URL(String(input)).pathname.endsWith('-display.webp');
     return new Response(null, { status: display && ++displayAttempts === 1 ? 503 : 200 });
   });
@@ -88,7 +100,7 @@ test('transient variant failure recovers without storing original-sized aliases'
 test('failed shared chat delivery does not delete objects a concurrent retry may attach', async t => {
   storageEnvironment(t);
   let deletes = 0;
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+  mockStorageFetch(t, async (input: string | URL | Request, init?: RequestInit) => {
     if (init?.method === 'DELETE') deletes++;
     return new Response(null, { status: String(input).includes('-display.webp') ? 503 : 200 });
   });
@@ -104,7 +116,7 @@ test('incomplete upload is not attached and the same idempotency key can retry s
   mockImageContentReview(t, 'allow');
   const providerFetch = globalThis.fetch;
   let fail = true;
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+  mockStorageFetch(t, async (input: string | URL | Request, init?: RequestInit) => {
     if (!new URL(String(input)).hostname.endsWith('r2.cloudflarestorage.com')) return providerFetch(input, init);
     return new Response(null, { status: init?.method === 'PUT' && fail && String(input).includes('-display.webp') ? 503 : 200 });
   });
@@ -126,10 +138,29 @@ test('incomplete upload is not attached and the same idempotency key can retry s
   assert.match(getListing(listing.id)!.images[0].displayUrl, /-display\.webp$/);
 });
 
+test('successfully stored variants are not attached or deleted when their public CDN delivery is unavailable', async t => {
+  storageEnvironment(t);
+  let puts = 0, deletes = 0, probes = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'images.example.test') { probes++; return new Response(null, { status: 503 }); }
+    if (init?.method === 'PUT') puts++;
+    if (init?.method === 'DELETE') deletes++;
+    return new Response(null, { status: 200 });
+  });
+  const listing = createListingDraft({ sellerId: 'cdn-unavailable', category: 'other', title: 'Desk' });
+  const { input } = await sample();
+  await assert.rejects(saveUploadedListingImagesForSeller({ listingId: listing.id, sellerId: listing.sellerId, images: [input] }));
+  assert.equal(puts, 2);
+  assert.equal(probes, 6);
+  assert.equal(deletes, 0);
+  assert.equal(getListing(listing.id)?.images.length, 0);
+});
+
 test('missing or invalid public image URL fails before writing an object', async t => {
   storageEnvironment(t);
   let requests = 0;
-  t.mock.method(globalThis, 'fetch', async () => { requests++; return new Response(null, { status: 200 }); });
+  mockStorageFetch(t, async () => { requests++; return new Response(null, { status: 200 }); });
   for (const url of ['', 'not a url', 'https://images.example.test/?token=secret']) {
     process.env.SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL = url;
     await assert.rejects(storeListingObject({ imageId: 'invalid-config', data: new Uint8Array([1]), mediaType: 'image/png' }));
@@ -148,7 +179,7 @@ test('cleanup never deletes an image already attached to its listing', async t =
   };
   addListingImageForSeller(listing.id, listing.sellerId, image);
   let requests = 0;
-  t.mock.method(globalThis, 'fetch', async () => { requests++; return new Response(null, { status: 200 }); });
+  mockStorageFetch(t, async () => { requests++; return new Response(null, { status: 200 }); });
   await discardUnattachedListingImage(image);
   assert.equal(requests, 0);
   assert.equal(getListing(listing.id)?.images.length, 1);
@@ -183,7 +214,7 @@ test('concurrent uploads report the actual saved image and clean up the rejected
   let release!: () => void;
   const bothStarted = new Promise<void>(resolve => { release = resolve; });
   const deleted: string[] = [];
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+  mockStorageFetch(t, async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     if (!url.hostname.endsWith('r2.cloudflarestorage.com')) return previousFetch(input, init);
     if (init?.method === 'DELETE') deleted.push(url.pathname);
@@ -223,7 +254,7 @@ test('replays the final allowed upload after a lost response without adding anot
   mockImageContentReview(t, 'allow');
   const providerFetch = globalThis.fetch;
   let objectWrites = 0;
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+  mockStorageFetch(t, async (input: string | URL | Request, init?: RequestInit) => {
     if (!new URL(String(input)).hostname.endsWith('r2.cloudflarestorage.com')) return providerFetch(input, init);
     if (init?.method === 'PUT') objectWrites++;
     return new Response(null, { status: 200 });

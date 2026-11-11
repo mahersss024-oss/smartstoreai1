@@ -46,6 +46,7 @@ async function fixture(t: TestContext) {
   const thumbnail = new Uint8Array(await sharp(original).resize(36).webp().toBuffer());
   const cleanups: Array<{ id: string; includePublic?: boolean }> = [];
   const oldEffects = { ...directImageUploadEffects };
+  t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {});
   t.mock.method(directImageUploadEffects, 'createTransfer', (job: DirectImageObjectJob) => ({ url: `https://isolated.r2.cloudflarestorage.com/isolated-intake/${job.sourceKey}`, method: 'PUT' as const, headers: { 'Content-Type': 'image/jpeg', 'If-None-Match': '*' } }));
   t.mock.method(directImageUploadEffects, 'readImage', async (_job: DirectImageObjectJob, variant: DirectImageVariant) => ({ data: variant === 'original' ? original : variant === 'display' ? display : thumbnail, mediaType: variant === 'original' ? 'image/jpeg' : 'image/webp', etag: '"isolated-etag"' }));
   t.mock.method(directImageUploadEffects, 'promote', async (job: DirectImageObjectJob) => getDirectImagePublicUrls(job));
@@ -107,6 +108,50 @@ test('database pending images block publication and blank-draft reset without ma
   // Optional photos stay optional once no upload is waiting.
   assert.equal((await setListingStatusForSeller(f.listing.id, f.seller.id, 'published'))?.status, 'published');
   assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 0);
+});
+
+test('database CDN verification gates readiness and publication until both public images are available', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const item = await claimed(f);
+  let started!: () => void, release!: () => void;
+  const waiting = new Promise<void>(resolve => { started = resolve; });
+  const verified = new Promise<void>(resolve => { release = resolve; });
+  t.mock.method(directImageUploadEffects, 'verifyDelivery', async (urls: { displayUrl: string; thumbnailUrl: string }) => {
+    assert.ok(urls.displayUrl.endsWith('-display.webp'));
+    assert.ok(urls.thumbnailUrl.endsWith('-thumbnail.webp'));
+    started(); await verified;
+  });
+  const completing = completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
+  try {
+    await waiting;
+    assert.equal((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).status, 'processing');
+    assert.equal(await prisma.listingImage.count({ where: { id: item.id } }), 0);
+    await assert.rejects(setListingStatusForSeller(f.listing.id, f.seller.id, 'published'), { code: 'image_uploads_pending' });
+  } finally { release(); }
+  assert.equal((await completing).action, 'ready');
+  assert.equal(await prisma.listingImage.count({ where: { id: item.id } }), 1);
+  assert.equal((await setListingStatusForSeller(f.listing.id, f.seller.id, 'published'))?.status, 'published');
+});
+
+test('database unavailable CDN delivery retains the draft and upload for a successful retry', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const item = await claimed(f);
+  let unavailable = true;
+  t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {
+    if (unavailable) throw new Error('public_image_unavailable');
+  });
+  assert.equal((await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken })).action, 'retry');
+  assert.equal((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).status, 'pending');
+  assert.equal(await prisma.listingImage.count({ where: { id: item.id } }), 0);
+  assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: f.listing.id } })).status, 'draft');
+  assert.equal(f.cleanups.length, 0, 'a temporary public delivery failure must not discard stored/source bytes');
+  await assert.rejects(setListingStatusForSeller(f.listing.id, f.seller.id, 'published'), { code: 'image_uploads_pending' });
+  unavailable = false;
+  const retry = await claimDirectImageUpload(item.id);
+  assert.equal(retry.action, 'process');
+  if (retry.action !== 'process') throw new Error('claim_expected');
+  assert.equal((await completeDirectImageUpload(item.id, { leaseToken: retry.leaseToken })).action, 'ready');
+  assert.equal(await prisma.listingImage.count({ where: { id: item.id } }), 1);
 });
 
 test('database claims reject duplicate and stale leases without deleting a newer task source', { skip: !enabled }, async t => {
