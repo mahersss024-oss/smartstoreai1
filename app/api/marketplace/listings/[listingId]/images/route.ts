@@ -1,3 +1,4 @@
+import { ImageProcessingCapacityError } from '@/agent/marketplace/image-processing-capacity';
 import { randomUUID } from 'node:crypto';
 
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
@@ -187,6 +188,11 @@ export async function POST(request: Request, context: RouteContext) {
       // image/master is not retained as a third public object.
       generatedVariants = await createListingImageVariants(sanitizedOriginal);
     } catch (error) {
+      if (error instanceof ImageProcessingCapacityError) {
+        await idempotency?.abandon();
+        return Response.json({ error: error.code, message: '\u064a\u062c\u0631\u064a \u062a\u062c\u0647\u064a\u0632 \u0635\u0648\u0631 \u0623\u062e\u0631\u0649. \u062d\u0627\u0648\u0644 \u0645\u062c\u062f\u062f\u064b\u0627 \u0628\u0639\u062f \u0642\u0644\u064a\u0644.' },
+          { status: 503, headers: { 'Retry-After': '2', 'Cache-Control': 'private, no-store' } });
+      }
       incrementRuntimeCounter('listing.image_upload.rejected', {
         reason:
           error instanceof ListingImageSecurityError

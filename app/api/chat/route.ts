@@ -58,6 +58,7 @@ import { customerLanguageInstructions, resolveCustomerLanguage } from '@/lib/cus
 import { parseChatConversationId } from '@/lib/chat/conversation';
 import { selectChatContext } from '@/lib/chat/context';
 import { checkChatRateLimit } from '@/lib/rate-limit';
+import { reserveChatGeneration } from '@/lib/chat/admission';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
@@ -703,6 +704,7 @@ async function generateCheckedAssistantResponse(
     allowDraftTools?: boolean;
     marketplaceIntent?: string;
     abortSignal?: AbortSignal;
+    onGenerationSettled?: () => Promise<void>;
   } = {},
 ) {
   const completedDraftIds = new Set<string>();
@@ -753,13 +755,15 @@ function createCheckedAssistantUIResponse(...args: Parameters<typeof generateChe
   return createUIMessageStreamResponse({
     stream: createUIMessageStream<UIMessage>({
       execute: async ({ writer }) => {
-        const id = `checked-${crypto.randomUUID()}`;
-        writer.write({ type: 'start', messageId: id, messageMetadata: { marketplaceIntent: options.marketplaceIntent } });
-        const text = await generateCheckedAssistantResponse(...args);
-        writer.write({ type: 'text-start', id });
-        writer.write({ type: 'text-delta', id, delta: getSafeAssistantText(text) || chatServiceUnavailableMessage });
-        writer.write({ type: 'text-end', id });
-        writer.write({ type: 'finish', finishReason: 'stop' });
+        try {
+          const id = `checked-${crypto.randomUUID()}`;
+          writer.write({ type: 'start', messageId: id, messageMetadata: { marketplaceIntent: options.marketplaceIntent } });
+          const text = await generateCheckedAssistantResponse(...args);
+          writer.write({ type: 'text-start', id });
+          writer.write({ type: 'text-delta', id, delta: getSafeAssistantText(text) || chatServiceUnavailableMessage });
+          writer.write({ type: 'text-end', id });
+          writer.write({ type: 'finish', finishReason: 'stop' });
+        } finally { await options.onGenerationSettled?.(); }
       },
       onError: () => chatServiceUnavailableMessage,
     }),
@@ -1019,220 +1023,227 @@ export async function POST(request: Request) {
     return createTextUIResponse(getModelProviderFailureResponse(language));
   }
 
-  const imageValidationFailure = validateChatImageAttachments(filteredMessages);
-  const retainedImageValidationFailure = validateRetainedListingImages(
-    body.retainedListingImages,
-  );
+  const admission = await reserveChatGeneration(session);
+  if (admission.response) return admission.response;
+  let backgroundGeneration = false;
+  try {
+    const imageValidationFailure = validateChatImageAttachments(filteredMessages);
+    const retainedImageValidationFailure = validateRetainedListingImages(
+      body.retainedListingImages,
+    );
 
-  if (imageValidationFailure || retainedImageValidationFailure) {
-    return generateProfessionalChatIssueResponse({
-      kind: 'upload_validation',
-      language,
-      userRequest: preliminaryUserRequest,
-      validationReason:
-        imageValidationFailure ?? retainedImageValidationFailure ?? undefined,
-    });
+    if (imageValidationFailure || retainedImageValidationFailure) {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'upload_validation',
+        language,
+        userRequest: preliminaryUserRequest,
+        validationReason:
+          imageValidationFailure ?? retainedImageValidationFailure ?? undefined,
+      });
+      }
+
+    await marketplaceTextAnalyzer.analyze(preliminaryUserRequest);
+    const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
+    const preliminaryComplianceDecision = await resolveAmbiguousTextPolicyDecision(
+      preliminaryUserRequest,
+    );
+    if (preliminaryComplianceDecision.modelAssessment) await recordModelReview({ subject: 'message', subjectId: `assistant:${session.user.id}`, userId: session.user.id, text: preliminaryUserRequest, assessment: preliminaryComplianceDecision.modelAssessment });
+
+    if (preliminaryComplianceDecision.decision === 'block') {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'text_policy_block',
+        language,
+        userRequest: preliminaryUserRequest,
+        textPolicyDecision: preliminaryComplianceDecision,
+      });
     }
 
-  await marketplaceTextAnalyzer.analyze(preliminaryUserRequest);
-  const preliminaryIntent = classifyMarketplaceIntent(preliminaryUserRequest);
-  const preliminaryComplianceDecision = await resolveAmbiguousTextPolicyDecision(
-    preliminaryUserRequest,
-  );
-  if (preliminaryComplianceDecision.modelAssessment) await recordModelReview({ subject: 'message', subjectId: `assistant:${session.user.id}`, userId: session.user.id, text: preliminaryUserRequest, assessment: preliminaryComplianceDecision.modelAssessment });
+    if (
+      preliminaryComplianceDecision.decision === 'needs_review' &&
+      isPolicyFacilitationIntent(preliminaryIntent.intent)
+    ) {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'text_policy_review',
+        language,
+        userRequest: preliminaryUserRequest,
+        textPolicyDecision: preliminaryComplianceDecision,
+      });
+    }
 
-  if (preliminaryComplianceDecision.decision === 'block') {
-    return generateProfessionalChatIssueResponse({
-      kind: 'text_policy_block',
+    if (body.resetDraftContext === true) {
+      await resetIncompleteSellerDrafts(session.user.id);
+    }
+
+    const marketplaceInterfaceContext = body.creationMethod === 'chat' ? await buildMarketplaceInterfaceContext({
+      session,
       language,
-      userRequest: preliminaryUserRequest,
-      textPolicyDecision: preliminaryComplianceDecision,
-    });
-  }
-
-  if (
-    preliminaryComplianceDecision.decision === 'needs_review' &&
-    isPolicyFacilitationIntent(preliminaryIntent.intent)
-  ) {
-    return generateProfessionalChatIssueResponse({
-      kind: 'text_policy_review',
-      language,
-      userRequest: preliminaryUserRequest,
-      textPolicyDecision: preliminaryComplianceDecision,
-    });
-  }
-
-  if (body.resetDraftContext === true) {
-    await resetIncompleteSellerDrafts(session.user.id);
-  }
-
-  const marketplaceInterfaceContext = body.creationMethod === 'chat' ? await buildMarketplaceInterfaceContext({
-    session,
-    language,
-  }) : null;
-  const marketplaceInterfaceScopeMessage = marketplaceInterfaceContext
-    ? buildMarketplaceInterfaceScopeMessage(marketplaceInterfaceContext)
-    : null;
-  const marketplaceInterfaceSystemMessage = marketplaceInterfaceContext
-    ? buildMarketplaceInterfaceSystemMessage(marketplaceInterfaceContext)
-    : null;
-  const scopeCheckMessages = marketplaceInterfaceScopeMessage
-    ? [...filteredMessages, marketplaceInterfaceScopeMessage]
-    : filteredMessages;
-  const inputScopeDecision = await checkInputScope({
-    messages: scopeCheckMessages,
-  });
-
-  if (
-    inputScopeDecision.decision === 'BLOCK' ||
-    inputScopeDecision.decision === 'UNCLEAR'
-  ) {
-    return generateProfessionalChatIssueResponse({
-      kind:
-        inputScopeDecision.decision === 'UNCLEAR'
-          ? 'scope_unclear'
-          : 'scope_block',
-      language,
-      userRequest: preliminaryUserRequest,
-      scopeDecision: inputScopeDecision,
-    });
-  }
-
-  if (
-    inputScopeDecision.decision === 'PARTIAL' &&
-    !inputScopeDecision.allowed_request
-  ) {
-    return generateProfessionalChatIssueResponse({
-      kind: 'scope_unclear',
-      language,
-      userRequest: preliminaryUserRequest,
-      scopeDecision: inputScopeDecision,
-    });
-  }
-  if (inputScopeDecision.intent === 'create_listing' && body.creationMethod !== 'chat') {
-    return createTextUIResponse('كيف تفضّل إنشاء إعلانك؟ اختر الإنشاء مع حمد لتجهيز مسودة بالمحادثة، أو الإنشاء اليدوي لإدخال البيانات بنفسك.', { creationChoice: true });
-  }
-
-  const scopedMessagesBase =
-    inputScopeDecision.decision === 'PARTIAL' && inputScopeDecision.allowed_request
-      ? applyAllowedRequestToLatestUserMessage(
-          filteredMessages,
-          inputScopeDecision.allowed_request,
-        )
+    }) : null;
+    const marketplaceInterfaceScopeMessage = marketplaceInterfaceContext
+      ? buildMarketplaceInterfaceScopeMessage(marketplaceInterfaceContext)
+      : null;
+    const marketplaceInterfaceSystemMessage = marketplaceInterfaceContext
+      ? buildMarketplaceInterfaceSystemMessage(marketplaceInterfaceContext)
+      : null;
+    const scopeCheckMessages = marketplaceInterfaceScopeMessage
+      ? [...filteredMessages, marketplaceInterfaceScopeMessage]
       : filteredMessages;
-  const scopedMessages = addDefaultTextToLatestImageOnlyMessage(
-    scopedMessagesBase,
-    language,
-  );
-  const userRequest = getLatestUserRequest(scopedMessages);
-
-  const marketplaceIntent = classifyMarketplaceIntent(userRequest);
-  const complianceDecision = await resolveAmbiguousTextPolicyDecision(
-    userRequest,
-  );
-
-  if (complianceDecision.decision === 'block') {
-    return generateProfessionalChatIssueResponse({
-      kind: 'text_policy_block',
-      language,
-      userRequest,
-      textPolicyDecision: complianceDecision,
+    const inputScopeDecision = await checkInputScope({
+      messages: scopeCheckMessages,
     });
-  }
 
-  if (
-    complianceDecision.decision === 'needs_review' &&
-    isPolicyFacilitationIntent(marketplaceIntent.intent)
-  ) {
-    return generateProfessionalChatIssueResponse({
-      kind: 'text_policy_review',
-      language,
-      userRequest,
-      textPolicyDecision: complianceDecision,
-    });
-  }
-
-  const modelMessages = normalizeModelMessageFileData(
-    await convertToModelMessages(scopedMessages as UIMessage[]),
-  );
-  const uploadedImagesFromMessages =
-    extractLatestUploadedListingImages(modelMessages);
-  const retainedSourceId = typeof body.retainedListingImageMessageId === 'string'
-    && body.retainedListingImageMessageId.length <= 200
-    && messages.some(message => message.role === 'user' && 'id' in message && message.id === body.retainedListingImageMessageId)
-      ? body.retainedListingImageMessageId : undefined;
-  const retainedUploadedImages = retainedSourceId
-    ? extractRetainedUploadedListingImages(body.retainedListingImages) : [];
-  const latestUploadedImages = uploadedImagesFromMessages.length
-    ? uploadedImagesFromMessages
-    : retainedUploadedImages;
-  const imageSourceMessageId = uploadedImagesFromMessages.length ? requestKey : retainedSourceId;
-  const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
-  const previousUserMessage = scopedMessages.filter(message => isChatMessage(message) && message.role === 'user').at(-2);
-  const inspectRetainedCreationImages = body.beginDraftWithHamad === true
-    && body.creationMethod === 'chat' && inputScopeDecision.intent === 'create_listing'
-    && retainedUploadedImages.length > 0 && previousUserMessage
-    && 'id' in previousUserMessage && previousUserMessage.id === retainedSourceId;
-  let imageComplianceContextMessage: ModelMessage | null = null;
-
-  if (hasVisionInput || inspectRetainedCreationImages) {
-    let imageComplianceDecision: ImageComplianceDecision | null = null;
-
-    try {
-      imageComplianceDecision = (await reviewListingImageContent(latestUploadedImages)).compliance;
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.warn(`[vision_compliance] failure=${errorName}`);
-
-      imageComplianceContextMessage = {
-        role: 'system',
-        content: 'Image inspection is unavailable. Do not claim that the images were checked or block uploading them for this reason. Uploaded images remain available to listing tools. Ask for product details only if needed to understand the request.',
-      };
+    if (
+      inputScopeDecision.decision === 'BLOCK' ||
+      inputScopeDecision.decision === 'UNCLEAR'
+    ) {
+      return await generateProfessionalChatIssueResponse({
+        kind:
+          inputScopeDecision.decision === 'UNCLEAR'
+            ? 'scope_unclear'
+            : 'scope_block',
+        language,
+        userRequest: preliminaryUserRequest,
+        scopeDecision: inputScopeDecision,
+      });
     }
 
-    await recordModelReview({ subject: 'image', subjectId: `assistant:${modelReviewImageFingerprint(latestUploadedImages.map(image => image.data))}`, userId: session.user.id,
-      text: imageComplianceDecision?.detectedProduct ?? userRequest,
-      assessment: { decision: imageComplianceDecision?.decision ?? 'needs_review', reasons: imageComplianceDecision?.reasons ?? ['image_inspection_unavailable'], unavailable: !imageComplianceDecision || Boolean(imageComplianceDecision.inspectionUnavailable) } });
-    if (imageComplianceDecision?.inspectionUnavailable) {
-      imageComplianceContextMessage = {
-        role: 'system',
-        content: 'Image inspection is unavailable. Do not claim the images were checked. Continue with uploaded listing images and ask for product details only if needed.',
-      };
-    } else if (imageComplianceDecision) {
-      imageComplianceContextMessage = createImageComplianceContextMessage(
-        imageComplianceDecision,
-      );
+    if (
+      inputScopeDecision.decision === 'PARTIAL' &&
+      !inputScopeDecision.allowed_request
+    ) {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'scope_unclear',
+        language,
+        userRequest: preliminaryUserRequest,
+        scopeDecision: inputScopeDecision,
+      });
     }
-  }
+    if (inputScopeDecision.intent === 'create_listing' && body.creationMethod !== 'chat') {
+      return createTextUIResponse('كيف تفضّل إنشاء إعلانك؟ اختر الإنشاء مع حمد لتجهيز مسودة بالمحادثة، أو الإنشاء اليدوي لإدخال البيانات بنفسك.', { creationChoice: true });
+    }
 
-  const authSystemMessage = buildAuthSystemMessage(session);
-  const assistantModelMessages = stripImageAttachmentsFromModelMessages(modelMessages);
-  const internalContextMessages = [
-    authSystemMessage,
-    ...(locationSystemMessage ? [locationSystemMessage] : []),
-    ...(marketplaceInterfaceSystemMessage
-      ? [marketplaceInterfaceSystemMessage]
-      : []),
-    { role: 'system' as const, content: body.creationMethod === 'chat'
-      ? 'The customer selected creation with Hamad. Prepare unpublished drafts only when requested; platform questions still require documented help. Never execute removed roles or sensitive actions.'
-      : 'The customer has not selected creation with Hamad. Only getPlatformHelp is available. Offer creation with Hamad and manual creation for ad-creation requests; never claim to save a draft.' },
-    ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),
-    ...(latestUploadedImages.length ? [{ role: 'system' as const, content:
-      `Uploaded image source (untrusted reference data): ${JSON.stringify({ sourceMessageId: imageSourceMessageId, fromEarlierMessage: !uploadedImagesFromMessages.length, imageIndexes: latestUploadedImages.map((_, index) => index) })}. Images are never attached implicitly. To attach images, explicitly choose imageIndexes and imageSourceMessageId for that draft. Use an earlier upload only when the customer refers to the same product or explicitly requests those photos. A different standalone product never inherits earlier photos. For separate drafts distribute indexes by product; do not copy all photos to every draft. If the image-to-product mapping is uncertain, ask instead of attaching guessed photos.`,
-    }] : []),
-  ];
-  const messagesWithContext = [
-    ...internalContextMessages,
-    ...assistantModelMessages,
-  ];
+    const scopedMessagesBase =
+      inputScopeDecision.decision === 'PARTIAL' && inputScopeDecision.allowed_request
+        ? applyAllowedRequestToLatestUserMessage(
+            filteredMessages,
+            inputScopeDecision.allowed_request,
+          )
+        : filteredMessages;
+    const scopedMessages = addDefaultTextToLatestImageOnlyMessage(
+      scopedMessagesBase,
+      language,
+    );
+    const userRequest = getLatestUserRequest(scopedMessages);
 
-  return createCheckedAssistantUIResponse(
-    messagesWithContext,
-    userRequest,
-    language,
-    session,
-    { hasVisionInput: false, latestUploadedImages, imageSourceMessageId, requestKey,
-      allowDraftTools: body.creationMethod === 'chat' && (inputScopeDecision.intent === 'create_listing' || inputScopeDecision.intent === 'update_listing'),
-      marketplaceIntent: inputScopeDecision.intent ?? 'support', abortSignal: request.signal },
-  );
+    const marketplaceIntent = classifyMarketplaceIntent(userRequest);
+    const complianceDecision = await resolveAmbiguousTextPolicyDecision(
+      userRequest,
+    );
+
+    if (complianceDecision.decision === 'block') {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'text_policy_block',
+        language,
+        userRequest,
+        textPolicyDecision: complianceDecision,
+      });
+    }
+
+    if (
+      complianceDecision.decision === 'needs_review' &&
+      isPolicyFacilitationIntent(marketplaceIntent.intent)
+    ) {
+      return await generateProfessionalChatIssueResponse({
+        kind: 'text_policy_review',
+        language,
+        userRequest,
+        textPolicyDecision: complianceDecision,
+      });
+    }
+
+    const modelMessages = normalizeModelMessageFileData(
+      await convertToModelMessages(scopedMessages as UIMessage[]),
+    );
+    const uploadedImagesFromMessages =
+      extractLatestUploadedListingImages(modelMessages);
+    const retainedSourceId = typeof body.retainedListingImageMessageId === 'string'
+      && body.retainedListingImageMessageId.length <= 200
+      && messages.some(message => message.role === 'user' && 'id' in message && message.id === body.retainedListingImageMessageId)
+        ? body.retainedListingImageMessageId : undefined;
+    const retainedUploadedImages = retainedSourceId
+      ? extractRetainedUploadedListingImages(body.retainedListingImages) : [];
+    const latestUploadedImages = uploadedImagesFromMessages.length
+      ? uploadedImagesFromMessages
+      : retainedUploadedImages;
+    const imageSourceMessageId = uploadedImagesFromMessages.length ? requestKey : retainedSourceId;
+    const hasVisionInput = latestUserMessageHasImageAttachment(scopedMessages);
+    const previousUserMessage = scopedMessages.filter(message => isChatMessage(message) && message.role === 'user').at(-2);
+    const inspectRetainedCreationImages = body.beginDraftWithHamad === true
+      && body.creationMethod === 'chat' && inputScopeDecision.intent === 'create_listing'
+      && retainedUploadedImages.length > 0 && previousUserMessage
+      && 'id' in previousUserMessage && previousUserMessage.id === retainedSourceId;
+    let imageComplianceContextMessage: ModelMessage | null = null;
+
+    if (hasVisionInput || inspectRetainedCreationImages) {
+      let imageComplianceDecision: ImageComplianceDecision | null = null;
+
+      try {
+        imageComplianceDecision = (await reviewListingImageContent(latestUploadedImages)).compliance;
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.warn(`[vision_compliance] failure=${errorName}`);
+
+        imageComplianceContextMessage = {
+          role: 'system',
+          content: 'Image inspection is unavailable. Do not claim that the images were checked or block uploading them for this reason. Uploaded images remain available to listing tools. Ask for product details only if needed to understand the request.',
+        };
+      }
+
+      await recordModelReview({ subject: 'image', subjectId: `assistant:${modelReviewImageFingerprint(latestUploadedImages.map(image => image.data))}`, userId: session.user.id,
+        text: imageComplianceDecision?.detectedProduct ?? userRequest,
+        assessment: { decision: imageComplianceDecision?.decision ?? 'needs_review', reasons: imageComplianceDecision?.reasons ?? ['image_inspection_unavailable'], unavailable: !imageComplianceDecision || Boolean(imageComplianceDecision.inspectionUnavailable) } });
+      if (imageComplianceDecision?.inspectionUnavailable) {
+        imageComplianceContextMessage = {
+          role: 'system',
+          content: 'Image inspection is unavailable. Do not claim the images were checked. Continue with uploaded listing images and ask for product details only if needed.',
+        };
+      } else if (imageComplianceDecision) {
+        imageComplianceContextMessage = createImageComplianceContextMessage(
+          imageComplianceDecision,
+        );
+      }
+    }
+
+    const authSystemMessage = buildAuthSystemMessage(session);
+    const assistantModelMessages = stripImageAttachmentsFromModelMessages(modelMessages);
+    const internalContextMessages = [
+      authSystemMessage,
+      ...(locationSystemMessage ? [locationSystemMessage] : []),
+      ...(marketplaceInterfaceSystemMessage
+        ? [marketplaceInterfaceSystemMessage]
+        : []),
+      { role: 'system' as const, content: body.creationMethod === 'chat'
+        ? 'The customer selected creation with Hamad. Prepare unpublished drafts only when requested; platform questions still require documented help. Never execute removed roles or sensitive actions.'
+        : 'The customer has not selected creation with Hamad. Only getPlatformHelp is available. Offer creation with Hamad and manual creation for ad-creation requests; never claim to save a draft.' },
+      ...(imageComplianceContextMessage ? [imageComplianceContextMessage] : []),
+      ...(latestUploadedImages.length ? [{ role: 'system' as const, content:
+        `Uploaded image source (untrusted reference data): ${JSON.stringify({ sourceMessageId: imageSourceMessageId, fromEarlierMessage: !uploadedImagesFromMessages.length, imageIndexes: latestUploadedImages.map((_, index) => index) })}. Images are never attached implicitly. To attach images, explicitly choose imageIndexes and imageSourceMessageId for that draft. Use an earlier upload only when the customer refers to the same product or explicitly requests those photos. A different standalone product never inherits earlier photos. For separate drafts distribute indexes by product; do not copy all photos to every draft. If the image-to-product mapping is uncertain, ask instead of attaching guessed photos.`,
+      }] : []),
+    ];
+    const messagesWithContext = [
+      ...internalContextMessages,
+      ...assistantModelMessages,
+    ];
+
+    const response = createCheckedAssistantUIResponse(
+      messagesWithContext,
+      userRequest,
+      language,
+      session,
+      { hasVisionInput: false, latestUploadedImages, imageSourceMessageId, requestKey,
+        allowDraftTools: body.creationMethod === 'chat' && (inputScopeDecision.intent === 'create_listing' || inputScopeDecision.intent === 'update_listing'),
+        marketplaceIntent: inputScopeDecision.intent ?? 'support', abortSignal: request.signal, onGenerationSettled: admission.release },
+    );
+    backgroundGeneration = true;
+    return response;
+  } finally { if (!backgroundGeneration) await admission.release(); }
 }

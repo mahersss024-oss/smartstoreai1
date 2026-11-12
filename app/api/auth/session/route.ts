@@ -9,6 +9,7 @@ import {
   getAuthSession,
   getCommissionAgreement,
   isConfiguredAdminEmail,
+  isSessionVersionCurrent,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
@@ -43,11 +44,12 @@ export async function GET(request: Request) {
           picture: true,
           role: true,
           deletedAt: true,
+          sessionVersion: true,
           lastActiveAt: true,
         },
       });
 
-      if (!profile || profile.deletedAt) {
+      if (!profile || profile.deletedAt || !isSessionVersionCurrent(session, profile)) {
         return Response.json(
           {
             authenticated: false,

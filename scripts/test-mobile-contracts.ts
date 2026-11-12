@@ -24,7 +24,7 @@ function isolatedEnvironment(contextHash: string): NodeJS.ProcessEnv {
     for (const match of readFileSync(join(root, file), 'utf8').matchAll(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=/gm)) keys.add(match[1]);
   }
   for (const name of keys) {
-    if (/^(DATABASE_URL$|DIRECT_URL$|SHADOW_DATABASE_URL$|SMARTSTORE_(OBJECT_STORAGE|EVIDENCE_STORAGE|VAPID|IMAGE_WORKER|DIRECT_IMAGE|IMAGE_INTAKE|RUN_DB_MIGRATIONS)|CLOUDFLARE_|R2_|S3_|AWS_|UPSTASH_|FIREBASE_|APNS_|GOOGLE_|APPLE_)/.test(name)) env[name] = '';
+    if (/^(DATABASE_URL$|DIRECT_URL$|SHADOW_DATABASE_URL$|SMARTSTORE_(OBJECT_STORAGE|EVIDENCE_STORAGE|IMAGE_RECOVERY|VAPID|IMAGE_WORKER|DIRECT_IMAGE|IMAGE_INTAKE|RUN_DB_MIGRATIONS)|CLOUDFLARE_|R2_|S3_|AWS_|UPSTASH_|FIREBASE_|APNS_|GOOGLE_|APPLE_)/.test(name)) env[name] = '';
   }
   return { ...env, CI: '1', NODE_ENV: 'test', AUTH_SECRET: 'isolated-mobile-contract-run-only',
     DEEPSEEK_API_KEY: 'test-model-placeholder', SMARTSTORE_MARKETPLACE_STORE: 'file',

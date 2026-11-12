@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import type { StaffMutationGuard } from '@/lib/auth/staff-mutation';
 import { prisma } from '@/lib/db/prisma';
 
 export type ReportNotification = {
@@ -53,11 +54,13 @@ export async function acknowledgeReportNotification(
   caseId: string,
   actorId: string,
   database: PrismaClient = prisma,
+  beforeMutation?: StaffMutationGuard,
 ) {
   return database.$transaction(async (tx) => {
     if (caseId.startsWith('model-review-')) {
       const review = await tx.adminAuditLog.findUnique({ where: { id: caseId }, select: { targetType: true, adminId: true } });
       if (review?.targetType !== 'ModelReview' || review.adminId !== null) return false;
+      await beforeMutation?.(tx);
       await tx.adminAuditLog.createMany({ data: [{ id: `${caseId}.read`, adminId: actorId, action: 'review_report', targetType: 'ModelReviewRead', targetId: caseId, metadata: { scope: 'shared' } }], skipDuplicates: true });
       return true;
     }
@@ -87,6 +90,7 @@ export async function acknowledgeReportNotification(
       where: { caseId, action: 'notification.viewed' },
       select: { id: true },
     });
+    await beforeMutation?.(tx);
     if (!viewed)
       await tx.evidenceEvent.create({
         data: {

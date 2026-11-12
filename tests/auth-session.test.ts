@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { prisma } from '@/lib/db/prisma';
+import { mockDatabaseMethod } from './helpers/mock-database-method';
 
 import {
   hasPlatformOwnerAccess,
@@ -146,12 +148,18 @@ test('verified authorization fails closed for stale role cookies in database mod
   }
 });
 
-test('configured admin emails keep verified admin access', async () => {
+test('configured owner keeps privileges with an active current database session, but deactivation and restored old sessions fail closed', async t => {
   const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
   process.env.SMARTSTORE_ADMIN_EMAILS = 'owner@example.com';
 
+  const originalDatabase = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = 'postgresql://fixture.invalid/not-used';
+  let account = { role: 'user', deletedAt: null as Date | null, sessionVersion: 0 };
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => account);
+  t.after(() => { if (originalDatabase === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = originalDatabase; });
+  const ownerSession = { user: { id: 'google:owner', email: 'owner@example.com' }, issuedAt: 1, expiresAt: Math.floor(Date.now()/1000) + 60 };
   try {
     assert.equal(
       await hasVerifiedAdminAccess({
@@ -161,6 +169,11 @@ test('configured admin emails keep verified admin access', async () => {
       }),
       true,
     );
+    account = { ...account, deletedAt: new Date() };
+    assert.equal(await hasVerifiedAdminAccess(ownerSession), false);
+    account = { ...account, deletedAt: null, sessionVersion: 1 };
+    assert.equal(await hasVerifiedAdminAccess(ownerSession), false);
+    assert.equal(await hasVerifiedAdminAccess({ ...ownerSession, user: { ...ownerSession.user, sessionVersion: 1 } }), true);
   } finally {
     if (originalStore === undefined) {
       delete process.env.SMARTSTORE_MARKETPLACE_STORE;
@@ -211,11 +224,15 @@ test('only the configured owner email is treated as the platform owner', () => {
   }
 });
 
-test('appointed admins and moderators never pass the platform owner gate', async () => {
+test('appointed admins and moderators never pass the platform owner gate', async t => {
   const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
   const originalAdminEmails = process.env.SMARTSTORE_ADMIN_EMAILS;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'database';
   process.env.SMARTSTORE_ADMIN_EMAILS = 'owner@example.com';
+  const originalDatabase = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = 'postgresql://fixture.invalid/not-used';
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ role: 'user', deletedAt: null, sessionVersion: 0 }));
+  t.after(() => { if (originalDatabase === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = originalDatabase; });
 
   try {
     const appointedAdmin = {

@@ -487,3 +487,57 @@ for (const failure of ["http", "malformed", "oversized", "incomplete", "network"
     assert.equal(JSON.stringify(f.logs).includes(f.env.IMAGE_WORKER_SECRET), false);
   });
 }
+
+test("DLQ recovery processes a valid remaining attempt without resetting server processing limits", async () => {
+  const f = await fixture();
+  f.message.attempts = 5;
+  await handleUploadMessage(f.message, f.env, { ...f.effects, recovery: true });
+  assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.callbacks.map(call => call.action), ["claim", "complete"]);
+  assert.equal(f.callbacks[0].body.terminal, undefined);
+});
+
+test("later DLQ recovery deliveries terminalize through claim without transforming or deleting before commit", async () => {
+  const f = await fixture();
+  f.message.attempts = 6;
+  f.setClaim({ action: "discard", source: { key: SOURCE }, targets: TARGETS });
+  await handleUploadMessage(f.message, f.env, { ...f.effects, recovery: true });
+  assert.deepEqual(f.callbacks.map(call => call.body), [{ terminal: "delivery_exhausted" }]);
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.reads.length, 0);
+  assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.deleted.sort(), [SOURCE, ...Object.values(TARGETS)].sort());
+  assert.equal(f.logs[0].event, "image_pipeline_delivery_exhausted");
+});
+
+test("DLQ terminal callback conflicts preserve every object and retry without stealing a live lease", async () => {
+  const f = await fixture();
+  f.message.attempts = 6;
+  f.effects.fetch = async () => new Response(null, { status: 409 });
+  await handleUploadMessage(f.message, f.env, { ...f.effects, recovery: true });
+  assert.equal(f.message.acknowledgements, 0);
+  assert.deepEqual(f.deleted, []);
+  assert.deepEqual(f.message.retries, [{ delaySeconds: 300 }]);
+});
+
+test("final unavailable DLQ terminal callbacks are observable and preserve inputs for the hourly expiry janitor", async () => {
+  const f = await fixture();
+  f.message.attempts = 9;
+  f.effects.fetch = async () => { throw new Error("server offline"); };
+  await handleUploadMessage(f.message, f.env, { ...f.effects, recovery: true });
+  assert.equal(f.message.acknowledgements, 0);
+  assert.deepEqual(f.deleted, []);
+  assert.deepEqual(f.message.retries, [{ delaySeconds: 300 }]);
+  assert.ok(f.logs.some(log => log.event === "image_pipeline_recovery_exhausted"));
+});
+
+test("queue entry point recognizes the DLQ and selects terminal-only recovery after its processing phase", async t => {
+  const f = await fixture();
+  f.message.attempts = 6;
+  f.setClaim({ action: "discard", source: { key: SOURCE }, targets: TARGETS });
+  t.mock.method(globalThis, "fetch", f.effects.fetch);
+  t.mock.method(console, "warn", () => {});
+  await worker.queue({ queue: "souqhamad-image-uploads-dlq", messages: [f.message] }, f.env);
+  assert.deepEqual(f.callbacks[0].body, { terminal: "delivery_exhausted" });
+  assert.equal(f.message.acknowledgements, 1);
+});

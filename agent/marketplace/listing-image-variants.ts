@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import type { Metadata } from 'sharp';
+import { withImageProcessingCapacity, imageProcessingTimeoutSeconds } from './image-processing-capacity';
 
 export const listingOriginalMaxDimension = 1800;
 export const listingDisplayMaxDimension = 900;
@@ -111,7 +112,7 @@ async function readSecureMetadata(input: {
       animated: true,
       failOn: 'warning',
       limitInputPixels: listingImageMaxInputPixels,
-    }).metadata();
+    }).timeout({ seconds: imageProcessingTimeoutSeconds() }).metadata();
   } catch {
     throw new ListingImageSecurityError(
       'image_decode_failed',
@@ -139,7 +140,7 @@ async function readSecureMetadata(input: {
   return { detectedMediaType, width, height };
 }
 
-export async function createSanitizedListingImageOriginal(input: {
+async function createSanitizedListingImageOriginalUnchecked(input: {
   data: Uint8Array;
   mediaType: string;
   fileName?: string;
@@ -150,6 +151,7 @@ export async function createSanitizedListingImageOriginal(input: {
     failOn: 'warning',
     limitInputPixels: listingImageMaxInputPixels,
   })
+    .timeout({ seconds: imageProcessingTimeoutSeconds() })
     .rotate()
     .resize({
       width: listingOriginalMaxDimension,
@@ -171,7 +173,7 @@ export async function createSanitizedListingImageOriginal(input: {
   };
 }
 
-export async function createListingImageVariants(input: {
+async function createListingImageVariantsUnchecked(input: {
   data: Uint8Array;
   mediaType: string;
   fileName?: string;
@@ -188,6 +190,7 @@ export async function createListingImageVariants(input: {
       failOn: 'warning',
       limitInputPixels: listingImageMaxInputPixels,
     })
+      .timeout({ seconds: imageProcessingTimeoutSeconds() })
       .rotate()
       .resize({
         width: maxDimension,
@@ -213,4 +216,16 @@ export async function createListingImageVariants(input: {
   ]);
 
   return { display, thumbnail };
+}
+
+export function createSanitizedListingImageOriginal(input: {
+  data: Uint8Array; mediaType: string; fileName?: string;
+}) {
+  return withImageProcessingCapacity(() => createSanitizedListingImageOriginalUnchecked(input));
+}
+
+export function createListingImageVariants(input: {
+  data: Uint8Array; mediaType: string; fileName?: string;
+}) {
+  return withImageProcessingCapacity(() => createListingImageVariantsUnchecked(input));
 }

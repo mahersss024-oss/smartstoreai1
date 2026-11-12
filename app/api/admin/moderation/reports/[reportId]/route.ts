@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 import { actOnCaseEvidence, readCaseEvidence, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
@@ -37,6 +38,10 @@ async function enforceModerationReportMutationRateLimit(
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -90,6 +95,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     getReportStatus(parsed.data.action),
     session.user,
     parsed.data.action === 'delete_listing' ? 'deleted' : parsed.data.action === 'reject_listing' ? 'rejected' : undefined,
+    tx => assertStaffMutationAccess(tx, session, 'moderator'),
   );
 
   if (result.status === 'not_found') {
@@ -106,6 +112,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(deleteWithCurrentAccess)(request, context);
+}
+
+async function deleteWithCurrentAccess(request: Request, context: RouteContext) {
   return withEvidenceProtection(deleteReport)(request, context);
 }
 
@@ -143,9 +153,10 @@ async function deleteReport(request: Request, context: RouteContext) {
     return Response.json({ error: 'report_must_be_closed' }, { status: 409 });
   }
 
-  await prisma.$transaction([
-    prisma.report.delete({ where: { id: reportId } }),
-    prisma.adminAuditLog.create({
+  await prisma.$transaction(async tx => {
+    await assertStaffMutationAccess(tx, session, 'moderator');
+    await tx.report.delete({ where: { id: reportId } });
+    await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
         action: 'dismiss_report',
@@ -156,8 +167,8 @@ async function deleteReport(request: Request, context: RouteContext) {
           status: report.status,
         },
       },
-    }),
-  ]);
+    });
+  });
 
   return Response.json({ status: 'deleted', reportId });
 }

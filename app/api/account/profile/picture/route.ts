@@ -36,12 +36,13 @@ function shouldPersistUserProfile() {
 async function deletePreviousProfilePictureBestEffort(
   userId: string,
   picture: string | null | undefined,
+  preserveForRecovery = true,
 ) {
   const cleanup = profileImageCleanupInput(userId, picture);
   if (!cleanup) return;
 
   try {
-    await enqueueImageObjectCleanup(prisma, cleanup);
+    await enqueueImageObjectCleanup(prisma, { ...cleanup, preserveForRecovery });
     await processImageObjectCleanup(cleanup.imageId);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
@@ -200,7 +201,7 @@ export async function POST(request: Request) {
   }
 
   if (!(await verifyProfilePictureDelivery(picture))) {
-    await deletePreviousProfilePictureBestEffort(ownerId, picture);
+    await deletePreviousProfilePictureBestEffort(ownerId, picture, false);
 
     return Response.json(
       {
@@ -224,12 +225,12 @@ export async function POST(request: Request) {
       return saved;
     });
   } catch (error) {
-    await deletePreviousProfilePictureBestEffort(ownerId, picture);
+    await deletePreviousProfilePictureBestEffort(ownerId, picture, false);
     throw error;
   }
 
   if (!user) {
-    await deletePreviousProfilePictureBestEffort(ownerId, picture);
+    await deletePreviousProfilePictureBestEffort(ownerId, picture, false);
     return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
   }
 

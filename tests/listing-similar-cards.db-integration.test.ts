@@ -35,7 +35,7 @@ test('PostgreSQL similar cards rank beyond the first batch and reread only publi
     ] });
     const rows = [
       { ...base, id: referenceId, title: 'family sedan clean', attributes },
-      ...Array.from({ length: 132 }, (_, i) => ({ ...base, id: `${prefix}-1-title-${String(i).padStart(3, '0')}`, title: 'family sedan clean', attributes: {} })),
+      ...Array.from({ length: 520 }, (_, i) => ({ ...base, id: `${prefix}-1-title-${String(i).padStart(3, '0')}`, title: 'family sedan clean', attributes: {} })),
       ...strongerIds.map(id => ({ ...base, id, title: 'commuter vehicle', attributes })),
       ...(['draft', 'paused', 'sold', 'deleted'] as const).map((status, i) => ({ ...base, id: excludedIds[i], title: 'family sedan clean', attributes, status })),
       { ...base, id: `${prefix}-3-inactive`, sellerId: inactiveId, title: 'family sedan clean', attributes },

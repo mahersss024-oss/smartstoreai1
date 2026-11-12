@@ -216,7 +216,7 @@ switch ($Action) {
         Invoke-WithLocalEnvironment 'test' {
             # Bypass scripts/test.mjs so .env.local is never loaded by this command.
             foreach ($key in @([Environment]::GetEnvironmentVariables('Process').Keys)) {
-                if ($key -match '^(SMARTSTORE_(OBJECT_STORAGE|EVIDENCE_STORAGE|VAPID)|CLOUDFLARE_|UPSTASH_|FIREBASE_|APNS_|GOOGLE_|APPLE_)') {
+                if ($key -match '^(SMARTSTORE_(OBJECT_STORAGE|EVIDENCE_STORAGE|IMAGE_RECOVERY|VAPID)|CLOUDFLARE_|UPSTASH_|FIREBASE_|APNS_|GOOGLE_|APPLE_)') {
                     [Environment]::SetEnvironmentVariable($key, $null, 'Process')
                 }
             }
@@ -237,6 +237,9 @@ switch ($Action) {
                 'tests/account-integrity.db-integration.test.ts' `
                 'tests/listing-partial-edits.db-integration.test.ts' `
                 'tests/listing-similar-cards.db-integration.test.ts' `
+                'tests/search-indexes.db-integration.test.ts' `
+                'tests/image-recovery-cleanup.db-integration.test.ts' `
+                'tests/auth-chat-controls.db-integration.test.ts' `
                 'tests/conversation-metadata.db-integration.test.ts' `
                 'tests/direct-image-uploads.db-integration.test.ts' `
                 'tests/notification-account-isolation.db-integration.test.ts' `

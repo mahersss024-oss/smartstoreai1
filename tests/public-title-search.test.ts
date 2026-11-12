@@ -24,9 +24,13 @@ test('database predicate searches only title and treats wildcards and SQL as lit
   const predicate = Prisma.sql`${marketplaceTitleSearchPredicate([input, 'ايفون'])}`;
   assert.ok(predicate.text.includes('"title"'));
   assert.ok(!predicate.text.includes(input));
-  assert.ok(predicate.values.includes(input));
-  assert.ok(!/description|searchText|category|city|ILIKE|LIKE/.test(predicate.text));
-  assert.equal((predicate.text.match(/strpos/g) ?? []).length, 2);
+  assert.ok(predicate.values.includes("%!%' OR 1=1 --%"));
+  assert.ok(!/description|searchText|category|city|ILIKE/.test(predicate.text));
+  assert.equal((predicate.text.match(/ LIKE /g) ?? []).length, 2);
+  assert.equal((predicate.text.match(/ESCAPE '!'/g) ?? []).length, 2);
+  assert.ok(predicate.text.includes('public.marketplace_normalized_title'));
+  const punctuation = marketplaceTitleSearchPredicate(['100%_!\\path']);
+  assert.deepEqual(punctuation.values, ['%100!%!_!!\\path%']);
   assert.ok(predicate.text.includes(' AND '));
 });
 
@@ -102,8 +106,8 @@ test('database public search selects and paginates title matches before image hy
     assert.ok(sql.text.includes('LIMIT'));
     assert.ok(sql.text.includes('OFFSET'));
     assert.ok(!/description|searchText|category/.test(sql.text));
-    assert.ok(sql.values.includes('ايفون'));
-    assert.ok(sql.values.includes('15'));
+    assert.ok(sql.values.includes('%ايفون%'));
+    assert.ok(sql.values.includes('%15%'));
     assert.deepEqual(sql.values.slice(-3), ['الرياض', 25, 24]);
     assert.equal(reads.length, 0);
     assert.equal(analyze.mock.callCount(), 0);

@@ -8,7 +8,8 @@
   "preview_urls": false,
   "vars": {
     "SERVER_ORIGIN": "https://souqhamad.com",
-    "INTAKE_BUCKET_NAME": "souqhamad-image-intake"
+    "INTAKE_BUCKET_NAME": "souqhamad-image-intake",
+    "UPLOAD_DLQ_NAME": "souqhamad-image-uploads-dlq"
   },
   // IMAGE_WORKER_SECRET is supplied using `wrangler secret put`, never here.
   "r2_buckets": [
@@ -26,6 +27,14 @@
       "max_retries": 20,
       "max_concurrency": 2,
       "dead_letter_queue": "souqhamad-image-uploads-dlq"
+    }, {
+      // Finite automatic recovery. No DLQ cycle: after five recovery deliveries,
+      // remaining attempts only request safe terminalization from the server.
+      "queue": "souqhamad-image-uploads-dlq",
+      "max_batch_size": 1,
+      "max_batch_timeout": 1,
+      "max_retries": 8,
+      "max_concurrency": 1
     }]
   },
   "observability": { "enabled": true }

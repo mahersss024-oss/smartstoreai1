@@ -5,10 +5,11 @@ import { DELETE as deleteUser } from '@/app/api/admin/users/[userId]/route';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { activeStaffAccount, staffAccountQuery } from './helpers/staff-fixture';
 
 function environment(t: TestContext) {
   const values = {
-    SMARTSTORE_MARKETPLACE_STORE: 'database', SMARTSTORE_ADMIN_EMAILS: 'mutation-owner@example.test',
+    SMARTSTORE_MARKETPLACE_STORE: 'database', DATABASE_URL: 'postgresql://fixture:fixture@127.0.0.1:9/unused', SMARTSTORE_ADMIN_EMAILS: 'mutation-owner@example.test',
     AUTH_SECRET: 'local-admin-mutation-concurrency-only', SMARTSTORE_RATE_LIMIT_BACKEND: 'memory',
     UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
   };
@@ -16,6 +17,7 @@ function environment(t: TestContext) {
     const old = process.env[key]; process.env[key] = value;
     t.after(() => { if (old === undefined) delete process.env[key]; else process.env[key] = old; });
   }
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
   const token = createSignedSession({ id: 'mutation-owner', email: 'mutation-owner@example.test', role: 'admin' });
   return (url: string, method: string, body?: object) => new Request('https://example.test' + url, {
@@ -43,6 +45,7 @@ test('administrative partial edits merge the locked current attributes and retai
     listing = { ...listing, status: 'paused', attributes: { color: 'blue', material: 'oak' },
       compliance: { decision: 'review', humanDecision: 'block' } };
     return callback({
+      $queryRaw: staffAccountQuery('mutation-owner'),
       $executeRaw: async (sql: TemplateStringsArray) => { locks.push(sql.join('?')); return 1; },
       listing: {
         findUnique: async () => structuredClone(listing),
@@ -81,9 +84,10 @@ test('administrative permanent deletion rejects an account restored after its in
   let deletes = 0;
   let audits = 0;
   let rowLocked = false;
-  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...snapshot }));
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async ({ where }: { where: { id: string } }) => where.id === 'mutation-owner' ? { ...activeStaffAccount } : ({ ...snapshot }));
   mockDatabaseMethod(t, prisma, '$transaction', async (callback: (tx: unknown) => Promise<unknown>) => callback({
-    $executeRaw: async (sql: TemplateStringsArray) => { if (/FOR UPDATE/.test(sql.join('?'))) rowLocked = true; return 1; },
+    $queryRaw: staffAccountQuery('mutation-owner'),
+      $executeRaw: async (sql: TemplateStringsArray) => { if (/FOR UPDATE/.test(sql.join('?'))) rowLocked = true; return 1; },
     listing: { findMany: async () => [] },
     conversation: { findMany: async () => [] },
     user: {

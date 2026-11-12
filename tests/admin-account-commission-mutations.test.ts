@@ -6,16 +6,18 @@ import { PATCH as editCommission } from '@/app/api/admin/commissions/[commission
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { activeStaffAccount, staffAccountQuery } from './helpers/staff-fixture';
 
 function environment(t: TestContext) {
   for (const [key, value] of Object.entries({
-    SMARTSTORE_MARKETPLACE_STORE: 'database', SMARTSTORE_ADMIN_EMAILS: 'account-commission-owner@example.test',
+    SMARTSTORE_MARKETPLACE_STORE: 'database', DATABASE_URL: 'postgresql://fixture:fixture@127.0.0.1:9/unused', SMARTSTORE_ADMIN_EMAILS: 'account-commission-owner@example.test',
     AUTH_SECRET: 'isolated-account-commission-mutations', SMARTSTORE_RATE_LIMIT_BACKEND: 'memory',
     UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
   })) {
     const previous = process.env[key]; process.env[key] = value;
     t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
   }
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
   mockDatabaseMethod(t, prisma.user, 'upsert', async () => ({ id: 'account-commission-owner' }));
   const token = createSignedSession({ id: 'account-commission-owner', email: 'account-commission-owner@example.test' });
@@ -44,10 +46,11 @@ test('admin user audit records the locked current profile instead of its stale i
   const locks: string[] = [];
   let rowLocked = false;
   const audits: Array<{ metadata: { previous: { role: string; phoneNumber: string }; updates: { phoneNumber: string } } }> = [];
-  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => structuredClone(current));
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async ({ where }: { where: { id: string } }) => where.id === 'account-commission-owner' ? { ...activeStaffAccount } : structuredClone(current));
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
     listing: { findMany: async () => [] }, conversation: { findMany: async () => [] },
-    $executeRaw: async (sql: TemplateStringsArray) => {
+    $queryRaw: staffAccountQuery('account-commission-owner'),
+      $executeRaw: async (sql: TemplateStringsArray) => {
       const query = sql.join('?'); locks.push(query);
       if (query.includes('FOR UPDATE')) {
         // A separate completed profile/role edit occurs after the route read
@@ -85,9 +88,10 @@ test('admin user audit records the locked current profile instead of its stale i
 test('admin user update returns missing without writing or auditing when the user disappears before its row lock', async t => {
   const request = environment(t);
   const current = userFixture();
-  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => current);
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async ({ where }: { where: { id: string } }) => where.id === 'account-commission-owner' ? { ...activeStaffAccount } : current);
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    listing: { findMany: async () => [] }, conversation: { findMany: async () => [] }, $executeRaw: async () => 1,
+    listing: { findMany: async () => [] }, conversation: { findMany: async () => [] }, $queryRaw: staffAccountQuery('account-commission-owner'),
+      $executeRaw: async () => 1,
     user: { findUnique: async () => null, update: async () => assert.fail('a vanished user must not be written') },
     adminAuditLog: { create: async () => assert.fail('an unperformed edit must not be audited') },
   }));
@@ -106,6 +110,7 @@ for (const stage of ['read', 'update'] as const) {
   test(`admin commission returns 404 only when its target is missing at ${stage}`, async t => {
     const request = environment(t);
     mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+      $queryRaw: staffAccountQuery('account-commission-owner'),
       $executeRaw: async () => 1,
       commission: {
         findUnique: async () => stage === 'read' ? null : { status: 'due', listingId: 'listing' },
@@ -127,7 +132,8 @@ test('existing commission write outages and conflicts return retryable 503 inste
   let code = '';
   let reads = 0;
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async () => 1,
+    $queryRaw: staffAccountQuery('account-commission-owner'),
+      $executeRaw: async () => 1,
     commission: { findUnique: async ({ select }: { select: { listingId?: boolean } }) => {
       if (select.listingId) return { listingId: 'listing' };
       reads++; return { status: 'due' };
@@ -168,7 +174,8 @@ test('unexpected commission write and audit errors are not disguised as missing 
   const transactionFailure = knownError('P2028', 'Unexpected transaction API misuse');
   let stage: 'write' | 'audit' | 'transaction-api' = 'write';
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async () => 1,
+    $queryRaw: staffAccountQuery('account-commission-owner'),
+      $executeRaw: async () => 1,
     commission: {
       findUnique: async () => ({ status: 'due', listingId: 'listing' }),
       update: async () => {
@@ -193,7 +200,8 @@ test('successful administrative commission status update retains its response an
   let current = { id: 'existing', listingId: 'listing', sellerId: 'seller', productValue: 1000, commissionAmount: 10,
     status: 'due', paidAt: null as Date | null, createdAt: new Date(0), updatedAt: new Date(0), listing: null };
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async () => 1,
+    $queryRaw: staffAccountQuery('account-commission-owner'),
+      $executeRaw: async () => 1,
     commission: {
       findUnique: async () => ({ status: current.status, listingId: current.listingId }),
       update: async ({ data }: { data: { status: string; paidAt: Date } }) => { current = { ...current, ...data }; return current; },

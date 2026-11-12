@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { prisma } from '@/lib/db/prisma';
-import { clearSessionCookie, getAuthSession } from '@/lib/auth/session';
+import { clearSessionCookie, getAuthSession, isSessionVersionCurrent } from '@/lib/auth/session';
 import { isSameOriginApiMutationAllowed } from '@/lib/security/same-origin';
 
 const productionCanonicalUrl = 'https://souqhamad.com';
@@ -71,10 +71,10 @@ export async function proxy(request: NextRequest) {
     if (session) {
       const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { deletedAt: true },
+        select: { deletedAt: true, sessionVersion: true },
       });
 
-      if (!user || user.deletedAt) {
+      if (!user || user.deletedAt || !isSessionVersionCurrent(session, user)) {
         const response = NextResponse.json(
           { error: 'auth_required' },
           { status: 401 },

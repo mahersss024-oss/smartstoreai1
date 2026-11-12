@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess } from '@/lib/auth/staff-mutation';
 import { createHash } from 'node:crypto';
 import { after } from 'next/server';
 import type { Prisma } from '@prisma/client';
@@ -193,6 +194,7 @@ export async function actOnCaseEvidence(sourceType: EvidenceSource, sourceId: st
     if (!current) return { error: 'evidence_not_found', status: 404 };
     if (current.status === 'disposed') return { error: 'evidence_disposed', status: 409 };
     if (current.status === 'disposing' && action !== 'evidence_dispose') return { error: 'evidence_disposal_in_progress', status: 409 };
+    await assertStaffMutationAccess(tx, session, action === 'evidence_dispose' ? 'owner' : action === 'evidence_retry' ? 'moderator' : 'admin');
     if (action === 'evidence_dispose') {
       // This action is restricted above to the configured platform owner and
       // requires the existing reason and explicit destructive confirmation.

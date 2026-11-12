@@ -1,59 +1,33 @@
 import { getAuthSession } from '@/lib/auth/session';
-import { enforceApiRateLimit } from '@/lib/api/rate-limit';
-import {
-  getRealtimeEventsSince,
-  subscribeRealtimeEvents,
-} from '@/lib/realtime/event-bus';
+import { enforceApiRateLimit, getApiRateLimitClientId } from '@/lib/api/rate-limit';
+import { acquireRealtimeConnection, realtimeConnectionLifetimeMs } from '@/lib/realtime/stream-limits';
+import { getRealtimeEventsSince, subscribeRealtimeEvents } from '@/lib/realtime/event-bus';
 import type { RealtimeEvent } from '@/lib/realtime/events';
 import { resolveRealtimeSubscriberContext } from '@/lib/realtime/authorization';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Close idle SSE connections so serverless/edge runtimes and proxies that cap
-// long-lived requests can recycle them cleanly. Clients reconnect automatically
-// and replay with Last-Event-ID.
-const maxConnectionLifetimeMs = Number.parseInt(
-  process.env.SMARTSTORE_SSE_MAX_LIFETIME_MS ?? '',
-  10,
-);
-const connectionLifetimeMs = Number.isFinite(maxConnectionLifetimeMs)
-  ? Math.max(15_000, maxConnectionLifetimeMs)
-  : 5 * 60_000;
+const maxBufferedBytes = 64 * 1024;
+const maxPendingBytes = 128 * 1024;
 
 function parseLastEventId(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const parsed = value ? Number.parseInt(value, 10) : NaN;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
-
 function toSseEvent(event: RealtimeEvent) {
   return `id: ${event.id}\nevent: smartstore\ndata: ${JSON.stringify(event)}\n\n`;
 }
-
 function toSseHeartbeat() {
-  return `event: heartbeat\ndata: ${JSON.stringify({
-    at: new Date().toISOString(),
-  })}\n\n`;
+  return `event: heartbeat\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`;
 }
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
   const rateLimitResponse = await enforceApiRateLimit(request, {
-    namespace: 'realtime_stream',
-    actorId: session?.user.id,
-    maxRequests: 30,
-    windowMs: 60_000,
+    namespace: 'realtime_stream', actorId: session?.user.id,
+    maxRequests: 30, windowMs: 60_000,
   });
-
-  if (rateLimitResponse) {
-    return rateLimitResponse;
-  }
-
+  if (rateLimitResponse) return rateLimitResponse;
   const context = await resolveRealtimeSubscriberContext(session).catch(() => undefined);
   if (context === undefined) return Response.json({ error: 'realtime_unavailable' }, {
     status: 503, headers: { 'Cache-Control': 'private, no-store' },
@@ -62,126 +36,95 @@ export async function GET(request: Request) {
     status: 401, headers: { 'Cache-Control': 'private, no-store' },
   });
   const url = new URL(request.url);
-  const lastEventId =
-    parseLastEventId(request.headers.get('last-event-id')) ??
+  const lastEventId = parseLastEventId(request.headers.get('last-event-id')) ??
     parseLastEventId(url.searchParams.get('lastEventId'));
-  let cleanup: (() => void) | null = null;
-
+  const releaseConnection = acquireRealtimeConnection(context.userId
+    ? `user:${context.userId}` : `client:${getApiRateLimitClientId(request)}`);
+  if (!releaseConnection) return Response.json({ error: 'realtime_capacity_exceeded' }, {
+    status: 429, headers: { 'Cache-Control': 'private, no-store', 'Retry-After': '5' },
+  });
+  let cleanup: (() => void) | undefined;
+  let flushStream: () => Promise<void> = async () => {};
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const encoder = new TextEncoder();
-      let closed = false;
-      let unsubscribe: (() => void) | null = null;
-      let heartbeatId: ReturnType<typeof setInterval> | null = null;
-      let lifetimeId: ReturnType<typeof setTimeout> | null = null;
-      const pending: Array<RealtimeEvent | null> = [];
-      let flushing = false;
-
-      const write = (value: string) => {
-        if (closed) {
-          return;
-        }
-
-        controller.enqueue(encoder.encode(value));
-      };
-
+      // Replay holds references to the already bounded retained log. Encode it
+      // incrementally as the reader pulls, instead of flooding the live queue.
+      const replay = getRealtimeEventsSince(lastEventId, context);
+      let replayIndex = 0;
+      let closed = false, flushing = false;
+      const pending: Uint8Array[] = [];
+      let pendingBytes = 0;
+      let heldFrame: Uint8Array | undefined;
       const close = () => {
-        if (closed) {
-          return;
-        }
-
+        if (closed) return;
         closed = true;
-        pending.length = 0;
-
-        if (heartbeatId !== null) {
-          clearInterval(heartbeatId);
-          heartbeatId = null;
-        }
-
-        if (lifetimeId !== null) {
-          clearTimeout(lifetimeId);
-          lifetimeId = null;
-        }
+        pending.length = replay.length = 0;
+        pendingBytes = 0;
+        heldFrame = undefined;
+        clearInterval(heartbeat);
+        clearTimeout(lifetime);
         unsubscribe?.();
-        unsubscribe = null;
-        request.signal.removeEventListener('abort', onAbort);
-
-        try {
-          controller.close();
-        } catch {
-          // Stream may already be closed by the runtime.
-        }
+        request.signal.removeEventListener('abort', close);
+        releaseConnection();
+        try { controller.close(); } catch { /* Runtime may have cancelled first. */ }
       };
-
-      const onAbort = () => {
-        close();
+      const hasFrames = () => Boolean(heldFrame || replayIndex < replay.length || pending.length);
+      const nextFrame = () => {
+        if (heldFrame) return heldFrame;
+        if (replayIndex < replay.length) return encoder.encode(toSseEvent(replay[replayIndex++]));
+        const frame = pending.shift();
+        if (frame) pendingBytes -= frame.byteLength;
+        return frame;
       };
-
       const flush = async () => {
-        if (flushing || closed) return;
+        if (closed || flushing) return;
         flushing = true;
         try {
-          while (!closed && pending.length) {
-            // A synchronous batch shares one current authorization decision;
-            // later arrivals wait for the next check. Bound queued work so an
-            // unavailable database cannot accumulate an unlimited event list.
-            const batch = pending.splice(0, 100);
+          while (!closed && hasFrames() && (controller.desiredSize ?? 0) > 0) {
+            // Recheck account deletion, session expiry and current administrator
+            // role before every batch, including a resumed backpressured replay.
             const current = await resolveRealtimeSubscriberContext(session);
             if (closed) return;
-            if (!current || current.userId !== context.userId || current.isAdmin !== context.isAdmin) {
-              close();
-              return;
+            if (!current || current.userId !== context.userId || current.isAdmin !== context.isAdmin) { close(); return; }
+            for (let count = 0; count < 32 && !closed && hasFrames(); count++) {
+              const frame = nextFrame();
+              if (!frame) break;
+              if (frame.byteLength > maxBufferedBytes) { close(); return; }
+              if ((controller.desiredSize ?? 0) < frame.byteLength) { heldFrame = frame; return; }
+              heldFrame = undefined;
+              controller.enqueue(frame);
             }
-            for (const event of batch) write(event ? toSseEvent(event) : toSseHeartbeat());
           }
-        } catch {
-          close();
-        } finally {
-          flushing = false;
-        }
+        } catch { close(); }
+        finally { flushing = false; }
       };
+      flushStream = flush;
       const sendEvent = (event: RealtimeEvent | null) => {
         if (closed) return;
-        if (pending.length >= 2000) { close(); return; }
-        pending.push(event);
+        const frame = encoder.encode(event ? toSseEvent(event) : toSseHeartbeat());
+        if (frame.byteLength > maxBufferedBytes || pending.length >= 2000 ||
+          pendingBytes + frame.byteLength > maxPendingBytes) { close(); return; }
+        pending.push(frame);
+        pendingBytes += frame.byteLength;
         void flush();
       };
-
-      write(`retry: 2000\nevent: ready\ndata: ${JSON.stringify({
-        connectedAt: new Date().toISOString(),
-      })}\n\n`);
-
-      const replayEvents = getRealtimeEventsSince(lastEventId, context);
-
-      for (const event of replayEvents) {
-        sendEvent(event);
-      }
-
-      unsubscribe = subscribeRealtimeEvents(context, sendEvent);
-      heartbeatId = setInterval(() => {
-        sendEvent(null);
-      }, 15_000);
-      lifetimeId = setTimeout(() => {
-        // Graceful end-of-life close; the client reconnects and replays.
-        close();
-      }, connectionLifetimeMs);
-
-      request.signal.addEventListener('abort', onAbort, { once: true });
+      controller.enqueue(encoder.encode(`retry: 2000\nevent: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`));
+      const unsubscribe = subscribeRealtimeEvents(context, sendEvent);
+      const heartbeat = setInterval(() => sendEvent(null), 15_000);
+      // Complete before App Runner's 120-second whole-request limit.
+      const lifetime = setTimeout(close, realtimeConnectionLifetimeMs());
+      request.signal.addEventListener('abort', close, { once: true });
       cleanup = close;
+      if (request.signal.aborted) close();
+      else void flush();
     },
-    cancel() {
-      cleanup?.();
-      cleanup = null;
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  });
+    pull() { return flushStream(); },
+    cancel() { cleanup?.(); cleanup = undefined; },
+  }, { highWaterMark: maxBufferedBytes, size: value => value.byteLength });
+  return new Response(stream, { headers: {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive', 'X-Accel-Buffering': 'no',
+  } });
 }
-

@@ -262,7 +262,8 @@ test('cloud storage deletions stay behind listing permissions and retired mainte
   );
 
   assert.match(adminListingRoute, /hasVerifiedModeratorAccess/);
-  assert.match(adminListingRoute, /deleteStoredListingImagesBestEffort/);
+  assert.match(adminListingRoute, /enqueueImageObjectCleanup\(tx/);
+  assert.match(adminListingRoute, /preserveForRecovery: true/);
   assert.match(maintenanceRoute, /isPlatformOwner/);
   assert.match(maintenanceRoute, /maintenance_retired/);
   assert.doesNotMatch(maintenanceRoute, /executeMaintenanceCleanup|executeMarketReset|schedulePendingImageObjectCleanup/);
@@ -314,7 +315,8 @@ test('admin users api is server-side admin protected and audited', () => {
   assert.match(updateRoute, /requestedMode === 'permanent' && !hasOwnerLevelAdminAccess/);
   assert.match(updateRoute, /account_must_be_disabled_first/);
   assert.match(updateRoute, /deleteUserImagesBestEffort/);
-  assert.match(updateRoute, /deleteListingObject/);
+  assert.match(updateRoute, /enqueueImageObjectCleanup\(tx/);
+  assert.match(updateRoute, /processImageObjectCleanup/);
 });
 
 test('admin listing mutations are server-side protected and rate limited', () => {
@@ -333,8 +335,9 @@ test('admin listing mutations are server-side protected and rate limited', () =>
   assert.match(listingRoute, /adminAuditLog\.create/);
   assert.match(listingRoute, /listing_must_be_deleted_first/);
   assert.match(listingRoute, /include:\s*\{\s*images:\s*true,?\s*\}/);
-  assert.match(listingRoute, /deleteStoredListingImagesBestEffort\(existing\.images\)/);
-  assert.match(listingRoute, /admin_listing_storage_delete/);
+  assert.match(listingRoute, /enqueueImageObjectCleanup\(tx/);
+  assert.match(listingRoute, /preserveForRecovery: true/);
+  assert.match(listingRoute, /processImageObjectCleanup\(image\.id, cleanupDeadline\)/);
 });
 
 test('moderators can view admin listings without listing mutation controls', () => {
@@ -447,8 +450,9 @@ test('closed moderation reports can be deleted only through moderator-protected 
     assert.match(route, /adminAuditLog\.create/);
   }
 
-  assert.match(listingReportRoute, /prisma\.report\.delete/);
-  assert.match(conversationReportRoute, /prisma\.userReport\.delete/);
+  assert.match(listingReportRoute, /tx\.report\.delete/);
+  assert.match(conversationReportRoute, /tx\.userReport\.delete/);
+  for (const route of [listingReportRoute, conversationReportRoute]) assert.match(route, /assertStaffMutationAccess\(tx/);
 });
 
 test('conversation reports stay compact until an administrator opens details', () => {
@@ -693,7 +697,8 @@ test('soft-deleted accounts remain visible to the owner and lose API access', ()
 
   assert.match(usersPage, /includeDeleted/);
   assert.match(usersPage, /حساب معطّل/);
-  assert.match(proxy, /select: \{ deletedAt: true \}/);
+  assert.match(proxy, /select: \{ deletedAt: true, sessionVersion: true \}/);
+  assert.match(proxy, /isSessionVersionCurrent/);
   assert.match(proxy, /clearSessionCookie/);
   assert.match(sessionRoute, /profile\.deletedAt/);
   assert.match(usersPage, /تعطيل الحساب/);

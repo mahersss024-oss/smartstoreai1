@@ -3,6 +3,7 @@ import {
   isAdminSession,
   isConfiguredAdminEmail,
   isModeratorSession,
+  isSessionVersionCurrent,
 } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 
@@ -47,12 +48,8 @@ export async function getVerifiedRoleForSession(
     return null;
   }
 
-  if (isPlatformOwner(session)) {
-    return 'owner';
-  }
-
   if (!shouldVerifyRoleFromDatabase()) {
-    return normalizeStoredRole(session.user.role);
+    return isPlatformOwner(session) ? 'owner' : normalizeStoredRole(session.user.role);
   }
 
   if (!process.env.DATABASE_URL?.trim()) {
@@ -63,14 +60,14 @@ export async function getVerifiedRoleForSession(
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { role: true, deletedAt: true },
+      select: { role: true, deletedAt: true, sessionVersion: true },
     });
 
-    if (!user || user.deletedAt) {
+    if (!user || user.deletedAt || !isSessionVersionCurrent(session, user)) {
       return null;
     }
 
-    return normalizeStoredRole(user.role);
+    return isPlatformOwner(session) ? 'owner' : normalizeStoredRole(user.role);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.warn(`[authorization] role_lookup_failed=${errorName}`);
@@ -85,10 +82,6 @@ export async function hasPlatformOwnerAccess(session: AuthSession | null) {
 
 /** Owner or appointed admin. */
 export async function hasVerifiedAdminAccess(session: AuthSession | null) {
-  if (isPlatformOwner(session)) {
-    return true;
-  }
-
   if (!shouldVerifyRoleFromDatabase()) {
     return isAdminSession(session);
   }
@@ -100,10 +93,6 @@ export async function hasVerifiedAdminAccess(session: AuthSession | null) {
 
 /** Owner, appointed admin or appointed moderator. */
 export async function hasVerifiedModeratorAccess(session: AuthSession | null) {
-  if (isPlatformOwner(session)) {
-    return true;
-  }
-
   if (!shouldVerifyRoleFromDatabase()) {
     return isModeratorSession(session);
   }

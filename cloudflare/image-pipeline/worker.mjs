@@ -20,6 +20,8 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOURCE_KEY = /^intake\/v1\/([A-Za-z0-9_-]{1,128})\.jpg$/;
 const CREATE_ACTIONS = new Set(["PutObject", "CopyObject", "CompleteMultipartUpload"]);
 const PRIVATE_METADATA = { cacheControl: "private, no-store" };
+export const DLQ_PROCESSING_DELIVERIES = 5;
+export const DLQ_MAX_RETRIES = 8;
 const CLAIM_TIMEOUT_MS = 10_000;
 const COMPLETE_TIMEOUT_MS = 180_000;
 const CLEANUP_TIMEOUT_MS = 120_000;
@@ -282,6 +284,17 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
     const origin = validateConfiguration(env);
     upload = parseUploadEvent(message.body, env.INTAKE_BUCKET_NAME);
     if (!upload) { message.ack(); return; }
+    if (dependencies.recovery === true && (message.attempts ?? 1) > DLQ_PROCESSING_DELIVERIES) {
+      // Final recovery deliveries only reconcile a durable terminal state. The
+      // server refuses a live lease/promotion, so this never cancels another writer.
+      const terminal = await callback(fetcher, origin, env, upload.uploadId, "claim", { terminal: "delivery_exhausted" });
+      validateClaim(terminal, upload);
+      if (terminal.action !== "discard") throw new PipelineError("worker_contract_invalid");
+      await cleanPrivate(env, upload, terminal.targets);
+      logger.warn(JSON.stringify({ event: "image_pipeline_delivery_exhausted", uploadId: upload.uploadId }));
+      message.ack();
+      return;
+    }
     const claim = await callback(fetcher, origin, env, upload.uploadId, "claim", { outputFormats: ["webp-v1", "jpeg-v1"] });
     validateClaim(claim, upload);
     if (claim.action === "discard") {
@@ -300,6 +313,9 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
     message.ack();
   } catch (error) {
     const code = error instanceof PipelineError ? error.code : "image_pipeline_unavailable";
+    if (dependencies.recovery === true && (message.attempts ?? 1) >= DLQ_MAX_RETRIES + 1) {
+      logger.warn(JSON.stringify({ event: "image_pipeline_recovery_exhausted", ...(upload ? { uploadId: upload.uploadId } : {}), code }));
+    }
     logger.warn(JSON.stringify({ event: "image_pipeline_retry", ...(upload ? { uploadId: upload.uploadId } : {}), code,
       ...(error instanceof PipelineError && error.upstreamStatus ? { upstreamStatus: error.upstreamStatus } : {}),
       ...(error instanceof PipelineError && error.upstreamError ? { upstreamError: error.upstreamError } : {}) }));
@@ -333,7 +349,8 @@ const imagePipelineWorker = {
   // No HTTP image/administration endpoint and no public-bucket access.
   async fetch() { return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } }); },
   async queue(batch, env) {
-    for (const message of batch.messages) await handleUploadMessage(message, env);
+    const recovery = batch.queue === (env.UPLOAD_DLQ_NAME || "souqhamad-image-uploads-dlq");
+    for (const message of batch.messages) await handleUploadMessage(message, env, { recovery });
   },
   async scheduled(_event, env) { await runScheduledCleanup(env); },
 };

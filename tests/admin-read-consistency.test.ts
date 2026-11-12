@@ -7,10 +7,11 @@ import { GET as getCommissions } from '@/app/api/admin/commissions/route';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { activeStaffAccount } from './helpers/staff-fixture';
 
 function environment(t: TestContext) {
   const values = {
-    SMARTSTORE_MARKETPLACE_STORE: 'database',
+    SMARTSTORE_MARKETPLACE_STORE: 'database', DATABASE_URL: 'postgresql://fixture:fixture@127.0.0.1:9/unused',
     SMARTSTORE_ADMIN_EMAILS: 'read-owner@example.test',
     AUTH_SECRET: 'isolated-admin-read-consistency',
   };
@@ -21,6 +22,7 @@ function environment(t: TestContext) {
       if (previous === undefined) delete process.env[key]; else process.env[key] = previous;
     });
   }
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
   const token = createSignedSession({ id: 'read-owner', email: 'read-owner@example.test' });
   return (path: string) => new Request(`https://example.test${path}`, {

@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '@/lib/api/fetch-timeout';
 import { prisma } from '@/lib/db/prisma';
 import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
 import { ImageStorageResponseError, retryImageStorage } from './image-storage-retry';
+import { archiveRecoverableImageObjects } from './image-recovery';
 
 type StoreListingObjectInput = {
   data: Uint8Array;
@@ -22,6 +23,7 @@ type DeleteListingObjectInput = {
   imageId: string;
   urls?: string[];
   requireCachePurge?: boolean;
+  preserveForRecovery?: boolean;
   deadline?: number;
 };
 
@@ -658,6 +660,11 @@ export async function deleteListingObject(input: DeleteListingObjectInput) {
 
   if (!keys.size) {
     return false;
+  }
+
+  if (input.preserveForRecovery) {
+    await archiveRecoverableImageObjects({ source: config, keys: [...keys],
+      deadline: input.deadline, sign: createPresignedRequest });
   }
 
   // A failed sibling delete must not skip invalidating objects already removed.

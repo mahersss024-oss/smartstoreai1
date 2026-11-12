@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -17,7 +18,7 @@ const updateSchema = z.object({
   expiresAt: z.string().datetime({ offset: true }).nullable(),
 });
 
-function requireOwner(request: Request) {
+function requireOwner(request: Request): { response: Response } | { session: NonNullable<ReturnType<typeof getAuthSession>> } {
   const session = getAuthSession(request);
   if (!session) return { response: Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders }) };
   if (!isPlatformOwner(session)) {
@@ -39,6 +40,10 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request);
+}
+
+async function patchWithCurrentAccess(request: Request) {
   const owner = requireOwner(request);
   if ('response' in owner) return owner.response;
 
@@ -74,6 +79,7 @@ export async function PATCH(request: Request) {
     const previous = await tx.siteMessage.findUnique({
       where: { id: primarySiteMessageId },
     });
+    await assertStaffMutationAccess(tx, owner.session, 'owner');
     const siteMessage = await tx.siteMessage.upsert({
       where: { id: primarySiteMessageId },
       create: {

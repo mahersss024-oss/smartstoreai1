@@ -226,6 +226,29 @@ const discardClaim = (job?: ListingImageUpload | null) => ({
   ...(job ? { source: { key: job.sourceKey }, targets: { original: job.originalKey, display: job.displayKey, thumbnail: job.thumbnailKey } } : {}),
 });
 
+/** A bounded DLQ recovery exhausted delivery; never steal a live writer lease. */
+export async function exhaustDirectImageUploadDelivery(uploadId: string) {
+  const job = await serializable(async tx => {
+    const current = await tx.listingImageUpload.findUnique({ where: { id: uploadId } });
+    if (!current || !['pending', 'processing'].includes(current.status)) return current;
+    const now = new Date();
+    await assertDirectImagePromotionIdle(tx, current.id, now);
+    if (current.status === 'processing' && current.leaseUntil && current.leaseUntil > now) {
+      throw new DirectImageUploadError('image_upload_processing', 409);
+    }
+    const { allowed } = await ownedTarget(tx, current.listingId, current.sellerId);
+    const status = current.expiresAt <= now ? 'expired'
+      : !directImageUploadsEnabled() || !allowed ? 'cancelled' : 'failed';
+    const errorCode = status === 'expired' ? 'image_upload_expired'
+      : status === 'cancelled' ? 'image_upload_target_changed' : 'image_delivery_exhausted';
+    return tx.listingImageUpload.update({ where: { id: current.id }, data: {
+      status, errorCode, leaseToken: null, leaseUntil: null,
+    } });
+  });
+  if (job) schedulePrivateCleanup(job, job.status !== 'ready');
+  return discardClaim(job ?? undefined);
+}
+
 export async function claimDirectImageUpload(uploadId: string) {
   const result = await serializable(async tx => {
     const job = await tx.listingImageUpload.findUnique({ where: { id: uploadId } });

@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { listModerationQueuePage } from '@/agent/marketplace/repository';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { hasVerifiedModeratorAccess } from '@/lib/auth/authorization';
@@ -11,6 +12,7 @@ import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
 import { z } from 'zod';
+import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +82,10 @@ const acknowledgeSchema = z
   .strict();
 
 export async function PATCH(request: Request) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request);
+}
+
+async function patchWithCurrentAccess(request: Request) {
   const session = getAuthSession(request);
   if (!session)
     return Response.json({ error: 'auth_required' }, { status: 401 });
@@ -107,6 +113,8 @@ export async function PATCH(request: Request) {
   const acknowledged = await acknowledgeReportNotification(
     parsed.data.caseId,
     session.user.id,
+    prisma,
+    tx => assertStaffMutationAccess(tx, session, 'moderator'),
   );
   if (!acknowledged)
     return Response.json(

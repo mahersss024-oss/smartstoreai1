@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { prisma } from '@/lib/db/prisma';
+import type { Prisma } from '@prisma/client';
 import { GET } from '@/app/api/marketplace/listings/[listingId]/route';
 import { listSimilarMarketplaceListings } from '@/agent/marketplace/repository';
 import { getComparableListings } from '@/agent/marketplace/market-intelligence';
@@ -68,49 +69,53 @@ test('similar card ranking scans beyond the first batch and rechecks public reco
     status: 'published', images: [], createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
     views: 0, messageCount: 0, favoriteCount: 0, compliance: { decision: 'allow', reasons: [], jurisdiction: 'SA', shariaSensitive: false },
   };
-  const rows = Array.from({ length: 300 }, (_, index) => ({
-    ...reference, id: 'candidate-' + String(index).padStart(3, '0'),
+  const rows = Array.from({ length: 1200 }, (_, index) => ({
+    ...reference, id: 'candidate-' + String(index).padStart(4, '0'),
     sellerId: 'candidate-owner',
-    title: index === 299 ? 'commuter vehicle' : reference.title,
+    title: index === 1199 ? 'commuter vehicle' : reference.title,
     description: null, city: reference.city!,
-    attributes: index === 299 ? reference.attributes : {},
+    attributes: index === 1199 ? reference.attributes : {},
     price: 50000, priceMode: 'fixed', condition: 'used',
     createdAt: new Date(reference.createdAt), updatedAt: new Date(reference.updatedAt),
     compliance: reference.compliance,
   }));
-  const readQueries: Record<string, unknown>[] = [];
+  const candidateQueries: Prisma.Sql[] = [];
   const originalFirst = prisma.listing.findFirst;
   const originalMany = prisma.listing.findMany;
+  const originalQuery = prisma.$queryRaw;
   t.after(() => {
     prisma.listing.findFirst = originalFirst;
     prisma.listing.findMany = originalMany;
+    prisma.$queryRaw = originalQuery;
   });
   prisma.listing.findFirst = t.mock.fn(async () => ({ id: reference.id })) as unknown as typeof prisma.listing.findFirst;
+  prisma.$queryRaw = t.mock.fn(async (sql: Prisma.Sql) => {
+    candidateQueries.push(sql);
+    assert.ok(sql.text.includes('"status" = \'published\''));
+    assert.ok(sql.text.includes('seller."deletedAt" IS NULL'));
+    assert.ok(sql.text.includes('NOT IN'));
+    assert.ok(sql.text.includes('ORDER BY "id" ASC'));
+    assert.ok(!/images|compliance|price/.test(sql.text));
+    assert.equal(sql.values.at(-1), 512);
+    const cursor = sql.values.find(value => typeof value === 'string' && /^candidate-/.test(value)) as string | undefined;
+    return rows.filter(row => !cursor || row.id > cursor).slice(0, 512);
+  }) as typeof prisma.$queryRaw;
   prisma.listing.findMany = t.mock.fn(async (input: unknown) => {
-    const args = input as { where: { status: string; category: string; seller: { deletedAt: null }; id: { gt?: string; not?: string; in?: string[] } }; select?: Record<string, unknown>; include?: { images: { where: { status: string }; take: number } }; take?: number };
-    readQueries.push(args as unknown as Record<string, unknown>);
+    const args = input as { where: { status: string; category: string; seller: { deletedAt: null }; id: { in: string[] } }; include: { images: { where: { status: string }; take: number } } };
     assert.equal(args.where.status, 'published');
     assert.equal(args.where.category, 'cars');
     assert.deepEqual(args.where.seller, { deletedAt: null });
-    if (args.select) {
-      assert.equal(args.select.images, undefined);
-      assert.equal(args.select.compliance, undefined);
-      assert.equal(args.select.price, undefined);
-      assert.equal(args.take, 128);
-      const cursor = args.where.id.gt;
-      return rows.filter(row => !cursor || row.id > cursor).slice(0, args.take) as never;
-    }
-    assert.equal(args.include!.images.where.status, 'approved');
-    assert.equal(args.include!.images.take, 1);
-    assert.equal(args.where.id.in!.length, 20);
+    assert.equal(args.include.images.where.status, 'approved');
+    assert.equal(args.include.images.take, 1);
+    assert.equal(args.where.id.in.length, 20);
     // Simulate a concurrent pause between candidate scan and final card read.
-    return rows.filter(row => args.where.id.in!.includes(row.id) && row.id !== 'candidate-298').reverse().map(row => ({ ...row, images: [] })) as never;
+    return rows.filter(row => args.where.id.in.includes(row.id) && row.id !== 'candidate-1198').reverse().map(row => ({ ...row, images: [] })) as never;
   }) as typeof prisma.listing.findMany;
   const cards = await listSimilarMarketplaceListings(reference);
-  assert.equal(readQueries.filter(query => query.select).length, 3);
-  assert.equal(cards[0].id, 'candidate-299');
+  assert.equal(candidateQueries.length, 3);
+  assert.equal(cards[0].id, 'candidate-1199');
   assert.equal(cards.length, 19);
-  assert.ok(cards.every(card => card.id !== 'candidate-298'));
+  assert.ok(cards.every(card => card.id !== 'candidate-1198'));
   assert.equal(new Set(cards.map(card => card.id)).size, cards.length);
 });
 

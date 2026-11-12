@@ -96,7 +96,7 @@ function database(t: TestContext, initial = [account()], commissions: Commission
         const value = cleanups.get(where.imageId) ?? { id: where.imageId, attempts: 0, leaseUntil: null, nextAttemptAt: new Date(0), cleanupAt: null, ...create };
         cleanups.set(where.imageId, value); return value;
       },
-      findUnique: async ({ where }: { where: { imageId: string } }) => cleanups.get(where.imageId) ?? null,
+      findUnique: async ({ where }: { where: { imageId?: string; id?: string } }) => cleanups.get(where.imageId ?? where.id!) ?? null,
       updateMany: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         const current = cleanups.get(where.id); if (!current) return { count: 0 };
         cleanups.set(where.id, { ...current, ...data }); return { count: 1 };
