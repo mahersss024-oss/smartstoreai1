@@ -1,3 +1,4 @@
+import { RedisRealtimeRelay } from './redis-relay';
 import {
   type PublishRealtimeEventInput,
   type RealtimeEvent,
@@ -13,6 +14,9 @@ type RealtimeSubscriber = {
 };
 
 const retainedEventsLimit = 2000;
+const retainedBytesLimit = 4 * 1024 * 1024;
+let retainedBytes = 0;
+const retainedSizes: number[] = [];
 
 let nextEventId = 0;
 let nextSubscriberId = 0;
@@ -20,13 +24,10 @@ let nextSubscriberId = 0;
 const retainedEvents: RealtimeEventEnvelope[] = [];
 const subscribers = new Map<number, RealtimeSubscriber>();
 
-function trimRetainedEvents() {
-  if (retainedEvents.length <= retainedEventsLimit) {
-    return;
-  }
-
-  retainedEvents.splice(0, retainedEvents.length - retainedEventsLimit);
-}
+const relay = new RedisRealtimeRelay(event => {
+  // Keep numeric SSE replay IDs local to this replica and never relay an echo.
+  retainAndDeliver({ ...event, id: ++nextEventId });
+});
 
 export function publishRealtimeEvent(
   input: PublishRealtimeEventInput,
@@ -39,8 +40,25 @@ export function publishRealtimeEvent(
     visibility: normalizeRealtimeVisibility(input.visibility),
   } as RealtimeEventEnvelope;
 
+  if (retainAndDeliver(event)) relay.publish(event);
+  return event;
+}
+
+function retainAndDeliver(event: RealtimeEventEnvelope) {
+  const size = Buffer.byteLength(JSON.stringify(event));
+  // Hints are best-effort; authoritative reconciliation remains available. Do
+  // not retain a frame too large for either the bounded relay or SSE replay.
+  if (size > 16 * 1024 - 512) {
+    console.warn('[realtime] oversized_event_omitted');
+    return false;
+  }
   retainedEvents.push(event);
-  trimRetainedEvents();
+  retainedSizes.push(size);
+  retainedBytes += size;
+  while (retainedEvents.length > retainedEventsLimit || retainedBytes > retainedBytesLimit) {
+    retainedEvents.shift();
+    retainedBytes -= retainedSizes.shift() ?? 0;
+  }
 
   for (const subscriber of subscribers.values()) {
     if (!isRealtimeEventVisibleToSubscriber(event, subscriber.context)) {
@@ -54,7 +72,7 @@ export function publishRealtimeEvent(
     }
   }
 
-  return event;
+  return true;
 }
 
 export function subscribeRealtimeEvents(
@@ -68,8 +86,10 @@ export function subscribeRealtimeEvents(
     onEvent,
   });
 
+  relay.start();
   return () => {
     subscribers.delete(subscriberId);
+    if (!subscribers.size) relay.stop();
   };
 }
 

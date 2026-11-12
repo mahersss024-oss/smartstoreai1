@@ -6,6 +6,7 @@ export type AuthSessionUser = {
   name?: string;
   picture?: string;
   phoneNumber?: string;
+  sessionVersion?: number;
   role?: 'user' | 'moderator' | 'admin' | string;
 };
 
@@ -138,6 +139,7 @@ export function parseSignedSession(value: string | undefined | null) {
     if (
       !parsed.user?.id ||
       !parsed.user.email ||
+      (parsed.user.sessionVersion !== undefined && (!Number.isSafeInteger(parsed.user.sessionVersion) || parsed.user.sessionVersion < 0)) ||
       typeof parsed.expiresAt !== 'number' ||
       parsed.expiresAt <= Math.floor(Date.now() / 1000)
     ) {
@@ -148,6 +150,11 @@ export function parseSignedSession(value: string | undefined | null) {
   } catch {
     return null;
   }
+}
+
+/** Legacy signed sessions remain valid until the account is deactivated. */
+export function isSessionVersionCurrent(session: AuthSession, account: { sessionVersion?: number }) {
+  return (session.user.sessionVersion ?? 0) === (account.sessionVersion ?? 0);
 }
 
 export function getCookieValue(request: Request, name: string) {

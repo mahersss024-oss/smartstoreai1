@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 
 import { setListingModerationStatus } from '@/agent/marketplace/repository';
@@ -43,6 +44,10 @@ async function enforceModerationMutationRateLimit(
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -93,6 +98,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     listingId,
     getModerationStatus(parsed.data.action),
     session.user,
+    tx => assertStaffMutationAccess(tx, session, 'moderator'),
   );
 
   if (result.status === 'not_found') {

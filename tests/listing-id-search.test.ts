@@ -33,7 +33,8 @@ test('ID SQL uses parameterized primary-key equality while retaining every expli
   assert.ok(!sql.text.includes(id));
   for (const field of ['city', 'category', 'price', 'condition', 'attributes']) assert.ok(sql.text.includes(`"${field}"`));
   assert.ok(sql.text.includes('NOT ('));
-  assert.ok(!/ILIKE|LIKE|"id".*contains/.test(sql.text));
+  assert.doesNotMatch(sql.text, /"id"\s*(?:I?LIKE|.*contains)/);
+  assert.ok(sql.values.includes('%damaged%'), 'explicit excluded words retain their literal title predicate');
   const normal = Prisma.sql`${publicListingFiltersSql({ query: 'Adidas' })}`;
   assert.ok(normal.text.includes('"title"'));
   assert.ok(!normal.text.includes('"id"'));

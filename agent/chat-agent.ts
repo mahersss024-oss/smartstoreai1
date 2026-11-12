@@ -1,4 +1,5 @@
-import { ToolLoopAgent } from 'ai';
+import { ToolLoopAgent, stepCountIs } from 'ai';
+import { chatGenerationLimits } from '@/lib/chat/admission';
 
 import { appConfig } from '@/app/app-config';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
@@ -25,7 +26,10 @@ export function createChatAgent(
     onDraftSaved?: (listingId: string) => void;
   } = {},
 ) {
+  const limits = chatGenerationLimits();
   return new ToolLoopAgent({
+    maxOutputTokens: limits.maxOutputTokens,
+    stopWhen: stepCountIs(limits.maxSteps),
     model: getDeepseekChatModel(options.hasVisionInput ? 'vision' : 'chat'),
     instructions:
       appConfig.agent.instructions +

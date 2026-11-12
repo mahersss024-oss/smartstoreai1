@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 import { actOnCaseEvidence, readCaseEvidence, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
@@ -21,6 +22,10 @@ const actionSchema = z.object({
 type RouteContext = { params: Promise<{ reportId: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401 });
   if (!(await hasVerifiedModeratorAccess(session))) {
@@ -51,6 +56,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     reportId,
     parsed.data.action,
     session.user,
+    tx => assertStaffMutationAccess(tx, session, 'moderator'),
   );
   if (result.status === 'not_found') {
     return Response.json({ error: 'report_not_found' }, { status: 404 });
@@ -62,6 +68,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(deleteWithCurrentAccess)(request, context);
+}
+
+async function deleteWithCurrentAccess(request: Request, context: RouteContext) {
   return withEvidenceProtection(deleteReport)(request, context);
 }
 
@@ -94,9 +104,10 @@ async function deleteReport(request: Request, context: RouteContext) {
     return Response.json({ error: 'report_must_be_closed' }, { status: 409 });
   }
 
-  await prisma.$transaction([
-    prisma.userReport.delete({ where: { id: reportId } }),
-    prisma.adminAuditLog.create({
+  await prisma.$transaction(async tx => {
+    await assertStaffMutationAccess(tx, session, 'moderator');
+    await tx.userReport.delete({ where: { id: reportId } });
+    await tx.adminAuditLog.create({
       data: {
         adminId: session.user.id,
         action: 'dismiss_report',
@@ -108,8 +119,8 @@ async function deleteReport(request: Request, context: RouteContext) {
           resolution: report.resolution,
         },
       },
-    }),
-  ]);
+    });
+  });
 
   return Response.json({ status: 'deleted', reportId });
 }

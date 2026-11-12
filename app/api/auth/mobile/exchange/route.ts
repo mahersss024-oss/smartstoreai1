@@ -1,3 +1,4 @@
+import { getVerifiedRoleForSession, shouldVerifyRoleFromDatabase } from '@/lib/auth/authorization';
 import { NextResponse } from 'next/server';
 
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   const sessionValue = parseMobileAuthTicket(url.searchParams.get('ticket'));
   const session = parseSignedSession(sessionValue);
 
-  if (!session) {
+  if (!session || (shouldVerifyRoleFromDatabase() && await getVerifiedRoleForSession(session) === null)) {
     return new Response('Invalid mobile sign-in ticket.', { status: 400 });
   }
 

@@ -1,3 +1,4 @@
+import type { StaffMutationGuard } from '@/lib/auth/staff-mutation';
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuthSessionUser } from '@/lib/auth/session';
@@ -30,6 +31,7 @@ import { resolveListingCategoryWithModel } from './listing-category-model';
 import { getMarketplaceCategorySearchIds } from '@/lib/marketplace/categories';
 import { mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
 import { createComparableListingSelector, getComparableListings } from './market-intelligence';
+import { similarListingCandidateFilterSql } from './similarity-candidate-filter';
 import { listingSemanticText, marketplaceTextAnalyzer } from './text-understanding';
 import {
   getMarketplaceSearchTermVariants,
@@ -1236,13 +1238,14 @@ export async function getListing(listingId: string, options: { publicOnly?: bool
 }
 
 const similarListingLimit = 20;
-const similarListingBatchSize = 128;
+const similarListingBatchSize = 512;
 
 /**
  * Reuse the same deterministic product matcher used by market analysis and
  * similar-listing follows. Scan eligible records in keyset batches rather
- * than ranking only the first feed page. Cost is O(published category size);
- * memory is bounded by one batch plus the best 20. Media is read only for
+ * than ranking only the first feed page. Canonical conflicting branches are
+ * excluded in SQL; worst-case cost remains O(published category size).
+ * Memory is bounded by one batch plus the best 20. Media is read only for
  * the final cards, with fresh public/seller checks instead of cached URLs.
  */
 export async function listSimilarMarketplaceListings(target: memoryStore.ListingRecord) {
@@ -1270,16 +1273,19 @@ export async function listSimilarMarketplaceListings(target: memoryStore.Listing
 
   let cursor: string | undefined;
   const bestListings = createComparableListingSelector(target, similarListingLimit);
+  const candidateFilter = similarListingCandidateFilterSql(target);
   while (true) {
-    const batch = await prisma.listing.findMany({
-      where: { ...publicWhere, id: { not: target.id, ...(cursor ? { gt: cursor } : {}) } },
-      orderBy: { id: 'asc' },
-      take: similarListingBatchSize,
-      select: {
-        id: true, sellerId: true, category: true, title: true, description: true,
-        attributes: true, city: true, createdAt: true, updatedAt: true,
-      },
-    });
+    const batch = await prisma.$queryRaw<Array<Pick<DatabaseListingRecord,
+      'id' | 'sellerId' | 'category' | 'title' | 'description' | 'attributes' | 'city' | 'createdAt' | 'updatedAt'
+    >>>(Prisma.sql`
+      SELECT "id", "sellerId", "category", "title", "description", "attributes", "city", "createdAt", "updatedAt"
+      FROM "Listing"
+      WHERE "status" = 'published' AND "category" = ${target.category} AND "id" <> ${target.id}
+        AND EXISTS (SELECT 1 FROM "User" seller WHERE seller.id = "Listing"."sellerId" AND seller."deletedAt" IS NULL)
+        AND ${candidateFilter}
+        ${cursor ? Prisma.sql`AND "id" > ${cursor}` : Prisma.empty}
+      ORDER BY "id" ASC LIMIT ${similarListingBatchSize}
+    `);
     for (const row of batch) bestListings.add(toListingRecord({
       ...row, price: null, priceMode: null, condition: null,
       status: 'published', views: 0, messageCount: 0, favoriteCount: 0, compliance: null,
@@ -3000,7 +3006,7 @@ export async function deleteListingImageForSeller(
     const imageToDelete = existing.images.find(image => image.id === imageId);
     if (!imageToDelete) return null;
 
-    await enqueueImageObjectCleanup(tx, { imageId, urls: [
+    await enqueueImageObjectCleanup(tx, { imageId, preserveForRecovery: true, urls: [
       imageToDelete.originalUrl, imageToDelete.displayUrl, imageToDelete.thumbnailUrl,
     ] });
     await tx.listingImage.delete({
@@ -5132,6 +5138,7 @@ export async function setUserReportModerationStatus(
   reportId: string,
   resolution: UserReportResolution,
   admin?: Actor,
+  beforeMutation?: StaffMutationGuard,
 ) {
   if (!shouldUseDatabaseStore()) {
     return memoryStore.setUserReportModerationStatus(
@@ -5169,6 +5176,7 @@ export async function setUserReportModerationStatus(
     if (shouldCloseConversation && existing.conversationId) {
       await lockConversationUserPair(tx, existing.reporterId, existing.targetUserId);
     }
+    await beforeMutation?.(tx);
     const claimed = await tx.userReport.updateMany({
       where: { id: reportId, status: 'open' },
       data: {
@@ -5256,6 +5264,7 @@ export async function setListingModerationStatus(
   listingId: string,
   status: Extract<ListingStatus, 'published' | 'rejected' | 'deleted'>,
   admin?: Actor,
+  beforeMutation?: StaffMutationGuard,
 ) {
   if (!shouldUseDatabaseStore()) {
     const existingListing = memoryStore.getListing(listingId);
@@ -5332,6 +5341,7 @@ export async function setListingModerationStatus(
     const current = await tx.listing.findUnique({ where: { id: listingId }, include: { images: true } });
     if (!current) return null;
     const existing = toListingRecord(current);
+    await beforeMutation?.(tx);
     await recordDatabaseFirstPublication(tx, listingId, status);
     const updatedListing = await tx.listing.update({
       where: { id: listingId },
@@ -5421,6 +5431,7 @@ export async function setReportModerationStatus(
   status: Extract<ReportRecord['status'], 'reviewed' | 'dismissed'>,
   admin?: Actor,
   listingStatus?: 'rejected' | 'deleted',
+  beforeMutation?: StaffMutationGuard,
 ) {
   const publishListingDecision = (listing: memoryStore.ListingRecord, previousStatus: ListingStatus) => {
     safelyPublishRealtimeEvent({
@@ -5480,6 +5491,7 @@ export async function setReportModerationStatus(
       where: { id: existing.listingId }, include: { images: true },
     }) : null;
     if (listingStatus && !currentListing) return 'listing_not_found' as const;
+    await beforeMutation?.(tx);
     const claimed = await tx.report.updateMany({
       where: { id: reportId, status: 'open' },
       data: { status },
@@ -5759,6 +5771,7 @@ export async function setCommissionStatusForAdmin(
   commissionId: string,
   status: Extract<CommissionStatus, 'due' | 'paid' | 'waived' | 'disputed'>,
   admin?: Actor,
+  beforeMutation?: StaffMutationGuard,
 ) {
   if (!shouldUseDatabaseStore()) {
     const result = memoryStore.setCommissionStatusForAdmin(commissionId, status);
@@ -5799,6 +5812,7 @@ export async function setCommissionStatusForAdmin(
     });
     if (!existing) return null;
 
+    await beforeMutation?.(tx);
     const commission = await tx.commission.update({
       where: { id: commissionId },
       data: {

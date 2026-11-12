@@ -148,6 +148,7 @@ export async function executeMaintenanceCleanup(input: { actorId: string; scope:
       for (const image of images) {
         await enqueueImageObjectCleanup(tx, {
           imageId: image.id,
+          preserveForRecovery: true,
           urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
         });
       }

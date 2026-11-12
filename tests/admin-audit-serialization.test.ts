@@ -5,6 +5,7 @@ import { DELETE as deleteCommission, PATCH as editCommission } from '@/app/api/a
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { activeStaffAccount, staffAccountQuery } from './helpers/staff-fixture';
 
 function environment(t: TestContext) {
   for (const [key, value] of Object.entries({
@@ -16,6 +17,7 @@ function environment(t: TestContext) {
     const previous = process.env[key]; process.env[key] = value;
     t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
   }
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
   mockDatabaseMethod(t, prisma.user, 'upsert', async () => ({ id: 'serialized-audit-owner' }));
   const token = createSignedSession({ id: 'serialized-audit-owner', email: 'serialized-audit-owner@example.test' });
@@ -36,7 +38,8 @@ for (const previouslyExists of [false, true]) {
     mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>, options: unknown) => {
       assert.deepEqual(options, { isolationLevel: 'ReadCommitted' });
       return work({
-        $executeRaw: async (strings: TemplateStringsArray, key: string) => {
+        $queryRaw: staffAccountQuery('serialized-audit-owner'),
+      $executeRaw: async (strings: TemplateStringsArray, key: string) => {
           assert.match(strings.join('?'), /pg_advisory_xact_lock\(771209/);
           assert.equal(key, 'primary');
           if (previouslyExists) current = messagePayload('a separately committed change');
@@ -71,6 +74,7 @@ test('commission status audit reads the locked current status after an interveni
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>, options: unknown) => {
     assert.deepEqual(options, { isolationLevel: 'ReadCommitted' });
     return work({
+      $queryRaw: staffAccountQuery('serialized-audit-owner'),
       $executeRaw: async (strings: TemplateStringsArray, key: string) => {
         const sql = strings.join('?'); locks.push(sql);
         if (sql.includes('pg_advisory_xact_lock')) assert.equal(key, 'listing:listing');
@@ -108,6 +112,7 @@ for (const stillExists of [true, false]) {
     let deletions = 0;
     let audits = 0;
     mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+      $queryRaw: staffAccountQuery('serialized-audit-owner'),
       $executeRaw: async (strings: TemplateStringsArray, key: string) => {
         assert.match(strings.join('?'), /pg_advisory_xact_lock\(771204/);
         assert.equal(key, 'listing:listing'); locked = true; return 1;

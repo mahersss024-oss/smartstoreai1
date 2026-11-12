@@ -148,11 +148,14 @@ export function matchesMarketplaceTitle(title: string | null | undefined, terms:
 }
 
 export function marketplaceTitleSearchPredicate(terms: string[]) {
-  const normalizedTitle = Prisma.sql`regexp_replace(
-    translate(lower(normalize(coalesce("title", ''), NFKC)), ${sourceCharacters}, ${targetCharacters}),
-    ${ignoredCharacters}, '', 'g'
-  )`;
+  // Keep normalization constants inside the immutable database function so the
+  // expression matches its trigram index even with a prepared/generic plan.
+  const normalizedTitle = Prisma.sql`public.marketplace_normalized_title("title")`;
   return terms.length
-    ? Prisma.join(terms.map(term => Prisma.sql`strpos(${normalizedTitle}, ${term}) > 0`), ' AND ')
+    ? Prisma.join(terms.map(term => {
+      // An explicit escape character preserves literal %, _ and backslashes.
+      const pattern = `%${term.replace(/[!%_]/g, '!$&')}%`;
+      return Prisma.sql`${normalizedTitle} LIKE ${pattern} ESCAPE '!'`;
+    }), ' AND ')
     : Prisma.sql`TRUE`;
 }

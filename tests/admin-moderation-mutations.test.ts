@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { DELETE as deleteListing, PATCH as editListing } from '@/app/api/admin/listings/[listingId]/route';
 import { PATCH as resolveReport } from '@/app/api/admin/moderation/reports/[reportId]/route';
@@ -8,16 +8,18 @@ import * as memoryStore from '@/agent/marketplace/store';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { activeStaffAccount, staffAccountQuery } from './helpers/staff-fixture';
 
 function environment(t: TestContext) {
   for (const [key, value] of Object.entries({
-    SMARTSTORE_MARKETPLACE_STORE: 'database', SMARTSTORE_ADMIN_EMAILS: 'moderation-owner@example.test',
+    SMARTSTORE_MARKETPLACE_STORE: 'database', DATABASE_URL: 'postgresql://fixture:fixture@127.0.0.1:9/unused', SMARTSTORE_ADMIN_EMAILS: 'moderation-owner@example.test',
     AUTH_SECRET: 'isolated-admin-moderation-mutations-only', SMARTSTORE_RATE_LIMIT_BACKEND: 'memory',
     UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
   })) {
     const previous = process.env[key]; process.env[key] = value;
     t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
   }
+  mockDatabaseMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
   mockDatabaseMethod(t, prisma.user, 'upsert', async () => ({ id: 'moderation-owner' }));
   mockDatabaseMethod(t, prisma.user, 'update', async () => ({ id: 'moderation-owner' }));
@@ -29,25 +31,31 @@ function environment(t: TestContext) {
   });
 }
 
-for (const currentStatus of ['published', 'deleted']) {
-  test(`permanent listing deletion uses the locked current ${currentStatus} state`, async t => {
+for (const [currentStatus, cleanupUnavailable] of [['published', false], ['deleted', false], ['deleted', true]] as const) {
+  test(`permanent listing deletion uses the locked current ${currentStatus} state${cleanupUnavailable ? ' while cleanup storage is unavailable' : ''}`, async t => {
     const request = environment(t);
     const identity = { id: 'delete-listing', sellerId: 'seller', status: 'deleted', images: [] };
     const current = { ...identity, status: currentStatus, images: [{ id: 'new-image', originalUrl: 'https://example.test/new.webp', displayUrl: 'https://example.test/new.webp', thumbnailUrl: 'https://example.test/new-thumb.webp' }] };
     const locks: string[] = [];
     let deleted = 0;
     let audits = 0;
-    const cleanedHashes: string[][] = [];
+    const queued: Array<{ imageId: string; urls: string[]; preserveForRecovery: boolean }> = [];
+    mockDatabaseMethod(t, prisma.imageObjectCleanup, 'findUnique', async () => {
+      if (cleanupUnavailable) throw new Error('synthetic_cleanup_database_unavailable');
+      return null;
+    });
     mockDatabaseMethod(t, prisma.evidenceAsset, 'count', async ({ where }: { where: { sourceHash: { in: string[] } } }) => {
-      cleanedHashes.push(where.sourceHash.in); return 0;
+      assert.ok(where.sourceHash.in.length); return 0;
     });
     mockDatabaseMethod(t, prisma.listing, 'findUnique', async () => identity);
     mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
+      $queryRaw: staffAccountQuery('moderation-owner'),
       $executeRaw: async (sql: TemplateStringsArray) => { locks.push(sql.join('?')); return 1; },
       listing: {
         findUnique: async () => { assert.match(locks.at(-1)!, /FOR UPDATE/); return current; },
         delete: async () => { deleted++; return current; },
       },
+      imageObjectCleanup: { upsert: async ({ create }: { create: typeof queued[number] }) => { queued.push(create); return create; } },
       adminAuditLog: { create: async () => { audits++; return {}; } },
     }));
     const response = await deleteListing(request('/api/admin/listings/delete-listing', 'DELETE'), {
@@ -59,8 +67,9 @@ for (const currentStatus of ['published', 'deleted']) {
     assert.equal(locks.length, 3);
     assert.ok(locks.slice(0, 2).every(sql => sql.includes('pg_advisory_xact_lock')));
     if (currentStatus === 'published') assert.equal((await response.json()).error, 'listing_must_be_deleted_first');
-    else assert.deepEqual(cleanedHashes, [[current.images[0].originalUrl, current.images[0].displayUrl, current.images[0].thumbnailUrl]
-      .map(url => createHash('sha256').update(url).digest('hex'))], 'cleanup uses images read inside the locked transaction');
+    else assert.deepEqual(queued, [{ imageId: current.images[0].id, ownerId: undefined,
+      urls: [...new Set([current.images[0].originalUrl, current.images[0].displayUrl, current.images[0].thumbnailUrl])],
+      preserveForRecovery: true }], 'durable cleanup captures the images read inside the locked transaction');
   });
 }
 
@@ -69,7 +78,8 @@ test('a stale administrative listing save returns a conflict without mutation or
   const listing = { id: 'changed-listing', sellerId: 'seller', updatedAt: new Date('2026-01-02T00:00:00Z') };
   mockDatabaseMethod(t, prisma.listing, 'findUnique', async () => listing);
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async () => 1,
+    $queryRaw: staffAccountQuery('moderation-owner'),
+      $executeRaw: async () => 1,
     listing: { findUnique: async () => listing, update: async () => assert.fail('stale save must not write') },
     adminAuditLog: { create: async () => assert.fail('stale save must not audit a mutation') },
   }));
@@ -89,7 +99,8 @@ test('concurrent listing-report decisions claim the open report once and audit o
   const bothRead = new Promise<void>(resolve => { release = resolve; });
   const audits: Array<{ metadata: { previousStatus: string; nextStatus: string } }> = [];
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async () => 1,
+    $queryRaw: staffAccountQuery('moderation-owner'),
+      $executeRaw: async () => 1,
     report: {
       findUnique: async () => { reads++; if (reads === 2) release(); await bothRead; return { status: 'open', listingId: report.listingId, reporterId: report.reporterId, listing: { sellerId: 'seller' } }; },
       updateMany: async ({ where, data }: { where: { status: string }; data: { status: string } }) => {
@@ -114,6 +125,7 @@ test('the listing-report route returns 409 when another moderator already resolv
   const request = environment(t);
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
     report: { findUnique: async () => ({ status: 'reviewed' }), updateMany: async () => assert.fail('closed report must not change') },
+    $queryRaw: staffAccountQuery('moderation-owner'),
   }));
   const response = await resolveReport(request('/api/admin/moderation/reports/report', 'PATCH', { action: 'dismiss' }), {
     params: Promise.resolve({ reportId: 'report' }),
@@ -159,7 +171,8 @@ test('a missing report target leaves its open decision untouched and locks evide
   const request = environment(t);
   const locks: Array<{ sql: string; values: unknown[] }> = [];
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({
-    $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => { locks.push({ sql: sql.join('?'), values }); return 1; },
+    $queryRaw: staffAccountQuery('moderation-owner'),
+      $executeRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => { locks.push({ sql: sql.join('?'), values }); return 1; },
     report: {
       findUnique: async () => ({ status: 'open', listingId: 'missing-listing', reporterId: 'reporter', listing: { sellerId: 'seller' } }),
       updateMany: async () => assert.fail('an absent target must not close the report'),

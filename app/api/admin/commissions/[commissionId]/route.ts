@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { withEvidenceProtection } from '@/agent/marketplace/evidence';
@@ -45,6 +46,10 @@ async function enforceAdminCommissionMutationRateLimit(
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -97,6 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       commissionId,
       parsed.data.status,
       session.user,
+      tx => assertStaffMutationAccess(tx, session, 'admin'),
     );
   } catch (error) {
     const code = transientDatabaseErrorCode(error);
@@ -115,6 +121,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(deleteWithCurrentAccess)(request, context);
+}
+
+async function deleteWithCurrentAccess(request: Request, context: RouteContext) {
   return withEvidenceProtection(deleteCommission)(request, context);
 }
 
@@ -151,6 +161,7 @@ async function deleteCommission(request: Request, context: RouteContext) {
     // Keep the same evidence-key-before-row order as seller and admin updates.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(771204, hashtext(${'listing:' + existing.listingId}))`;
     if (!(await tx.commission.findUnique({ where: { id: commissionId }, select: { id: true } }))) return false;
+    await assertStaffMutationAccess(tx, session, 'admin');
     await tx.commission.delete({ where: { id: commissionId } });
     await tx.adminAuditLog.create({
       data: {

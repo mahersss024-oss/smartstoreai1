@@ -27,6 +27,9 @@ async function fixture(t: TestContext) {
   const commission = await prisma.commission.create({ data: { listingId: listing.id, sellerId: seller.id, status: 'due', productValue: 1000, commissionAmount: 10 } });
   const savedMessage = await prisma.siteMessage.findUnique({ where: { id: 'primary' } });
   for (const [key, value] of Object.entries({
+    // Real production actors already exist. Development's email upsert takes
+    // an unrelated User write lock before the decision transaction starts.
+    NODE_ENV: 'production',
     SMARTSTORE_ADMIN_EMAILS: owner.email, AUTH_SECRET: 'local-serialized-audits-only',
     SMARTSTORE_RATE_LIMIT_BACKEND: 'memory', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
   })) {

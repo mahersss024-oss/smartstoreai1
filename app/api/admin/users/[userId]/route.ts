@@ -1,7 +1,8 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import { z } from 'zod';
 import { lockUserEvidenceEntities, withEvidenceProtection } from '@/agent/marketplace/evidence';
 
-import { deleteListingObject, isOwnedProfileImageUrl } from '@/agent/marketplace/object-storage';
+import { enqueueImageObjectCleanup, processImageObjectCleanup, profileImageCleanupInput } from '@/agent/marketplace/image-object-cleanup';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
@@ -34,26 +35,16 @@ async function deleteUserImagesBestEffort(
   profilePicture: string | null,
   listingImages: StoredUserImage[],
 ) {
-  const objects = [
-    ...(profilePicture && isOwnedProfileImageUrl(userId, profilePicture)
-      ? [{ imageId: `profile:${userId}`, urls: [profilePicture] }]
-      : []),
-    ...listingImages.map((image) => ({
-      imageId: image.id,
-      urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
-    })),
-  ];
-
-  await Promise.all(
-    objects.map(async (object) => {
-      try {
-        await deleteListingObject(object);
-      } catch (error) {
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        console.warn(`[admin_user_image_storage_delete] failure=${errorName}`);
-      }
-    }),
-  );
+  const profile = profileImageCleanupInput(userId, profilePicture);
+  const deadline = Date.now() + 20_000;
+  for (const imageId of [
+    ...(profile ? [profile.imageId] : []),
+    ...listingImages.map(image => image.id),
+  ]) {
+    if (Date.now() >= deadline) break;
+    try { await processImageObjectCleanup(imageId, deadline); }
+    catch { console.warn('[admin_user_storage_delete] outcome=pending'); }
+  }
 }
 
 type RouteContext = {
@@ -128,6 +119,10 @@ function mapUpdatedUser(user: {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -262,6 +257,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       select: { role: true, phoneNumber: true },
     });
     if (!previous) return null;
+    await assertStaffMutationAccess(tx, session, 'admin');
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -337,6 +333,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(deleteWithCurrentAccess)(request, context);
+}
+
+async function deleteWithCurrentAccess(request: Request, context: RouteContext) {
   return withEvidenceProtection(deleteUser)(request, context);
 }
 
@@ -446,7 +446,8 @@ async function deleteUser(request: Request, context: RouteContext) {
   }
 
   const deleteMode = requestedMode;
-  const storedListingImages = existing.listings.flatMap(
+  let removedPicture = existing.picture;
+  let storedListingImages = existing.listings.flatMap(
     (listing) => listing.images,
   );
 
@@ -455,11 +456,12 @@ async function deleteUser(request: Request, context: RouteContext) {
     await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${existing.id} FOR UPDATE`;
     const current = await tx.user.findUnique({
       where: { id: existing.id },
-      select: { deletedAt: true },
+      select: { deletedAt: true, picture: true, listings: { select: { images: true } } },
     });
     if (!current) {
       return Response.json({ error: 'user_not_found' }, { status: 404, headers: noStoreHeaders });
     }
+    await assertStaffMutationAccess(tx, session, 'admin');
     // A restore may have completed after the initial read. Check the locked
     // current row, so permanent deletion cannot act on a stale disabled state.
     if (deleteMode === 'permanent' && !current.deletedAt) {
@@ -485,6 +487,13 @@ async function deleteUser(request: Request, context: RouteContext) {
     });
 
     if (deleteMode === 'permanent') {
+      removedPicture = current.picture;
+      storedListingImages = current.listings.flatMap(listing => listing.images);
+      const profile = profileImageCleanupInput(existing.id, current.picture);
+      if (profile) await enqueueImageObjectCleanup(tx, profile);
+      for (const image of storedListingImages) await enqueueImageObjectCleanup(tx, {
+        imageId: image.id, urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl], preserveForRecovery: true,
+      });
       await tx.user.delete({
         where: { id: existing.id },
       });
@@ -502,7 +511,7 @@ async function deleteUser(request: Request, context: RouteContext) {
   if (deleteMode === 'permanent') {
     await deleteUserImagesBestEffort(
       existing.id,
-      existing.picture,
+      removedPicture,
       storedListingImages,
     );
   }

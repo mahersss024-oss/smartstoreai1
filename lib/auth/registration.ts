@@ -179,9 +179,9 @@ export async function persistUserRegistration(request: Request, identity: AuthSe
   }
 }
 
-function sessionUser(user: { id: string; email: string; name: string | null; picture: string | null; role: string }) {
+function sessionUser(user: { id: string; email: string; name: string | null; picture: string | null; role: string; sessionVersion: number }) {
   return {
     id: user.id, email: user.email, name: user.name ?? undefined,
-    picture: user.picture ?? undefined, role: user.role,
+    picture: user.picture ?? undefined, role: user.role, sessionVersion: user.sessionVersion,
   };
 }

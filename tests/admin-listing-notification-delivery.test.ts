@@ -3,6 +3,7 @@ import test, { type TestContext } from 'node:test';
 import { PATCH } from '@/app/api/admin/listings/[listingId]/route';
 import { createSessionCookie } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
+import { activeStaffAccount, staffAccountQuery } from './helpers/staff-fixture';
 import { drainNotificationDeliveries, notificationDeliveryEffects } from '@/lib/push/delivery-jobs';
 
 function replaceMethod(t: TestContext, target: object, key: string, method: (...args: never[]) => unknown) {
@@ -20,7 +21,7 @@ type Job = {
 function fixture(t: TestContext, status = 'pending') {
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected external request in notification fixture'); });
   const env = {
-    SMARTSTORE_MARKETPLACE_STORE: 'database', SMARTSTORE_ADMIN_EMAILS: 'notification-owner@example.test',
+    SMARTSTORE_MARKETPLACE_STORE: 'database', DATABASE_URL: 'postgresql://fixture:fixture@127.0.0.1:9/unused', SMARTSTORE_ADMIN_EMAILS: 'notification-owner@example.test',
     AUTH_SECRET: 'isolated-admin-notification-session-secret',
     UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '', SMARTSTORE_RATE_LIMIT_BACKEND: 'memory',
   };
@@ -29,6 +30,7 @@ function fixture(t: TestContext, status = 'pending') {
     process.env[key] = value;
     t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
   }
+  replaceMethod(t, prisma.user, 'findUnique', async () => ({ ...activeStaffAccount }));
   let clock = Date.now();
   let listing = {
     id: 'admin-notification-listing', sellerId: 'admin-notification-seller', category: 'furniture',
@@ -44,6 +46,7 @@ function fixture(t: TestContext, status = 'pending') {
     const next = { ...listing };
     const pendingJobs = jobs.map(job => ({ ...job }));
     const result = await (callback as unknown as (tx: object) => Promise<unknown>)({
+      $queryRaw: staffAccountQuery('notification-owner'),
       $executeRaw: async () => 1,
       listing: {
         findUnique: async () => ({ ...next }),

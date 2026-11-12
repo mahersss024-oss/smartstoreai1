@@ -45,7 +45,8 @@ test('literal FOREACH trigger declarations include every evidence lock and guard
   for (const table of ['User', 'Listing', 'ListingImage', 'Conversation', 'ConversationMessage', 'Commission', 'Report', 'UserReport']) {
     assert.ok(triggers.has(`${table}.evidence_guard`), `missing source guard: ${table}`);
   }
-  assert.equal(triggers.size, 32);
+  assert.ok(triggers.has('User.smartstore_revoke_deactivated_sessions'));
+  assert.equal(triggers.size, 33);
 });
 
 test('dynamic literal trigger operations preserve later drops and migrations', () => {

@@ -1,3 +1,4 @@
+import { assertStaffMutationAccess, withStaffMutationProtection } from '@/lib/auth/staff-mutation';
 import type { Listing, ListingImage } from '@prisma/client';
 import { z } from 'zod';
 import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, mergeMarketplaceCategoryAttributes } from '@/lib/marketplace/category-options';
@@ -8,7 +9,7 @@ import { withEvidenceProtection } from '@/agent/marketplace/evidence';
 
 import { recordDatabaseFirstPublication } from '@/agent/marketplace/listing-publication';
 import { ensureDatabaseSaleCommission } from '@/agent/marketplace/listing-commission';
-import { deleteListingObject } from '@/agent/marketplace/object-storage';
+import { enqueueImageObjectCleanup, processImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 import { createUnassessedMarketplaceCompliance } from '@/agent/marketplace/policy';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
@@ -55,29 +56,6 @@ async function enforceAdminListingMutationRateLimit(
   });
 }
 
-async function deleteStoredListingImagesBestEffort(
-  images: Array<{
-    id: string;
-    originalUrl: string;
-    displayUrl: string;
-    thumbnailUrl: string;
-  }>,
-) {
-  await Promise.all(
-    images.map(async (image) => {
-      try {
-        await deleteListingObject({
-          imageId: image.id,
-          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
-        });
-      } catch (error) {
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        console.warn(`[admin_listing_storage_delete] failure=${errorName}`);
-      }
-    }),
-  );
-}
-
 function buildSearchText(input: {
   category?: string | null;
   title?: string | null;
@@ -106,6 +84,10 @@ function buildSearchText(input: {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(patchWithCurrentAccess)(request, context);
+}
+
+async function patchWithCurrentAccess(request: Request, context: RouteContext) {
   const session = getAuthSession(request);
 
   if (!session) {
@@ -168,6 +150,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!existing) {
       return { response: Response.json({ error: 'listing_not_found' }, { status: 404 }) };
     }
+    await assertStaffMutationAccess(tx, session, 'moderator');
     if (parsed.data.expectedUpdatedAt && existing.updatedAt.getTime() !== new Date(parsed.data.expectedUpdatedAt).getTime()) {
       return { response: Response.json({ error: 'listing_changed' }, { status: 409 }) };
     }
@@ -337,6 +320,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
+  return withStaffMutationProtection(deleteWithCurrentAccess)(request, context);
+}
+
+async function deleteWithCurrentAccess(request: Request, context: RouteContext) {
   return withEvidenceProtection(deleteListing)(request, context);
 }
 
@@ -383,6 +370,10 @@ async function deleteListing(request: Request, context: RouteContext) {
       return { response: Response.json({ error: 'listing_must_be_deleted_first' }, { status: 409 }) };
     }
 
+    await assertStaffMutationAccess(tx, session, 'moderator');
+    for (const image of existing.images) await enqueueImageObjectCleanup(tx, {
+      imageId: image.id, urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl], preserveForRecovery: true,
+    });
     // Permanent deletion cascades to the listing's dependent marketplace rows.
     await tx.listing.delete({ where: { id: listingId } });
     await tx.adminAuditLog.create({
@@ -400,7 +391,12 @@ async function deleteListing(request: Request, context: RouteContext) {
   if ('response' in deletion) return deletion.response;
   const { existing } = deletion;
 
-  await deleteStoredListingImagesBestEffort(existing.images);
+  const cleanupDeadline = Date.now() + 20_000;
+  for (const image of existing.images) {
+    if (Date.now() >= cleanupDeadline) break;
+    try { await processImageObjectCleanup(image.id, cleanupDeadline); }
+    catch { console.warn('[admin_listing_storage_delete] outcome=pending'); }
+  }
 
   try {
     publishRealtimeEvent({

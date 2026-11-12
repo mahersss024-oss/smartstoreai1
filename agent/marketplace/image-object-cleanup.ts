@@ -6,7 +6,7 @@ import { deleteEvidenceObject, deleteListingObject, isOwnedProfileImageUrl } fro
 import { directImagePromotionUploadId } from './direct-image-promotion';
 
 type CleanupDatabase = Pick<Prisma.TransactionClient, 'imageObjectCleanup'>;
-type CleanupInput = { imageId: string; urls: string[]; ownerId?: string };
+type CleanupInput = { imageId: string; urls: string[]; ownerId?: string; preserveForRecovery?: boolean };
 const leaseMs = 60_000;
 
 /** Call inside the same transaction that removes its authoritative reference. */
@@ -14,7 +14,8 @@ export async function enqueueImageObjectCleanup(database: CleanupDatabase, input
   const urls = [...new Set(input.urls.filter(Boolean))];
   if (!urls.length) return;
   return database.imageObjectCleanup.upsert({ where: { imageId: input.imageId },
-    create: { imageId: input.imageId, ownerId: input.ownerId, urls }, update: {} });
+    create: { imageId: input.imageId, ownerId: input.ownerId, urls, preserveForRecovery: input.preserveForRecovery ?? false },
+    update: input.preserveForRecovery ? { preserveForRecovery: true } : {} });
 }
 
 /** Private evidence cleanup is issued only from database-owned asset manifests. */
@@ -34,7 +35,7 @@ export async function enqueueEvidenceObjectCleanup(database: CleanupDatabase, as
 export function profileImageCleanupInput(userId: string, picture?: string | null): CleanupInput | undefined {
   if (!picture || !isOwnedProfileImageUrl(userId, picture)) return undefined;
   return { imageId: `profile:${userId}:${createHash('sha256').update(picture).digest('hex')}`,
-    ownerId: userId, urls: [picture] };
+    ownerId: userId, urls: [picture], preserveForRecovery: true };
 }
 
 export async function processImageObjectCleanup(imageId: string, deadline = Date.now() + 20_000) {
@@ -84,8 +85,16 @@ export async function processImageObjectCleanup(imageId: string, deadline = Date
           (job.ownerId ? 0 : await prisma.listingImage.count({ where: { OR: [
             { originalUrl: { in: job.urls } }, { displayUrl: { in: job.urls } }, { thumbnailUrl: { in: job.urls } },
           ] } }));
-        if (!attached) completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
-          requireCachePurge: true, deadline });
+        if (!attached) {
+          // Authoritative reference removal upgrades retention in that same
+          // transaction. Read AFTER checking attachments: an earlier rollback
+          // receipt snapshot must not bypass a newly committed preservation flag.
+          const policy = await prisma.imageObjectCleanup.findUnique({ where: { id: job.id },
+            select: { leaseToken: true, preserveForRecovery: true } });
+          if (!policy || policy.leaseToken !== leaseToken) return false;
+          completed = await deleteListingObject({ imageId: job.imageId, urls: job.urls,
+            requireCachePurge: true, preserveForRecovery: policy.preserveForRecovery, deadline });
+        }
         else if (job.imageId.startsWith('legacy-upload:') || directUploadId) {
           // An unknown attach commit may have reopened its attempt receipt. The
           // authoritative image now owns these bytes; its eventual deletion
