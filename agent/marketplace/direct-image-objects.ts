@@ -11,6 +11,14 @@ import { ImageStorageResponseError, retryImageStorage } from './image-storage-re
 import { directImagePromotionBudgetMs } from './direct-image-promotion';
 
 export type DirectImageVariant = 'original' | 'display' | 'thumbnail';
+/** Metadata from the exact staged bytes already decoded by the server. */
+export type VerifiedProcessedImageSource = {
+  variant: DirectImageVariant;
+  sourceKey: string;
+  etag: string;
+  mediaType: string;
+  sizeBytes: number;
+};
 export type DirectImageObjectJob = {
   id: string;
   listingId: string;
@@ -191,16 +199,33 @@ export async function readProcessedImage(job: DirectImageObjectJob, variant: Dir
 }
 
 /** Staged objects remain private. Only the server can copy them to public storage. */
-export async function promoteProcessedImages(job: DirectImageObjectJob, deadline = Date.now() + directImagePromotionBudgetMs) {
+export async function promoteProcessedImages(
+  job: DirectImageObjectJob,
+  deadline = Date.now() + directImagePromotionBudgetMs,
+  verifiedSources: readonly VerifiedProcessedImageSource[] = [],
+) {
   const { intakeStorage, storage } = requireConfiguration();
   // One absolute I/O budget also bounds ambiguous-response verification. The
   // durable promotion receipt protects fixed URLs beyond this deadline.
   const variants: DirectImageVariant[] = job.originalKey === job.displayKey
     ? ['display', 'thumbnail']
     : ['original', 'display', 'thumbnail'];
+  const verifiedByVariant = new Map<DirectImageVariant, VerifiedProcessedImageSource>();
+  for (const verified of verifiedSources) {
+    if (!variants.includes(verified.variant) || verifiedByVariant.has(verified.variant) ||
+      verified.sourceKey !== stagedKey(job, verified.variant) || verified.mediaType !== getDirectImageVariantMediaType(job, verified.variant) ||
+      !Number.isSafeInteger(verified.sizeBytes) || verified.sizeBytes < 1 || verified.sizeBytes > maxImageBytes ||
+      !/^"[\x21\x23-\x7e]{1,200}"$/.test(verified.etag)) {
+      throw new Error('invalid_verified_image_source');
+    }
+    verifiedByVariant.set(verified.variant, verified);
+  }
   const promoteVariant = async (variant: DirectImageVariant) => {
     const source = stagedKey(job, variant);
-    const etag = await objectRequest(intakeStorage, 'HEAD', source, {}, async response => {
+    const verified = verifiedByVariant.get(variant);
+    // The conditional copy binds the decoded GET's ETag to this exact lease.
+    // A changed source fails the copy instead of copying unverified bytes.
+    const etag = verified?.etag ?? await objectRequest(intakeStorage, 'HEAD', source, {}, async response => {
       if (!response.ok) throw new ImageStorageResponseError(response.status);
       const contentLength = Number(response.headers.get('content-length'));
       if (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > maxImageBytes ||
