@@ -15,6 +15,7 @@ import { scheduleListingEvidenceCopy } from './evidence';
 import {
   createDirectImageTransfer, discardDirectImageObjects, getDirectImageUploadConfiguration,
   promoteProcessedImages, readProcessedImage, getDirectImageVariantMediaType, getDirectImagePublicUrls,
+  type VerifiedProcessedImageSource,
 } from './direct-image-objects';
 import {
   DirectImagePromotionBusyError, assertDirectImagePromotionIdle, directImagePromotionProtectsCleanup, reserveDirectImagePromotion,
@@ -376,7 +377,13 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     if (reserved.state === 'discard') { schedulePrivateCleanup(job); return { action: 'discard' as const }; }
     const ownedPromotion = reserved.promotion;
     promotion = ownedPromotion;
-    const urls = await directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline);
+    const verifiedSources: VerifiedProcessedImageSource[] = variants.flatMap((image, index) => {
+      const variant = variantNames[index];
+      const sourceKey = reserved.job[`${variant}Key`];
+      return image.etag && sourceKey ? [{ variant, sourceKey, etag: image.etag,
+        mediaType: image.mediaType, sizeBytes: image.data.byteLength }] : [];
+    });
+    const urls = await directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline, verifiedSources);
     await directImageUploadEffects.verifyDelivery(urls, ownedPromotion.deadline);
     if (Date.now() > ownedPromotion.deadline) throw new Error('image_promotion_deadline');
     const finalized = await serializable(async tx => {

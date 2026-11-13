@@ -3,6 +3,7 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { prisma } from '@/lib/db/prisma';
 import { claimDirectImageUpload, completeDirectImageUpload, directImageUploadEffects } from '@/agent/marketplace/direct-image-uploads';
+import type { DirectImageObjectJob, VerifiedProcessedImageSource } from '@/agent/marketplace/direct-image-objects';
 import { imageUploadObjectKeys } from '@/agent/marketplace/direct-image-upload-policy';
 import { POST as claim } from '@/app/api/internal/image-uploads/[uploadId]/claim/route';
 
@@ -132,7 +133,19 @@ for (const useWrongDisplay of [false, true]) {
     }));
     t.mock.method(directImageUploadEffects, 'review', async () => { throw new Error('finalization_must_not_request_model_review'); });
     t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {});
-    t.mock.method(directImageUploadEffects, 'promote', async () => { promotions++; return {
+    t.mock.method(directImageUploadEffects, 'promote', async (_job: DirectImageObjectJob, _deadline: number,
+      verifiedSources: readonly VerifiedProcessedImageSource[]) => {
+      promotions++;
+      assert.equal(verifiedSources.length, 2);
+      assert.deepEqual(verifiedSources.map(source => source.variant), ['display', 'thumbnail']);
+      for (const source of verifiedSources) {
+        assert.equal(source.etag, '"test"');
+        assert.equal(source.mediaType, 'image/webp');
+        assert.equal(source.sizeBytes, webp.byteLength);
+        const expectedKey = source.variant === 'display' ? job.displayKey : job.thumbnailKey;
+        assert.equal(source.sourceKey, expectedKey);
+      }
+      return {
       originalUrl: 'https://images.test/listings/ready-webp-display.webp',
       displayUrl: 'https://images.test/listings/ready-webp-display.webp', thumbnailUrl: 'https://images.test/listings/ready-webp-thumbnail.webp',
     }; });

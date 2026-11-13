@@ -182,6 +182,76 @@ function copyGate() {
   const promise = new Promise<void>(resolve => { release = resolve; });
   return { promise, release };
 }
+
+test('promotion reuses the decoded staged sources and preserves conditional copies without redundant HEADs', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const base = fixture();
+  const job = { ...base, originalKey: base.displayKey };
+  const variants = ['display', 'thumbnail'] as const;
+  const verified = variants.map(variant => ({ variant, sourceKey: job[`${variant}Key`]!,
+    etag: `"${variant}-decoded"`, mediaType: 'image/webp', sizeBytes: 3 }));
+  const requests: Array<{ method: string; headers: Headers }> = [];
+  globalThis.fetch = async (_input, init) => {
+    requests.push({ method: init?.method ?? 'GET', headers: new Headers(init?.headers) });
+    assert.equal(init?.method, 'PUT');
+    assert.equal(init.body, undefined);
+    return new Response('<CopyObjectResult><ETag>"copied"</ETag></CopyObjectResult>');
+  };
+  try {
+    await promoteProcessedImages(job, undefined, verified);
+    assert.equal(requests.length, 2);
+    for (const variant of variants) {
+      const copy = requests.find(request => request.headers.get('x-amz-copy-source')?.endsWith(`/${variant}.webp`));
+      assert.ok(copy);
+      assert.equal(copy.headers.get('x-amz-copy-source-if-match'), `"${variant}-decoded"`);
+      assert.equal(copy.headers.get('cf-copy-destination-if-none-match'), '*');
+    }
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test('verified source receipts cannot cross leases or replace validated MIME, size, or strong ETag', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const base = fixture();
+  const job = { ...base, originalKey: base.displayKey };
+  const valid = { variant: 'display' as const, sourceKey: job.displayKey!, etag: '"decoded"', mediaType: 'image/webp', sizeBytes: 3 };
+  let copies = 0;
+  globalThis.fetch = async (_input, init) => {
+    if (init?.method === 'PUT') copies++;
+    return new Response(null, { headers: { 'Content-Length': '3', 'Content-Type': 'image/webp', ETag: '"decoded"' } });
+  };
+  try {
+    for (const change of [{ sourceKey: 'staged/v1/upload-one/another-lease/display.webp' },
+      { etag: 'W/"decoded"' }, { mediaType: 'image/jpeg' }, { sizeBytes: 0 }, { sizeBytes: 12 * 1024 * 1024 + 1 }]) {
+      await assert.rejects(promoteProcessedImages(job, undefined, [{ ...valid, ...change }]), /invalid_verified_image_source/);
+    }
+    assert.equal(copies, 0);
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test('a changed decoded source cannot be accepted by retrying its copy against a new ETag', async () => {
+  const restore = environment();
+  const originalFetch = globalThis.fetch;
+  const base = fixture();
+  const job = { ...base, originalKey: base.displayKey };
+  const verified = (['display', 'thumbnail'] as const).map(variant => ({ variant,
+    sourceKey: job[`${variant}Key`]!, etag: '"decoded-before-change"', mediaType: 'image/webp', sizeBytes: 3 }));
+  let sourceHeads = 0;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (init?.method === 'PUT') {
+      assert.equal(new Headers(init.headers).get('x-amz-copy-source-if-match'), '"decoded-before-change"');
+      return new Response(null, { status: 412 });
+    }
+    if (url.pathname.startsWith('/private-intake/')) sourceHeads++;
+    return new Response(null, { status: 404 });
+  };
+  try {
+    await assert.rejects(promoteProcessedImages(job, undefined, verified), /destination_conflict/);
+    assert.equal(sourceHeads, 0);
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
 const settleStorage = () => new Promise<void>(resolve => setImmediate(resolve));
 
 function copiedVariant(input: string | URL | Request) {
