@@ -127,6 +127,7 @@ for (const useWrongDisplay of [false, true]) {
     replaceDelegate(prisma.listingImageUpload, 'updateMany', async ({ data }: { data: Record<string, unknown> }) => { job = { ...job, ...data } as typeof job; return { count: 1 }; });
     replaceDelegate(prisma.listingImage, 'findUnique', async () => attached);
     replaceDelegate(prisma.listing, 'findUnique', async () => ({ sellerId: 'owner', status: 'draft' }));
+    t.mock.method(directImageUploadEffects, 'inspectImage', async () => ({ mediaType: 'image/webp', sizeBytes: 100, etag: '"test"' }));
     t.mock.method(directImageUploadEffects, 'readImage', async (_job: unknown, variant: string) => ({
       data: variant === 'display' && useWrongDisplay ? jpeg : webp,
       mediaType: variant === 'display' && useWrongDisplay ? 'image/jpeg' : 'image/webp', etag: '"test"',

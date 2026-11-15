@@ -12,7 +12,8 @@ export async function GET(request: Request, context: Context) {
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
   return directImageRoute(async () => {
     const { listingId, uploadId } = await context.params;
-    return getOwnedDirectImageUpload(listingId, session.user.id, uploadId);
+    return getOwnedDirectImageUpload(listingId, session.user.id, uploadId,
+      { reconcileSource: new URL(request.url).searchParams.get('reconcile') === '1' });
   });
 }
 

@@ -16,7 +16,7 @@ async function fixture(options = {}) {
   const source = options.source ?? await sharp({ create: { width: 2400, height: 1200, channels: 3, background: "#397b68" } })
     .jpeg().withMetadata({ orientation: 6 }).toBuffer();
   const records = new Map([[SOURCE, { data: source, httpMetadata: { contentType: "image/jpeg" } }]]);
-  const writes = [], reads = [], deleted = [], callbacks = [], transforms = [], logs = [];
+  const writes = [], reads = [], deleted = [], callbacks = [], transforms = [], logs = [], timings = [];
   const info = async body => {
     const metadata = await sharp(await bytesFrom(body)).metadata();
     return { format: `image/${metadata.format}`, width: metadata.width, height: metadata.height, fileSize: metadata.size };
@@ -78,7 +78,7 @@ async function fixture(options = {}) {
   };
   let completionResult = { action: "ready" };
   const effects = {
-    logger: { warn: value => logs.push(JSON.parse(value)) },
+    logger: { warn: value => logs.push(JSON.parse(value)), info: value => timings.push(JSON.parse(value)) },
     fetch: async (url, init) => {
       const action = new URL(url).pathname.split("/").at(-1);
       const body = JSON.parse(init.body);
@@ -93,11 +93,34 @@ async function fixture(options = {}) {
     attempts: 1, acknowledgements: 0, retries: [],
     ack() { this.acknowledgements++; }, retry(settings) { this.retries.push(settings); },
   };
-  return { env, effects, message, records, reads, writes, deleted, callbacks, transforms, logs, source,
+  return { env, effects, message, records, reads, writes, deleted, callbacks, transforms, logs, timings, source,
     setClaim(value) { claimResult = value; }, setCompletion(value) { completionResult = value; },
     run() { return handleUploadMessage(message, env, effects); },
   };
 }
+
+test("validated stages carry lease-bound metadata and safe stage timings", async () => {
+  const f = await fixture();
+  await f.run();
+  assert.equal(f.message.acknowledgements, 1);
+  for (const { key, settings } of f.writes) {
+    const variant = VARIANTS.find(value => TARGETS[value.name] === key);
+    const metadata = settings.customMetadata;
+    assert.equal(metadata.validationVersion, 'worker-image-v1');
+    assert.equal(metadata.uploadId, ID);
+    assert.equal(metadata.leaseToken, LEASE);
+    assert.equal(metadata.sourceSha256, hash(f.source));
+    assert.equal(metadata.variant, variant.name);
+    assert.equal(metadata.format, variant.format);
+    assert.ok(Number(metadata.width) > 0 && Number(metadata.width) <= variant.dimension);
+    assert.ok(Number(metadata.height) > 0 && Number(metadata.height) <= variant.dimension);
+  }
+  assert.equal(f.timings.length, 1);
+  const { event, ...durations } = f.timings[0];
+  assert.equal(event, 'image_pipeline_timing');
+  assert.deepEqual(Object.keys(durations).sort(), ['claimMs', 'completionMs', 'sourceMs', 'stagingMs', 'totalMs', 'transformMs']);
+  assert.ok(Object.values(durations).every(value => Number.isFinite(value) && value >= 0));
+});
 
 test("only raw JPEG create events from the configured private bucket are eligible", () => {
   for (const action of ["PutObject", "CopyObject", "CompleteMultipartUpload"]) {

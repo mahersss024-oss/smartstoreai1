@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
-import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
+import { incrementRuntimeCounter, recordRuntimeDurationMs } from '@/lib/observability/runtime-metrics';
 import {
   createPresignedRequest,
   deleteListingObject,
@@ -11,13 +11,30 @@ import { ImageStorageResponseError, retryImageStorage } from './image-storage-re
 import { directImagePromotionBudgetMs } from './direct-image-promotion';
 
 export type DirectImageVariant = 'original' | 'display' | 'thumbnail';
-/** Metadata from the exact staged bytes already decoded by the server. */
+/** Metadata bound to validated staged bytes by their ETag. */
 export type VerifiedProcessedImageSource = {
   variant: DirectImageVariant;
   sourceKey: string;
   etag: string;
   mediaType: string;
   sizeBytes: number;
+};
+export type ProcessedImageAttestation = {
+  validationVersion: 'worker-image-v1';
+  uploadId: string;
+  leaseToken: string;
+  sourceSha256: string;
+  variant: DirectImageVariant;
+  format: 'image/jpeg' | 'image/webp';
+  width: number;
+  height: number;
+  sha256: string;
+};
+export type InspectedProcessedImage = {
+  mediaType: string;
+  etag: string;
+  sizeBytes: number;
+  attestation?: ProcessedImageAttestation;
 };
 export type DirectImageObjectJob = {
   id: string;
@@ -186,6 +203,65 @@ async function objectRequest<T>(config: S3ObjectStorageConfig, method: 'GET' | '
   }, budget);
 }
 
+/** Read signed R2 metadata without transferring the staged image bytes. */
+export async function inspectProcessedImage(job: DirectImageObjectJob, variant: DirectImageVariant, expectedLease: string): Promise<InspectedProcessedImage> {
+  const startedAt = Date.now();
+  try {
+    const { intakeStorage } = requireConfiguration();
+    return await objectRequest(intakeStorage, 'HEAD', stagedKey(job, variant), {}, async response => {
+      if (!response.ok) throw new ImageStorageResponseError(response.status);
+      const mediaType = response.headers.get('content-type')?.split(';')[0].trim();
+      const sizeBytes = Number(response.headers.get('content-length'));
+      const etag = response.headers.get('etag');
+      if (!mediaType || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > maxImageBytes || !etag) {
+        throw new Error('invalid_processed_image');
+      }
+      const read = (name: string) => response.headers.get(`x-amz-meta-${name}`) ?? undefined;
+      const validationVersion = read('validationVersion');
+      // Older Workers still require the existing byte-level validation.
+      if (validationVersion === undefined) return { mediaType, etag, sizeBytes };
+      const uploadId = read('uploadId');
+      const leaseToken = read('leaseToken');
+      const sourceSha256 = read('sourceSha256');
+      const storedVariant = read('variant');
+      const format = read('format');
+      const width = Number(read('width'));
+      const height = Number(read('height'));
+      const sha256 = read('sha256');
+      const dimension = variant === 'original' ? 1800 : variant === 'display' ? 900 : 360;
+      if (validationVersion !== 'worker-image-v1' || uploadId !== job.id || !leaseToken || leaseToken !== expectedLease ||
+        sourceSha256 !== job.sha256 || storedVariant !== variant || format !== mediaType ||
+        format !== getDirectImageVariantMediaType(job, variant) ||
+        !Number.isSafeInteger(width) || width < 1 || width > dimension ||
+        !Number.isSafeInteger(height) || height < 1 || height > dimension ||
+        !sha256 || !/^[a-f0-9]{64}$/.test(sha256)) throw new Error('invalid_processed_image_attestation');
+      return { mediaType, etag, sizeBytes, attestation: {
+        validationVersion, uploadId, leaseToken, sourceSha256, variant, format: format as ProcessedImageAttestation['format'],
+        width, height, sha256,
+      } };
+    });
+  } finally {
+    recordRuntimeDurationMs('image.direct.processed_head', Date.now() - startedAt);
+  }
+}
+
+/** Only an owned, pending upload may reconcile a lost PUT response. */
+export async function inspectDirectImageSource(job: DirectImageObjectJob) {
+  assertJob(job);
+  const startedAt = Date.now();
+  try {
+    const { intakeStorage } = requireConfiguration();
+    return await objectRequest(intakeStorage, 'HEAD', job.sourceKey, {}, async response => {
+      if (response.status === 404) return false;
+      if (!response.ok) throw new ImageStorageResponseError(response.status);
+      if (response.headers.get('content-type')?.split(';')[0].trim() !== 'image/jpeg' ||
+          Number(response.headers.get('content-length')) !== job.sizeBytes) throw new Error('invalid_image_source');
+      // Worker verifies the exact source hash before generating any outputs.
+      return true;
+    });
+  } finally { recordRuntimeDurationMs('image.direct.source_head', Date.now() - startedAt); }
+}
+
 export async function readProcessedImage(job: DirectImageObjectJob, variant: DirectImageVariant) {
   const { intakeStorage } = requireConfiguration();
   return objectRequest(intakeStorage, 'GET', stagedKey(job, variant), {}, async response => {
@@ -223,7 +299,7 @@ export async function promoteProcessedImages(
   const promoteVariant = async (variant: DirectImageVariant) => {
     const source = stagedKey(job, variant);
     const verified = verifiedByVariant.get(variant);
-    // The conditional copy binds the decoded GET's ETag to this exact lease.
+    // The conditional copy binds the validated staged ETag to this exact lease.
     // A changed source fails the copy instead of copying unverified bytes.
     const etag = verified?.etag ?? await objectRequest(intakeStorage, 'HEAD', source, {}, async response => {
       if (!response.ok) throw new ImageStorageResponseError(response.status);
