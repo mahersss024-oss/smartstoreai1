@@ -1,4 +1,4 @@
-import { createDirectImageUpload, directImageUploadInput, getOwnedActiveDirectImageUploads } from '@/agent/marketplace/direct-image-uploads';
+import { createDirectImageUpload, directImageUploadInput, getOwnedActiveDirectImageUploads, resumeDirectImageUpload } from '@/agent/marketplace/direct-image-uploads';
 import { DirectImageUploadError } from '@/agent/marketplace/direct-image-upload-policy';
 import { directImageRoute, readDirectImageJson } from '@/lib/api/direct-image-upload-route';
 import { noStoreHeaders } from '@/lib/api/no-store';
@@ -17,7 +17,8 @@ export async function GET(request: Request, context: { params: Promise<{ listing
 export async function POST(request: Request, context: { params: Promise<{ listingId: string }> }) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers: noStoreHeaders });
-  const limited = await enforceApiRateLimit(request, { namespace: 'image_upload_reservation', actorId: session.user.id, maxRequests: 10, windowMs: 60_000 });
+  // Bound metadata reads and signing for replays as well as new reservations.
+  const limited = await enforceApiRateLimit(request, { namespace: 'image_upload_request', actorId: session.user.id, maxRequests: 120, windowMs: 60_000 });
   if (limited) return limited;
   return directImageRoute(async () => {
     const key = request.headers.get('idempotency-key')?.trim();
@@ -25,6 +26,12 @@ export async function POST(request: Request, context: { params: Promise<{ listin
     const parsed = directImageUploadInput.safeParse(await readDirectImageJson(request));
     if (!parsed.success) throw new DirectImageUploadError('invalid_request', 400);
     const { listingId } = await context.params;
+    const resumed = await resumeDirectImageUpload(listingId, session.user.id, key, parsed.data);
+    if (resumed) return resumed;
+    const reservationLimit = await enforceApiRateLimit(request, {
+      namespace: 'image_upload_reservation', actorId: session.user.id, maxRequests: 10, windowMs: 60_000,
+    });
+    if (reservationLimit) return reservationLimit;
     return createDirectImageUpload(listingId, session.user.id, key, parsed.data);
   }, 201);
 }

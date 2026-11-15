@@ -35,7 +35,8 @@ export async function readDirectImageJson(request: Request) {
 
 export async function directImageRoute(operation: () => Promise<unknown>, status = 200) {
   try {
-    return Response.json(await operation(), { status, headers: noStoreHeaders });
+    const result = await operation();
+    return result instanceof Response ? result : Response.json(result, { status, headers: noStoreHeaders });
   } catch (error) {
     if (error instanceof DirectImageUploadError) {
       return Response.json({ error: error.code }, { status: error.status, headers: noStoreHeaders });
