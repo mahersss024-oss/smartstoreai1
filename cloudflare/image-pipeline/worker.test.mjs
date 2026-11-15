@@ -146,6 +146,44 @@ test("complete path generates three private correctly sized files, awaits server
   assert.equal(f.records.size, 0);
 });
 
+test("server-owned successful cleanup avoids a second Worker delete and still acknowledges delivery", async () => {
+  const f = await fixture();
+  f.setCompletion({ action: "ready", cleanup: "server" });
+  await f.run();
+  assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.message.retries, []);
+  assert.deepEqual(f.deleted, []);
+  assert.equal(f.records.size, 4, "server keeps cleanup ownership for raw and staged files");
+  assert.deepEqual(f.callbacks.map(call => call.action), ["claim", "complete"]);
+});
+
+test("server-owned terminal cleanup handles cancellation and exhausted recovery without Worker deletes", async () => {
+  for (const recovery of [false, true]) {
+    const f = await fixture();
+    f.setClaim({ action: "discard", cleanup: "server", source: { key: SOURCE }, targets: TARGETS });
+    if (recovery) f.message.attempts = 6;
+    await handleUploadMessage(f.message, f.env, { ...f.effects, recovery });
+    assert.equal(f.message.acknowledgements, 1);
+    assert.deepEqual(f.deleted, []);
+    assert.equal(f.transforms.length, 0);
+  }
+  const f = await fixture();
+  f.setCompletion({ action: "discard", cleanup: "server" });
+  await f.run();
+  assert.equal(f.message.acknowledgements, 1);
+  assert.deepEqual(f.deleted, []);
+});
+
+test("cleanup hand-off never authorizes discarding images when completion requests a retry", async () => {
+  const f = await fixture();
+  f.setCompletion({ action: "retry", cleanup: "server" });
+  await f.run();
+  assert.equal(f.message.acknowledgements, 0);
+  assert.equal(f.message.retries.length, 1);
+  assert.deepEqual(f.deleted, []);
+  assert.ok(f.records.has(SOURCE));
+});
+
 test("new jobs stage only display and thumbnail WebP outputs", async () => {
   const f = await fixture();
   const displayKey = `staged/v1/${ID}/${LEASE}/display.webp`;

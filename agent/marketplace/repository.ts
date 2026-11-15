@@ -1219,13 +1219,13 @@ export async function listMarketplaceListings(
     : prisma.$transaction(readListings, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
-export async function getListing(listingId: string, options: { publicOnly?: boolean } = {}) {
+export async function getListing(listingId: string, options: { publicOnly?: boolean; transaction?: Prisma.TransactionClient } = {}) {
   if (!shouldUseDatabaseStore()) {
     const listing = memoryStore.getListing(listingId);
     return options.publicOnly && listing?.status !== 'published' ? null : listing;
   }
 
-  const listing = await prisma.listing.findUnique({
+  const listing = await (options.transaction ?? prisma).listing.findUnique({
     where: { id: listingId, ...(options.publicOnly ? { status: 'published' as const, seller: { deletedAt: null } } : {}) },
     include: {
       images: {
