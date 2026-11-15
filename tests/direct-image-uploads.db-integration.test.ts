@@ -224,6 +224,27 @@ test('database reservations and legacy uploads share the eight-image limit under
   await assert.rejects(start(f), { code: 'listing_image_limit_reached' });
 });
 
+test('database attaches the eighth upload when seven images are saved and rejects only a ninth reservation', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  await prisma.listingImage.createMany({ data: Array.from({ length: 7 }, (_, index) => ({
+    id: randomUUID(), listingId: f.listing.id,
+    originalUrl: `https://images.isolated.test/saved-${index}.webp`,
+    displayUrl: `https://images.isolated.test/saved-${index}.webp`,
+    thumbnailUrl: `https://images.isolated.test/saved-${index}-thumbnail.webp`,
+    status: 'approved', isPrimary: index === 0, qualityScore: 80, enhancements: [],
+  })) });
+  const last = await claimed(f);
+  t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {
+    assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 7);
+  });
+  assert.equal((await completeDirectImageUpload(last.id, { leaseToken: last.claim.leaseToken })).action, 'ready');
+  const result = await getOwnedDirectImageUpload(f.listing.id, f.seller.id, last.id);
+  assert.equal(result.upload.status, 'ready');
+  assert.equal(result.listing?.images.length, 8);
+  assert.equal(await prisma.listingImageUpload.count({ where: { listingId: f.listing.id, status: { in: ['pending', 'processing'] } } }), 0);
+  await assert.rejects(start(f), { code: 'listing_image_limit_reached' });
+});
+
 test('database pending images block publication and blank-draft reset without making photos mandatory', { skip: !enabled }, async t => {
   const f = await fixture(t);
   await prisma.listing.update({ where: { id: f.listing.id }, data: { title: null } });
