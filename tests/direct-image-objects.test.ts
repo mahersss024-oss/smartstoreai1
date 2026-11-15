@@ -9,6 +9,7 @@ import {
   getDirectImageUploadConfiguration,
   promoteProcessedImages,
   readProcessedImage,
+  inspectProcessedImage, inspectDirectImageSource,
   type DirectImageObjectJob,
 } from '@/agent/marketplace/direct-image-objects';
 
@@ -46,6 +47,44 @@ function fixture(): DirectImageObjectJob {
     createdAt: new Date('2026-10-27T00:00:00Z'), expiresAt: new Date(Date.now() + 3_600_000),
   };
 }
+
+test('Worker attestation is accepted only for the current lease, source, dimensions and variant', async t => {
+  const restore = environment(); t.after(restore);
+  const metadata: Record<string, string> = {
+    'content-type': 'image/webp', 'content-length': '120', etag: '"validated"',
+    'x-amz-meta-validationVersion': 'worker-image-v1', 'x-amz-meta-uploadId': 'upload-one',
+    'x-amz-meta-leaseToken': 'lease-one', 'x-amz-meta-sourceSha256': 'a'.repeat(64),
+    'x-amz-meta-variant': 'display', 'x-amz-meta-format': 'image/webp',
+    'x-amz-meta-width': '900', 'x-amz-meta-height': '600', 'x-amz-meta-sha256': 'b'.repeat(64),
+  };
+  let headers = { ...metadata };
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    assert.equal(init?.method, 'HEAD'); return new Response(null, { headers });
+  });
+  assert.equal((await inspectProcessedImage(fixture(), 'display', 'lease-one')).attestation?.width, 900);
+  for (const [key, value] of Object.entries({ leaseToken: 'old-lease', sourceSha256: 'c'.repeat(64),
+    variant: 'thumbnail', width: '901', format: 'image/jpeg', validationVersion: 'unknown', sha256: 'bad' })) {
+    headers = { ...metadata, [`x-amz-meta-${key}`]: value };
+    await assert.rejects(inspectProcessedImage(fixture(), 'display', 'lease-one'), /attestation/);
+  }
+  headers = { ...metadata }; delete headers['x-amz-meta-validationVersion'];
+  assert.equal((await inspectProcessedImage(fixture(), 'display', 'lease-one')).attestation, undefined);
+});
+
+test('source reconciliation performs only a private HEAD and rejects mismatched objects', async t => {
+  const restore = environment(); t.after(restore);
+  let status = 404, size = '3';
+  t.mock.method(globalThis, 'fetch', async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    assert.equal(init?.method, 'HEAD');
+    assert.equal(new URL(String(url)).pathname, '/private-intake/intake/v1/upload-one.jpg');
+    return new Response(null, { status, headers: { 'content-type': 'image/jpeg', 'content-length': size } });
+  });
+  assert.equal(await inspectDirectImageSource(fixture()), false);
+  status = 200;
+  assert.equal(await inspectDirectImageSource(fixture()), true);
+  size = '4';
+  await assert.rejects(inspectDirectImageSource(fixture()), /invalid_image_source/);
+});
 
 test('direct images remain disabled by default and incomplete opt-in is not advertised', () => {
   const restore = environment({ SMARTSTORE_DIRECT_IMAGE_UPLOADS: 'false' });

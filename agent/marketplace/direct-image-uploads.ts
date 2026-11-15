@@ -6,7 +6,7 @@ import { after } from 'next/server';
 
 import { prisma } from '@/lib/db/prisma';
 import { publishRealtimeEvent } from '@/lib/realtime/event-bus';
-import { incrementRuntimeCounter } from '@/lib/observability/runtime-metrics';
+import { incrementRuntimeCounter, recordRuntimeDurationMs } from '@/lib/observability/runtime-metrics';
 import { analyzeImageQuality } from './image-quality';
 import { verifyListingImageDelivery } from './listing-image-readiness';
 import { reviewListingImageContent } from './listing-image-content';
@@ -15,7 +15,7 @@ import { scheduleListingEvidenceCopy } from './evidence';
 import {
   createDirectImageTransfer, discardDirectImageObjects, getDirectImageUploadConfiguration,
   promoteProcessedImages, readProcessedImage, getDirectImageVariantMediaType, getDirectImagePublicUrls,
-  type VerifiedProcessedImageSource,
+  inspectProcessedImage, inspectDirectImageSource, type VerifiedProcessedImageSource,
 } from './direct-image-objects';
 import {
   DirectImagePromotionBusyError, assertDirectImagePromotionIdle, directImagePromotionProtectsCleanup, reserveDirectImagePromotion,
@@ -38,6 +38,8 @@ export const directImageUploadInput = z.object({
 export const directImageUploadEffects = {
   createTransfer: createDirectImageTransfer,
   readImage: readProcessedImage,
+  inspectImage: inspectProcessedImage,
+  inspectSource: inspectDirectImageSource,
   promote: promoteProcessedImages,
   verifyDelivery: verifyListingImageDelivery,
   discard: discardDirectImageObjects,
@@ -45,6 +47,12 @@ export const directImageUploadEffects = {
   review: reviewListingImageContent,
   now: () => Date.now(),
 };
+
+async function measureImageStep<T>(stage: string, operation: () => Promise<T>): Promise<T> {
+  const startedAt = Date.now();
+  try { return await operation(); }
+  finally { recordRuntimeDurationMs(`image.direct.${stage}`, Date.now() - startedAt); }
+}
 
 async function serializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
@@ -175,7 +183,7 @@ function terminalUploadResponse<T extends { action: 'ready' | 'discard' }>(respo
     ? { ...response, cleanup: 'server' as const } : response;
 }
 
-export async function getOwnedDirectImageUpload(listingId: string, sellerId: string, uploadId: string) {
+export async function getOwnedDirectImageUpload(listingId: string, sellerId: string, uploadId: string, options: { reconcileSource?: boolean } = {}) {
   const { getListing } = await import('./repository');
   const { job, listing } = await serializable(async tx => {
     const found = await tx.listingImageUpload.findFirst({ where: { id: uploadId, listingId, sellerId } });
@@ -200,7 +208,10 @@ export async function getOwnedDirectImageUpload(listingId: string, sellerId: str
     return { job, listing: job.status === 'ready' ? listing : undefined };
   });
   if (['cancelled', 'failed', 'expired'].includes(job.status)) schedulePrivateCleanup(job);
-  return { upload: imageUploadSummary(job), ...(listing?.sellerId === sellerId ? { listing } : {}) };
+  const sourceUploaded = options.reconcileSource && job.status === 'pending'
+    ? await directImageUploadEffects.inspectSource(job) : undefined;
+  return { upload: imageUploadSummary(job), ...(listing?.sellerId === sellerId ? { listing } : {}),
+    ...(sourceUploaded !== undefined ? { sourceUploaded } : {}) };
 }
 
 /** Recover work after leaving an editor or losing a cancellation request offline. */
@@ -359,19 +370,30 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     return terminalUploadResponse({ action: 'discard' as const }, job);
   }
   let promotion: DirectImagePromotion | undefined;
+  const completionStartedAt = Date.now();
   try {
     const noOriginal = job.originalKey === job.displayKey;
     const variantNames = noOriginal ? ['display', 'thumbnail'] as const : ['original', 'display', 'thumbnail'] as const;
     const variants = await Promise.all(variantNames.map(async variant => {
-      const image = await directImageUploadEffects.readImage(job, variant);
-      await validateProcessedImage(image, variant, getDirectImageVariantMediaType(job, variant));
-      return image;
+      const startedAt = Date.now();
+      try {
+        const inspected = await directImageUploadEffects.inspectImage(job, variant, input.leaseToken);
+        if (inspected?.attestation) {
+          incrementRuntimeCounter('image.direct.worker_validation');
+          return inspected;
+        }
+        const image = await directImageUploadEffects.readImage(job, variant);
+        await validateProcessedImage(image, variant, getDirectImageVariantMediaType(job, variant));
+        incrementRuntimeCounter('image.direct.legacy_validation');
+        return { mediaType: image.mediaType, etag: image.etag, sizeBytes: image.data.byteLength };
+      } finally { recordRuntimeDurationMs('image.direct.validation', Date.now() - startedAt); }
     }));
     const [original] = variants;
     // The direct/manual upload path performs technical checks only. Hamad
     // retains its independent image understanding and review within chat.
-    const quality = analyzeImageQuality({ fileName: job.fileName, mimeType: original.mediaType, sizeBytes: original.data.byteLength });
-    const waitDeadline = Date.now() + 150_000;
+    const quality = analyzeImageQuality({ fileName: job.fileName, mimeType: original.mediaType, sizeBytes: original.sizeBytes });
+    const reservationStartedAt = Date.now();
+    const waitDeadline = reservationStartedAt + 150_000;
     let reserved: { state: 'reserved'; job: ListingImageUpload; promotion: DirectImagePromotion } | { state: 'ready' } | { state: 'discard' };
     while (true) {
       try {
@@ -398,6 +420,7 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
+    recordRuntimeDurationMs('image.direct.reservation', Date.now() - reservationStartedAt);
     if (reserved.state === 'ready') return terminalUploadResponse({ action: 'ready' as const }, job);
     if (reserved.state === 'discard') return terminalUploadResponse({ action: 'discard' as const }, job);
     const ownedPromotion = reserved.promotion;
@@ -406,12 +429,12 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
       const variant = variantNames[index];
       const sourceKey = reserved.job[`${variant}Key`];
       return image.etag && sourceKey ? [{ variant, sourceKey, etag: image.etag,
-        mediaType: image.mediaType, sizeBytes: image.data.byteLength }] : [];
+        mediaType: image.mediaType, sizeBytes: image.sizeBytes }] : [];
     });
-    const urls = await directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline, verifiedSources);
-    await directImageUploadEffects.verifyDelivery(urls, ownedPromotion.deadline);
+    const urls = await measureImageStep('promotion', () => directImageUploadEffects.promote(reserved.job, ownedPromotion.deadline, verifiedSources));
+    await measureImageStep('delivery', () => directImageUploadEffects.verifyDelivery(urls, ownedPromotion.deadline));
     if (Date.now() > ownedPromotion.deadline) throw new Error('image_promotion_deadline');
-    const finalized = await serializable(async tx => {
+    const finalized = await measureImageStep('finalize', () => serializable(async tx => {
       const current = await tx.listingImageUpload.findUnique({ where: { id: job.id } });
       if (current?.status === 'ready') return 'ready' as const;
       if (!current || !isImageUploadActive(current)) return 'discard' as const;
@@ -438,7 +461,7 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
       } });
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { status: 'ready', readyAt: new Date(), leaseToken: null, leaseUntil: null, errorCode: null } });
       return 'finalized' as const;
-    });
+    }));
     if (finalized === 'ready') return terminalUploadResponse({ action: 'ready' as const }, job);
     if (finalized === 'discard') return terminalUploadResponse({ action: 'discard' as const }, job);
     scheduleListingEvidenceCopy(job.listingId);
@@ -461,6 +484,7 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
     incrementRuntimeCounter('image.direct.incomplete');
     return technical ? terminalUploadResponse({ action: 'discard' as const }, job) : { action: 'retry' as const };
   } finally {
+    recordRuntimeDurationMs('image.direct.complete', Date.now() - completionStartedAt);
     if (promotion) await releaseDirectImagePromotion(promotion).catch(() => {
       console.warn('[direct_image_upload] promotion_receipt=retained');
     });

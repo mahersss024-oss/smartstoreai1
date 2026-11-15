@@ -220,13 +220,15 @@ async function readSource(env, claim) {
   return { bytes, info };
 }
 
-async function storeStage(env, uploadId, claim, variant, bytes) {
+async function storeStage(env, uploadId, claim, variant, bytes, info) {
   const hash = await sha256(bytes);
   const key = claim.targets[variant.name];
   const stored = await env.INTAKE.put(key, bytes, {
     onlyIf: { etagDoesNotMatch: "*" },
     httpMetadata: { ...PRIVATE_METADATA, contentType: variant.format },
-    customMetadata: { uploadId, leaseToken: claim.leaseToken, sourceSha256: claim.source.sha256, sha256: hash },
+    customMetadata: { uploadId, leaseToken: claim.leaseToken, sourceSha256: claim.source.sha256, sha256: hash,
+      validationVersion: "worker-image-v1", variant: variant.name, format: variant.format,
+      width: String(info.width), height: String(info.height) },
   });
   if (stored) return;
   // A lost response may leave an immutable staged object. Reuse it only if the
@@ -240,24 +242,27 @@ async function storeStage(env, uploadId, claim, variant, bytes) {
   if (await sha256(await limitedBytes(existing.body)) !== hash) throw new PipelineError("staged_output_conflict", false);
 }
 
-async function processImage(env, uploadId, claim) {
-  const { bytes, info: sourceInfo } = await readSource(env, claim);
+async function processImage(env, uploadId, claim, measure) {
+  const { bytes, info: sourceInfo } = await measure("sourceMs", () => readSource(env, claim));
   // Sequential transforms bound per-invocation memory and service concurrency.
   for (const variant of variantsForTargets(claim.targets)) {
-    const output = await env.IMAGES.input(bytesStream(bytes))
-      .transform({ width: variant.dimension, height: variant.dimension, fit: "scale-down" })
-      .output({ format: variant.format, quality: variant.quality, anim: false });
-    const response = output.response();
-    if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== variant.format) throw new PipelineError("image_output_invalid");
-    let transformed = await limitedBytes(response.body);
-    if (variant.format === "image/jpeg") transformed = stripJpegMetadata(transformed);
-    const info = await env.IMAGES.info(bytesStream(transformed));
-    assertInfo(info, variant.format, variant.dimension);
-    // EXIF orientation may swap axes; area and the unordered pair still forbid
-    // enlargement. scale-down itself preserves the entire source image.
-    if (Math.max(info.width, info.height) > Math.max(sourceInfo.width, sourceInfo.height) ||
-      Math.min(info.width, info.height) > Math.min(sourceInfo.width, sourceInfo.height)) throw new PipelineError("image_output_enlarged", false);
-    await storeStage(env, uploadId, claim, variant, transformed);
+    const { transformed, info } = await measure("transformMs", async () => {
+      const output = await env.IMAGES.input(bytesStream(bytes))
+        .transform({ width: variant.dimension, height: variant.dimension, fit: "scale-down" })
+        .output({ format: variant.format, quality: variant.quality, anim: false });
+      const response = output.response();
+      if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== variant.format) throw new PipelineError("image_output_invalid");
+      let transformed = await limitedBytes(response.body);
+      if (variant.format === "image/jpeg") transformed = stripJpegMetadata(transformed);
+      const info = await env.IMAGES.info(bytesStream(transformed));
+      assertInfo(info, variant.format, variant.dimension);
+      // EXIF orientation may swap axes; area and the unordered pair still forbid
+      // enlargement. scale-down itself preserves the entire source image.
+      if (Math.max(info.width, info.height) > Math.max(sourceInfo.width, sourceInfo.height) ||
+        Math.min(info.width, info.height) > Math.min(sourceInfo.width, sourceInfo.height)) throw new PipelineError("image_output_enlarged", false);
+      return { transformed, info };
+    });
+    await measure("stagingMs", () => storeStage(env, uploadId, claim, variant, transformed, info));
   }
 }
 
@@ -286,6 +291,13 @@ async function finish(fetcher, origin, env, upload, claim, body) {
 export async function handleUploadMessage(message, env, dependencies = {}) {
   const fetcher = dependencies.fetch ?? globalThis.fetch;
   const logger = dependencies.logger ?? console;
+  const timings = { claimMs: 0, sourceMs: 0, transformMs: 0, stagingMs: 0, completionMs: 0 };
+  const startedAt = Date.now();
+  const measure = async (stage, operation) => {
+    const start = Date.now();
+    try { return await operation(); }
+    finally { timings[stage] += Math.max(0, Date.now() - start); }
+  };
   let upload;
   try {
     const origin = validateConfiguration(env);
@@ -302,21 +314,21 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
       message.ack();
       return;
     }
-    const claim = await callback(fetcher, origin, env, upload.uploadId, "claim", { outputFormats: ["webp-v1", "jpeg-v1"] });
+    const claim = await measure("claimMs", () => callback(fetcher, origin, env, upload.uploadId, "claim", { outputFormats: ["webp-v1", "jpeg-v1"] }));
     validateClaim(claim, upload);
     if (claim.action === "discard") {
       await cleanAfterTerminalResponse(env, upload, claim.targets, claim);
       message.ack();
       return;
     }
-    try { await processImage(env, upload.uploadId, claim); }
+    try { await processImage(env, upload.uploadId, claim, measure); }
     catch (error) {
       const known = error instanceof PipelineError ? error : new PipelineError("image_processing_unavailable");
-      await finish(fetcher, origin, env, upload, claim, { leaseToken: claim.leaseToken, errorCode: known.code, retryable: known.retryable });
+      await measure("completionMs", () => finish(fetcher, origin, env, upload, claim, { leaseToken: claim.leaseToken, errorCode: known.code, retryable: known.retryable }));
       message.ack();
       return;
     }
-    await finish(fetcher, origin, env, upload, claim, { leaseToken: claim.leaseToken });
+    await measure("completionMs", () => finish(fetcher, origin, env, upload, claim, { leaseToken: claim.leaseToken }));
     message.ack();
   } catch (error) {
     const code = error instanceof PipelineError ? error.code : "image_pipeline_unavailable";
@@ -328,6 +340,11 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
       ...(error instanceof PipelineError && error.upstreamError ? { upstreamError: error.upstreamError } : {}) }));
     const delaySeconds = Math.min(300, 15 * 2 ** Math.min(Math.max(0, (message.attempts ?? 1) - 1), 5));
     message.retry({ delaySeconds });
+  } finally {
+    if (upload) {
+      try { logger.info?.(JSON.stringify({ event: "image_pipeline_timing", ...timings, totalMs: Math.max(0, Date.now() - startedAt) })); }
+      catch { /* Diagnostics cannot change delivery acknowledgement. */ }
+    }
   }
 }
 

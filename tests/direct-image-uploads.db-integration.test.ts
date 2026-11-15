@@ -48,6 +48,8 @@ async function fixture(t: TestContext) {
   const cleanups: Array<{ id: string; includePublic?: boolean }> = [];
   const oldEffects = { ...directImageUploadEffects };
   t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {});
+  t.mock.method(directImageUploadEffects, 'inspectImage', async () => ({ mediaType: 'image/webp', sizeBytes: 100, etag: '"isolated"' }));
+  t.mock.method(directImageUploadEffects, 'inspectSource', async () => false);
   t.mock.method(directImageUploadEffects, 'createTransfer', (job: DirectImageObjectJob) => ({ url: `https://isolated.r2.cloudflarestorage.com/isolated-intake/${job.sourceKey}`, method: 'PUT' as const, headers: { 'Content-Type': 'image/jpeg', 'If-None-Match': '*' } }));
   t.mock.method(directImageUploadEffects, 'readImage', async (_job: DirectImageObjectJob, variant: DirectImageVariant) => ({ data: variant === 'original' ? original : variant === 'display' ? display : thumbnail, mediaType: variant === 'original' ? 'image/jpeg' : 'image/webp', etag: '"isolated-etag"' }));
   t.mock.method(directImageUploadEffects, 'promote', async (job: DirectImageObjectJob) => getDirectImagePublicUrls(job));
@@ -68,6 +70,42 @@ async function fixture(t: TestContext) {
   return { seller, listing, cleanups, original, display, thumbnail };
 }
 const start = (f: Fixture, key: string = randomUUID()) => createDirectImageUpload(f.listing.id, f.seller.id, key, metadata);
+
+test('lost transfer reconciliation checks storage only for the owned pending reservation', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const response = await start(f);
+  let probes = 0;
+  t.mock.method(directImageUploadEffects, 'inspectSource', async () => { probes++; return true; });
+  assert.equal('sourceUploaded' in await getOwnedDirectImageUpload(f.listing.id, f.seller.id, response.upload.id), false);
+  assert.equal(probes, 0);
+  await assert.rejects(getOwnedDirectImageUpload(f.listing.id, 'other-owner', response.upload.id, { reconcileSource: true }), { code: 'image_upload_not_found' });
+  assert.equal(probes, 0);
+  assert.equal((await getOwnedDirectImageUpload(f.listing.id, f.seller.id, response.upload.id, { reconcileSource: true })).sourceUploaded, true);
+  assert.equal(probes, 1);
+  await claimDirectImageUpload(response.upload.id);
+  assert.equal('sourceUploaded' in await getOwnedDirectImageUpload(f.listing.id, f.seller.id, response.upload.id, { reconcileSource: true }), false);
+  assert.equal(probes, 1);
+});
+
+test('attested Worker outputs bypass private downloads but still verify public delivery before attaching', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const item = await claimed(f);
+  t.mock.method(directImageUploadEffects, 'readImage', async () => { throw new Error('private_download_must_not_run'); });
+  t.mock.method(directImageUploadEffects, 'inspectImage', async (_job: DirectImageObjectJob, variant: DirectImageVariant, leaseToken: string) => ({
+    mediaType: variant === 'original' ? 'image/jpeg' : 'image/webp', sizeBytes: 100, etag: '"validated"',
+    attestation: { validationVersion: 'worker-image-v1', uploadId: item.id, leaseToken,
+      sourceSha256: metadata.sha256, variant, format: variant === 'original' ? 'image/jpeg' : 'image/webp',
+      width: 100, height: 60, sha256: 'b'.repeat(64) },
+  }));
+  let deliveryChecks = 0;
+  t.mock.method(directImageUploadEffects, 'verifyDelivery', async () => {
+    deliveryChecks++;
+    assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 0);
+  });
+  assert.equal((await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken })).action, 'ready');
+  assert.equal(deliveryChecks, 1);
+  assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 1);
+});
 async function claimed(f: Fixture) {
   const response = await start(f);
   const claim = await claimDirectImageUpload(response.upload.id);
