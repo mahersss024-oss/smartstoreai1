@@ -41,6 +41,7 @@ export const directImageUploadEffects = {
   promote: promoteProcessedImages,
   verifyDelivery: verifyListingImageDelivery,
   discard: discardDirectImageObjects,
+  scheduleCleanup: (task: () => Promise<void>) => after(task),
   review: reviewListingImageContent,
   now: () => Date.now(),
 };
@@ -143,34 +144,62 @@ async function safeDiscard(job: ListingImageUpload, includePublic = false) {
   }
 }
 
+const scheduledPrivateCleanups = new Set<string>();
+
 function schedulePrivateCleanup(job: ListingImageUpload, includePublic = true) {
-  if (job.cleanupAt) return;
+  if (job.cleanupAt) return false;
+  // Coalesce same-process replay callbacks without mixing different leases or
+  // public-deletion authority. The database manifest remains the crash fallback.
+  const key = JSON.stringify([job.id, job.sourceKey, job.originalKey, job.displayKey, job.thumbnailKey, includePublic]);
+  if (scheduledPrivateCleanups.has(key)) return true;
+  scheduledPrivateCleanups.add(key);
   // Metadata is already durably terminal. A slow storage provider must not hold
   // the customer's cancellation/status response open; cron retries any failure.
-  try { after(async () => { await safeDiscard(job, includePublic); }); }
-  catch { /* Tests or a stopped request context leave this work to the janitor. */ }
+  try {
+    directImageUploadEffects.scheduleCleanup(async () => {
+      try { await safeDiscard(job, includePublic); }
+      finally { scheduledPrivateCleanups.delete(key); }
+    });
+    return true;
+  } catch {
+    scheduledPrivateCleanups.delete(key);
+    return false; // A stopped request context leaves cleanup to the Worker/janitor.
+  }
+}
+
+// Internal, optional hand-off: older Workers ignore it; newer Workers avoid a
+// second delete only after the server has registered its durable cleanup work.
+// cleanupAt stays unset until deletion succeeds, so cron recovers a lost task.
+function terminalUploadResponse<T extends { action: 'ready' | 'discard' }>(response: T, job?: ListingImageUpload) {
+  return job && schedulePrivateCleanup(job, response.action !== 'ready' && job.status !== 'ready')
+    ? { ...response, cleanup: 'server' as const } : response;
 }
 
 export async function getOwnedDirectImageUpload(listingId: string, sellerId: string, uploadId: string) {
-  const job = await serializable(async tx => {
+  const { getListing } = await import('./repository');
+  const { job, listing } = await serializable(async tx => {
     const found = await tx.listingImageUpload.findFirst({ where: { id: uploadId, listingId, sellerId } });
     if (!found) throw new DirectImageUploadError('image_upload_not_found', 404);
-    const { allowed } = await ownedTarget(tx, listingId, sellerId);
-    if (!allowed) throw new DirectImageUploadError('image_upload_not_found', 404);
+    // Waiting polls need ownership/status only. A ready poll instead loads the
+    // canonical ordered listing once, in the same snapshot as its upload job.
+    const listing = found.status === 'ready' ? await getListing(listingId, { transaction: tx }) : undefined;
+    const target = found.status === 'ready' ? listing ?? null : await tx.listing.findUnique({
+      where: { id: listingId }, select: { sellerId: true, status: true, compliance: true },
+    });
+    const seller = await tx.user.findUnique({ where: { id: sellerId }, select: { deletedAt: true } });
+    if (!imageUploadTargetAllowed(target, sellerId, seller)) throw new DirectImageUploadError('image_upload_not_found', 404);
+    let job = found;
     if (isImageUploadActive(found) && !directImageUploadsEnabled()) {
-      return tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'cancelled', errorCode: 'direct_image_uploads_disabled', leaseToken: null, leaseUntil: null } });
+      job = await tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'cancelled', errorCode: 'direct_image_uploads_disabled', leaseToken: null, leaseUntil: null } });
+    } else if (['pending', 'processing'].includes(found.status) && found.expiresAt <= new Date()) {
+      job = await tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'expired', errorCode: 'image_upload_expired', leaseToken: null, leaseUntil: null } });
     }
-    if (['pending', 'processing'].includes(found.status) && found.expiresAt <= new Date()) {
-      return tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'expired', errorCode: 'image_upload_expired', leaseToken: null, leaseUntil: null } });
+    if (found.status === 'ready' && !listing?.images.some(image => image.id === found.id)) {
+      job = await tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'cancelled', errorCode: 'image_deleted' } });
     }
-    if (found.status === 'ready' && !await tx.listingImage.findUnique({ where: { id: found.id }, select: { id: true } })) {
-      return tx.listingImageUpload.update({ where: { id: found.id }, data: { status: 'cancelled', errorCode: 'image_deleted' } });
-    }
-    return found;
+    return { job, listing: job.status === 'ready' ? listing : undefined };
   });
   if (['cancelled', 'failed', 'expired'].includes(job.status)) schedulePrivateCleanup(job);
-  const { getListing } = await import('./repository');
-  const listing = job.status === 'ready' ? await getListing(listingId) : undefined;
   return { upload: imageUploadSummary(job), ...(listing?.sellerId === sellerId ? { listing } : {}) };
 }
 
@@ -246,8 +275,7 @@ export async function exhaustDirectImageUploadDelivery(uploadId: string) {
       status, errorCode, leaseToken: null, leaseUntil: null,
     } });
   });
-  if (job) schedulePrivateCleanup(job, job.status !== 'ready');
-  return discardClaim(job ?? undefined);
+  return terminalUploadResponse(discardClaim(job ?? undefined), job ?? undefined);
 }
 
 export async function claimDirectImageUpload(uploadId: string) {
@@ -278,7 +306,7 @@ export async function claimDirectImageUpload(uploadId: string) {
   });
   if (result.action === 'discard') {
     const terminal = await prisma.listingImageUpload.findUnique({ where: { id: uploadId } });
-    if (terminal) schedulePrivateCleanup(terminal, terminal.status !== 'ready');
+    return terminalUploadResponse(result, terminal ?? undefined);
   }
   return result;
 }
@@ -304,14 +332,13 @@ export const directImageCompleteInput = z.object({
 export async function completeDirectImageUpload(uploadId: string, input: z.infer<typeof directImageCompleteInput>) {
   const job = await prisma.listingImageUpload.findUnique({ where: { id: uploadId } });
   if (!job) return { action: 'discard' as const };
-  if (job.status === 'ready') return { action: 'ready' as const };
+  if (job.status === 'ready') return terminalUploadResponse({ action: 'ready' as const }, job);
   if (!isImageUploadActive(job)) {
     if (['pending', 'processing'].includes(job.status)) {
       await prisma.listingImageUpload.updateMany({ where: { id: job.id, status: job.status, expiresAt: { lte: new Date() } },
         data: { status: 'expired', errorCode: 'image_upload_expired', leaseToken: null, leaseUntil: null } });
     }
-    schedulePrivateCleanup(job);
-    return { action: 'discard' as const };
+    return terminalUploadResponse({ action: 'discard' as const }, job);
   }
   if (job.status !== 'processing' || job.leaseToken !== input.leaseToken || !job.leaseUntil || job.leaseUntil <= new Date()) {
     throw new DirectImageUploadError('image_upload_lease_mismatch', 409);
@@ -323,15 +350,13 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
       data: { status: retry ? 'pending' : 'failed', errorCode: input.errorCode, leaseToken: null, leaseUntil: null },
     });
     if (!changed.count) throw new DirectImageUploadError('image_upload_lease_mismatch', 409);
-    if (!retry) schedulePrivateCleanup(job);
-    return { action: retry ? 'retry' as const : 'discard' as const };
+    return retry ? { action: 'retry' as const } : terminalUploadResponse({ action: 'discard' as const }, job);
   }
   if (!directImageUploadsEnabled()) {
     const changed = await prisma.listingImageUpload.updateMany({ where: { id: job.id, status: 'processing', leaseToken: input.leaseToken },
       data: { status: 'cancelled', errorCode: 'direct_image_uploads_disabled', leaseToken: null, leaseUntil: null } });
     if (!changed.count) throw new DirectImageUploadError('image_upload_lease_mismatch', 409);
-    schedulePrivateCleanup(job);
-    return { action: 'discard' as const };
+    return terminalUploadResponse({ action: 'discard' as const }, job);
   }
   let promotion: DirectImagePromotion | undefined;
   try {
@@ -373,8 +398,8 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    if (reserved.state === 'ready') return { action: 'ready' as const };
-    if (reserved.state === 'discard') { schedulePrivateCleanup(job); return { action: 'discard' as const }; }
+    if (reserved.state === 'ready') return terminalUploadResponse({ action: 'ready' as const }, job);
+    if (reserved.state === 'discard') return terminalUploadResponse({ action: 'discard' as const }, job);
     const ownedPromotion = reserved.promotion;
     promotion = ownedPromotion;
     const verifiedSources: VerifiedProcessedImageSource[] = variants.flatMap((image, index) => {
@@ -414,8 +439,8 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
       await tx.listingImageUpload.update({ where: { id: job.id }, data: { status: 'ready', readyAt: new Date(), leaseToken: null, leaseUntil: null, errorCode: null } });
       return 'finalized' as const;
     });
-    if (finalized === 'ready') return { action: 'ready' as const };
-    if (finalized === 'discard') { schedulePrivateCleanup(job); return { action: 'discard' as const }; }
+    if (finalized === 'ready') return terminalUploadResponse({ action: 'ready' as const }, job);
+    if (finalized === 'discard') return terminalUploadResponse({ action: 'discard' as const }, job);
     scheduleListingEvidenceCopy(job.listingId);
     try {
       const current = await prisma.listing.findUnique({ where: { id: job.listingId }, select: { sellerId: true, status: true } });
@@ -423,20 +448,18 @@ export async function completeDirectImageUpload(uploadId: string, input: z.infer
         visibility: { includePublic: current.status === 'published', includeAdmins: true, userIds: [current.sellerId] } });
     } catch { /* Committed writes remain authoritative if event delivery fails. */ }
     incrementRuntimeCounter('image.direct.ready');
-    schedulePrivateCleanup(job, false);
-    return { action: 'ready' as const };
+    return terminalUploadResponse({ action: 'ready' as const }, job);
   } catch (error) {
     // An ambiguous database response must not delete a committed image.
     const attached = await prisma.listingImage.findUnique({ where: { id: job.id }, select: { id: true } });
-    if (attached) return { action: 'ready' as const };
+    if (attached) return terminalUploadResponse({ action: 'ready' as const }, job);
     if (error instanceof DirectImageUploadError && error.status === 409) throw error;
     const technical = error instanceof DirectImageUploadError && error.status === 422;
     const changed = await prisma.listingImageUpload.updateMany({ where: { id: job.id, status: 'processing', leaseToken: input.leaseToken },
       data: { status: technical ? 'failed' : 'pending', errorCode: technical ? 'invalid_processed_image' : 'image_processing_unavailable', leaseToken: null, leaseUntil: null } });
     if (!changed.count) throw new DirectImageUploadError('image_upload_lease_mismatch', 409);
-    if (technical) schedulePrivateCleanup(job);
     incrementRuntimeCounter('image.direct.incomplete');
-    return { action: technical ? 'discard' as const : 'retry' as const };
+    return technical ? terminalUploadResponse({ action: 'discard' as const }, job) : { action: 'retry' as const };
   } finally {
     if (promotion) await releaseDirectImagePromotion(promotion).catch(() => {
       console.warn('[direct_image_upload] promotion_receipt=retained');

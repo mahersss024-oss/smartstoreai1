@@ -267,13 +267,20 @@ async function cleanPrivate(env, upload, targets) {
   await env.INTAKE.delete([...new Set(keys)]);
 }
 
+async function cleanAfterTerminalResponse(env, upload, targets, result) {
+  // New servers own cleanup and retain a durable cleanupAt=null receipt until
+  // it succeeds. Older servers (or ones unable to schedule it) keep the prior
+  // Worker cleanup behavior. Never interpret retry/failed responses as a hand-off.
+  if (result.cleanup !== "server") await cleanPrivate(env, upload, targets);
+}
+
 async function finish(fetcher, origin, env, upload, claim, body) {
   const result = await callback(fetcher, origin, env, upload.uploadId, "complete", body);
   if (result?.action === "retry") throw new PipelineError("server_requested_retry");
   if (!["ready", "discard"].includes(result?.action)) throw new PipelineError("worker_contract_invalid");
   // Only an explicit committed terminal response authorizes cleanup. Network,
   // HTML/error responses, active leases and retry responses preserve all inputs.
-  await cleanPrivate(env, upload, claim.targets);
+  await cleanAfterTerminalResponse(env, upload, claim.targets, result);
 }
 
 export async function handleUploadMessage(message, env, dependencies = {}) {
@@ -290,7 +297,7 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
       const terminal = await callback(fetcher, origin, env, upload.uploadId, "claim", { terminal: "delivery_exhausted" });
       validateClaim(terminal, upload);
       if (terminal.action !== "discard") throw new PipelineError("worker_contract_invalid");
-      await cleanPrivate(env, upload, terminal.targets);
+      await cleanAfterTerminalResponse(env, upload, terminal.targets, terminal);
       logger.warn(JSON.stringify({ event: "image_pipeline_delivery_exhausted", uploadId: upload.uploadId }));
       message.ack();
       return;
@@ -298,7 +305,7 @@ export async function handleUploadMessage(message, env, dependencies = {}) {
     const claim = await callback(fetcher, origin, env, upload.uploadId, "claim", { outputFormats: ["webp-v1", "jpeg-v1"] });
     validateClaim(claim, upload);
     if (claim.action === "discard") {
-      await cleanPrivate(env, upload, claim.targets);
+      await cleanAfterTerminalResponse(env, upload, claim.targets, claim);
       message.ack();
       return;
     }

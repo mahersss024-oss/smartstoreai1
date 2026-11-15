@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import {
   cancelOwnedDirectImageUpload, claimDirectImageUpload, cleanupExpiredDirectImageUploads,
@@ -74,6 +75,93 @@ async function claimed(f: Fixture) {
   if (claim.action !== 'process') throw new Error('claim_expected');
   return { id: response.upload.id, claim };
 }
+
+function observeStatusReads(t: TestContext) {
+  const listingReads: Array<Prisma.ListingFindUniqueArgs & { runInTransaction: boolean }> = [];
+  let observing = true;
+  // Observe actual Prisma reads rather than replace its dynamic model delegates.
+  prisma.$use(async (params, next) => {
+    if (observing && params.model === 'Listing' && params.action === 'findUnique') {
+      listingReads.push({ ...params.args, runInTransaction: params.runInTransaction });
+    }
+    return next(params);
+  });
+  t.after(() => { observing = false; });
+  return listingReads;
+}
+
+test('database waiting status polls read ownership once without loading listing images', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const upload = await start(f);
+  const reads = observeStatusReads(t);
+  const result = await getOwnedDirectImageUpload(f.listing.id, f.seller.id, upload.upload.id);
+  assert.equal(result.upload.status, 'pending');
+  assert.equal(result.listing, undefined);
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].runInTransaction, true);
+  assert.equal(reads[0].include, undefined);
+  assert.deepEqual(Object.keys(reads[0].select ?? {}).sort(), ['compliance', 'sellerId', 'status']);
+  await assert.rejects(getOwnedDirectImageUpload(f.listing.id, 'another-account', upload.upload.id), { code: 'image_upload_not_found' });
+  await prisma.user.update({ where: { id: f.seller.id }, data: { deletedAt: new Date() } });
+  await assert.rejects(getOwnedDirectImageUpload(f.listing.id, f.seller.id, upload.upload.id), { code: 'image_upload_not_found' });
+});
+
+test('database ready status returns one ordered canonical listing snapshot and rejects deleted images', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const first = await claimed(f);
+  const second = await claimed(f);
+  await completeDirectImageUpload(first.id, { leaseToken: first.claim.leaseToken });
+  await completeDirectImageUpload(second.id, { leaseToken: second.claim.leaseToken });
+  await setPrimaryListingImageForSeller(f.listing.id, f.seller.id, second.id);
+  const reads = observeStatusReads(t);
+  const result = await getOwnedDirectImageUpload(f.listing.id, f.seller.id, first.id);
+  assert.equal(result.upload.status, 'ready');
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].runInTransaction, true);
+  assert.equal(result.listing?.images[0].id, second.id);
+  assert.equal(result.listing?.images[0].isPrimary, true);
+  assert.deepEqual(new Set(result.listing?.images.map(image => image.id)), new Set([first.id, second.id]));
+  await prisma.listingImage.delete({ where: { id: first.id } });
+  const deleted = await getOwnedDirectImageUpload(f.listing.id, f.seller.id, first.id);
+  assert.equal(deleted.upload.status, 'cancelled');
+  assert.equal(deleted.listing, undefined);
+});
+
+test('database terminal cleanup hand-off is durable and cron retries failed background cleanup', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const item = await claimed(f);
+  const scheduled: Array<() => Promise<void>> = [];
+  t.mock.method(directImageUploadEffects, 'scheduleCleanup', (task: () => Promise<void>) => { scheduled.push(task); });
+  t.mock.method(directImageUploadEffects, 'discard', async () => false);
+  const result = await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
+  assert.equal(result.action, 'ready');
+  assert.equal('cleanup' in result && result.cleanup, 'server');
+  const replay = await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
+  assert.equal('cleanup' in replay && replay.cleanup, 'server');
+  const terminalClaim = await claimDirectImageUpload(item.id);
+  assert.equal(terminalClaim.action, 'discard');
+  assert.equal('cleanup' in terminalClaim && terminalClaim.cleanup, 'server');
+  assert.equal(scheduled.length, 1);
+  assert.equal((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).cleanupAt, null);
+  await scheduled[0]();
+  assert.equal((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).cleanupAt, null);
+  let cleanups = 0;
+  t.mock.method(directImageUploadEffects, 'discard', async (_job: DirectImageObjectJob, options?: { includePublic?: boolean }) => { cleanups++; assert.equal(options?.includePublic, false); return true; });
+  await cleanupExpiredDirectImageUploads();
+  assert.equal(cleanups, 1);
+  assert.ok((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).cleanupAt);
+  assert.equal(await prisma.listingImage.count({ where: { id: item.id } }), 1);
+});
+
+test('database cleanup leaves Worker fallback enabled when the request cannot schedule a task', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const item = await claimed(f);
+  t.mock.method(directImageUploadEffects, 'scheduleCleanup', () => { throw new Error('request_context_stopped'); });
+  const result = await completeDirectImageUpload(item.id, { leaseToken: item.claim.leaseToken });
+  assert.equal(result.action, 'ready');
+  assert.equal('cleanup' in result, false);
+  assert.equal((await prisma.listingImageUpload.findUniqueOrThrow({ where: { id: item.id } })).cleanupAt, null);
+});
 
 test('database initiation deduplicates concurrent retries, binds metadata and rejects another owner', { skip: !enabled }, async t => {
   const f = await fixture(t);
