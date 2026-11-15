@@ -15,6 +15,15 @@ import { POST as claim } from '@/app/api/internal/image-uploads/[uploadId]/claim
 import { POST as complete } from '@/app/api/internal/image-uploads/[uploadId]/complete/route';
 import { POST as cleanup } from '@/app/api/internal/image-uploads/cleanup/route';
 import { createSessionCookie } from '@/lib/auth/session';
+import { directImageRoute } from '@/lib/api/direct-image-upload-route';
+
+test('image routes preserve throttling responses and their retry delay', async () => {
+  const limited = Response.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '17' } });
+  const response = await directImageRoute(async () => limited, 201);
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get('Retry-After'), '17');
+  assert.equal((await response.json()).error, 'rate_limited');
+});
 
 test('direct image requests accept only bounded JPEG metadata and content fingerprints', () => {
   const input = { fileName: 'image.jpg', mediaType: 'image/jpeg', sizeBytes: 12 * 1024 * 1024, sha256: 'a'.repeat(64) };

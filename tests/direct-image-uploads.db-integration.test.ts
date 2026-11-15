@@ -17,6 +17,8 @@ import { getRealtimeEventsSince } from '@/lib/realtime/event-bus';
 import { getDirectImagePublicUrls, type DirectImageObjectJob, type DirectImageVariant } from '@/agent/marketplace/direct-image-objects';
 import { processImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 import { directImagePromotionReceiptId, reserveDirectImagePromotion, releaseDirectImagePromotion } from '@/agent/marketplace/direct-image-promotion';
+import { POST as reserveImageUpload } from '@/app/api/marketplace/listings/[listingId]/image-uploads/route';
+import { createSessionCookie } from '@/lib/auth/session';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
 const env = {
@@ -208,6 +210,52 @@ test('database initiation deduplicates concurrent retries, binds metadata and re
   assert.equal(await prisma.listingImageUpload.count({ where: { listingId: f.listing.id } }), 1);
   await assert.rejects(createDirectImageUpload(f.listing.id, f.seller.id, 'same-key', { ...metadata, sha256: 'b'.repeat(64) }), { code: 'idempotency_payload_mismatch' });
   await assert.rejects(createDirectImageUpload(f.listing.id, 'another-account', 'another-key', metadata), { code: 'listing_not_found' });
+});
+
+test('reservation renewals preserve the new-image quota and remain owned and payload-bound', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const cookie = createSessionCookie({ id: f.seller.id, email: f.seller.email!, role: 'user' }).split(';')[0];
+  const request = (key: string, body = metadata, actorCookie = cookie) => reserveImageUpload(new Request(
+    `http://localhost/api/marketplace/listings/${f.listing.id}/image-uploads`, {
+      method: 'POST', headers: { Cookie: actorCookie, 'Content-Type': 'application/json', 'Idempotency-Key': key },
+      body: JSON.stringify(body),
+    }), { params: Promise.resolve({ listingId: f.listing.id }) });
+  const first = await request('first-image');
+  assert.equal(first.status, 201);
+  const { upload } = await first.json();
+  for (let index = 0; index < 12; index++) {
+    const replay = await request('first-image');
+    assert.equal(replay.status, 201, 'renewal must not exhaust the new-image quota');
+    assert.equal((await replay.json()).upload.id, upload.id);
+  }
+  for (let index = 1; index < 8; index++) assert.equal((await request(`image-${index}`)).status, 201);
+  assert.equal(await prisma.listingImageUpload.count({ where: { listingId: f.listing.id } }), 8);
+  for (let index = 0; index < 2; index++) assert.equal((await request(`over-capacity-${index}`)).status, 409);
+  const limited = await request('new-after-quota');
+  assert.equal(limited.status, 429);
+  assert.ok(Number(limited.headers.get('Retry-After')) > 0);
+  const renewed = await request('first-image');
+  assert.equal(renewed.status, 201, 'existing owned uploads remain resumable at the new-image limit');
+  const mismatch = await request('first-image', { ...metadata, sha256: 'b'.repeat(64) });
+  assert.equal(mismatch.status, 409);
+  assert.equal((await mismatch.json()).error, 'idempotency_payload_mismatch');
+  const stranger = createSessionCookie({ id: `other-${randomUUID()}`, email: 'other@example.test', role: 'user' }).split(';')[0];
+  assert.equal((await request('first-image', metadata, stranger)).status, 404);
+});
+
+test('existing image renewals still have a bounded request quota', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  const cookie = createSessionCookie({ id: f.seller.id, email: f.seller.email!, role: 'user' }).split(';')[0];
+  const request = () => reserveImageUpload(new Request(`http://localhost/api/marketplace/listings/${f.listing.id}/image-uploads`, {
+    method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json', 'Idempotency-Key': 'same-image' },
+    body: JSON.stringify(metadata),
+  }), { params: Promise.resolve({ listingId: f.listing.id }) });
+  for (let index = 0; index < 120; index++) assert.equal((await request()).status, 201);
+  t.mock.method(directImageUploadEffects, 'createTransfer', () => { throw new Error('throttled_request_must_not_sign'); });
+  const limited = await request();
+  assert.equal(limited.status, 429);
+  assert.ok(Number(limited.headers.get('Retry-After')) > 0);
+  assert.equal(await prisma.listingImageUpload.count({ where: { listingId: f.listing.id } }), 1);
 });
 
 test('database reservations and legacy uploads share the eight-image limit under concurrent requests', { skip: !enabled }, async t => {

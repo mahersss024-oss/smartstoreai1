@@ -94,6 +94,17 @@ async function ownedTarget(tx: Prisma.TransactionClient, listingId: string, sell
   return { listing, allowed: imageUploadTargetAllowed(listing, sellerId, seller) };
 }
 
+/** Existing reservations use the same ownership, expiry and fingerprint checks as
+ * creation, but renewing their transfer must not consume the new-image quota. */
+export async function resumeDirectImageUpload(listingId: string, sellerId: string, key: string, input: z.infer<typeof directImageUploadInput>) {
+  requireConfiguration();
+  const previous = await prisma.listingImageUpload.findUnique({
+    where: { sellerId_listingId_idempotencyKey: { sellerId, listingId, idempotencyKey: key } },
+    select: { id: true },
+  });
+  return previous ? createDirectImageUpload(listingId, sellerId, key, input) : null;
+}
+
 export async function createDirectImageUpload(listingId: string, sellerId: string, key: string, input: z.infer<typeof directImageUploadInput>) {
   requireConfiguration();
   const fingerprint = imageUploadFingerprint(input);
