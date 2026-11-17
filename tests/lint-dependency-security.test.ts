@@ -13,13 +13,18 @@ const pluginRequire = createRequire(configRequire.resolve('@next/eslint-plugin-n
 const glob = pluginRequire('fast-glob');
 const { getRootDirs } = pluginRequire('./utils/get-root-dirs');
 
-test('Next.js root discovery uses tinyglobby with no vulnerable dependency in the locked graph', () => {
+test('lint glob consumers share the replacement and the vulnerable packages are absent from the lockfile', () => {
+  const parserRequire = createRequire(configRequire.resolve('@typescript-eslint/parser'));
+  const estreeRequire = createRequire(parserRequire.resolve('@typescript-eslint/typescript-estree'));
+  const resolverRequire = createRequire(configRequire.resolve('eslint-import-resolver-typescript'));
   const entry = pluginRequire.resolve('fast-glob');
-  assert.match(entry.replaceAll('\\', '/'), /tinyglobby@0\.2\.17/);
+  assert.match(entry.replaceAll('\\', '/'), /\/smartstore-lint-glob\/index\.cjs$/);
+  assert.equal(estreeRequire.resolve('tinyglobby'), entry);
+  assert.equal(resolverRequire.resolve('tinyglobby'), entry);
   const lock = readFileSync('pnpm-lock.yaml', 'utf8');
-  assert.doesNotMatch(lock, /^\s+(?:braces|micromatch|fast-glob)@/m);
+  assert.doesNotMatch(lock, /^\s+(?:braces|micromatch|fast-glob|picomatch|tinyglobby)@/m);
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-  assert.equal(pkg.pnpm.overrides['@next/eslint-plugin-next@16.4.0>fast-glob'], 'npm:tinyglobby@0.2.17');
+  assert.equal(pkg.pnpm.overrides['@next/eslint-plugin-next@16.4.0>fast-glob'], 'file:tooling/lint-glob');
   assert.deepEqual(Object.keys(pkg.pnpm.patchedDependencies).sort(), ['@next/eslint-plugin-next@16.4.0', 'minimatch@11.0.1']);
   assert.equal(pkg.pnpm.auditConfig?.ignoreGhsas, undefined);
 });
@@ -38,6 +43,20 @@ test('Next.js globSync directory discovery preserves default, literal, glob and 
   assert.deepEqual(normalize(discover([join(apps, 'store'), join(apps, 'سوق')])), normalize([join(apps, 'store'), join(apps, 'سوق')]));
   assert.deepEqual(discover(join(apps, 'missing-*')), []);
   assert.deepEqual(normalize(glob.globSync(['apps/*', '!apps/admin'], { cwd, onlyDirectories: true })), ['apps/store', 'apps/سوق']);
+});
+
+test('TypeScript config discovery handles literal roots, wildcard projects and ignored directories', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'smartstore-lint-projects-'));
+  for (const name of ['web', 'ignored', '.internal']) {
+    mkdirSync(join(cwd, name));
+    writeFileSync(join(cwd, name, 'tsconfig.json'), '{}');
+  }
+  assert.equal(glob.isDynamicPattern('web/tsconfig.json'), false);
+  assert.equal(glob.isDynamicPattern('{web,other}/tsconfig.json'), true);
+  assert.deepEqual(glob.globSync('*/tsconfig.json', {
+    cwd, dot: true, expandDirectories: false, ignore: ['ignored/**'],
+  }).sort(), ['.internal/tsconfig.json', 'web/tsconfig.json']);
+  assert.deepEqual(glob.globSync('web', { cwd }), ['web/tsconfig.json']);
 });
 
 test('effective ESLint rules match the pre-replacement baseline for TSX and TypeScript', async () => {
