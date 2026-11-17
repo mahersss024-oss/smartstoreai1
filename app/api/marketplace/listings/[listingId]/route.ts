@@ -177,6 +177,16 @@ export async function PATCH(request: Request, context: RouteContext) {
         : Response.json(responseBody, { status: 404 });
     }
 
+    if (action.data.action === 'publish' && listing.status !== 'published' && !listing.category.trim() &&
+        listing.compliance.humanDecision !== 'block' && listing.status !== 'deleted' && listing.status !== 'rejected') {
+      await idempotency?.abandon();
+      return Response.json({
+        error: 'listing_required_fields_missing',
+        fields: ['category'],
+        message: 'اختر تصنيف الإعلان قبل النشر.',
+      }, { status: 422, headers: noStoreHeaders });
+    }
+
     if (action.data.action === 'publish' && listing.status !== 'published') {
       const responseBody = {
         error: 'listing_publish_blocked',

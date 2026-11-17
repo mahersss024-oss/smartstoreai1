@@ -305,6 +305,35 @@ test('database pending images block publication and blank-draft reset without ma
   assert.equal(await prisma.listingImage.count({ where: { listingId: f.listing.id } }), 0);
 });
 
+test('a category-free draft can finish its photo before the seller adds the publication details', { skip: !enabled }, async t => {
+  const f = await fixture(t);
+  await prisma.listing.update({ where: { id: f.listing.id }, data: { category: '', title: null } });
+  const upload = await claimed(f);
+  assert.equal((await completeDirectImageUpload(upload.id, { leaseToken: upload.claim.leaseToken })).action, 'ready');
+  assert.equal((await getOwnedDirectImageUpload(f.listing.id, f.seller.id, upload.id)).listing?.images.length, 1);
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Cookie: createSessionCookie({ id: f.seller.id, email: f.seller.email }).split(';')[0],
+  };
+  const { PATCH } = await import('@/app/api/marketplace/listings/[listingId]/route');
+  const params = { params: Promise.resolve({ listingId: f.listing.id }) };
+  const edit = (body: object) => PATCH(new Request(`http://localhost/api/marketplace/listings/${f.listing.id}`, {
+    method: 'PATCH', headers, body: JSON.stringify(body),
+  }), params);
+  const incomplete = await edit({ action: 'publish' });
+  assert.equal(incomplete.status, 422);
+  assert.deepEqual((await incomplete.json()).fields, ['category']);
+  assert.equal((await edit({
+    category: 'furniture', title: 'طاولة خشبية', description: 'طاولة بحالة جيدة', city: 'الرياض', price: 100,
+  })).status, 200);
+  const published = await edit({ action: 'publish' });
+  assert.equal(published.status, 200);
+  const { listing } = await published.json();
+  assert.equal(listing.status, 'published');
+  assert.deepEqual(listing.images.map((image: { id: string }) => image.id), [upload.id]);
+});
+
 test('database CDN verification gates readiness and publication until both public images are available', { skip: !enabled }, async t => {
   const f = await fixture(t);
   const item = await claimed(f);

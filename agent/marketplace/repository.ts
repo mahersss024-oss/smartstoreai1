@@ -2685,7 +2685,9 @@ export async function setListingStatusForSeller(
 ) {
   if (!shouldUseDatabaseStore()) {
     const existingListing = memoryStore.getListing(listingId);
-    const previousStatus = existingListing?.status ?? status;
+    if (!existingListing || existingListing.sellerId !== sellerId) return null;
+    if (status === 'published' && !existingListing.category.trim()) return existingListing;
+    const previousStatus = existingListing.status;
     const listing = memoryStore.setListingStatusForSeller(
       listingId,
       sellerId,
@@ -2733,6 +2735,7 @@ export async function setListingStatusForSeller(
 
   if (status === 'published' && (existing.compliance.humanDecision === 'block' || existing.status === 'deleted' || existing.status === 'rejected')) return existing;
   if (existing.status === 'deleted' && status !== 'deleted') return null;
+  if (status === 'published' && !existing.category.trim()) return existing;
   const nextStatus =
     status === 'published' && existing.compliance.decision !== 'allow'
       ? existing.compliance.decision === 'block'
