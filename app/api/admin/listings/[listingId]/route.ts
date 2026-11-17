@@ -159,6 +159,14 @@ async function patchWithCurrentAccess(request: Request, context: RouteContext) {
       return { response: Response.json({ error: 'invalid_category', message: 'اختر تصنيفًا من القائمة.' }, { status: 400 }) };
     }
 
+    if (parsed.data.status === 'published' && !(parsed.data.category ?? existing.category).trim()) {
+      return { response: Response.json({
+        error: 'listing_required_fields_missing',
+        fields: ['category'],
+        message: 'اختر تصنيف الإعلان قبل النشر.',
+      }, { status: 422 }) };
+    }
+
     let attributes: Record<string, unknown>;
     try {
       attributes = mergeMarketplaceCategoryAttributes(parsed.data.category ?? existing.category,

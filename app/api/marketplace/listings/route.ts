@@ -42,7 +42,7 @@ const publicSearchSchema = z.object({
   .refine(value => !value.carModel || Boolean(value.category === 'cars' && value.categoryOption && getMarketplaceCarModel(value.categoryOption, value.carModel)), { message: 'invalid_car_model' });
 const createListingSchema = z.object({
   autoCategory: z.boolean().optional(),
-  category: z.enum(marketplaceCategoryIds),
+  category: z.enum(marketplaceCategoryIds).optional(),
   title: z.string().min(2).max(140).optional(),
   description: z.string().min(2).max(4000).optional(),
   price: z
@@ -165,9 +165,12 @@ export async function POST(request: Request) {
   let listing: Awaited<ReturnType<typeof createListingDraft>>;
 
   try {
-    listing = await createListingDraft(session.user, parsed.data, {
-      idempotencyKey: idempotency?.operationKey,
-    });
+    const { category, autoCategory, ...details } = parsed.data;
+    listing = await createListingDraft(session.user, {
+      ...details,
+      category: category ?? '',
+      autoCategory: category ? autoCategory : undefined,
+    }, { idempotencyKey: idempotency?.operationKey });
   } catch (error) {
     if (error instanceof InvalidMarketplaceCategoryOptionError) {
       await idempotency?.abandon();
