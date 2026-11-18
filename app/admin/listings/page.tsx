@@ -31,6 +31,7 @@ import { ActionConfirmDialog } from '@/components/action-confirm-dialog';
 import { CitySelector } from '@/components/city-selector';
 import { FloatingActionNotice } from '@/components/floating-action-notice';
 import { ResilientImage } from '@/components/resilient-image';
+import { ListingNoPhoto } from '@/components/listing-no-photo';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useSmartstoreRealtime } from '@/lib/realtime/use-smartstore-realtime';
 import { Button } from '@ui/button';
@@ -205,6 +206,7 @@ function AdminListingCard({
       </div>
 
       {activeImage && <div className="grid aspect-[4/3] max-h-80 place-items-center overflow-hidden rounded-md border bg-background"><ResilientImage src={getListingDisplayUrl(activeImage)!} fallbackSrcs={[activeImage.originalUrl, activeImage.thumbnailUrl].filter((url): url is string => Boolean(url))} alt={listing.title ?? 'صورة الإعلان'} className="h-full w-full object-contain" fallback={<ImageIcon className="size-8 text-muted-foreground" />} /></div>}
+      {listing.images.length === 0 && <ListingNoPhoto className="aspect-[4/3] max-h-80 overflow-hidden rounded-md border" />}
       {listing.images.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
           {listing.images.map((image) => (
@@ -792,7 +794,7 @@ function AdminListingsPageContent() {
           onOpen={openListing}
           rows={listings.map(listing => ({
             id: listing.id, label: listing.title ?? 'إعلان بدون عنوان', dirty: listingIsDirty(listing),
-            cells: [<span key="title" className="admin-listing-identity">{listing.images[0] ? <ResilientImage alt="" src={listing.images[0].thumbnailUrl} className="admin-result-image" /> : <ImageIcon className="size-8 shrink-0 text-muted-foreground" />}<strong>{listing.title ?? 'إعلان بدون عنوان'}</strong></span>, listing.seller?.name ?? listing.seller?.email ?? 'غير متوفر', listing.city ?? 'غير محددة', typeof listing.price === 'number' ? `${formatNumber(listing.price)} ر.س` : listing.price === 'bid' || listing.priceMode === 'bid' ? 'على السوم' : listing.price === 'negotiable' || listing.priceMode === 'negotiable' ? 'قابل للتفاوض' : 'غير محدد', <span key="status" className="admin-status">{statusOptions.find(option => option.value === listing.status)?.label ?? listing.status}</span>],
+            cells: [<span key="title" className="admin-listing-identity">{listing.images[0] ? <ResilientImage alt="" src={listing.images[0].thumbnailUrl} className="admin-result-image" /> : <ListingNoPhoto className="size-8 shrink-0 rounded-md" />}<strong>{listing.title ?? 'إعلان بدون عنوان'}</strong></span>, listing.seller?.name ?? listing.seller?.email ?? 'غير متوفر', listing.city ?? 'غير محددة', typeof listing.price === 'number' ? `${formatNumber(listing.price)} ر.س` : listing.price === 'bid' || listing.priceMode === 'bid' ? 'على السوم' : listing.price === 'negotiable' || listing.priceMode === 'negotiable' ? 'قابل للتفاوض' : 'غير محدد', <span key="status" className="admin-status">{statusOptions.find(option => option.value === listing.status)?.label ?? listing.status}</span>],
           }))}
         />
 

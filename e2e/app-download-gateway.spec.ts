@@ -42,6 +42,11 @@ test('administrative previews remain browser-accessible and private drafts stay 
   await page.goto(`/listings/${id}`);
   await expect(page.locator('[data-admin-record-preview]')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Private draft fixture' })).toBeVisible();
+  const wordmark = page.getByRole('img', { name: 'إعلان بدون صور — سوق حمد' });
+  await expect(wordmark).toBeVisible();
+  await expect(wordmark).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(wordmark.locator('span')).toHaveCSS('mask-image', /hamad-market-wordmark\.webp/);
+  await expect(wordmark.locator('span')).toHaveCSS('opacity', '0.2');
   await expect(page.locator('meta[property="og:title"]')).not.toHaveAttribute('content', /Private draft/);
   await expect(page.getByRole('link', { name: 'العودة إلى الإدارة' })).toHaveAttribute('href', '/admin/listings');
   await page.context().clearCookies();

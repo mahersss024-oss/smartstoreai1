@@ -32,7 +32,7 @@ export function AdminListingPreview({ listing }: { listing: ListingRecord }) {
     </dl>
     <p className="whitespace-pre-wrap break-words text-sm leading-7">{listing.description}</p>
     <dl className="grid gap-2 text-sm">{Object.entries(listing.attributes || {}).map(([key, value]) => <div key={key} className="flex flex-wrap justify-between gap-3 border-b py-2"><dt>{formatAttributeLabel(key)}</dt><dd className="max-w-full break-words">{formatAttributeValue(key, value)}</dd></div>)}</dl>
-    <ListingImageGallery images={images} title={listing.title || 'صور الإعلان'} />
+    <ListingImageGallery images={images} showNoPhoto={listing.images.length === 0} title={listing.title || 'صور الإعلان'} />
     <p className="break-words text-sm">معرف المعلن: {listing.sellerId}</p>
   </PreviewFrame>;
 }
