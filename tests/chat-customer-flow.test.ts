@@ -45,6 +45,44 @@ test('creation without an explicit method offers both options without running an
   assert.equal(listSellerListings('choice-owner').length, 0);
 });
 
+test('Hamad creation selection reaches scope checking with the original listing details', async t => {
+  const analysis = textAnalysis({ intent: 'general_info' });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  const details = 'آيفون 14 مستعمل في الرياض بسعر 1200 ريال';
+  let intakeChecks = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system')
+      .map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      const checked = JSON.parse(body.messages.at(-1).content);
+      assert.equal(checked.hamad_creation_selected, true);
+      assert.equal(checked.latest_user_request, details);
+      intakeChecks++;
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'listing_intake', intent: 'create_listing' }));
+    }
+    if (instructions.includes('output Scope Checker')) {
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+    }
+    assert.equal(body.messages.at(-1).content, details);
+    const names = body.tools.map((tool: { function: { name: string } }) => tool.function.name);
+    assert.ok(names.includes('createListingDraft'));
+    assert.ok(!names.includes('publishListing'));
+    return completion('هل حالة البطارية جيدة؟');
+  });
+  const response = await POST(request('intake-owner', 'first-details', {
+    creationMethod: 'chat',
+    messages: [{ id: 'first-details', role: 'user', parts: [{ type: 'text', text: details }] }],
+  }));
+  assert.equal(response.status, 200);
+  const stream = await response.text();
+  assert.match(stream, /هل حالة البطارية جيدة/);
+  assert.doesNotMatch(stream, /"creationChoice":true|الإنشاء اليدوي/);
+  assert.equal(intakeChecks, 1);
+  assert.equal(listSellerListings('intake-owner').length, 0);
+});
+
 for (const scenario of ['arabic_rewrite', 'output_check_outage'] as const) {
   test('documented platform help preserves verified policy facts through '+scenario, async t => {
     mockIntent(t, 'support');

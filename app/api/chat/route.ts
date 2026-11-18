@@ -1089,6 +1089,7 @@ export async function POST(request: Request) {
       : filteredMessages;
     const inputScopeDecision = await checkInputScope({
       messages: scopeCheckMessages,
+      hamadCreationSelected: body.creationMethod === 'chat',
     });
 
     if (

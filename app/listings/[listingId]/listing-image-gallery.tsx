@@ -13,10 +13,12 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { ResilientImage } from '@/components/resilient-image';
+import { ListingNoPhoto } from '@/components/listing-no-photo';
 
 type ListingImageGalleryProps = {
   images: ListingGalleryImage[];
   title: string;
+  showNoPhoto?: boolean;
 };
 
 export type ListingGalleryImage = {
@@ -83,6 +85,7 @@ function getImageKey(image: ListingGalleryImage, index: number) {
 export function ListingImageGallery({
   images,
   title,
+  showNoPhoto = false,
 }: ListingImageGalleryProps) {
   const visibleImages = images;
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -336,6 +339,11 @@ export function ListingImageGallery({
   return (
     <section className="w-full overflow-hidden">
       <div className="grid gap-3">
+        {showNoPhoto && !visibleImages.length && (
+          <div className="px-1 py-2 sm:px-2">
+            <ListingNoPhoto className="aspect-[4/3] w-full" />
+          </div>
+        )}
         {visibleImages.length > 0 && (
           <div className="grid gap-3 px-1 py-2 sm:px-2">
             {visibleImages.map((image, index) => {

@@ -182,7 +182,7 @@ jobs:
         with:
           repository: mahersss024-oss/app
           # Update deliberately when validating a new server/mobile version pair.
-          ref: 88b3a406f29970f0852517fb81421a2e44b06761
+          ref: c8d0a9f515275b0d46f6bcd5687011b724dfe978
           path: AI
           ssh-key: ${{ secrets.MOBILE_REPO_DEPLOY_KEY }}
           persist-credentials: false
