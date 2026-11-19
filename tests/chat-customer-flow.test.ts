@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { POST } from '@/app/api/chat/route';
 import { createSessionCookie } from '@/lib/auth/session';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
-import { createListingDraft, getListing, listSellerListings } from '@/agent/marketplace/store';
+import { createListingDraft, getListing, listSellerListings, setListingStatusForSeller } from '@/agent/marketplace/store';
 import { platformPolicies } from '@/lib/platform/policies';
 import { legacyHamadRoleReply } from '@/lib/chat-response-safety';
 import { textAnalysis } from './helpers/text-understanding';
@@ -441,6 +441,9 @@ test('photos and edits are confined to the confirmed draft when two are open', a
   const sellerId = 'confirmed-draft-owner';
   const phone = createListingDraft({ sellerId, category: 'other', title: 'هاتف سامسونج' });
   const desk = createListingDraft({ sellerId, category: 'other', title: 'مكتب خشبي' });
+  const paused = createListingDraft({ sellerId, category: 'other', title: 'سماعات موقوفة' });
+  setListingStatusForSeller(paused.id, sellerId, 'paused');
+  const otherSeller = createListingDraft({ sellerId: 'unrelated-draft-owner', category: 'other', title: 'مسودة حساب آخر' });
   const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
   const photo = { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
   const photoTurn = { id: 'desk-photo', role: 'user', parts: [photo] };
@@ -453,7 +456,14 @@ test('photos and edits are confined to the confirmed draft when two are open', a
       return completion(JSON.stringify({ decision: 'allow', confidence: 0.99, reasons: [], detected_product: 'مكتب خشبي', category_match: 'unclear', sharia_sensitive: false }));
     }
     const instructions = messages.filter(message => message.role === 'system').map(message => String(message.content)).join('\n');
-    if (instructions.includes('input Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'named_draft', intent: 'update_listing' }));
+    if (instructions.includes('input Scope Checker')) {
+      const { platform_context: draftContext } = JSON.parse(String(messages.at(-1)?.content));
+      assert.ok(draftContext.includes(phone.id));
+      assert.ok(draftContext.includes(desk.id));
+      assert.ok(!draftContext.includes(paused.id));
+      assert.ok(!draftContext.includes(otherSeller.id));
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'named_draft', intent: 'update_listing' }));
+    }
     if (instructions.includes('output Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
     assert.ok(instructions.includes(desk.id));
     assert.ok(!instructions.includes(phone.id));
@@ -485,7 +495,8 @@ test('photos and edits are confined to the confirmed draft when two are open', a
   assert.ok(!getListing(phone.id)?.description);
   assert.equal(getListing(desk.id)?.images.length, 1);
   assert.equal(getListing(desk.id)?.description, 'مكتب بحالة ممتازة');
-  assert.equal(listSellerListings(sellerId).length, 2);
+  assert.equal(getListing(paused.id)?.status, 'paused');
+  assert.equal(listSellerListings(sellerId).length, 3);
 });
 
 test('a new draft cannot attach the previous product photo without the customer selecting it', async t => {
