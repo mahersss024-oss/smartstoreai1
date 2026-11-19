@@ -1,10 +1,11 @@
 import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
+import sharp from 'sharp';
 import { POST } from '@/app/api/chat/route';
 import { createSessionCookie } from '@/lib/auth/session';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
-import { listSellerListings } from '@/agent/marketplace/store';
+import { createListingDraft, getListing, listSellerListings } from '@/agent/marketplace/store';
 import { platformPolicies } from '@/lib/platform/policies';
 import { legacyHamadRoleReply } from '@/lib/chat-response-safety';
 import { textAnalysis } from './helpers/text-understanding';
@@ -23,7 +24,7 @@ function request(userId: string, turnId: string, extra: Record<string, unknown> 
   }, body: JSON.stringify({ messages: [{ id: turnId, role: 'user', parts: [{ type: 'text', text: 'أريد تجهيز إعلان هاتف' }] }], ...extra }) });
 }
 
-function mockIntent(t: TestContext, intent: 'support' | 'create_listing' | 'search_listing') {
+function mockIntent(t: TestContext, intent: 'support' | 'create_listing' | 'update_listing' | 'search_listing') {
   const analysis = textAnalysis({ intent });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
@@ -415,6 +416,7 @@ test('starting another draft never inspects an older product photo or forwards r
     }
     const checker = body.messages.some((message: { content: unknown }) => typeof message.content === 'string' && message.content.includes('output Scope Checker'));
     if (checker) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+    assert.ok(!body.messages.some((message: { content: unknown }) => String(message.content).includes('Uploaded image source')));
     generations++;
     return completion('ما بيانات المنتج الجديد الذي تريد تجهيز مسودته؟');
   });
@@ -431,6 +433,96 @@ test('starting another draft never inspects an older product photo or forwards r
   assert.match(stream, /المنتج الجديد/);
   assert.equal(generations, 1);
   assert.equal(listSellerListings('unrelated-photo-owner').length, 0);
+});
+
+test('photos and edits are confined to the confirmed draft when two are open', async t => {
+  mockIntent(t, 'update_listing');
+  resetImageContentReviewCacheForTests();
+  const sellerId = 'confirmed-draft-owner';
+  const phone = createListingDraft({ sellerId, category: 'other', title: 'هاتف سامسونج' });
+  const desk = createListingDraft({ sellerId, category: 'other', title: 'مكتب خشبي' });
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
+  const photo = { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
+  const photoTurn = { id: 'desk-photo', role: 'user', parts: [photo] };
+  const creationMethod = 'chat';
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const messages: { role: string; content: unknown }[] = body.messages;
+    if (messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
+      return completion(JSON.stringify({ decision: 'allow', confidence: 0.99, reasons: [], detected_product: 'مكتب خشبي', category_match: 'unclear', sharia_sensitive: false }));
+    }
+    const instructions = messages.filter(message => message.role === 'system').map(message => String(message.content)).join('\n');
+    if (instructions.includes('input Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'named_draft', intent: 'update_listing' }));
+    if (instructions.includes('output Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+    assert.ok(instructions.includes(desk.id));
+    assert.ok(!instructions.includes(phone.id));
+    assert.match(instructions, /"sourceMessageId":"desk-photo"/);
+    attempts++;
+    const tool = (name: string, args: Record<string, unknown>) => completion(null, { name, arguments: JSON.stringify(args) });
+    const selection = { imageIndexes: [0], imageSourceMessageId: photoTurn.id };
+    if (attempts === 1) return tool('addUploadedImagesToListing', { listingId: phone.id, ...selection });
+    if (attempts === 2) return tool('addUploadedImagesToListing', { listingId: desk.id, ...selection });
+    if (attempts === 3) return tool('updateListing', { description: 'مكتب بحالة ممتازة' });
+    return completion('أضفت الصورة إلى مسودة المكتب الخشبي وحدّثت الوصف. راجعها من [إعلاناتي](/account/listings).');
+  });
+
+  const ambiguous = await (await POST(request(sellerId, 'ambiguous-update', { creationMethod, messages: [
+    { id: 'ambiguous-update', role: 'user', parts: [{ type: 'text', text: 'حدّث وصف المسودة' }] },
+  ] }))).text();
+  assert.match(ambiguous, /حدّد اسم المسودة أو رقمها/);
+  const clarification = await (await POST(request(sellerId, 'unused', { creationMethod, messages: [photoTurn] }))).text();
+  assert.match(clarification, /الصور لمسودة جديدة أو موجودة/);
+  assert.equal(attempts, 0);
+  const response = await POST(request(sellerId, 'unused', {
+    creationMethod, retainedListingImages: [photo], retainedListingImageMessageId: photoTurn.id,
+    messages: [photoTurn, { id: 'ask-target', role: 'assistant', parts: [{ type: 'text', text: 'الصور لمسودة جديدة أو موجودة؟' }] },
+      { id: 'confirm-desk', role: 'user', parts: [{ type: 'text', text: 'أضف هذه الصور لمسودة مكتب خشبي واكتب أن المكتب بحالة ممتازة' }] }],
+  }));
+  assert.match(await response.text(), /أضفت الصورة إلى مسودة المكتب/);
+  assert.equal(attempts, 4);
+  assert.equal(getListing(phone.id)?.images.length, 0);
+  assert.ok(!getListing(phone.id)?.description);
+  assert.equal(getListing(desk.id)?.images.length, 1);
+  assert.equal(getListing(desk.id)?.description, 'مكتب بحالة ممتازة');
+  assert.equal(listSellerListings(sellerId).length, 2);
+});
+
+test('a new draft cannot attach the previous product photo without the customer selecting it', async t => {
+  mockIntent(t, 'create_listing');
+  const sellerId = 'separate-new-product-owner';
+  const phone = createListingDraft({ sellerId, category: 'other', title: 'هاتف سامسونج' });
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'green' } }).png().toBuffer();
+  const photo = { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
+  const photoTurn = { id: 'previous-phone-photo', role: 'user', parts: [photo] };
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'new_draft', intent: 'create_listing' }));
+    if (instructions.includes('output Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+    assert.ok(!instructions.includes('Uploaded image source'));
+    const draft = { category: 'other', title: 'مكتب جديد' };
+    attempts++;
+    const create = (args: Record<string, unknown>) => completion(null, { name: 'createListingDraft', arguments: JSON.stringify(args) });
+    if (attempts === 1) return create({ ...draft, imageIndexes: [0], imageSourceMessageId: photoTurn.id });
+    if (attempts === 2) {
+      assert.match(JSON.stringify(body.messages.at(-1)), /invalid_image_selection/);
+      return create(draft);
+    }
+    return completion('حُفظت مسودة المكتب الجديد بدون صور. راجعها من [إعلاناتي](/account/listings).');
+  });
+  const response = await POST(request(sellerId, 'unused', {
+    creationMethod: 'chat', retainedListingImages: [photo], retainedListingImageMessageId: photoTurn.id,
+    messages: [photoTurn, { id: 'phone-reply', role: 'assistant', parts: [{ type: 'text', text: 'هذه صور الهاتف.' }] },
+      { id: 'new-desk', role: 'user', parts: [{ type: 'text', text: 'جهّز مسودة جديدة لمكتب خشبي بدون صور.' }] }],
+  }));
+  assert.match(await response.text(), /حُفظت مسودة المكتب الجديد بدون صور/);
+  assert.equal(attempts, 3);
+  assert.equal(getListing(phone.id)?.images.length, 0);
+  const drafts = listSellerListings(sellerId);
+  assert.equal(drafts.length, 2);
+  assert.equal(drafts.find(draft => draft.id !== phone.id)?.images.length, 0);
 });
 
 test('a platform question with a photo never grants draft writes even after choosing Hamad', async t => {
