@@ -179,7 +179,7 @@ test('Hamad creation selection reaches scope checking with the original listing 
     const names = body.tools.map((tool: { function: { name: string } }) => tool.function.name);
     assert.ok(names.includes('createListingDraft'));
     assert.ok(!names.includes('publishListing'));
-    return completion('هل حالة البطارية جيدة؟');
+    return completion('DRAFT_QUESTION:specifications');
   });
   const response = await POST(request('intake-owner', 'first-details', {
     creationMethod: 'chat',
@@ -187,7 +187,7 @@ test('Hamad creation selection reaches scope checking with the original listing 
   }));
   assert.equal(response.status, 200);
   const stream = await response.text();
-  assert.match(stream, /هل حالة البطارية جيدة/);
+  assert.match(stream, /ما المواصفات التي تريد إدراجها في المسودة/);
   assert.doesNotMatch(stream, /"creationChoice":true|الإنشاء اليدوي/);
   assert.equal(intakeChecks, 1);
   assert.equal(listSellerListings('intake-owner').length, 0);
@@ -324,41 +324,86 @@ test('invalid creation mode is rejected before text analysis or agent execution'
   assert.equal(analyzed, false);
 });
 
-test('successful draft facts reach output review and rewriting false publication and duplicate-creation claims cannot repeat the write', async t => {
+test('the receipt uses saved draft facts even when the model falsely claims publication', async t => {
   mockIntent(t, 'create_listing');
   let writes = 0;
-  let rewrites = 0;
-  let reviews = 0;
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
-    if (instructions.includes('output Scope Checker')) {
-      reviews++;
-      const checked = JSON.parse(body.messages.at(-1).content);
-      const verified = checked.verified_tool_results.find((result: { toolName: string }) => result.toolName === 'createListingDraft');
-      assert.equal(verified.output.listing.status, 'draft');
-      assert.equal(verified.output.listing.title, 'هاتف العميل');
-      return completion(JSON.stringify({ decision: reviews === 1 ? 'BLOCK' : 'ALLOW', confidence: 1, reason_code: 'draft_only' }));
-    }
-    if (instructions.includes('Regenerate the answer')) {
-      rewrites++;
-      assert.ok(!body.tools?.length);
-      return completion('حُفظت مسودة إعلانك. راجعها من [إعلاناتي](/account/listings) وانشرها بنفسك.');
-    }
-    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('The ad is published. Please create the draft again.');
+    assert.doesNotMatch(instructions, /output Scope Checker|Regenerate the answer/);
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('تم نشر الإعلان. يجب أن تعيد إنشاء المسودة.');
     writes++;
     return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({ category: 'other', title: 'هاتف العميل', price: 100 }) });
   });
   const stream = await (await POST(request('verified-draft-owner', 'verified-draft-turn', { creationMethod: 'chat' }))).text();
   assert.match(stream, /\/account\/listings/);
-  assert.doesNotMatch(stream, /published|create the draft again/i);
+  assert.match(stream, /حُفظت المسودة «هاتف العميل»/);
+  assert.doesNotMatch(stream, /تم نشر الإعلان|تعيد إنشاء المسودة/);
   assert.equal(writes, 1);
-  assert.equal(rewrites, 1);
-  assert.equal(reviews, 1);
   const drafts = listSellerListings('verified-draft-owner');
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].status, 'draft');
   assert.equal(drafts[0].price, 100);
+});
+
+test('a made-up save reply cannot confirm an operation when no draft tool was called', async t => {
+  mockIntent(t, 'create_listing');
+  t.mock.method(globalThis, 'fetch', async () => completion('حفظت المسودة وأرفقت الصور بنجاح.'));
+  const userId = 'no-receipt-owner';
+  const response = await POST(request(userId, 'no-write-turn', { creationMethod: 'chat' }));
+  const stream = await response.text();
+  assert.match(stream, /ما المنتج أو الخدمة التي تريد الإعلان عنها/);
+  assert.doesNotMatch(stream, /حفظت المسودة|أرفقت الصور|\/account\/listings/);
+  assert.equal(listSellerListings(userId).length, 0);
+});
+
+test('the receipt reports a partial image save even when the model says all photos were attached', async t => {
+  mockIntent(t, 'create_listing');
+  resetImageContentReviewCacheForTests();
+  const sellerId = 'partial-image-receipt-owner';
+  const turnId = 'partial-image-receipt-turn';
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    if (body.messages.some((message: { content: unknown }) => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
+      return completion(JSON.stringify({ decision: 'allow', confidence: 0.99, reasons: [], detected_product: 'مكتب خشبي', category_match: 'unclear', sharia_sensitive: false }));
+    }
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('تم حفظ وإرفاق كل الصور بنجاح.');
+    return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({
+      category: 'other', title: 'مكتب خشبي', imageIndexes: [0, 1], imageSourceMessageId: turnId,
+    }) });
+  });
+  const response = await POST(request(sellerId, turnId, {
+    creationMethod: 'chat',
+    messages: [{ id: turnId, role: 'user', parts: [
+      { type: 'text', text: 'جهّز مسودة مكتب خشبي مع الصورتين' },
+      { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') },
+      { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,AQID' },
+    ] }],
+  }));
+  const stream = await response.text();
+  assert.match(stream, /حُفظت المسودة «مكتب خشبي»/);
+  assert.match(stream, /حُفظت 1 من أصل 2 صورة/);
+  assert.doesNotMatch(stream, /إرفاق كل الصور/);
+  assert.equal(listSellerListings(sellerId)[0]?.images.length, 1);
+});
+
+test('an empty update produces a clarification without reporting a save', async t => {
+  mockIntent(t, 'update_listing');
+  const sellerId = 'empty-update-receipt-owner';
+  const draft = createListingDraft({ sellerId, category: 'other', title: 'مكتب خشبي' });
+  const before = structuredClone(draft);
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('عدّلت المسودة.');
+    return completion(null, { name: 'updateListing', arguments: JSON.stringify({ listingId: draft.id }) });
+  });
+  const response = await POST(request(sellerId, 'empty-update', {
+    creationMethod: 'chat',
+    messages: [{ id: 'empty-update', role: 'user', parts: [{ type: 'text', text: 'عدّل مسودة مكتب خشبي' }] }],
+  }));
+  assert.match(await response.text(), /ما التعديل الذي تريد حفظه في هذه المسودة/);
+  assert.deepEqual(getListing(draft.id), before);
 });
 
 test('photo-first creation understands the retained product only when the customer begins creation with Hamad', async t => {
@@ -384,7 +429,7 @@ test('photo-first creation understands the retained product only when the custom
     if (instructions.includes('output Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
     assert.ok(instructions.includes('هاتف مصور'), 'the draft agent needs the actual retained-photo assessment');
     replies++;
-    return completion('المنتج هاتف مصور. ما التفاصيل التي تريد إضافتها إلى المسودة؟');
+    return completion('DRAFT_QUESTION:product');
   });
   const initial = { id: 'photo-first-source', role: 'user', parts: [photo] };
   const choice = await (await POST(request('photo-first-owner', 'unused', { messages: [initial] }))).text();
@@ -396,7 +441,7 @@ test('photo-first creation understands the retained product only when the custom
     messages: [initial, { id: 'photo-choice', role: 'assistant', parts: [{ type: 'text', text: 'اختر طريقة الإنشاء.' }] },
       { id: 'photo-method-selected', role: 'user', parts: [{ type: 'text', text: 'أختار الإنشاء مع حمد.' }] }],
   }));
-  assert.match(await response.text(), /المنتج هاتف مصور/);
+  assert.match(await response.text(), /ما اسم المنتج الظاهر في الصور/);
   assert.equal(inspections, 1);
   assert.equal(replies, 1);
 });
@@ -418,7 +463,7 @@ test('starting another draft never inspects an older product photo or forwards r
     if (checker) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
     assert.ok(!body.messages.some((message: { content: unknown }) => String(message.content).includes('Uploaded image source')));
     generations++;
-    return completion('ما بيانات المنتج الجديد الذي تريد تجهيز مسودته؟');
+    return completion('DRAFT_QUESTION:product');
   });
   const stream = await (await POST(request('unrelated-photo-owner', 'unused', {
     creationMethod: 'chat', beginDraftWithHamad: true, retainedListingImages: [photo], retainedListingImageMessageId: 'old-product-photo',
@@ -430,7 +475,7 @@ test('starting another draft never inspects an older product photo or forwards r
       { id: 'choose-for-new-product', role: 'user', parts: [{ type: 'text', text: 'أختار الإنشاء مع حمد.' }] },
     ],
   }))).text();
-  assert.match(stream, /المنتج الجديد/);
+  assert.match(stream, /ما المنتج أو الخدمة التي تريد الإعلان عنها/);
   assert.equal(generations, 1);
   assert.equal(listSellerListings('unrelated-photo-owner').length, 0);
 });
@@ -483,13 +528,23 @@ test('photos and edits are confined to the confirmed draft when two are open', a
   assert.match(ambiguous, /حدّد اسم المسودة أو رقمها/);
   const clarification = await (await POST(request(sellerId, 'unused', { creationMethod, messages: [photoTurn] }))).text();
   assert.match(clarification, /الصور لمسودة جديدة أو موجودة/);
+  const namedDesk = { ...photoTurn, parts: [...photoTurn.parts, { type: 'text', text: 'هذه صورة مسودة مكتب خشبي' }] };
+  const confirmDesk = { id: 'confirm-desk', role: 'user', parts: [
+    { type: 'text', text: 'أضف هذه الصورة لنفس المسودة واكتب أن المكتب بحالة ممتازة' },
+  ] };
+  const unavailablePhoto = await POST(request(sellerId, 'unused', {
+    creationMethod, retainedListingImages: [photo], retainedListingImageMessageId: photoTurn.id,
+    messages: [{ ...namedDesk, parts: namedDesk.parts.filter(part => part.type === 'text') }, confirmDesk],
+  }));
+  assert.match(await unavailablePhoto.text(), /أعد إرفاق الصور المقصودة/);
   assert.equal(attempts, 0);
   const response = await POST(request(sellerId, 'unused', {
     creationMethod, retainedListingImages: [photo], retainedListingImageMessageId: photoTurn.id,
-    messages: [photoTurn, { id: 'ask-target', role: 'assistant', parts: [{ type: 'text', text: 'الصور لمسودة جديدة أو موجودة؟' }] },
-      { id: 'confirm-desk', role: 'user', parts: [{ type: 'text', text: 'أضف هذه الصور لمسودة مكتب خشبي واكتب أن المكتب بحالة ممتازة' }] }],
+    messages: [namedDesk, confirmDesk],
   }));
-  assert.match(await response.text(), /أضفت الصورة إلى مسودة المكتب/);
+  const stream = await response.text();
+  assert.match(stream, /حُدّثت المسودة «مكتب خشبي»/);
+  assert.match(stream, /عدد الصور المختارة المحفوظة في المسودة 1/);
   assert.equal(attempts, 4);
   assert.equal(getListing(phone.id)?.images.length, 0);
   assert.ok(!getListing(phone.id)?.description);
@@ -497,6 +552,21 @@ test('photos and edits are confined to the confirmed draft when two are open', a
   assert.equal(getListing(desk.id)?.description, 'مكتب بحالة ممتازة');
   assert.equal(getListing(paused.id)?.status, 'paused');
   assert.equal(listSellerListings(sellerId).length, 3);
+});
+
+test('a request naming a missing draft does not modify the only remaining draft', async t => {
+  mockIntent(t, 'update_listing');
+  const sellerId = 'missing-named-draft-owner';
+  const desk = createListingDraft({ sellerId, category: 'other', title: 'مكتب خشبي' });
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('a mismatched draft must be clarified before model generation'));
+  for (const text of ['عدّل مسودة هاتف سامسونج', 'عدّل مسودة إعلان هاتف سامسونج']) {
+    const response = await POST(request(sellerId, 'unused', {
+      creationMethod: 'chat',
+      messages: [{ id: 'missing-phone', role: 'user', parts: [{ type: 'text', text }] }],
+    }));
+    assert.match(await response.text(), /حدّد اسم المسودة أو رقمها/);
+  }
+  assert.equal(getListing(desk.id)?.title, 'مكتب خشبي');
 });
 
 test('a new draft cannot attach the previous product photo without the customer selecting it', async t => {
@@ -528,7 +598,7 @@ test('a new draft cannot attach the previous product photo without the customer 
     messages: [photoTurn, { id: 'phone-reply', role: 'assistant', parts: [{ type: 'text', text: 'هذه صور الهاتف.' }] },
       { id: 'new-desk', role: 'user', parts: [{ type: 'text', text: 'جهّز مسودة جديدة لمكتب خشبي بدون صور.' }] }],
   }));
-  assert.match(await response.text(), /حُفظت مسودة المكتب الجديد بدون صور/);
+  assert.match(await response.text(), /حُفظت المسودة «مكتب جديد»/);
   assert.equal(attempts, 3);
   assert.equal(getListing(phone.id)?.images.length, 0);
   const drafts = listSellerListings(sellerId);

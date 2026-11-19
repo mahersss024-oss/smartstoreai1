@@ -216,6 +216,10 @@ export async function discardUnattachedListingImage(image: Pick<ListingImage, 'i
   }
 }
 
+export function getChatListingImageId(listingId: string, image: UploadedListingImage) {
+  return `chat-image-${createHash('sha256').update(listingId).update(image.data).digest('hex')}`;
+}
+
 export async function saveUploadedListingImagesForSeller({
   listingId,
   sellerId,
@@ -250,7 +254,7 @@ export async function saveUploadedListingImagesForSeller({
   let storageFailure: unknown;
 
   for (const [index, uploadedImage] of images.entries()) {
-    const imageId = draftOnly ? `chat-image-${createHash('sha256').update(listingId).update(uploadedImage.data).digest('hex')}` : randomUUID();
+    const imageId = draftOnly ? getChatListingImageId(listingId, uploadedImage) : randomUUID();
     if (latestListing.images.some(image => image.id === imageId)) continue;
     if (latestListing.images.length >= maxImages) break;
     let sanitizedOriginal: Awaited<

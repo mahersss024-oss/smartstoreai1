@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { analyzeImageQuality } from '@/agent/marketplace/image-quality';
 import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
 import {
+  getChatListingImageId,
   saveUploadedListingImagesForSeller,
   type UploadedListingImage,
 } from '@/agent/marketplace/listing-image-storage';
@@ -27,6 +28,7 @@ import {
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
 import type { ChatDraftAction } from '@/lib/chat/draft-selection';
+import type { ChatDraftReceipt } from '@/lib/chat/draft-receipt';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 
@@ -135,6 +137,21 @@ function confirmationRequired(message: string) {
   };
 }
 
+function confirmSelectedDraftPhotos(
+  listing: Awaited<ReturnType<typeof createListingDraft>>,
+  selected: UploadedListingImage[],
+  previousImageIds: ReadonlySet<string>,
+) {
+  const requested = new Set(selected.map(image => getChatListingImageId(listing.id, image)));
+  const attached = listing.images.map(image => image.id).filter(id => requested.has(id));
+  const added = attached.filter(id => !previousImageIds.has(id));
+  return {
+    requestedImageCount: requested.size,
+    attachedImageCount: attached.length,
+    addedImageCount: added.length,
+    receipt: { requested: [...requested], attached, added },
+  };
+}
 
 async function getCurrentEditableSellerListing({
   sellerId,
@@ -160,7 +177,7 @@ export function createMarketplaceTools(
     language?: AppLanguage;
     requestKey?: string;
     draftAction?: ChatDraftAction;
-    onDraftSaved?: (listingId: string) => void;
+    onDraftReceipt?: (receipt: ChatDraftReceipt) => void;
   } = {},
 ) {
   const draftOperations = new Map<string, number>();
@@ -168,6 +185,15 @@ export function createMarketplaceTools(
   const draftsCreatedThisTurn = new Set<string>();
   const imageOwners = new Map<number, string>();
   const { draftAction } = options;
+  let pendingWrite = Promise.resolve();
+  function writeInOrder<T>(signal: AbortSignal | undefined, run: () => Promise<T>) {
+    const result = pendingWrite.then(() => {
+      signal?.throwIfAborted();
+      return run();
+    });
+    pendingWrite = result.then(() => undefined, () => undefined);
+    return result;
+  }
   function canEditDraft(listingId: string | undefined) {
     if (!draftAction) return true;
     if (draftAction.intent === 'update') return listingId === draftAction.listingId;
@@ -185,7 +211,7 @@ export function createMarketplaceTools(
       description:
         'Create an owned unpublished marketplace draft from a natural seller conversation with a minimum product signal. Preserve confirmed details in title, description, price, city, condition, category and attributes, including model, year, mileage, specs, accessories, warranty, defects, color, material, brand, sale terms and seller notes. Omit unknown specifications and attributes; never put meta notes about missing seller details in listing fields. After a successful result the draft is already saved: do not ask the seller to create it again or call this tool again for the same product. Use updateListing with the saved listingId for later details; create another draft only for a different product or an explicit request for a separate ad. Automated policy concerns are advisory administration alerts, not authority to reject customer content. Respect explicit human moderation and technical permissions.',
       inputSchema: createDraftInputSchema,
-      execute: async (input) => {
+      execute: (input, context) => writeInOrder(context?.abortSignal, async () => {
         if (!session) {
           return authRequired();
         }
@@ -199,6 +225,9 @@ export function createMarketplaceTools(
         const listingInput = normalizeListingDetailsInput(
           listingDetailsInputSchema.parse(input),
         ) as CreateListingInput;
+        if (!listingInput.title?.trim() && !listingInput.description?.trim()) {
+          return { status: 'missing_product_details', message: 'Ask what product or service the seller wants to list. A category, city or price alone is not enough to save a draft.' };
+        }
         const productIdentity = listingInput.title
           ? JSON.stringify([listingInput.category, normalizeMarketplaceSearchText(listingInput.title)])
           : undefined;
@@ -211,17 +240,25 @@ export function createMarketplaceTools(
           };
         }
         let listing: Awaited<ReturnType<typeof createListingDraft>>;
-        let imageUploadUnavailable = false;
-
         try {
           const signature = JSON.stringify({ ...listingInput, imageIndexes: input.imageIndexes, imageSourceMessageId: input.imageSourceMessageId }, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
             ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
           if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
           const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
           listing = await createListingDraft(session.user, listingInput, { idempotencyKey, modelReview: true });
+          const savedProduct = normalizeMarketplaceSearchText(listing.title || listing.description || '');
+          const requestedProduct = normalizeMarketplaceSearchText(listingInput.title || listingInput.description || '');
+          if (savedProduct !== requestedProduct || (!listingInput.autoCategory && listingInput.category !== listing.category)) {
+            options.onDraftReceipt?.({ kind: 'replay_conflict', listing });
+            return {
+              status: 'already_saved',
+              listing,
+              message: 'A prior attempt for this turn saved a draft. Its product or category differs from the current tool request. No new listing or photos were saved by this call. Report the actual saved draft and ask the seller to review it before retrying.',
+            };
+          }
           if (listing.status === 'draft' || listing.status === 'pending') {
             draftsCreatedThisTurn.add(listing.id);
-            options.onDraftSaved?.(listing.id);
+            options.onDraftReceipt?.({ kind: 'saved', listing });
           }
         } catch (error) {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
@@ -238,12 +275,8 @@ export function createMarketplaceTools(
           throw error;
         }
 
-        if (listing.status !== 'draft' && listing.status !== 'pending') return {
-          status: 'already_saved', listing,
-          message: 'This request already saved the listing. Do not create another or modify its current state; guide the user to Account > My listings.',
-        };
-
         if (listing.compliance.humanDecision === 'block') {
+          options.onDraftReceipt?.({ kind: 'blocked', listing });
           return {
             status: 'blocked',
             message:
@@ -251,11 +284,20 @@ export function createMarketplaceTools(
             listing,
           };
         }
+        if (listing.status !== 'draft' && listing.status !== 'pending') {
+          options.onDraftReceipt?.({ kind: 'replayed', listing });
+          return {
+            status: 'already_saved', listing,
+            message: 'This request already saved the listing. Do not create another or modify its current state; guide the user to Account > My listings.',
+          };
+        }
 
         const imageSelectionConflict = selection.some(({ index }) => imageOwners.has(index) && imageOwners.get(index) !== listing.id);
+        const images = selection.map(({ image }) => image);
+        const previousImageIds = new Set(listing.images.map(image => image.id));
         if (selection.length && !imageSelectionConflict) {
+          context?.abortSignal?.throwIfAborted();
           selection.forEach(({ index }) => imageOwners.set(index, listing.id));
-          const images = selection.map(({ image }) => image);
           const review = await reviewListingImageContent(images, listing.images, { listingId: listing.id, userId: session.user.id });
           const listingWithImages = await saveUploadedListingImagesForSeller({
             listingId: listing.id,
@@ -264,7 +306,6 @@ export function createMarketplaceTools(
             contentReviewStatuses: review.imageReviewStatuses,
             draftOnly: true,
           }).catch((error: unknown) => {
-            imageUploadUnavailable = true;
             console.warn(`[draft_image_upload] failure=${error instanceof Error ? error.name : 'UnknownError'}`);
             return null;
           });
@@ -278,29 +319,32 @@ export function createMarketplaceTools(
           createdDraftsByProduct.set(productIdentity, listing);
         }
 
+        const { receipt, ...photos } = confirmSelectedDraftPhotos(listing, images, previousImageIds);
+        if (photos.requestedImageCount) options.onDraftReceipt?.({ kind: 'photos', listing, photos: receipt });
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'draft_created',
           imageSelectionConflict,
+          ...photos,
           message:
             listing.status === 'pending'
               ? 'Draft created for manual review. Do not publish directly.'
               : imageSelectionConflict
                 ? 'Draft created without photos: selected photos already belong to another product draft in this turn. Ask which remaining photos belong to this product; never copy unrelated photos.'
-              : imageUploadUnavailable
+                : photos.attachedImageCount < photos.requestedImageCount
                 ? 'Draft created. Some photos could not be saved, but photos are optional and the seller can publish manually from Account > My listings.'
-              : listing.images.some((image) => image.status === 'approved')
+                : photos.attachedImageCount
                 ? 'Draft created with the uploaded product image. The seller must review and publish it from Account > My listings.'
                 : 'Draft created. Photos are optional. Ask about useful missing details separately in chat; do not put notes about missing details in listing fields. Direct the seller to Account > My listings when they want to publish.',
           listing,
         };
-      },
+      }),
     }),
 
     updateListing: tool({
       description:
         'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes; omit unknown specifications, and never add notes about missing details to listing fields. Ask follow-up questions separately in chat. Use the server-confirmed listingId or the listingId returned by draft creation in this turn. A draft price change requires confirmedPriceChange=true.',
       inputSchema: updateListingDetailsInputSchema,
-      execute: async (input) => {
+      execute: (input, context) => writeInOrder(context?.abortSignal, async () => {
         if (!session) {
           return authRequired();
         }
@@ -315,6 +359,9 @@ export function createMarketplaceTools(
           return confirmationRequired(
             'Confirm the price change explicitly before updating the listing price.',
           );
+        }
+        if (!Object.keys(updates).length) {
+          return { status: 'missing_update_details', message: 'Ask what detail to change before saving the draft.' };
         }
 
         const targetListing = await getCurrentEditableSellerListing({
@@ -351,9 +398,8 @@ export function createMarketplaceTools(
           };
         }
 
-        options.onDraftSaved?.(listing.id);
-
         if (listing.compliance.humanDecision === 'block') {
+          options.onDraftReceipt?.({ kind: 'blocked', listing });
           return {
             status: 'blocked',
             message:
@@ -362,11 +408,12 @@ export function createMarketplaceTools(
           };
         }
 
+        options.onDraftReceipt?.({ kind: 'updated', listing });
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'updated',
           listing,
         };
-      },
+      }),
     }),
 
     addUploadedImagesToListing: tool({
@@ -376,7 +423,7 @@ export function createMarketplaceTools(
         listingId: z.string().min(1),
         ...uploadedImageSelection,
       }),
-      execute: async ({ listingId, ...selectionInput }) => {
+      execute: ({ listingId, ...selectionInput }, context) => writeInOrder(context?.abortSignal, async () => {
         if (!session) {
           return authRequired();
         }
@@ -412,7 +459,9 @@ export function createMarketplaceTools(
         }
         selection.forEach(({ index }) => imageOwners.set(index, listingId));
         const images = selection.map(({ image }) => image);
+        const previousImageIds = new Set(targetListing.images.map(image => image.id));
         const review = await reviewListingImageContent(images, targetListing.images, { listingId, userId: session.user.id });
+        context?.abortSignal?.throwIfAborted();
         const listing = await saveUploadedListingImagesForSeller({
           listingId,
           sellerId: session.user.id,
@@ -428,13 +477,18 @@ export function createMarketplaceTools(
           };
         }
 
-        options.onDraftSaved?.(listing.id);
+        const { receipt, ...photos } = confirmSelectedDraftPhotos(listing, images, previousImageIds);
+        options.onDraftReceipt?.({ kind: 'photos', listing, photos: receipt });
+        const status = photos.attachedImageCount === 0 ? 'images_not_added'
+          : photos.attachedImageCount < photos.requestedImageCount ? 'images_partially_added'
+          : photos.addedImageCount ? 'images_added' : 'images_already_attached';
         return {
-          status: 'images_added',
+          status,
+          ...photos,
           contentCheck: review.status,
           listing,
         };
-      },
+      }),
     }),
 
 

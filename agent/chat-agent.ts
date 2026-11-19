@@ -1,6 +1,7 @@
 import { ToolLoopAgent, stepCountIs } from 'ai';
 import { chatGenerationLimits } from '@/lib/chat/admission';
 import type { ChatDraftAction } from '@/lib/chat/draft-selection';
+import type { ChatDraftReceipt } from '@/lib/chat/draft-receipt';
 
 import { appConfig } from '@/app/app-config';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
@@ -25,7 +26,7 @@ export function createChatAgent(
     allowDraftTools?: boolean;
     draftAction?: ChatDraftAction;
     requestKey?: string;
-    onDraftSaved?: (listingId: string) => void;
+    onDraftReceipt?: (receipt: ChatDraftReceipt) => void;
   } = {},
 ) {
   const limits = chatGenerationLimits();
@@ -47,7 +48,7 @@ export function createChatAgent(
         language: customerLanguage,
         requestKey: options.requestKey,
         draftAction: options.draftAction,
-        onDraftSaved: options.onDraftSaved,
+        onDraftReceipt: options.onDraftReceipt,
       })),
     },
   });
