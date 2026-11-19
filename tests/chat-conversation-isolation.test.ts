@@ -69,7 +69,7 @@ test('the real chat route cannot execute old product searches or emit marketplac
     if (!checker) assert.deepEqual(body.tools.map((tool: { function: { name: string } }) => tool.function.name), ['getPlatformHelp']);
     return Response.json({ id: 'scoped-help', object: 'chat.completion', created: 1, model: 'test-model',
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
-        content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'البحث عن المنتجات ليس من دوري. يمكنك استخدام بحث السوق بنفسك.',
+        content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'اكتب اسم المنتج في خانة البحث بالصفحة الرئيسية وحدد المدينة.',
       } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });
   const beforeEvents = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false });
@@ -77,7 +77,7 @@ test('the real chat route cannot execute old product searches or emit marketplac
     const response = await POST(request(id));
     assert.equal(response.status, 200);
     const stream = await response.text();
-    assert.match(stream, /ليس من دوري/);
+    assert.match(stream, /اكتب اسم المنتج في خانة البحث/);
     assert.doesNotMatch(stream, /tool-output-available/);
   }
   assert.deepEqual(getRealtimeEventsSince(null, { userId: user.id, isAdmin: false }), beforeEvents);
