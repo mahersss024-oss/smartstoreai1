@@ -26,6 +26,7 @@ import {
 } from '@/agent/marketplace/repository';
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
+import type { ChatDraftAction } from '@/lib/chat/draft-selection';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 
@@ -147,13 +148,8 @@ async function getCurrentEditableSellerListing({
     return listing && listing.sellerId === sellerId ? listing : null;
   }
 
-  const listings = await listSellerListings(sellerId);
-
-  return (
-    listings.find((listing) =>
-      listing.status === 'draft',
-    ) ?? null
-  );
+  const drafts = (await listSellerListings(sellerId)).filter(listing => listing.status === 'draft');
+  return drafts.length === 1 ? drafts[0] : null;
 }
 
 export function createMarketplaceTools(
@@ -163,12 +159,20 @@ export function createMarketplaceTools(
     imageSourceMessageId?: string;
     language?: AppLanguage;
     requestKey?: string;
+    draftAction?: ChatDraftAction;
     onDraftSaved?: (listingId: string) => void;
   } = {},
 ) {
   const draftOperations = new Map<string, number>();
   const createdDraftsByProduct = new Map<string, Awaited<ReturnType<typeof createListingDraft>>>();
+  const draftsCreatedThisTurn = new Set<string>();
   const imageOwners = new Map<number, string>();
+  const { draftAction } = options;
+  function canEditDraft(listingId: string | undefined) {
+    if (!draftAction) return true;
+    if (draftAction.intent === 'update') return listingId === draftAction.listingId;
+    return listingId !== undefined && draftsCreatedThisTurn.has(listingId);
+  }
   function selectUploadedImages(input: z.infer<typeof createDraftInputSchema> | { imageIndexes?: number[]; imageSourceMessageId?: string }) {
     const indexes = [...new Set(input.imageIndexes ?? [])];
     if (indexes.length && ((options.imageSourceMessageId && input.imageSourceMessageId !== options.imageSourceMessageId)
@@ -184,6 +188,10 @@ export function createMarketplaceTools(
       execute: async (input) => {
         if (!session) {
           return authRequired();
+        }
+
+        if (draftAction?.intent === 'update') {
+          return confirmationRequired('This request is for an existing draft. Update the confirmed draft only.');
         }
 
         const selection = selectUploadedImages(createDraftInputSchema.parse(input));
@@ -211,7 +219,10 @@ export function createMarketplaceTools(
           if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
           const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
           listing = await createListingDraft(session.user, listingInput, { idempotencyKey, modelReview: true });
-          if (listing.status === 'draft' || listing.status === 'pending') options.onDraftSaved?.(listing.id);
+          if (listing.status === 'draft' || listing.status === 'pending') {
+            draftsCreatedThisTurn.add(listing.id);
+            options.onDraftSaved?.(listing.id);
+          }
         } catch (error) {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
           if (isListingLimitReachedError(error)) {
@@ -287,7 +298,7 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes; omit unknown specifications, and never add notes about missing details to listing fields. Ask follow-up questions separately in chat. Omit listingId only to select the latest owned draft. A new standalone product requires a new draft. A draft price change requires confirmedPriceChange=true.',
+        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes; omit unknown specifications, and never add notes about missing details to listing fields. Ask follow-up questions separately in chat. Use the server-confirmed listingId or the listingId returned by draft creation in this turn. A draft price change requires confirmedPriceChange=true.',
       inputSchema: updateListingDetailsInputSchema,
       execute: async (input) => {
         if (!session) {
@@ -295,6 +306,10 @@ export function createMarketplaceTools(
         }
 
         const { listingId, confirmedPriceChange, ...updates } = updateListingDetailsInputSchema.parse(input);
+        const confirmedId = listingId ?? (draftAction?.intent === 'update' ? draftAction.listingId : undefined);
+        if (!canEditDraft(confirmedId)) {
+          return confirmationRequired('Use only the draft confirmed for this request or created in this chat turn.');
+        }
 
         if (updates.price !== undefined && confirmedPriceChange !== true) {
           return confirmationRequired(
@@ -304,14 +319,13 @@ export function createMarketplaceTools(
 
         const targetListing = await getCurrentEditableSellerListing({
           sellerId: session.user.id,
-          listingId,
+          listingId: confirmedId,
         });
 
         if (!targetListing) {
           return {
             status: 'not_found',
-            message:
-              'No editable seller draft was found. If the seller has provided product details in this conversation but no saved draft exists, create the draft first, then apply these details.',
+            message: 'No single editable draft was found. Ask the seller to identify the draft they want to edit.',
           };
         }
 
@@ -365,6 +379,9 @@ export function createMarketplaceTools(
       execute: async ({ listingId, ...selectionInput }) => {
         if (!session) {
           return authRequired();
+        }
+        if (!canEditDraft(listingId)) {
+          return confirmationRequired('Attach photos only to the draft confirmed for this request or created in this chat turn.');
         }
 
         if (!options.latestUploadedImages?.length) {

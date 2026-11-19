@@ -146,7 +146,7 @@ test('assistant context contains owned drafts only and directs manual review wit
   const marketplaceInstructions = readProjectFile('agent', 'marketplace', 'agents.ts');
 
   assert.doesNotMatch(marketplaceTools, /searchMarketplaceListings|compareMarketplaceListings|listMarketplaceListings/);
-  assert.match(chatRoute, /drafts\.filter\(listing => listing\.status === 'draft'\)/);
+  assert.match(chatRoute, /listSellerListings\(session\.user\.id\)/);
   assert.match(chatRoute, /reviewUrl: '\/account\/listings'/);
   assert.doesNotMatch(chatRoute, /getVerifiedSelectedListingContext|getListing\(parsed\.id\)/);
   assert.match(marketplaceInstructions, /customer reviews and publishes from \/account\/listings themselves/);
