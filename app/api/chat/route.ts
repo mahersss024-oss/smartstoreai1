@@ -38,10 +38,12 @@ import {
 } from '@/agent/marketplace/repository';
 import {
   applyAllowedRequestToLatestUserMessage,
+  buildScopeContext,
   checkInputScope,
   checkOutputScope,
   getLatestUserRequest,
   getSafeScopeResponse,
+  isScopeFallbackMessage,
   latestUserMessageHasImageAttachment,
   messageHasImageAttachment,
 } from '@/agent/scope-guard';
@@ -53,7 +55,7 @@ import {
 import type { AppLanguage } from '@/app/i18n';
 import { getRequestContentLength, rejectOversizedRequest } from '@/lib/api/request-size';
 import { getAuthSession } from '@/lib/auth/session';
-import { getSafeAssistantText, chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
+import { getHamadCustomerReply, chatServiceUnavailableMessage, hamadCustomerReplyStyle } from '@/lib/chat-response-safety';
 import { customerLanguageInstructions, resolveCustomerLanguage } from '@/lib/customer-language';
 import { parseChatConversationId } from '@/lib/chat/conversation';
 import { selectChatContext } from '@/lib/chat/context';
@@ -394,12 +396,11 @@ function createTextUIResponse(
   text: string,
   options: { creationChoice?: boolean } = {},
 ) {
-  text = getSafeAssistantText(text) || (text.includes(authRequiredMarker)
+  text = getHamadCustomerReply(text) || (text.includes(authRequiredMarker)
     ? `${authRequiredMarker} يرجى تسجيل الدخول أولًا لمتابعة المساعدة في سوق حمد.`
     : chatServiceUnavailableMessage);
-  const timestamp = Date.now();
-  const messageId = `guard-message-${timestamp}`;
-  const textId = `guard-text-${timestamp}`;
+  const messageId = `guard-message-${crypto.randomUUID()}`;
+  const textId = `${messageId}-text`;
 
   return createUIMessageStreamResponse({
     stream: createUIMessageStream<UIMessage>({
@@ -503,19 +504,6 @@ function buildMarketplaceInterfaceSystemMessage(content: string) {
     content,
   } satisfies ModelMessage;
 }
-
-function buildMarketplaceInterfaceScopeMessage(content: string) {
-  return {
-    role: 'assistant',
-    parts: [
-      {
-        type: 'text',
-        text: content,
-      },
-    ],
-  };
-}
-
 
 function getDefaultImageAnalysisRequest(language: AppLanguage) {
   void language;
@@ -703,11 +691,13 @@ async function generateCheckedAssistantResponse(
     requestKey?: string;
     allowDraftTools?: boolean;
     marketplaceIntent?: string;
+    conversationContext?: ReturnType<typeof buildScopeContext>;
     abortSignal?: AbortSignal;
     onGenerationSettled?: () => Promise<void>;
   } = {},
 ) {
   const completedDraftIds = new Set<string>();
+  const conversationContext = options.conversationContext;
   try {
     const { additionalInstructions, promptMessages } = splitInstructionMessages(messages);
     const chatAgent = createChatAgent(session, {
@@ -717,9 +707,9 @@ async function generateCheckedAssistantResponse(
     const firstResult = await withChatAbortTimeout(chatAgentGenerationTimeoutMs, signal =>
       chatAgent.generate({ messages: promptMessages, abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal }));
     const verifiedToolResults = firstResult.steps.flatMap(step => step.toolResults);
-    const firstText = getSafeAssistantText(firstResult.text);
+    const firstText = getHamadCustomerReply(firstResult.text);
     if (firstText) {
-      const decision = await checkOutputScope({ userRequest, assistantResponse: firstText, verifiedToolResults });
+      const decision = await checkOutputScope({ userRequest, assistantResponse: firstText, verifiedToolResults, conversationContext });
       if (decision.decision === 'ALLOW') return firstText;
       if (isOutputCheckerProviderFailure(decision)) return getModelProviderFailureResponse(language, completedDraftIds.size > 0);
     }
@@ -727,7 +717,7 @@ async function generateCheckedAssistantResponse(
       ...options, language, answerOnly: true,
       additionalInstructions: [
         additionalInstructions,
-        'Regenerate the answer in Arabic only. The only roles are unpublished drafts and documented platform help. Do not search, compare, price, negotiate or execute sensitive actions. Do not reveal internal decisions.',
+        'Regenerate the answer in Arabic only. Use earlier turns to resolve references in the latest request. Ask a focused question if clarification is needed. Avoid introductions unless asked. The only roles are unpublished drafts and documented platform help. Do not search, compare, price, negotiate or execute sensitive actions. Do not reveal internal decisions.',
         completedDraftIds.size
           ? 'A verified draft has already been saved. Tell the customer it is saved and link to /account/listings. Never ask them to create it again, start over, or imply it is unsaved. If they supplied more details, say they can be added to the existing draft unless an update result confirms they were saved.'
           : 'Preserve verified facts and functional links, but remove unsupported claims.',
@@ -738,9 +728,9 @@ async function generateCheckedAssistantResponse(
     });
     const retryResult = await withChatAbortTimeout(chatAgentRetryTimeoutMs, signal =>
       retryAgent.generate({ messages: promptMessages, abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal }));
-    const retryText = getSafeAssistantText(retryResult.text);
+    const retryText = getHamadCustomerReply(retryResult.text);
     if (retryText) {
-      const decision = await checkOutputScope({ userRequest, assistantResponse: retryText, verifiedToolResults });
+      const decision = await checkOutputScope({ userRequest, assistantResponse: retryText, verifiedToolResults, conversationContext });
       if (decision.decision === 'ALLOW') return retryText;
     }
   } catch (error) {
@@ -760,7 +750,7 @@ function createCheckedAssistantUIResponse(...args: Parameters<typeof generateChe
           writer.write({ type: 'start', messageId: id, messageMetadata: { marketplaceIntent: options.marketplaceIntent } });
           const text = await generateCheckedAssistantResponse(...args);
           writer.write({ type: 'text-start', id });
-          writer.write({ type: 'text-delta', id, delta: getSafeAssistantText(text) || chatServiceUnavailableMessage });
+          writer.write({ type: 'text-delta', id, delta: getHamadCustomerReply(text) || chatServiceUnavailableMessage });
           writer.write({ type: 'text-end', id });
           writer.write({ type: 'finish', finishReason: 'stop' });
         } finally { await options.onGenerationSettled?.(); }
@@ -784,6 +774,7 @@ type ChatIssueResponseInput = {
     | 'auth_required';
   language: AppLanguage;
   userRequest: string;
+  hasPriorUserTurn?: boolean;
   validationReason?: string;
   complianceDecision?: ImageComplianceDecision;
   textPolicyDecision?: ReturnType<typeof evaluateSaudiMarketplaceCompliance>;
@@ -794,6 +785,7 @@ function getChatIssueFallbackResponse({
   kind,
   language,
   validationReason,
+  hasPriorUserTurn,
 }: ChatIssueResponseInput) {
   if (kind === 'upload_validation') {
     return getImageUploadValidationResponse(
@@ -827,7 +819,7 @@ function getChatIssueFallbackResponse({
   }
 
   if (kind === 'scope_unclear') {
-    return getSafeScopeResponse('UNCLEAR', language);
+    return getSafeScopeResponse('UNCLEAR', language, hasPriorUserTurn);
   }
 
   return getSafeScopeResponse(
@@ -841,11 +833,13 @@ async function generateProfessionalChatIssueResponse(
 ) {
   const fallback = getChatIssueFallbackResponse(input);
 
+  if (input.scopeDecision?.reason_code === 'scope_checker_failure') {
+    return createTextUIResponse('تعذر إكمال رد حمد الآن. أعد إرسال سؤالك بعد قليل.');
+  }
   if (
     input.kind === 'image_inspection_unavailable' ||
     input.kind === 'scope_block' ||
-    input.kind === 'scope_unclear' ||
-    input.scopeDecision?.reason_code === 'scope_checker_failure'
+    input.kind === 'scope_unclear'
   ) {
     return createTextUIResponse(fallback);
   }
@@ -871,6 +865,7 @@ For text policy issues, explain the supplied outcome without turning a model con
 For scope issues, redirect to draft preparation and documented platform help only.
 For auth_required, explain that Hamad chat requires sign-in before assistant interaction.
 For manual review, be helpful, brief, and ask for clearer matching details/images.
+${hamadCustomerReplyStyle}
 ${customerLanguageInstructions}`,
           messages: [
             {
@@ -899,7 +894,7 @@ ${customerLanguageInstructions}`,
           ],
         }),
     );
-    let responseText = getSafeAssistantText(result.text);
+    let responseText = getHamadCustomerReply(result.text);
 
     if (responseText) {
       if (input.kind === 'auth_required') {
@@ -988,7 +983,7 @@ export async function POST(request: Request) {
     }
 
     if (isChatMessage(message) && message.role === 'assistant') {
-      return hasChatMessagePayload(message);
+      return hasChatMessagePayload(message) && !isScopeFallbackMessage(message);
     }
 
     return true;
@@ -1078,18 +1073,14 @@ export async function POST(request: Request) {
       session,
       language,
     }) : null;
-    const marketplaceInterfaceScopeMessage = marketplaceInterfaceContext
-      ? buildMarketplaceInterfaceScopeMessage(marketplaceInterfaceContext)
-      : null;
     const marketplaceInterfaceSystemMessage = marketplaceInterfaceContext
       ? buildMarketplaceInterfaceSystemMessage(marketplaceInterfaceContext)
       : null;
-    const scopeCheckMessages = marketplaceInterfaceScopeMessage
-      ? [...filteredMessages, marketplaceInterfaceScopeMessage]
-      : filteredMessages;
+    const hasPriorUserTurn = filteredMessages.filter(message => message.role === 'user').length > 1;
     const inputScopeDecision = await checkInputScope({
-      messages: scopeCheckMessages,
+      messages: filteredMessages,
       hamadCreationSelected: body.creationMethod === 'chat',
+      marketplaceInterfaceContext: marketplaceInterfaceContext ?? undefined,
     });
 
     if (
@@ -1104,6 +1095,7 @@ export async function POST(request: Request) {
         language,
         userRequest: preliminaryUserRequest,
         scopeDecision: inputScopeDecision,
+        hasPriorUserTurn,
       });
     }
 
@@ -1116,6 +1108,7 @@ export async function POST(request: Request) {
         language,
         userRequest: preliminaryUserRequest,
         scopeDecision: inputScopeDecision,
+        hasPriorUserTurn,
       });
     }
     if (inputScopeDecision.intent === 'create_listing' && body.creationMethod !== 'chat') {
@@ -1242,7 +1235,8 @@ export async function POST(request: Request) {
       session,
       { hasVisionInput: false, latestUploadedImages, imageSourceMessageId, requestKey,
         allowDraftTools: body.creationMethod === 'chat' && (inputScopeDecision.intent === 'create_listing' || inputScopeDecision.intent === 'update_listing'),
-        marketplaceIntent: inputScopeDecision.intent ?? 'support', abortSignal: request.signal, onGenerationSettled: admission.release },
+        marketplaceIntent: inputScopeDecision.intent ?? 'support', conversationContext: buildScopeContext(scopedMessages),
+        abortSignal: request.signal, onGenerationSettled: admission.release },
     );
     backgroundGeneration = true;
     return response;

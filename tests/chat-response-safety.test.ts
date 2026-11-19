@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  getHamadCustomerReply,
   getSafeAssistantText,
   isRawServiceErrorResponse,
+  legacyHamadRoleReply,
 } from '@/lib/chat-response-safety';
 import { normalizeInternalChatHref } from '@/lib/chat/internal-links';
 
@@ -23,6 +25,32 @@ test('keeps normal assistant text', () => {
 
   assert.equal(isRawServiceErrorResponse(text), false);
   assert.equal(getSafeAssistantText(`  ${text}  `), text);
+});
+
+test('collapses only complete repeats of the older Hamad role reply', () => {
+  assert.equal(getSafeAssistantText(legacyHamadRoleReply.repeat(2)), legacyHamadRoleReply);
+  const reply = `${legacyHamadRoleReply}\nأي معلومة عن المنصة تحتاج إليها؟`;
+  assert.equal(getSafeAssistantText(reply), reply);
+});
+
+test('Hamad replies use search instructions and neutral guidance without warnings or accusations', () => {
+  for (const text of [
+    'لا أستطيع البحث عن إعلانات لك.',
+    'ما أقدر أبحث عن هذا الإعلان.',
+    'ما أقدر أدور لك على إعلان.',
+    'البحث عن الإعلانات ليس من دوري.',
+    legacyHamadRoleReply,
+    'هذه عملية احتيال.',
+    'انتبه قد يكون هناك خداع.',
+    'قد يكون هذا عملية نصب.',
+    'قد يكون الإعلان وهميًا.',
+  ]) assert.equal(getHamadCustomerReply(text), '', text);
+  for (const text of [
+    'اكتب اسم المنتج في خانة «ابحث عن إعلان» ثم حدّد مدينتك.',
+    'افتح الإعلان واضغط إبلاغ، ثم حدّد السبب.',
+    'التحويل المباشر يتم بين الطرفين وعلى مسؤوليتهما.',
+    'أضفت وصف الخيمة وطريقة نصبها إلى المسودة.',
+  ]) assert.equal(getHamadCustomerReply(text), text);
 });
 
 test('assistant prose uses the service description rather than model-provider names', () => {

@@ -60,10 +60,12 @@ test('static auth policy and scope replies remain Arabic for all accepted langua
     assert.equal(getSafeScopeResponse(decision, 'en'), getSafeScopeResponse(decision, 'ar'));
     assert.ok(isArabicCustomerText(getSafeScopeResponse(decision, 'en')));
   }
-});test('server and client guard generated replies without page-specific rendering checks', () => {
+});
+
+test('server and client guard generated replies without page-specific rendering checks', () => {
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
   const agent = readFileSync('agent/chat-agent.ts', 'utf8');
   assert.match(route, /return resolveCustomerLanguage\(settings\?\.language\)/);
-  assert.match(route, /text = getSafeAssistantText\(text\)/);
+  assert.match(route, /text = getHamadCustomerReply\(text\)/);
   assert.match(agent, /customerLanguageInstructions/);
 });

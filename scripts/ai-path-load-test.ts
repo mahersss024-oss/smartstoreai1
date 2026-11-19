@@ -361,6 +361,8 @@ async function main() {
   const { getSafeScopeResponse } = await import('../agent/scope-guard');
   scopeFallbackReplies.add(getSafeScopeResponse('BLOCK', 'ar'));
   scopeFallbackReplies.add(getSafeScopeResponse('UNCLEAR', 'ar'));
+  scopeFallbackReplies.add(getSafeScopeResponse('UNCLEAR', 'ar', true));
+  scopeFallbackReplies.add(getSafeScopeResponse('OUTPUT_BLOCK', 'ar'));
 
   const summaries: LoadResult[] = [];
 

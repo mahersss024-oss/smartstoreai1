@@ -6,6 +6,7 @@ import { createSessionCookie } from '@/lib/auth/session';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { listSellerListings } from '@/agent/marketplace/store';
 import { platformPolicies } from '@/lib/platform/policies';
+import { legacyHamadRoleReply } from '@/lib/chat-response-safety';
 import { textAnalysis } from './helpers/text-understanding';
 import { resetImageContentReviewCacheForTests } from '@/agent/marketplace/listing-image-content';
 
@@ -44,6 +45,114 @@ test('creation without an explicit method offers both options without running an
   assert.match(stream, /الإنشاء اليدوي/);
   assert.equal(listSellerListings('choice-owner').length, 0);
 });
+
+test('a short follow-up uses the prior platform question and ignores repeated role replies', async t => {
+  // The single-message analyzer would send this follow-up to draft creation.
+  mockIntent(t, 'create_listing');
+  const earlierQuestion = 'كيف أراجع مسودة الإعلان؟';
+  const followUp = 'ومن الجوال؟';
+  let checkedInput = false;
+  let checkedOutput = false;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system')
+      .map((message: { content: string }) => message.content).join('\n');
+    const text = JSON.stringify(body.messages);
+    assert.ok(!text.includes(legacyHamadRoleReply));
+    if (instructions.includes('Scope Checker')) {
+      const checked = JSON.parse(body.messages.at(-1).content);
+      assert.deepEqual(checked.conversation_context, [
+        { role: 'user', text: earlierQuestion }, { role: 'user', text: followUp },
+      ]);
+      if (instructions.includes('input Scope Checker')) {
+        assert.equal(checked.latest_user_request, followUp);
+        checkedInput = true;
+        return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_help_followup', intent: 'support' }));
+      }
+      assert.equal(checked.user_request, followUp);
+      assert.ok(checked.verified_tool_results.length > 0);
+      checkedOutput = true;
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+    }
+    assert.ok(text.includes(earlierQuestion));
+    assert.deepEqual(body.tools.map((tool: { function: { name: string } }) => tool.function.name), ['getPlatformHelp']);
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('افتح إعلاناتي من التطبيق لمراجعة المسودة.');
+    return completion(null, { name: 'getPlatformHelp', arguments: JSON.stringify({ topic: 'listings' }) });
+  });
+  const stream = await (await POST(request('context-owner', 'follow-up', { messages: [
+    { id: 'earlier-question', role: 'user', parts: [{ type: 'text', text: earlierQuestion }] },
+    { id: 'old-role-reply', role: 'assistant', parts: [{ type: 'text', text: legacyHamadRoleReply.repeat(2) }] },
+    { id: 'follow-up', role: 'user', parts: [{ type: 'text', text: followUp }] },
+  ] }))).text();
+  assert.equal(checkedInput, true);
+  assert.equal(checkedOutput, true);
+  assert.equal(stream.match(/"type":"text-delta"/g)?.length, 1);
+  assert.match(stream, /افتح إعلاناتي من التطبيق/);
+  assert.doesNotMatch(stream, /أنا حمد|creationChoice/);
+  assert.equal(listSellerListings('context-owner').length, 0);
+});
+
+test('unclear follow-ups and unavailable scope checks stream distinct replies once', async t => {
+  const analysis = textAnalysis({ intent: 'general_info' });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  let unavailable = false;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    assert.match(String(init?.body), /input Scope Checker/);
+    return unavailable
+      ? Response.json({ error: { message: 'checker unavailable' } }, { status: 401 })
+      : completion(JSON.stringify({ decision: 'UNCLEAR', confidence: 1, reason_code: 'missing_reference' }));
+  });
+  const messages = ['كيف أراجع المسودة؟', 'وهذا؟'].map((text, index) => ({
+    id: `unclear-${index}`, role: 'user', parts: [{ type: 'text', text }],
+  }));
+  for (const expected of [/هل تتابع النقطة السابقة/, /أعد إرسال سؤالك بعد قليل/]) {
+    const response = await POST(request('unclear-owner', 'missing-reference', { messages }));
+    const stream = await response.text();
+    assert.match(stream, expected);
+    assert.equal(stream.match(/"type":"text-delta"/g)?.length, 1);
+    assert.doesNotMatch(stream, /أنا حمد|"creationChoice":true/);
+    unavailable = true;
+  }
+});
+
+for (const scenario of [
+  { topic: 'search', intent: 'search_listing', question: 'وين ألقى إعلان عن لابتوب؟',
+    unwanted: 'لا أستطيع البحث عن الإعلانات.', answer: 'اكتب لابتوب في خانة «ابحث عن إعلان» وحدّد مدينتك.' },
+  { topic: 'terms', intent: 'support', question: 'هل سوق حمد يستلم التحويل؟',
+    unwanted: 'احذر، هذا التحويل قد يكون احتيالًا.', answer: 'التحويل المباشر يتم بين الطرفين وعلى مسؤوليتهما.' },
+] as const) {
+  test(`rewrites unwanted ${scenario.topic} wording before streaming the verified reply`, async t => {
+    mockIntent(t, scenario.intent);
+    let rewrites = 0;
+    let verifications = 0;
+    t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const body = JSON.parse(String(init?.body));
+      const instructions = body.messages.filter((message: { role: string }) => message.role === 'system')
+        .map((message: { content: string }) => message.content).join('\n');
+      if (instructions.includes('output Scope Checker')) {
+        const checked = JSON.parse(body.messages.at(-1).content);
+        assert.equal(checked.assistant_response, scenario.answer);
+        assert.ok(checked.verified_tool_results.length > 0);
+        verifications++;
+        return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
+      }
+      if (instructions.includes('Regenerate the answer')) {
+        assert.ok(!body.tools?.length);
+        rewrites++;
+        return completion(scenario.answer);
+      }
+      if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion(scenario.unwanted);
+      return completion(null, { name: 'getPlatformHelp', arguments: JSON.stringify({ topic: scenario.topic }) });
+    });
+    const messages = [{ id: `style-${scenario.topic}`, role: 'user', parts: [{ type: 'text', text: scenario.question }] }];
+    const stream = await (await POST(request(`style-owner-${scenario.topic}`, 'unused', { messages }))).text();
+    assert.equal(rewrites, 1);
+    assert.equal(verifications, 1);
+    assert.ok(stream.includes(scenario.answer));
+    assert.ok(!stream.includes(scenario.unwanted));
+  });
+}
 
 test('Hamad creation selection reaches scope checking with the original listing details', async t => {
   const analysis = textAnalysis({ intent: 'general_info' });
@@ -147,7 +256,7 @@ test('legacy search parts and reset flags cannot restore removed product tools o
     generations++;
     assert.deepEqual(body.tools.map((tool: { function: { name: string } }) => tool.function.name), ['getPlatformHelp']);
     assert.ok(!body.messages.some((message: { role: string }) => message.role === 'tool'));
-    return completion('يمكنك البحث بنفسك من حقل البحث في الصفحة الرئيسية. دوري تجهيز المسودات وشرح المنصة.');
+    return completion('اكتب اسم المنتج في خانة البحث في الصفحة الرئيسية.');
   });
   const stream = await (await POST(request('legacy-owner', 'legacy-turn', {
     creationMethod: 'chat', resetSearchState: true, selectedListing: { id: 'other-seller-record' },
@@ -156,7 +265,7 @@ test('legacy search parts and reset flags cannot restore removed product tools o
       { id: 'new', role: 'user', parts: [{ type: 'text', text: 'ابحث عن هاتف' }] },
     ],
   }))).text();
-  assert.match(stream, /دوري تجهيز المسودات/);
+  assert.match(stream, /اكتب اسم المنتج في خانة البحث/);
   assert.doesNotMatch(stream, /tool-output-available|forged|other-seller-record/);
   assert.equal(generations, 1);
 });
@@ -167,13 +276,16 @@ test('long conversation context stays bounded and oversized latest requests are 
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     bodies.push(body);
+    if (body.messages.some((message: { role: string; content: unknown }) => message.role === 'system' && String(message.content).includes('input Scope Checker'))) {
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'platform_followup', intent: 'support' }));
+    }
     const checker = body.messages.some((message: { content: unknown }) => typeof message.content === 'string' && message.content.includes('output Scope Checker'));
     return completion(checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'أساعدك في استخدام المنصة.');
   });
   const messages = Array.from({ length: 61 }, (_, index) => ({ id: 'history-'+index, role: index % 2 ? 'assistant' : 'user', parts: [{ type: 'text', text: 'طلب '+index }] }));
   const response = await POST(request('long-owner', 'ignored', { messages }));
   assert.match(await response.text(), /text-delta/);
-  const generation = bodies.find(body => body.messages.some(message => String(message.content).includes('طلب 60')));
+  const generation = bodies.find(body => body.messages.some(message => message.role === 'user' && message.content === 'طلب 60'));
   assert.ok(generation);
   assert.ok(generation.messages.filter(message => message.role !== 'system').length <= 40);
   const before = bodies.length;
@@ -262,6 +374,12 @@ test('photo-first creation understands the retained product only when the custom
       return completion(JSON.stringify({ decision: 'allow', confidence: 0.99, reasons: [], detected_product: 'هاتف مصور', category_match: 'unclear', sharia_sensitive: false }));
     }
     const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      const checked = JSON.parse(body.messages.at(-1).content);
+      assert.equal(checked.hamad_creation_selected, true);
+      assert.match(JSON.stringify(checked.conversation_context), /Earlier image attachment reference: photo-first-source/);
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'photo_first_creation', intent: 'create_listing' }));
+    }
     if (instructions.includes('output Scope Checker')) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
     assert.ok(instructions.includes('هاتف مصور'), 'the draft agent needs the actual retained-photo assessment');
     replies++;
@@ -289,6 +407,12 @@ test('starting another draft never inspects an older product photo or forwards r
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     assert.ok(!body.messages.some((message: { content: unknown }) => Array.isArray(message.content) && message.content.some((part: { type: string }) => part.type === 'image_url')));
+    if (body.messages.some((message: { role: string; content: unknown }) => message.role === 'system' && String(message.content).includes('input Scope Checker'))) {
+      const checked = JSON.parse(body.messages.at(-1).content);
+      assert.equal(checked.hamad_creation_selected, true);
+      assert.match(JSON.stringify(checked.conversation_context), /لدي منتج آخر بلا صور/);
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'new_product', intent: 'create_listing' }));
+    }
     const checker = body.messages.some((message: { content: unknown }) => typeof message.content === 'string' && message.content.includes('output Scope Checker'));
     if (checker) return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }));
     generations++;
