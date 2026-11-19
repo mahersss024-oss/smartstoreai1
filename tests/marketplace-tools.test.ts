@@ -135,8 +135,10 @@ test('the same product title cannot create a second draft in one chat turn when 
     input: Record<string, unknown>, options: Record<string, never>,
   ) => Promise<{ status: string; message: string; listing: { id: string; title: string; description?: string } }>;
 
-  const first = await create({ category: 'other', title: 'Office Desk' }, {});
-  const repeated = await create({ category: 'other', title: 'office desk', description: 'Solid wood, confirmed by seller' }, {});
+  const [first, repeated] = await Promise.all([
+    create({ category: 'other', title: 'Office Desk' }, {}),
+    create({ category: 'other', title: 'office desk', description: 'Solid wood, confirmed by seller' }, {}),
+  ]);
 
   assert.equal(first.status, 'draft_created');
   assert.equal(repeated.status, 'already_saved');
@@ -217,7 +219,7 @@ test(`chat creation and attachment continue when content review is ${reviewDecis
   assert.equal(created.listing.images.length, 1);
   assert.equal(created.listing.images[0].status, 'approved');
   const attached = await add({ listingId: created.listing.id, imageIndexes: [0] }, {});
-  assert.equal(attached.status, 'images_added');
+  assert.equal(attached.status, 'images_already_attached');
   assert.equal(attached.contentCheck, reviewDecision === 'unavailable' ? 'unavailable' : 'allowed');
   assert.equal(attached.listing.images.length, 1, 'reattaching the same uploaded image must not duplicate it');
   assert.ok(attached.listing.images.every(image => image.status === 'approved'));
@@ -281,4 +283,69 @@ test('photos require an explicit source and selection and separate product draft
   assert.equal(duplicate.status, 'draft_created');
   assert.equal(duplicate.imageSelectionConflict, true);
   assert.equal(duplicate.listing?.images.length, 0);
+});
+
+test('a retried turn with a different product cannot attach its photo to the draft returned by the replay', async t => {
+  mockImageContentReview(t);
+  const sellerId = 'seller:reordered-photo-replay';
+  const data = await sharp({ create: { width: 16, height: 16, channels: 3, background: 'purple' } }).png().toBuffer();
+  const create = () => createMarketplaceTools(createTestSession(sellerId), {
+    requestKey: 'reordered-photo-turn',
+    imageSourceMessageId: 'reordered-photo-turn',
+    latestUploadedImages: [{ data, mediaType: 'image/png' }],
+  }).createListingDraft.execute!;
+
+  const toolContext = { toolCallId: 'draft', messages: [], context: {} };
+  await create()({ category: 'other', title: 'Office desk' }, toolContext);
+  const replay = await create()({ category: 'other', title: 'Computer monitor', imageIndexes: [0], imageSourceMessageId: 'reordered-photo-turn' }, toolContext);
+  assert.ok('status' in replay);
+  assert.equal(replay.status, 'already_saved');
+  const drafts = listSellerListings(sellerId);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].title, 'Office desk');
+  assert.equal(drafts[0].images.length, 0);
+});
+
+test('a photo tool distinguishes unreadable files, partial attachment, and an existing photo', async t => {
+  mockImageContentReview(t);
+  const sellerId = 'seller:unreadable-draft-photo';
+  const draft = createListingDraft({ sellerId, category: 'other', title: 'Office desk' });
+  const validPhoto = await sharp({ create: { width: 16, height: 16, channels: 3, background: 'blue' } }).png().toBuffer();
+  const tools = createMarketplaceTools(createTestSession(sellerId), {
+    imageSourceMessageId: 'unreadable-photo',
+    latestUploadedImages: [
+      { data: new Uint8Array([1, 2, 3]), mediaType: 'image/png' },
+      { data: validPhoto, mediaType: 'image/png' },
+    ],
+  });
+  const attach = async (imageIndexes: number[]) => {
+    const result = await tools.addUploadedImagesToListing.execute!(
+      { listingId: draft.id, imageIndexes, imageSourceMessageId: 'unreadable-photo' },
+      { toolCallId: 'attach', messages: [], context: {} },
+    );
+    assert.ok('status' in result);
+    assert.ok('attachedImageCount' in result);
+    return result;
+  };
+  const result = await attach([0]);
+  assert.equal(result.status, 'images_not_added');
+  assert.equal(result.attachedImageCount, 0);
+  const partial = await attach([0, 1]);
+  assert.equal(partial.status, 'images_partially_added');
+  assert.equal(partial.requestedImageCount, 2);
+  assert.equal(partial.addedImageCount, 1);
+  const repeated = await attach([1]);
+  assert.equal(repeated.status, 'images_already_attached');
+  assert.equal(repeated.attachedImageCount, 1);
+  assert.equal(repeated.addedImageCount, 0);
+  assert.equal(listSellerListings(sellerId)[0].images.length, 1);
+});
+
+test('the draft tool asks for an item when it only has a category or price', async () => {
+  const sellerId = 'seller:missing-product';
+  const tools = createMarketplaceTools(createTestSession(sellerId));
+  const result = await tools.createListingDraft.execute!({ category: 'other', price: 100 }, { toolCallId: 'draft', messages: [], context: {} });
+  assert.ok('status' in result);
+  assert.equal(result.status, 'missing_product_details');
+  assert.equal(listSellerListings(sellerId).length, 0);
 });

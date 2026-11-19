@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { NextRequest } from 'next/server';
+import sharp from 'sharp';
 import { prisma } from '@/lib/db/prisma';
 import { reserveChatGeneration } from '@/lib/chat/admission';
 import { assertStaffMutationAccess } from '@/lib/auth/staff-mutation';
@@ -15,6 +16,8 @@ import { GET as readSession } from '@/app/api/auth/session/route';
 import { PATCH as editListing } from '@/app/api/admin/listings/[listingId]/route';
 import { proxy } from '@/proxy';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
+import { createMarketplaceTools } from '@/agent/tools/marketplace';
+import { renderChatDraftReceipt, type ChatDraftReceipt } from '@/lib/chat/draft-receipt';
 
 function enabled() {
   if (process.env.SMARTSTORE_DB_INTEGRATION !== '1') return false;
@@ -48,6 +51,34 @@ async function fixture(t: TestContext) {
   });
   return { customer, moderator, owner, session };
 }
+
+test('PostgreSQL photo receipt reports only the selected image that committed to the owned draft', { timeout: 20000 }, async t => {
+  if (!enabled()) return t.skip('Requires the named disposable loopback PostgreSQL test database.');
+  const f = await fixture(t);
+  const draft = await prisma.listing.create({ data: {
+    sellerId: f.customer.id, title: 'مكتب خشبي', category: 'other', status: 'draft',
+  } });
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'gray' } }).png().toBuffer();
+  const draftReceipts: ChatDraftReceipt[] = [];
+  const tools = createMarketplaceTools(f.session(f.customer), {
+    draftAction: { intent: 'update', listingId: draft.id },
+    imageSourceMessageId: 'db-photo-receipt',
+    latestUploadedImages: [
+      { data: png, mediaType: 'image/png' },
+      { data: new Uint8Array([1, 2, 3]), mediaType: 'image/png' },
+    ],
+    onDraftReceipt: receipt => draftReceipts.push(receipt),
+  });
+
+  await tools.addUploadedImagesToListing.execute!(
+    { listingId: draft.id, imageIndexes: [0, 1], imageSourceMessageId: 'db-photo-receipt' },
+    { toolCallId: 'db-attach', messages: [], context: {} },
+  );
+  const saved = await prisma.listing.findUniqueOrThrow({ where: { id: draft.id }, include: { images: true } });
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.status, 'draft');
+  assert.match(renderChatDraftReceipt(draftReceipts), /حُفظت 1 من أصل 2 صورة/);
+});
 
 test('PostgreSQL admission atomically bounds concurrent leases and preserves profile timestamps', { timeout: 20000 }, async t => {
   if (!enabled()) return t.skip('Requires the named disposable loopback PostgreSQL test database.');
