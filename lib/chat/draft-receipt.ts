@@ -1,12 +1,15 @@
 import type { ListingDraft } from '@/agent/marketplace/types';
 import { getHamadCustomerReply } from '@/lib/chat-response-safety';
 import type { ChatDraftAction } from './draft-selection';
+import { draftQuestionField, type DraftQuestionField } from './draft-memory';
 
 type DraftRecord = Pick<ListingDraft, 'id' | 'title' | 'status'>;
 type PhotoReceipt = { requested: string[]; attached: string[]; added: string[] };
 
 export type ChatDraftReceipt =
-  | { kind: 'saved' | 'updated' | 'replayed' | 'replay_conflict' | 'blocked'; listing: DraftRecord }
+  | { kind: 'saved'; listing: DraftRecord; facts?: Partial<Pick<ListingDraft, 'price' | 'city' | 'condition' | 'category' | 'description'>> }
+  | { kind: 'replayed' | 'replay_conflict' | 'blocked'; listing: DraftRecord }
+  | { kind: 'updated'; listing: DraftRecord; changes?: Record<string, unknown> }
   | { kind: 'photos'; listing: DraftRecord; photos: PhotoReceipt };
 
 function quotedTitle(title?: string) {
@@ -66,9 +69,10 @@ const draftQuestions = {
   bundle: 'هل تريد عرض المنتجات معًا في إعلان واحد أم تجهيز مسودة منفصلة لكل منتج؟',
   photos: 'ما الصور التي تريد إرفاقها بهذه المسودة؟',
   change: 'ما التعديل الذي تريد حفظه في هذه المسودة؟',
+  draft: 'أي مسودة تقصد؟ اذكر اسمها أو رقمها من [إعلاناتي](/account/listings).',
+  category: 'ما النوع أو العلامة التجارية التي تريدها ضمن التصنيف المختار؟',
 } as const;
 
-type DraftQuestionField = keyof typeof draftQuestions;
 const productPhotoQuestion = 'ما اسم المنتج الظاهر في الصور؟';
 
 export function getChatDraftQuestionField(text: string): DraftQuestionField | undefined {
@@ -94,7 +98,22 @@ export function isChatDraftMutationTool(name?: string) {
   return name === 'createListingDraft' || name === 'updateListing' || name === 'addUploadedImagesToListing';
 }
 
-export const draftClarificationInstructions = `The server reports draft writes from verified results. Use the entire relevant conversation to collect seller-provided facts. Treat a short reply after a draft question as a possible answer to that field. When there is enough information for a valid draft, call the appropriate draft tool; optional price, city, condition, photos and specifications can be completed later. Ask only for a fact that is genuinely needed and avoid repeating an answered question. If clarification is necessary, emit exactly DRAFT_QUESTION:<field> and no other text. This internal code is consumed by the server and rendered in Arabic before it reaches the customer. Fields: ${Object.keys(draftQuestions).join(', ')}.`;
+export const draftClarificationInstructions = `Use the relevant conversation and the current draft task to collect seller-confirmed facts. Use natural Arabic suitable for the customer. With enough information, use the draft tool. A price, city, condition, photo or optional specification can be added later. After a write, describe exactly what the tool actually saved, including the changed fields or image counts when relevant. Never imply a draft was published. For a necessary question when nothing was written, output DRAFT_QUESTION:<field> on the first line, then one naturally written Arabic question directly about the missing detail on the next line. The first line is internal metadata. Avoid asking for a detail the seller has already given. Fields: ${draftQuestionField.options.join(', ')}.`;
+
+export function getDraftClarification(
+  action: ChatDraftAction,
+  modelText: string,
+  hasImages: boolean,
+  toolResults: Parameters<typeof renderChatDraftClarification>[3],
+) {
+  const envelope = /^DRAFT_QUESTION:([a-z]+)(?:\r?\n([\s\S]+))?$/u.exec(modelText.trim());
+  const field = draftQuestionField.safeParse(envelope?.[1]);
+  const fallback = renderChatDraftClarification(action, envelope ? `DRAFT_QUESTION:${envelope[1]}` : '', hasImages, toolResults);
+  const expected = getChatDraftQuestionField(fallback);
+  const question = field.success && field.data === expected && envelope?.[2]?.length && envelope[2].length <= 400
+    && /[؟?]$/u.test(envelope[2].trim()) ? getHamadCustomerReply(envelope[2]) : undefined;
+  return { field: expected, question, fallback };
+}
 
 export function renderChatDraftClarification(
   action: ChatDraftAction,
@@ -109,13 +128,14 @@ export function renderChatDraftClarification(
     case 'limit_reached': return 'بلغت الحد الأقصى للإعلانات المحفوظة في حسابك. راجع [إعلاناتي](/account/listings) قبل إضافة إعلان آخر.';
     case 'missing_product_details': return draftQuestions.product;
     case 'missing_update_details': return draftQuestions.change;
-    case 'invalid_category_option': return 'ما النوع أو العلامة التجارية التي تريدها ضمن التصنيف المختار؟';
+    case 'price_not_authorized': return draftQuestions.price;
+    case 'invalid_category_option': return draftQuestions.category;
     case 'missing_images':
     case 'invalid_image_selection':
     case 'image_selection_conflict': return 'أعد إرفاق الصور التي تقصدها مع ذكر المسودة.';
     case 'not_found':
     case 'user_action_required': return 'تعذّر تعديل المسودة. راجع حالتها من [إعلاناتي](/account/listings).';
-    case 'needs_confirmation': return 'حدّد المسودة وأكّد التعديل الذي تريد حفظه.';
+    case 'needs_confirmation': return draftQuestions.draft;
   }
 
   const field = /^DRAFT_QUESTION:([a-z]+)$/.exec(modelText.trim())?.[1];
