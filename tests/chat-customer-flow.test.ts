@@ -324,6 +324,98 @@ test('invalid creation mode is rejected before text analysis or agent execution'
   assert.equal(analyzed, false);
 });
 
+test('a repeated intake question gets one contextual retry that saves from the customer’s answer', async t => {
+  mockIntent(t, 'create_listing');
+  const owner = 'answered-intake-owner';
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      assert.deepEqual(JSON.parse(body.messages.at(-1).content).recent_draft_clarifications, ['product']);
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_intake_followup', intent: 'create_listing' }));
+    }
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('حُفظت المسودة.');
+    attempts++;
+    if (attempts === 1) return completion('DRAFT_QUESTION:product');
+    assert.match(instructions, /repeating a recent draft clarification/i);
+    assert.ok(body.messages.some((message: { role: string; content: string }) => message.role === 'user' && message.content === 'آيفون 14 مستعمل'));
+    return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({ category: 'other', title: 'آيفون 14 مستعمل', condition: 'used' }) });
+  });
+  const response = await POST(request(owner, 'answered-product', {
+    creationMethod: 'chat',
+    messages: [
+      { id: 'start-listing', role: 'user', parts: [{ type: 'text', text: 'أريد تجهيز إعلان' }] },
+      { id: 'ask-product', role: 'assistant', parts: [{ type: 'text', text: 'ما المنتج أو الخدمة التي تريد الإعلان عنها؟' }] },
+      { id: 'answered-product', role: 'user', parts: [{ type: 'text', text: 'آيفون 14 مستعمل' }] },
+    ],
+  }));
+  const stream = await response.text();
+  assert.match(stream, /حُفظت المسودة «آيفون 14 مستعمل»/);
+  assert.doesNotMatch(stream, /ما المنتج أو الخدمة/);
+  assert.equal(attempts, 2);
+  const drafts = listSellerListings(owner);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].condition, 'used');
+});
+
+test('a repeated clarification after a draft tool attempt does not retry the write', async t => {
+  mockIntent(t, 'create_listing');
+  const owner = 'failed-attempt-intake-owner';
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_intake_followup', intent: 'create_listing' }));
+    }
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('DRAFT_QUESTION:product');
+    attempts++;
+    return completion(null, { name: 'createListingDraft', arguments: '{"category":"other"}' });
+  });
+  const response = await POST(request(owner, 'incomplete-product', {
+    creationMethod: 'chat',
+    messages: [
+      { id: 'start-listing', role: 'user', parts: [{ type: 'text', text: 'جهّز إعلانًا' }] },
+      { id: 'ask-product', role: 'assistant', parts: [{ type: 'text', text: 'ما المنتج أو الخدمة التي تريد الإعلان عنها؟' }] },
+      { id: 'incomplete-product', role: 'user', parts: [{ type: 'text', text: 'غير متأكد' }] },
+    ],
+  }));
+  assert.match(await response.text(), /تعذّر إكمال حفظ المسودة/);
+  assert.equal(attempts, 1);
+  assert.equal(listSellerListings(owner).length, 0);
+});
+
+test('alternating already-asked draft questions stop after one recovery attempt', async t => {
+  mockIntent(t, 'create_listing');
+  const owner = 'repeated-intake-owner';
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_intake_followup', intent: 'create_listing' }));
+    }
+    attempts++;
+    return completion(attempts === 1 ? 'DRAFT_QUESTION:product' : 'DRAFT_QUESTION:price');
+  });
+  const response = await POST(request(owner, 'answer-price', {
+    creationMethod: 'chat',
+    messages: [
+      { id: 'start-listing', role: 'user', parts: [{ type: 'text', text: 'جهّز إعلانًا' }] },
+      { id: 'ask-product', role: 'assistant', parts: [{ type: 'text', text: 'ما المنتج أو الخدمة التي تريد الإعلان عنها؟' }] },
+      { id: 'answer-product', role: 'user', parts: [{ type: 'text', text: 'مكتب خشبي' }] },
+      { id: 'ask-price', role: 'assistant', parts: [{ type: 'text', text: 'ما السعر الذي تريد وضعه في المسودة؟' }] },
+      { id: 'answer-price', role: 'user', parts: [{ type: 'text', text: '250 ريال' }] },
+    ],
+  }));
+  const stream = await response.text();
+  assert.doesNotMatch(stream, /ما المنتج أو الخدمة|ما السعر الذي تريد/);
+  assert.match(stream, /تعذّر إكمال حفظ المسودة/);
+  assert.equal(attempts, 2);
+  assert.equal(listSellerListings(owner).length, 0);
+});
+
 test('the receipt uses saved draft facts even when the model falsely claims publication', async t => {
   mockIntent(t, 'create_listing');
   let writes = 0;
