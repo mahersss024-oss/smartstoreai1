@@ -21,7 +21,8 @@ import {
   getComplianceBlockResponse,
   getComplianceReviewResponse,
 } from '@/agent/marketplace/policy';
-import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { listingSemanticText, marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import type { ImageComplianceDecision } from '@/agent/marketplace/vision-compliance';
 import { reviewListingImageContent } from '@/agent/marketplace/listing-image-content';
 import {
@@ -62,6 +63,7 @@ import { selectChatContext } from '@/lib/chat/context';
 import { acceptsPreviousDraftPhotos, canResumeUnnamedDraftEdit, excludesDraftPhotos, selectChatDraft, type ChatDraftAction } from '@/lib/chat/draft-selection';
 import {
   draftClarificationInstructions,
+  getChatDraftQuestionField,
   getDraftClarification,
   getRecentChatDraftQuestionFields,
   isChatDraftMutationTool,
@@ -722,6 +724,33 @@ function splitInstructionMessages(messages: ModelMessage[]) {
   };
 }
 
+function getDraftSpecificationIntake(
+  messages: ChatMessage[],
+  session: NonNullable<ReturnType<typeof getAuthSession>>,
+  conversationId: string | null,
+) {
+  const turns = messages.filter(message => message.role === 'assistant' || message.role === 'user');
+  const [productQuestion, productAnswer, specificationQuestion, specificationAnswer] = turns.slice(-4);
+  if (productQuestion?.role !== 'assistant' || productAnswer?.role !== 'user'
+    || specificationQuestion?.role !== 'assistant' || specificationAnswer?.role !== 'user') return;
+
+  const questionField = (question: ChatMessage, prefix: ChatMessage[]) => {
+    const pending = readDraftMemory(prefix, session, conversationId).pending;
+    if (pending) return pending.task?.intent === 'create' ? pending.field : undefined;
+    return getChatDraftQuestionField(buildScopeContext([question], 1)[0]?.text ?? '');
+  };
+  if (questionField(productQuestion, turns.slice(0, -2)) !== 'product'
+    || questionField(specificationQuestion, turns) !== 'specifications') return;
+  if (messageHasImageAttachment(productAnswer) || messageHasImageAttachment(specificationAnswer)) return;
+
+  const title = getLatestUserRequest([productAnswer]);
+  const description = getLatestUserRequest([specificationAnswer]);
+  // Carry only literal customer text for the product name and specifications.
+  if (title.length < 2 || title.length > 140 || description.length < 2 || description.length > 500
+    || !/\p{L}/u.test(title) || /[\r\n؟?<>]|https?:|Earlier image attachment reference:/iu.test(`${title} ${description}`)) return;
+  return { title, description };
+}
+
 async function generateCheckedAssistantResponse(
   messages: ModelMessage[],
   userRequest: string,
@@ -737,6 +766,7 @@ async function generateCheckedAssistantResponse(
     marketplaceIntent?: string;
     conversationContext?: ReturnType<typeof buildScopeContext>;
     draftMemory?: DraftMemory;
+    specificationIntake?: ReturnType<typeof getDraftSpecificationIntake>;
     onDraftMemory?: (memory: DraftMemory) => void;
     conversationId?: string | null;
     abortSignal?: AbortSignal;
@@ -784,14 +814,15 @@ async function generateCheckedAssistantResponse(
         `Recent draft questions asked about ${[...recentDraftQuestions].join(', ')}. Read the customer's following replies and carry the confirmed details forward.`,
       ] : []),
     ] : [];
+    const onDraftReceipt = (receipt: ChatDraftReceipt) => {
+      const { id, title, status } = receipt.listing;
+      draftReceipts.push({ ...receipt, listing: { id, title, status } });
+    };
     const startAgent = (recoveryInstructions?: string) => createChatAgent(session, {
       ...options,
       language,
       additionalInstructions: [additionalInstructions, ...draftInstructions, recoveryInstructions].filter(Boolean).join('\n\n'),
-      onDraftReceipt: receipt => {
-        const { id, title, status } = receipt.listing;
-        draftReceipts.push({ ...receipt, listing: { id, title, status } });
-      },
+      onDraftReceipt,
     });
     const chatAgent = startAgent();
     const firstResult = await withChatAbortTimeout(chatAgentGenerationTimeoutMs, signal =>
@@ -801,10 +832,34 @@ async function generateCheckedAssistantResponse(
     if (draftAction) {
       const hasImages = Boolean(options.latestUploadedImages?.length);
       const firstReply = getDraftClarification(draftAction, firstResult.text, hasImages, verifiedToolResults);
+      const writes = firstResult.steps.flatMap(step => step.toolCalls)
+        .filter(call => call !== undefined).filter(call => isChatDraftMutationTool(call.toolName));
+      const attemptedWrite = writes.length > 0;
+      const canRecoverWithoutReplay = writes.every(call => call.toolName === 'createListingDraft' && verifiedToolResults.some(result =>
+        result !== undefined && result.toolCallId === call.toolCallId && result.toolName === call.toolName
+        && result.output !== null && typeof result.output === 'object' && 'status' in result.output
+        && result.output.status === 'missing_product_details'));
+      const intake = options.specificationIntake;
+      if (session && draftAction.intent === 'create' && intake && !hasImages && options.requestKey
+        && canRecoverWithoutReplay && (firstReply.field === 'specifications' || firstReply.field === 'product')) {
+        const analysis = await marketplaceTextAnalyzer.analyze(listingSemanticText(intake), 4_000);
+        if (analysis?.product && analysis.category && analysis.confidence >= 0.8
+          && analysis.offerKind !== 'unknown' && analysis.offerKind !== 'bundle') {
+          options.abortSignal?.throwIfAborted();
+          const tools = createMarketplaceTools(session, {
+            draftAction, requestKey: options.requestKey, onDraftReceipt,
+          });
+          const output = await tools.createListingDraft.execute({ ...intake, category: analysis.category }, {
+            toolCallId: 'verified-specification-recovery',
+            messages: promptMessages,
+            abortSignal: options.abortSignal,
+            context: {},
+          });
+          if (draftReceipts.length) return await finishDraftWrite('');
+          return await finishDraftQuestion(getDraftClarification(draftAction, '', false, [{ toolName: 'createListingDraft', output }]));
+        }
+      }
       if (!isRepeatedDraftQuestion(firstReply.field)) return await finishDraftQuestion(firstReply);
-
-      const attemptedWrite = firstResult.steps.some(step =>
-        step.toolCalls.some(call => isChatDraftMutationTool(call?.toolName)));
       if (!attemptedWrite) {
         const recoveryAgent = startAgent(
           'The first reply was repeating a recent draft clarification. Review the seller’s earlier facts and latest answer. Use the appropriate tool if enough is known. Otherwise ask only a different, necessary question. Never guess missing details.',
@@ -1444,6 +1499,9 @@ export async function POST(request: Request) {
         allowDraftTools: Boolean(draftAction), draftAction,
         marketplaceIntent: inputScopeDecision.intent ?? 'support', conversationContext: buildScopeContext(scopedMessages),
         draftMemory: { focusedDraftId: draftMemory.focusedDraftId, pending: continuesTask ? pending : undefined },
+        specificationIntake: draftAction?.intent === 'create' && inputScopeDecision.decision === 'ALLOW'
+          && inputScopeDecision.continues_draft !== false
+          ? getDraftSpecificationIntake(scopedMessages, session, chatConversationId) : undefined,
         conversationId: chatConversationId,
         abortSignal: request.signal, onGenerationSettled: admission.release },
     );
