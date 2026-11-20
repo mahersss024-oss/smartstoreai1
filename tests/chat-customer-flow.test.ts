@@ -10,6 +10,8 @@ import { platformPolicies } from '@/lib/platform/policies';
 import { legacyHamadRoleReply } from '@/lib/chat-response-safety';
 import { textAnalysis } from './helpers/text-understanding';
 import { resetImageContentReviewCacheForTests } from '@/agent/marketplace/listing-image-content';
+import { readDraftMemory, signDraftMemory } from '@/lib/chat/draft-memory';
+import { canResumeUnnamedDraftEdit, selectChatDraft } from '@/lib/chat/draft-selection';
 
 function completion(content: string | null, tool?: { name: string; arguments: string }) {
   return Response.json({ id: 'customer-flow', object: 'chat.completion', created: 1, model: 'test-model',
@@ -29,6 +31,138 @@ function mockIntent(t: TestContext, intent: 'support' | 'create_listing' | 'upda
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
 }
+
+function userTurn(id: string, text: string) {
+  return { id, role: 'user', parts: [{ type: 'text', text }] };
+}
+
+function assistantTurn(stream: string) {
+  const chunks = stream.split('\n').flatMap(line => line.startsWith('data: {') ? [JSON.parse(line.slice(6))] : []);
+  return {
+    id: chunks.find(chunk => chunk.type === 'start').messageId as string,
+    role: 'assistant',
+    parts: [{ type: 'text', text: chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.delta).join('') }],
+    metadata: Object.assign({}, ...chunks.map(chunk => chunk.messageMetadata ?? {})),
+  };
+}
+
+test('draft memory rejects changes to its signature, account, session or conversation', () => {
+  const session = { user: { id: 'owner-a', email: 'a@example.test', sessionVersion: 1 }, issuedAt: 1, expiresAt: 3 };
+  const conversationId = 'draft-memory-test-conversation';
+  const memory = { focusedDraftId: 'desk', pending: { field: 'price' as const, task: { intent: 'update' as const, listingId: 'desk' } } };
+  const token = signDraftMemory(memory, session, conversationId);
+  const messages = (hamadDraftMemory: string) => [{ role: 'assistant', metadata: { hamadDraftMemory } }, { role: 'user' }];
+  assert.deepEqual(readDraftMemory(messages(token), session, conversationId), memory);
+  assert.deepEqual(readDraftMemory(messages(token), { ...session, user: { ...session.user, id: 'owner-b' } }, conversationId), {});
+  assert.deepEqual(readDraftMemory(messages(token), { ...session, user: { ...session.user, sessionVersion: 2 } }, conversationId), {});
+  assert.deepEqual(readDraftMemory(messages(token), session, 'different-conversation'), {});
+  assert.deepEqual(readDraftMemory(messages((token[0] === 'a' ? 'b' : 'a') + token.slice(1)), session, conversationId), {});
+});
+
+test('a mixed request naming two drafts never authorizes both edits on the focused draft', () => {
+  const drafts = [{ id: 'desk', title: 'مكتب خشبي' }, { id: 'phone', title: 'هاتف سامسونج' }];
+  const request = 'عدّل وصف مسودة مكتب خشبي، وغيّر سعر هاتف سامسونج إلى ٣٠٠';
+  assert.equal(selectChatDraft(request, drafts, {
+    focusedDraftId: 'desk', continuesDraft: true, draftReference: 'مكتب خشبي',
+  }), undefined);
+  assert.equal(canResumeUnnamedDraftEdit(request, drafts), false);
+  assert.equal(selectChatDraft('أرجع للمكتب', drafts, { draftReference: 'للمكتب' })?.id, 'desk');
+  assert.equal(selectChatDraft('أرجع إلى المكتب', drafts, { draftReference: 'المكتب' })?.id, 'desk');
+});
+
+test('a natural draft reply retains the selected draft and saves only customer-authorized changes', async t => {
+  mockIntent(t, 'update_listing');
+  const owner = 'draft-context-owner';
+  const desk = createListingDraft({ sellerId: owner, category: 'other', title: 'مكتب خشبي', price: 250, city: 'جدة' });
+  const phone = createListingDraft({ sellerId: owner, category: 'other', title: 'هاتف للعمل', price: 500 });
+  let secondTurn = false;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      const scope = JSON.parse(body.messages.at(-1).content);
+      assert.equal(scope.draft_memory.focusedDraftId, desk.id);
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'same_draft', intent: 'update_listing', continues_draft: true,
+        draft_edits: [{ field: 'price', evidence: 'خلّه ١٬١٥٠.' }],
+      }));
+    }
+    if (instructions.includes('output Scope Checker')) {
+      const proof = JSON.parse(body.messages.at(-1).content).verified_tool_results.verifiedDraftReceipts;
+      assert.deepEqual(proof[0].changes, secondTurn ? { price: 1150 } : { description: 'مكتب عملي بحالة ممتازة' });
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'grounded_reply' }));
+    }
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) {
+      return completion(secondTurn ? 'تمام، صار سعر المكتب ١١٥٠ ريال.' : 'عدّلت وصف المكتب وخليته يوضح حالته.');
+    }
+    assert.match(instructions, new RegExp(desk.id));
+    return completion(null, { name: 'updateListing', arguments: JSON.stringify(secondTurn
+      ? { price: 1150, description: 'وصف إضافي غير مطلوب' }
+      : { description: 'مكتب عملي بحالة ممتازة', price: 700, confirmedPriceChange: true, city: 'الرياض' }) });
+  });
+
+  const conversation = { creationMethod: 'chat', chatConversationId: 'draft-context-conversation' };
+  const first = userTurn('description-turn', 'عدّل وصف مسودة مكتب خشبي فقط واكتب أنه بحالة ممتازة');
+  const reply = assistantTurn(await (await POST(request(owner, first.id, { ...conversation, messages: [first] }))).text());
+  assert.match(reply.parts[0].text, /عدّلت وصف المكتب وخليته يوضح حالته/);
+  assert.equal(typeof reply.metadata.hamadDraftMemory, 'string');
+  assert.equal(getListing(desk.id)?.price, 250);
+  assert.equal(getListing(desk.id)?.city, 'جدة');
+
+  secondTurn = true;
+  const next = userTurn('price-turn', 'خلّه ١٬١٥٠.');
+  const final = assistantTurn(await (await POST(request(owner, next.id, { ...conversation, messages: [first, reply, next] }))).text());
+  assert.match(final.parts[0].text, /صار سعر المكتب ١١٥٠ ريال/);
+  assert.equal(getListing(desk.id)?.price, 1150);
+  assert.equal(getListing(desk.id)?.description, 'مكتب عملي بحالة ممتازة');
+  assert.equal(getListing(phone.id)?.price, 500);
+});
+
+test('a natural clarification keeps the exact source photos through another customer reply', async t => {
+  mockIntent(t, 'create_listing');
+  resetImageContentReviewCacheForTests();
+  const owner = 'draft-image-checkpoint-owner';
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'cyan' } }).png().toBuffer();
+  const photo = { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
+  let readyToSave = false;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    if (body.messages.some((message: { content: unknown }) => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
+      return completion(JSON.stringify({ decision: 'allow', confidence: 0.99, reasons: [], detected_product: 'هاتف', sharia_sensitive: false }));
+    }
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      if (readyToSave) assert.equal(JSON.parse(body.messages.at(-1).content).draft_memory.pendingField, 'product');
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_intake', intent: 'create_listing', continues_draft: readyToSave }));
+    }
+    if (instructions.includes('output Scope Checker')) {
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'grounded_reply' }));
+    }
+    assert.match(instructions, /"sourceMessageId":"phone-photo"/);
+    if (!readyToSave) return completion('DRAFT_QUESTION:product\nوش موديل الجوال اللي بالصورة؟');
+    if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('جهّزت لك مسودة الآيفون وأرفقت معها الصورة.');
+    return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({
+      category: 'other', title: 'آيفون 14', imageSourceMessageId: 'phone-photo', imageIndexes: [0],
+    }) });
+  });
+  const conversation = { creationMethod: 'chat', chatConversationId: 'draft-image-checkpoint-session' };
+  const first = { id: 'phone-photo', role: 'user', parts: [photo] };
+  const choice = userTurn('select-hamad', 'أختار الإنشاء مع حمد.');
+  const retained = { retainedListingImages: [photo], retainedListingImageMessageId: first.id };
+  const reply = assistantTurn(await (await POST(request(owner, choice.id, { ...conversation, ...retained,
+    beginDraftWithHamad: true, messages: [first, choice],
+  }))).text());
+  assert.equal(reply.parts[0].text, 'وش موديل الجوال اللي بالصورة؟');
+  assert.equal(typeof reply.metadata.hamadDraftMemory, 'string');
+  readyToSave = true;
+  const answer = userTurn('phone-model', 'آيفون 14');
+  const turn = { ...conversation, ...retained, messages: [first, choice, reply, answer] };
+  const rejected = await POST(request(owner, answer.id, { ...turn, retainedListingImages: [{ ...photo, url: 'data:image/png;base64,AQID' }] }));
+  assert.match(await rejected.text(), /أعد إرفاق الصور/);
+  assert.equal(listSellerListings(owner).length, 0);
+  const result = await POST(request(owner, answer.id, turn));
+  assert.match(await result.text(), /جهّزت لك مسودة الآيفون وأرفقت معها الصورة/);
+  assert.equal(listSellerListings(owner)[0]?.images.length, 1);
+});
 
 test('a stale account cannot send its chat into another authenticated account', async t => {
   let calls = 0;
@@ -335,6 +469,9 @@ test('a repeated intake question gets one contextual retry that saves from the c
       assert.deepEqual(JSON.parse(body.messages.at(-1).content).recent_draft_clarifications, ['product']);
       return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'draft_intake_followup', intent: 'create_listing' }));
     }
+    if (instructions.includes('output Scope Checker')) {
+      return completion(JSON.stringify({ decision: 'BLOCK', confidence: 1, reason_code: 'draft_title_needed' }));
+    }
     if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('حُفظت المسودة.');
     attempts++;
     if (attempts === 1) return completion('DRAFT_QUESTION:product');
@@ -422,7 +559,13 @@ test('the receipt uses saved draft facts even when the model falsely claims publ
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
-    assert.doesNotMatch(instructions, /output Scope Checker|Regenerate the answer/);
+    if (instructions.includes('output Scope Checker')) {
+      const proof = JSON.parse(body.messages.at(-1).content).verified_tool_results.verifiedDraftReceipts;
+      assert.equal(proof[0].kind, 'saved');
+      assert.equal(proof[0].listing.status, 'draft');
+      return completion(JSON.stringify({ decision: 'BLOCK', confidence: 1, reason_code: 'draft_was_not_published' }));
+    }
+    assert.doesNotMatch(instructions, /Regenerate the answer/);
     if (body.messages.some((message: { role: string }) => message.role === 'tool')) return completion('تم نشر الإعلان. يجب أن تعيد إنشاء المسودة.');
     writes++;
     return completion(null, { name: 'createListingDraft', arguments: JSON.stringify({ category: 'other', title: 'هاتف العميل', price: 100 }) });
@@ -635,8 +778,7 @@ test('photos and edits are confined to the confirmed draft when two are open', a
     messages: [namedDesk, confirmDesk],
   }));
   const stream = await response.text();
-  assert.match(stream, /حُدّثت المسودة «مكتب خشبي»/);
-  assert.match(stream, /عدد الصور المختارة المحفوظة في المسودة 1/);
+  assert.match(stream, /أضفت الصورة إلى مسودة المكتب الخشبي وحدّثت الوصف/);
   assert.equal(attempts, 4);
   assert.equal(getListing(phone.id)?.images.length, 0);
   assert.ok(!getListing(phone.id)?.description);
@@ -690,7 +832,7 @@ test('a new draft cannot attach the previous product photo without the customer 
     messages: [photoTurn, { id: 'phone-reply', role: 'assistant', parts: [{ type: 'text', text: 'هذه صور الهاتف.' }] },
       { id: 'new-desk', role: 'user', parts: [{ type: 'text', text: 'جهّز مسودة جديدة لمكتب خشبي بدون صور.' }] }],
   }));
-  assert.match(await response.text(), /حُفظت المسودة «مكتب جديد»/);
+  assert.match(await response.text(), /حُفظت مسودة المكتب الجديد بدون صور/);
   assert.equal(attempts, 3);
   assert.equal(getListing(phone.id)?.images.length, 0);
   const drafts = listSellerListings(sellerId);

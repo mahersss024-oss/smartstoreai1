@@ -41,7 +41,7 @@ export type CommissionAgreement = {
   acceptedAt: number;
 };
 
-function getAuthSecret() {
+export function getAuthSecret() {
   const secret = process.env.AUTH_SECRET?.trim();
 
   if (secret) {

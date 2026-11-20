@@ -29,6 +29,7 @@ import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
 import type { ChatDraftAction } from '@/lib/chat/draft-selection';
 import type { ChatDraftReceipt } from '@/lib/chat/draft-receipt';
+import { filterDraftEdits } from '@/lib/chat/draft-edits';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 
@@ -258,7 +259,8 @@ export function createMarketplaceTools(
           }
           if (listing.status === 'draft' || listing.status === 'pending') {
             draftsCreatedThisTurn.add(listing.id);
-            options.onDraftReceipt?.({ kind: 'saved', listing });
+            const { price, city, condition, category, description } = listing;
+            options.onDraftReceipt?.({ kind: 'saved', listing, facts: { price, city, condition, category, description } });
           }
         } catch (error) {
           if (error instanceof InvalidMarketplaceCategoryOptionError) return { status: 'invalid_category_option', message: error.message };
@@ -342,26 +344,30 @@ export function createMarketplaceTools(
 
     updateListing: tool({
       description:
-        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Preserve confirmed seller details and attributes; omit unknown specifications, and never add notes about missing details to listing fields. Ask follow-up questions separately in chat. Use the server-confirmed listingId or the listingId returned by draft creation in this turn. A draft price change requires confirmedPriceChange=true.',
+        'Prepare details of an owned unpublished draft only. Never edit published, paused, sold, pending-review or deleted listings; direct the seller to Account > My listings for those changes. Send only the fields the customer asked to change; preserve all other details. Ask follow-up questions separately in chat. Use the server-confirmed listingId or the listingId returned by draft creation in this turn. The server verifies the exact requested amount before accepting a price change.',
       inputSchema: updateListingDetailsInputSchema,
       execute: (input, context) => writeInOrder(context?.abortSignal, async () => {
         if (!session) {
           return authRequired();
         }
 
-        const { listingId, confirmedPriceChange, ...updates } = updateListingDetailsInputSchema.parse(input);
+        const { listingId, confirmedPriceChange, ...proposedUpdates } = updateListingDetailsInputSchema.parse(input);
         const confirmedId = listingId ?? (draftAction?.intent === 'update' ? draftAction.listingId : undefined);
         if (!canEditDraft(confirmedId)) {
           return confirmationRequired('Use only the draft confirmed for this request or created in this chat turn.');
         }
 
-        if (updates.price !== undefined && confirmedPriceChange !== true) {
+        const updates = draftAction?.edits ? filterDraftEdits(proposedUpdates, draftAction.edits) : proposedUpdates;
+        if (!draftAction?.edits && updates.price !== undefined && confirmedPriceChange !== true) {
           return confirmationRequired(
             'Confirm the price change explicitly before updating the listing price.',
           );
         }
         if (!Object.keys(updates).length) {
-          return { status: 'missing_update_details', message: 'Ask what detail to change before saving the draft.' };
+          return {
+            status: proposedUpdates.price !== undefined ? 'price_not_authorized' : 'missing_update_details',
+            message: 'Ask only for the intended change or exact price still needed. No changes were saved by this call.',
+          };
         }
 
         const targetListing = await getCurrentEditableSellerListing({
@@ -408,7 +414,14 @@ export function createMarketplaceTools(
           };
         }
 
-        options.onDraftReceipt?.({ kind: 'updated', listing });
+        const changes = Object.fromEntries(
+          Object.keys(updates).map(field => [field, field === 'attributes'
+            ? Object.fromEntries(Object.keys(updates.attributes ?? {}).map(key => [key, listing.attributes[key]]))
+            : field === 'categoryOption' ? listing.attributes[marketplaceCategoryOptionAttribute] ?? null
+              : field === 'carModel' ? listing.attributes[marketplaceCarModelAttribute] ?? null
+                : field in listing ? listing[field as keyof typeof listing] : listing.attributes[field]]),
+        );
+        options.onDraftReceipt?.({ kind: 'updated', listing, changes });
         return {
           status: listing.status === 'pending' ? 'needs_review' : 'updated',
           listing,
@@ -431,7 +444,7 @@ export function createMarketplaceTools(
           return confirmationRequired('Attach photos only to the draft confirmed for this request or created in this chat turn.');
         }
 
-        if (!options.latestUploadedImages?.length) {
+        if ((draftAction?.edits && !draftAction.edits.photos) || !options.latestUploadedImages?.length) {
           return {
             status: 'missing_images',
             message:

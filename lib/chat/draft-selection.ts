@@ -1,6 +1,7 @@
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
+import type { DraftEdits } from './draft-edits';
 
-export type ChatDraftAction = { intent: 'create' } | { intent: 'update'; listingId: string };
+export type ChatDraftAction = ({ intent: 'create' } | { intent: 'update'; listingId: string }) & { edits?: DraftEdits };
 
 const sameDraftReference = /(?:^| )[لب]?نفس (?:المسوده|الاعلان)(?= |$)/u;
 const genericDraftWords = new Set([
@@ -31,6 +32,9 @@ function findDraftReference<T extends { id: string; title?: string | null }>(req
     if (!matches.length && !genericDraftWords.has(firstWord) && !identifiers.has(firstWord)) return null;
     for (const match of matches) targets.add(match.draft);
   }
+  for (const entry of draftTitles) {
+    if (` ${words} `.includes(` ${entry.title} `)) targets.add(entry.draft);
+  }
   if (identifiers.size) {
     if (identifiers.size !== 1) return null;
     const target = drafts.find(draft => identifiers.has(draft.id));
@@ -40,15 +44,37 @@ function findDraftReference<T extends { id: string; title?: string | null }>(req
   if (/(?:رقم|معرف) (?:المسوده|الاعلان)(?: |$)/u.test(words)) return null;
 }
 
+export function canResumeUnnamedDraftEdit(request: string, drafts: readonly { id: string; title?: string | null }[]) {
+  return findDraftReference(request, drafts) === undefined
+    && !/(?:مسودتين|اعلانين|المسودات|الاعلانات|والثانيه|والثاني|والاخر)(?:\s|$)/u.test(wordsIn(request));
+}
+
 export function selectChatDraft<T extends { id: string; title?: string | null }>(
   request: string,
   drafts: readonly T[],
-  previousUserRequest = '',
+  context: { previousUserRequest?: string; focusedDraftId?: string; draftReference?: string; continuesDraft?: boolean } = {},
 ) {
   const target = findDraftReference(request, drafts);
   if (target !== undefined) return target ?? undefined;
-  if (sameDraftReference.test(wordsIn(request))) {
-    return findDraftReference(previousUserRequest, drafts) ?? undefined;
+  if (context.draftReference) {
+    const reference = wordsIn(context.draftReference);
+    if (!reference || !` ${wordsIn(request)} `.includes(` ${reference} `)) return undefined;
+    const explicit = findDraftReference(reference, drafts);
+    if (explicit !== undefined) return explicit ?? undefined;
+    const titleWords = (text: string) => wordsIn(text).split(' ').map(word =>
+      word.replace(/^(?:[وبف]?ال|لل)(?=\p{L}{3})/u, ''),
+    );
+    const terms = titleWords(reference);
+    const named = terms.every(word => word.length >= 3)
+      ? drafts.filter(draft => terms.every(term => titleWords(draft.title ?? '').includes(term))) : [];
+    return named.length === 1 ? named[0] : undefined;
+  }
+  const refersToSame = sameDraftReference.test(wordsIn(request));
+  if (context.focusedDraftId && (refersToSame || context.continuesDraft)) {
+    return drafts.find(draft => draft.id === context.focusedDraftId);
+  }
+  if (refersToSame) {
+    return findDraftReference(context.previousUserRequest ?? '', drafts) ?? undefined;
   }
   return drafts.length === 1 ? drafts[0] : undefined;
 }
