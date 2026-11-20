@@ -68,7 +68,33 @@ const draftQuestions = {
   change: 'ما التعديل الذي تريد حفظه في هذه المسودة؟',
 } as const;
 
-export const draftClarificationInstructions = `The server reports draft writes from verified results. If you need to ask the customer a question, answer with exactly DRAFT_QUESTION:<field> and no other text. Choose the missing field using the latest request and conversation: ${Object.keys(draftQuestions).join(', ')}. Do not require optional details before saving a draft when the product is clear.`;
+type DraftQuestionField = keyof typeof draftQuestions;
+const productPhotoQuestion = 'ما اسم المنتج الظاهر في الصور؟';
+
+export function getChatDraftQuestionField(text: string): DraftQuestionField | undefined {
+  const question = text.trim();
+  if (question === productPhotoQuestion) return 'product';
+  return (Object.keys(draftQuestions) as DraftQuestionField[]).find(field => draftQuestions[field] === question);
+}
+
+export function getRecentChatDraftQuestionFields(messages: readonly { role?: unknown; text: string }[] = []) {
+  if (messages.at(-1)?.role !== 'user') return [];
+  const fields = new Set<DraftQuestionField>();
+  for (const message of messages.slice(0, -1).reverse()) {
+    if (message.role === 'user') continue;
+    if (message.role !== 'assistant') break;
+    const field = getChatDraftQuestionField(message.text);
+    if (!field) break;
+    fields.add(field);
+  }
+  return [...fields];
+}
+
+export function isChatDraftMutationTool(name?: string) {
+  return name === 'createListingDraft' || name === 'updateListing' || name === 'addUploadedImagesToListing';
+}
+
+export const draftClarificationInstructions = `The server reports draft writes from verified results. Use the entire relevant conversation to collect seller-provided facts. Treat a short reply after a draft question as a possible answer to that field. When there is enough information for a valid draft, call the appropriate draft tool; optional price, city, condition, photos and specifications can be completed later. Ask only for a fact that is genuinely needed and avoid repeating an answered question. If clarification is necessary, emit exactly DRAFT_QUESTION:<field> and no other text. This internal code is consumed by the server and rendered in Arabic before it reaches the customer. Fields: ${Object.keys(draftQuestions).join(', ')}.`;
 
 export function renderChatDraftClarification(
   action: ChatDraftAction,
@@ -76,8 +102,7 @@ export function renderChatDraftClarification(
   hasImages: boolean,
   toolResults: readonly ({ toolName: string; output?: unknown } | undefined)[],
 ) {
-  const failed = toolResults.findLast(result =>
-    result?.toolName === 'createListingDraft' || result?.toolName === 'updateListing' || result?.toolName === 'addUploadedImagesToListing');
+  const failed = toolResults.findLast(result => isChatDraftMutationTool(result?.toolName));
   const output = failed?.output;
   const status = output && typeof output === 'object' && 'status' in output ? output.status : undefined;
   switch (status) {
@@ -94,8 +119,8 @@ export function renderChatDraftClarification(
   }
 
   const field = /^DRAFT_QUESTION:([a-z]+)$/.exec(modelText.trim())?.[1];
-  if (field === 'product' && hasImages) return 'ما اسم المنتج الظاهر في الصور؟';
+  if (field === 'product' && hasImages) return productPhotoQuestion;
   if (field && Object.hasOwn(draftQuestions, field)) return draftQuestions[field as keyof typeof draftQuestions];
   if (action.intent === 'update') return draftQuestions.change;
-  return hasImages ? 'ما اسم المنتج الظاهر في الصور؟' : draftQuestions.product;
+  return hasImages ? productPhotoQuestion : draftQuestions.product;
 }

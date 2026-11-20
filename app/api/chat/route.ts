@@ -60,7 +60,15 @@ import { customerLanguageInstructions, resolveCustomerLanguage } from '@/lib/cus
 import { parseChatConversationId } from '@/lib/chat/conversation';
 import { selectChatContext } from '@/lib/chat/context';
 import { acceptsPreviousDraftPhotos, excludesDraftPhotos, selectChatDraft, type ChatDraftAction } from '@/lib/chat/draft-selection';
-import { draftClarificationInstructions, renderChatDraftClarification, renderChatDraftReceipt, type ChatDraftReceipt } from '@/lib/chat/draft-receipt';
+import {
+  draftClarificationInstructions,
+  getChatDraftQuestionField,
+  getRecentChatDraftQuestionFields,
+  isChatDraftMutationTool,
+  renderChatDraftClarification,
+  renderChatDraftReceipt,
+  type ChatDraftReceipt,
+} from '@/lib/chat/draft-receipt';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 import { reserveChatGeneration } from '@/lib/chat/admission';
 
@@ -686,23 +694,57 @@ async function generateCheckedAssistantResponse(
 ) {
   const draftReceipts: ChatDraftReceipt[] = [];
   const conversationContext = options.conversationContext;
+  const draftAction = options.draftAction;
+  const recentDraftQuestions = draftAction ? getRecentChatDraftQuestionFields(conversationContext) : [];
+  const isRepeatedDraftQuestion = (reply: string) => {
+    const field = getChatDraftQuestionField(reply);
+    return field !== undefined && recentDraftQuestions.includes(field);
+  };
   try {
     const { additionalInstructions, promptMessages } = splitInstructionMessages(messages);
-    const chatAgent = createChatAgent(session, {
+    const draftInstructions = draftAction ? [
+      draftClarificationInstructions,
+      ...(recentDraftQuestions.length ? [
+        `Recent draft questions asked about ${recentDraftQuestions.join(', ')}. Read the customer's following replies and carry the confirmed details forward. The most recent listed field is first.`,
+      ] : []),
+    ] : [];
+    const startAgent = (recoveryInstructions?: string) => createChatAgent(session, {
       ...options,
       language,
-      additionalInstructions: options.draftAction ? [additionalInstructions, draftClarificationInstructions].join('\n\n') : additionalInstructions,
+      additionalInstructions: [additionalInstructions, ...draftInstructions, recoveryInstructions].filter(Boolean).join('\n\n'),
       onDraftReceipt: receipt => {
         const { id, title, status } = receipt.listing;
         draftReceipts.push({ ...receipt, listing: { id, title, status } });
       },
     });
+    const chatAgent = startAgent();
     const firstResult = await withChatAbortTimeout(chatAgentGenerationTimeoutMs, signal =>
       chatAgent.generate({ messages: promptMessages, abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal }));
     const verifiedToolResults = firstResult.steps.flatMap(step => step.toolResults);
     if (draftReceipts.length) return renderChatDraftReceipt(draftReceipts);
-    if (options.draftAction) {
-      return renderChatDraftClarification(options.draftAction, firstResult.text, Boolean(options.latestUploadedImages?.length), verifiedToolResults);
+    if (draftAction) {
+      const hasImages = Boolean(options.latestUploadedImages?.length);
+      const firstReply = renderChatDraftClarification(draftAction, firstResult.text, hasImages, verifiedToolResults);
+      if (!isRepeatedDraftQuestion(firstReply)) return firstReply;
+
+      const attemptedWrite = firstResult.steps.some(step =>
+        step.toolCalls.some(call => isChatDraftMutationTool(call?.toolName)));
+      if (!attemptedWrite) {
+        const recoveryAgent = startAgent(
+          'The first reply was repeating a recent draft clarification. Review the seller’s earlier facts and latest answer. Use the appropriate tool if enough is known. Otherwise ask only a different, necessary question. Never guess missing details.',
+        );
+        const recoveryResult = await withChatAbortTimeout(chatAgentRetryTimeoutMs, signal =>
+          recoveryAgent.generate({ messages: promptMessages, abortSignal: options.abortSignal ? AbortSignal.any([signal, options.abortSignal]) : signal }));
+        if (draftReceipts.length) return renderChatDraftReceipt(draftReceipts);
+        const recoveryReply = renderChatDraftClarification(
+          draftAction, recoveryResult.text, hasImages, recoveryResult.steps.flatMap(step => step.toolResults),
+        );
+        if (!isRepeatedDraftQuestion(recoveryReply)) return recoveryReply;
+      }
+
+      return draftAction.intent === 'create'
+        ? 'تعذّر إكمال حفظ المسودة في المحادثة. يمكنك إكمال الإعلان بالإنشاء اليدوي.'
+        : 'تعذّر إكمال تعديل المسودة في المحادثة. يمكنك متابعته من [إعلاناتي](/account/listings).';
     }
 
     const firstText = getHamadCustomerReply(firstResult.text);

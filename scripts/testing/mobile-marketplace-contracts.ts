@@ -388,6 +388,8 @@ export const mobileMarketplaceContracts = [
       'Actual chat asks for details when no draft operation was recorded.'),
     scenario('tests/chat-customer-flow.test.ts', 'the receipt reports a partial image save even when the model says all photos were attached', 'node',
       'Actual chat reports the number of selected images that persisted after a partial save.'),
+    scenario('tests/chat-customer-flow.test.ts', 'a repeated intake question gets one contextual retry that saves from the customer’s answer', 'node',
+      'Actual chat reuses the seller’s answer and saves one draft when the first reply repeats the intake question.'),
     scenario('tests/chat-action-boundary.test.ts', 'chat cannot prepare another seller draft or inject an existing listing ID when creating', 'node',
       'Actual assistant tools reject another seller draft and bind new draft identity/status to the signed owner.')],
     remainingChecks: ['Provider requests are mocked; live model streaming, quotas and device cancellation need separate integration checks.', ...nativeChecks],

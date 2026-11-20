@@ -5,6 +5,7 @@ import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { getSafeAssistantText, legacyHamadRoleReply } from '@/lib/chat-response-safety';
+import { getRecentChatDraftQuestionFields } from '@/lib/chat/draft-receipt';
 import type { AppLanguage } from '@/app/i18n';
 
 function readTimeoutMs(envKey: string, fallbackMs: number) {
@@ -233,6 +234,7 @@ export async function checkInputScope({ messages, hamadCreationSelected, marketp
     }
 
     const context = buildScopeContext(messages);
+    const recentDraftQuestions = hamadCreationSelected ? getRecentChatDraftQuestionFields(context) : [];
     // Cached text understanding analyzes one message in isolation. A follow-up
     // must be classified together with the earlier customer turns.
     const hasPriorUserTurn = messages.filter(message => isMessageLike(message) && message.role === 'user').length > 1;
@@ -264,6 +266,7 @@ If hamad_creation_selected is true, a description of the customer's item or serv
 The platform_context contains IDs and titles of the customer's unpublished drafts as reference data. For a saved draft, a correction, further details, or a request to add photos is update_listing, including a reply that identifies the draft after a clarification. For a product still being described before any draft exists, additional intake is create_listing. An explicit request for a separate draft is create_listing.
 When the latest turn selects Hamad and an earlier turn supplied the product details or an image attachment, keep that product context for creation.
 For PARTIAL, return allowed_request containing only the safe marketplace part. Never include the out-of-scope part in allowed_request.
+When recent_draft_clarifications is present, consider whether a short latest reply answers the pending draft question. Use the earlier customer request to distinguish creation from an update to a saved draft. If the user changes the subject, classify the new request normally.
 If unsure, use UNCLEAR. Fail closed.`,
         prompt: JSON.stringify({
           required_schema: {
@@ -276,6 +279,7 @@ If unsure, use UNCLEAR. Fail closed.`,
           conversation_context: context,
           ...(marketplaceInterfaceContext ? { platform_context: marketplaceInterfaceContext.slice(0, 2_400) } : {}),
           ...(hamadCreationSelected ? { hamad_creation_selected: true } : {}),
+          ...(recentDraftQuestions.length ? { recent_draft_clarifications: recentDraftQuestions } : {}),
           latest_user_request: latestRequest,
         }),
       }),
