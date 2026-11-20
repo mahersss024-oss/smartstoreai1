@@ -93,9 +93,9 @@ test('regeneration exposes no draft write tools and unavailable output review ne
   const safe = createReadOnlyMarketplaceTools();
   for (const name of ['createListingDraft', 'updateListing', 'addUploadedImagesToListing', 'setListingStatus', 'sendMessage', 'openConversation']) assert.ok(!(name in safe), name);
   assert.deepEqual(Object.keys(safe), ['getPlatformHelp']);
-  const route = readFileSync('app/api/chat/route.ts', 'utf8');
-  assert.match(route, /const retryAgent = createChatAgent\(session, \{[\s\S]*?answerOnly: true/);
-  assert.match(route, /isOutputCheckerProviderFailure\(decision\)\) return getModelProviderFailureResponse/);
+  const engine = readFileSync('lib/chat/hamad-engine.ts', 'utf8');
+  assert.match(engine, /const retryAgent = createChatAgent\(session, \{[\s\S]*?answerOnly: true/);
+  assert.match(engine, /decision\.reason_code === 'output_checker_failure'\) return \{ text: getModelProviderFailureResponse/);
 });
 
 test('a concurrent human moderation decision cannot be overwritten by a seller content or publication write', async t => {

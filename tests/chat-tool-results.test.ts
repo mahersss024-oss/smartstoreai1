@@ -9,9 +9,11 @@ test('chat route reviews all draft and help tool steps but never streams old sea
     'utf8',
   );
 
-  assert.match(route, /firstResult\.steps\.flatMap\(step => step\.toolResults\)/);
-  assert.match(route, /assistantResponse: firstText, verifiedToolResults/);
-  assert.doesNotMatch(route, /extractAssistantSearchToolResults|type: 'tool-input-available'|type: 'tool-output-available'/);
+  const engine = readFileSync(join(process.cwd(), 'lib', 'chat', 'hamad-engine.ts'), 'utf8');
+  assert.match(route, /await runHamadTurn\(turn\)/);
+  assert.match(engine, /firstResult\.steps\.flatMap\(step => step\.toolResults\)/);
+  assert.match(engine, /assistantResponse: firstText, verifiedToolResults/);
+  assert.doesNotMatch(route + engine, /extractAssistantSearchToolResults|type: 'tool-input-available'|type: 'tool-output-available'/);
 });
 
 test('chat route has no buyer search fast path and keeps bounded model generation', () => {
@@ -20,13 +22,11 @@ test('chat route has no buyer search fast path and keeps bounded model generatio
     'utf8',
   );
 
-  assert.doesNotMatch(route, /direct_search_fast_path/);
-  assert.doesNotMatch(route, /maybeCreateDirectSearchResponse/);
-  assert.doesNotMatch(route, /isGenericMarketplaceSearchStarter/);
-  assert.doesNotMatch(route, /getGenericMarketplaceSearchStarterResponse/);
-  assert.match(route, /createChatAgent\(session/);
-  assert.match(route, /chatAgentGenerationTimeoutMs/);
-  assert.match(route, /abortSignal: signal/);
+  const engine = readFileSync(join(process.cwd(), 'lib', 'chat', 'hamad-engine.ts'), 'utf8');
+  assert.doesNotMatch(route + engine, /direct_search_fast_path|maybeCreateDirectSearchResponse|isGenericMarketplaceSearchStarter|getGenericMarketplaceSearchStarterResponse/);
+  assert.match(engine, /createChatAgent\(session/);
+  assert.match(engine, /generate\(startAgent\(\), generationTimeoutMs\)/);
+  assert.match(engine, /abortSignal: AbortSignal\.any\(\[signal, abortSignal\]\)/);
 });
 
 test('chat image assessments are advisory and do not block uploads or publication', () => {

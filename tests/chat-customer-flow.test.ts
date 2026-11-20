@@ -458,6 +458,85 @@ test('invalid creation mode is rejected before text analysis or agent execution'
   assert.equal(analyzed, false);
 });
 
+test('a product answer saves a draft when Hamad asks for an optional detail again', async t => {
+  const owner = 'product-answer-engine-owner';
+  const analysis = textAnalysis({ intent: 'create_listing', category: 'computers', product: 'laptop' });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  let followUp = false;
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+    String(init?.body).includes('input Scope Checker')
+      ? completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'product_answered', intent: 'create_listing', continues_draft: false }))
+      : completion(followUp ? 'DRAFT_QUESTION:specifications' : 'DRAFT_QUESTION:product'));
+  const options = { creationMethod: 'chat', chatConversationId: 'engine-product-answer-conversation' };
+  const start = userTurn('start-product-only', 'أبي إعلان');
+  const question = assistantTurn(await (await POST(request(owner, start.id, { ...options, messages: [start] }))).text());
+  assert.match(question.parts[0].text, /ما المنتج أو الخدمة/);
+  assert.equal(typeof question.metadata.hamadDraftMemory, 'string');
+  followUp = true;
+  const answer = userTurn('product-only-answer', 'لابتوب');
+  const reply = assistantTurn(await (await POST(request(owner, answer.id, { ...options, messages: [start, question, answer] }))).text());
+  assert.match(reply.parts[0].text, /حُفظت المسودة «لابتوب»/);
+  assert.doesNotMatch(reply.parts[0].text, /المواصفات|تعذّر إكمال حفظ المسودة/);
+  const drafts = listSellerListings(owner);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].category, 'computers');
+  assert.equal(drafts[0].status, 'draft');
+});
+
+test('أكمل resumes the original product answer and keeps one draft across retries', async t => {
+  const owner = 'resume-product-engine-owner';
+  const analysis = textAnalysis({ intent: 'create_listing', category: 'computers', product: 'laptop' });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    assert.match(String(init?.body), /input Scope Checker/);
+    assert.equal(JSON.parse(body.messages.at(-1).content).latest_user_request, 'لابتوب');
+    return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'product_answered', intent: 'create_listing', continues_draft: true }));
+  });
+  const history = [
+    userTurn('start-laptop-resume', 'أبي إعلان'),
+    { id: 'ask-laptop-resume', role: 'assistant', parts: [{ type: 'text', text: 'ما المنتج أو الخدمة التي تريد الإعلان عنها؟' }] },
+    userTurn('original-laptop-answer', 'لابتوب'),
+    { id: 'stop-laptop-resume', role: 'assistant', parts: [{
+      type: 'text', text: 'تعذّر إكمال حفظ المسودة في المحادثة. يمكنك إكمال الإعلان بالإنشاء اليدوي.',
+    }] },
+  ];
+  for (const id of ['continue-laptop-first', 'continue-laptop-retry']) {
+    const reply = await POST(request(owner, id, {
+      creationMethod: 'chat',
+      messages: [...history, userTurn(id, 'أكمل')],
+    }));
+    assert.match(await reply.text(), /حُفظت المسودة «لابتوب»/);
+  }
+  const drafts = listSellerListings(owner);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].title, 'لابتوب');
+  assert.equal(drafts[0].status, 'draft');
+});
+
+test('a product name in a cancellation does not authorize intake recovery', async t => {
+  const owner = 'cancel-intake-engine-owner';
+  const analysis = textAnalysis({ intent: 'create_listing', category: 'computers', product: 'laptop' });
+  t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+  t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+    String(init?.body).includes('input Scope Checker')
+      ? completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'product_named', intent: 'create_listing' }))
+      : completion('DRAFT_QUESTION:product'));
+  const reply = await POST(request(owner, 'cancel-laptop', {
+    creationMethod: 'chat',
+    messages: [
+      userTurn('start-cancelled-laptop', 'أبي إعلان'),
+      { id: 'ask-cancelled-laptop', role: 'assistant', parts: [{ type: 'text', text: 'ما المنتج أو الخدمة التي تريد الإعلان عنها؟' }] },
+      userTurn('cancel-laptop', 'لا تحفظ اللابتوب'),
+    ],
+  }));
+  assert.doesNotMatch(await reply.text(), /حُفظت المسودة/);
+  assert.equal(listSellerListings(owner).length, 0);
+});
+
 for (const rejectedToolInput of [false, true]) {
   test(`identified draft and answered specifications are saved once after ${rejectedToolInput ? 'an empty tool call' : 'a repeated question'}`, async t => {
     const owner = rejectedToolInput ? 'specs-signed-owner' : 'specs-legacy-owner';
