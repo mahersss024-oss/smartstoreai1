@@ -93,33 +93,19 @@ export function isStaleIdempotencyReservation(updatedAt: Date, now = Date.now())
   return updatedAt.getTime() <= now - memoryPendingTtlMs;
 }
 
-async function createDatabaseReservation(input: IdempotencyInput, key: string) {
-  await prisma.apiIdempotencyKey.create({
-    data: {
-      namespace: input.namespace,
-      actorKey: input.actorKey,
-      key,
-    },
-  });
-}
-
 function createDatabaseReservationHandle(
-  input: IdempotencyInput,
-  key: string,
+  sourceOperationKey: string,
+  lease: { id: string; updatedAt: Date },
 ): IdempotencyReservation {
+  const where = { ...lease, status: 'pending' };
   return {
-    operationKey: operationKey(input, key),
+    operationKey: sourceOperationKey,
     complete: async (body, status = 200) => {
       const safeBody = toJsonSafeValue(body);
 
-      await prisma.apiIdempotencyKey.update({
-        where: {
-          namespace_actorKey_key: {
-            namespace: input.namespace,
-            actorKey: input.actorKey,
-            key,
-          },
-        },
+      // A request may finish after another attempt has claimed its reservation.
+      await prisma.apiIdempotencyKey.updateMany({
+        where,
         data: {
           status: 'completed',
           statusCode: status,
@@ -130,14 +116,7 @@ function createDatabaseReservationHandle(
       return jsonResponse(safeBody, status);
     },
     abandon: async () => {
-      await prisma.apiIdempotencyKey.deleteMany({
-        where: {
-          namespace: input.namespace,
-          actorKey: input.actorKey,
-          key,
-          status: 'pending',
-        },
-      });
+      await prisma.apiIdempotencyKey.deleteMany({ where });
     },
   };
 }
@@ -184,94 +163,76 @@ export async function reserveIdempotencyKey(
       };
     }
 
-    memoryRecords.set(recordKey, {
+    const lease: MemoryIdempotencyRecord = {
       status: 'pending',
       updatedAt: now,
       expiresAt: now + memoryPendingTtlMs,
-    });
+    };
+    memoryRecords.set(recordKey, lease);
 
     return {
       operationKey: sourceOperationKey,
       complete: async (body, status = 200) => {
         const completedAt = Date.now();
-        pruneMemoryRecords(completedAt);
         const safeBody = toJsonSafeValue(body);
 
-        memoryRecords.set(recordKey, {
-          status: 'completed',
-          statusCode: status,
-          response: safeBody,
-          updatedAt: completedAt,
-          expiresAt: completedAt + memoryCompletedTtlMs,
-        });
+        if (memoryRecords.get(recordKey) === lease) {
+          memoryRecords.set(recordKey, {
+            status: 'completed',
+            statusCode: status,
+            response: safeBody,
+            updatedAt: completedAt,
+            expiresAt: completedAt + memoryCompletedTtlMs,
+          });
+        }
 
         return jsonResponse(safeBody, status);
       },
       abandon: async () => {
-        memoryRecords.delete(recordKey);
+        if (memoryRecords.get(recordKey) === lease) memoryRecords.delete(recordKey);
       },
     };
   }
 
-  try {
-    await createDatabaseReservation(input, key);
-  } catch {
-    const existing = await prisma.apiIdempotencyKey.findUnique({
-      where: {
-        namespace_actorKey_key: {
-          namespace: input.namespace,
-          actorKey: input.actorKey,
-          key,
-        },
-      },
-    });
+  const identity = { ...input, key };
+  const [created] = await prisma.apiIdempotencyKey.createManyAndReturn({
+    data: [identity],
+    select: { id: true, updatedAt: true },
+    skipDuplicates: true,
+  });
+  if (created) return createDatabaseReservationHandle(sourceOperationKey, created);
 
-    if (existing?.status === 'completed' && existing.response !== null) {
-      return {
-        operationKey: sourceOperationKey,
-        response: jsonResponse(existing.response, existing.statusCode ?? 200),
-        complete: async (body, status) => jsonResponse(body, status),
-        abandon: async () => {},
-      };
-    }
+  const existing = await prisma.apiIdempotencyKey.findUnique({
+    where: { namespace_actorKey_key: identity },
+  });
 
-    if (
-      existing?.status === 'pending' &&
-      isStaleIdempotencyReservation(existing.updatedAt)
-    ) {
-      const claimedReservation = await prisma.apiIdempotencyKey.updateMany({
-        where: {
-          namespace: input.namespace,
-          actorKey: input.actorKey,
-          key,
-          status: 'pending',
-          updatedAt: existing.updatedAt,
-        },
-        data: {
-          status: 'pending',
-          statusCode: null,
-          response: Prisma.DbNull,
-        },
-      });
-
-      if (claimedReservation.count === 1) {
-        return createDatabaseReservationHandle(input, key);
-      }
-    }
-
+  if (existing?.status === 'completed' && existing.response !== null) {
     return {
       operationKey: sourceOperationKey,
-      response: jsonResponse(
-        {
-          error: 'idempotency_in_progress',
-          message: 'This request is already being processed.',
-        },
-        409,
-      ),
+      response: jsonResponse(existing.response, existing.statusCode ?? 200),
       complete: async (body, status) => jsonResponse(body, status),
       abandon: async () => {},
     };
   }
 
-  return createDatabaseReservationHandle(input, key);
+  const now = new Date();
+  if (existing?.status === 'pending' && isStaleIdempotencyReservation(existing.updatedAt, now.getTime())) {
+    const claim = await prisma.apiIdempotencyKey.updateMany({
+      where: { id: existing.id, status: 'pending', updatedAt: existing.updatedAt },
+      data: { statusCode: null, response: Prisma.DbNull, updatedAt: now },
+    });
+    if (claim.count === 1) {
+      return createDatabaseReservationHandle(sourceOperationKey, { id: existing.id, updatedAt: now });
+    }
+  }
+
+  return {
+    operationKey: sourceOperationKey,
+    response: jsonResponse(
+      { error: 'idempotency_in_progress', message: 'This request is already being processed.' },
+      409,
+    ),
+    complete: async (body, status) => jsonResponse(body, status),
+    abandon: async () => {},
+  };
 }

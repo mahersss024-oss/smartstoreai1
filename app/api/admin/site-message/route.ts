@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { noStoreHeaders } from '@/lib/api/no-store';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { rejectOversizedRequest } from '@/lib/api/request-size';
-import { isPlatformOwner } from '@/lib/auth/authorization';
+import { getVerifiedRoleForSession, isPlatformOwner } from '@/lib/auth/authorization';
 import { getAuthSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
 import { primarySiteMessageId } from '@/lib/site-message';
@@ -31,6 +31,9 @@ function requireOwner(request: Request): { response: Response } | { session: Non
 export async function GET(request: Request) {
   const owner = requireOwner(request);
   if ('response' in owner) return owner.response;
+  if (await getVerifiedRoleForSession(owner.session) !== 'owner') {
+    return Response.json({ error: 'owner_required' }, { status: 403, headers: noStoreHeaders });
+  }
 
   const siteMessage = await prisma.siteMessage.findUnique({
     where: { id: primarySiteMessageId },

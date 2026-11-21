@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import type { Prisma } from '@prisma/client';
 import { PATCH as editCommission } from '@/app/api/admin/commissions/[commissionId]/route';
-import { PATCH as editSiteMessage } from '@/app/api/admin/site-message/route';
+import { GET as readSiteMessage, PATCH as editSiteMessage } from '@/app/api/admin/site-message/route';
 import { updateCommissionSaleAmountForSeller } from '@/agent/marketplace/repository';
 import { createSignedSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/prisma';
@@ -51,6 +51,22 @@ async function fixture(t: TestContext) {
 }
 
 const messagePayload = (message: string) => ({ message, type: 'info', isEnabled: true, expiresAt: null });
+
+test('PostgreSQL app message reads reject a revoked owner session and accept a current one', { skip: !enabled() }, async t => {
+  const f = await fixture(t);
+  const path = '/api/admin/site-message';
+  assert.equal((await editSiteMessage(f.request(path, messagePayload('Isolated owner message')))).status, 200);
+  const request = (sessionVersion?: number) => new Request('https://example.test' + path, {
+    headers: { Authorization: `Bearer ${createSignedSession({ id: f.owner.id, email: f.owner.email, sessionVersion })}` },
+  });
+  const previousSession = request();
+  assert.equal((await readSiteMessage(previousSession)).status, 200);
+  await prisma.user.update({ where: { id: f.owner.id }, data: { sessionVersion: { increment: 1 } } });
+  assert.equal((await readSiteMessage(previousSession)).status, 403);
+  const current = await readSiteMessage(request(1));
+  assert.equal(current.status, 200);
+  assert.equal((await current.json()).siteMessage.message, 'Isolated owner message');
+});
 
 async function waitForDatabaseLock(pid: number) {
   const until = Date.now() + 5000;

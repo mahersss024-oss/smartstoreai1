@@ -17,10 +17,18 @@ test('a committed legacy upload recovers after receipt failure even when it fill
   const listing = { id: 'receipt-image-listing', sellerId: 'receipt-image-seller', category: 'other', title: 'Fixture',
     attributes: {}, compliance: {}, status: 'draft', createdAt: new Date(), updatedAt: new Date(), images: [] as Image[] };
   for (let i = 0; i < 7; i++) listing.images.push({ id: 'existing-' + i, listingId: listing.id, originalUrl: 'data:image/webp;base64,AA==', displayUrl: '', thumbnailUrl: '', isPrimary: i === 0, status: 'approved', qualityScore: 0, enhancements: [], createdAt: new Date() });
-  let receipt: { status: string; response?: unknown; statusCode?: number } | null = null, failReceipt = true, inserts = 0;
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'create', async () => { if (receipt) throw new Error('unique'); receipt = { status: 'pending' }; return receipt; });
+  let receipt: { id: string; updatedAt: Date; status: string; response?: unknown; statusCode?: number } | null = null, failReceipt = true, inserts = 0;
+  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'createManyAndReturn', async () => {
+    if (receipt) return [];
+    receipt = { id: 'legacy-image-receipt', updatedAt: new Date(), status: 'pending' };
+    return [receipt];
+  });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'findUnique', async () => receipt);
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'update', async ({ data }: { data: { status: string } }) => { if (failReceipt) { failReceipt = false; throw new Error('lost-receipt'); } Object.assign(receipt!, data); return receipt; });
+  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'updateMany', async ({ data }: { data: { status: string } }) => {
+    if (failReceipt) { failReceipt = false; throw new Error('lost-receipt'); }
+    Object.assign(receipt!, data);
+    return { count: 1 };
+  });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'deleteMany', async () => { receipt = null; return { count: 1 }; });
   mockDatabaseMethod(t, prisma.listing, 'findUnique', async () => structuredClone(listing));
   mockDatabaseMethod(t, prisma, '$transaction', async (work: (tx: unknown) => Promise<unknown>) => work({

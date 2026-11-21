@@ -1,4 +1,3 @@
-import { resetIncompleteSellerDrafts } from '@/agent/marketplace/repository';
 import { enforceApiRateLimit } from '@/lib/api/rate-limit';
 import { getAuthSession } from '@/lib/auth/session';
 import { parseChatConversationId } from '@/lib/chat/conversation';
@@ -25,10 +24,7 @@ export async function POST(request: Request) {
     return rateLimitResponse;
   }
 
-  if (session) {
-    await resetIncompleteSellerDrafts(session.user.id);
-  }
-
+  // Legacy clients clear their conversation locally. Saved listings belong to the seller.
   return Response.json(
     { status: 'reset' },
     {

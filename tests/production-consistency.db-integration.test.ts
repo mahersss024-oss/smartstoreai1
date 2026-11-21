@@ -46,9 +46,9 @@ async function fixture(t: TestContext) {
 test('PostgreSQL send replays a committed source after receipt failure and pruning exactly once', { timeout: 30_000 }, async t => {
   if (!localDatabaseEnabled()) return t.skip('Requires the named disposable loopback PostgreSQL test database.');
   const f = await fixture(t), key = 'committed-source-' + randomUUID();
-  const writeReceipt = prisma.apiIdempotencyKey.update.bind(prisma.apiIdempotencyKey);
+  const writeReceipt = prisma.apiIdempotencyKey.updateMany.bind(prisma.apiIdempotencyKey);
   let fail = true;
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'update', async (...args: Parameters<typeof writeReceipt>) => {
+  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'updateMany', async (...args: Parameters<typeof writeReceipt>) => {
     if (fail) { fail = false; throw new Error('response_receipt_unavailable'); }
     return writeReceipt(...args);
   });

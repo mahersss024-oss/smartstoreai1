@@ -15,6 +15,41 @@ function shouldRunDatabaseIntegration() {
   );
 }
 
+test('PostgreSQL idempotency keeps the new reservation when an older request finishes or abandons', async t => {
+  if (!shouldRunDatabaseIntegration()) return t.skip('Requires the isolated PostgreSQL integration database.');
+  const url = new URL(process.env.DATABASE_URL ?? '');
+  assert.equal(url.hostname, '127.0.0.1');
+  assert.equal(url.port, '55432');
+  assert.equal(url.pathname, '/smartstore_codex_test');
+  assert.equal(process.env.SMARTSTORE_MARKETPLACE_STORE, 'database');
+
+  const { prisma } = await import('@/lib/db/prisma');
+  const { reserveIdempotencyKey } = await import('@/lib/api/idempotency');
+  const input = { namespace: 'isolated_lease_test', actorKey: randomUUID() };
+  const key = 'request-retry';
+  const identity = { ...input, key };
+  const request = new Request('http://localhost/api/test', { headers: { 'Idempotency-Key': key } });
+  t.after(() => prisma.apiIdempotencyKey.deleteMany({ where: identity }));
+
+  const original = await reserveIdempotencyKey(request, input);
+  assert.ok(original && !original.response);
+  await prisma.apiIdempotencyKey.updateMany({ where: identity, data: { updatedAt: new Date(Date.now() - 121_000) } });
+  const contenders = await Promise.all([reserveIdempotencyKey(request, input), reserveIdempotencyKey(request, input)]);
+  const retry = contenders.find(candidate => candidate && !candidate.response);
+  assert.ok(retry);
+  assert.equal(contenders.filter(candidate => candidate?.response?.status === 409).length, 1);
+  assert.equal(retry.operationKey, original.operationKey);
+
+  await original.complete({ attempt: 'old' });
+  await original.abandon();
+  assert.equal((await reserveIdempotencyKey(request, input))?.response?.status, 409);
+
+  await retry.complete({ attempt: 'new' }, 201);
+  const replay = (await reserveIdempotencyKey(request, input))?.response;
+  assert.equal(replay?.status, 201);
+  assert.deepEqual(await replay?.json(), { attempt: 'new' });
+});
+
 function isolatedImageStorage() {
   const changes = {
     SMARTSTORE_IMAGE_STORAGE: 's3', SMARTSTORE_OBJECT_STORAGE_ENDPOINT: 'https://test-only.r2.cloudflarestorage.com',
