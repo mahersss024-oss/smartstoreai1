@@ -70,6 +70,40 @@ test('a mixed request naming two drafts never authorizes both edits on the focus
   assert.equal(selectChatDraft('أرجع إلى المكتب', drafts, { draftReference: 'المكتب' })?.id, 'desk');
 });
 
+test('ordinal draft edits require a draft name even when the model continues the previous draft', async t => {
+  mockIntent(t, 'update_listing');
+  const owner = 'ordinal-draft-context-owner';
+  const phone = createListingDraft({ sellerId: owner, category: 'other', title: 'آيفون للبيع', price: 1800 });
+  const laptop = createListingDraft({ sellerId: owner, category: 'other', title: 'لابتوب للبيع', price: 2400 });
+  const chatConversationId = 'ordinal-draft-context-conversation';
+  const memory = signDraftMemory({ focusedDraftId: laptop.id }, {
+    user: { id: owner, email: owner + '@example.test' }, issuedAt: 1, expiresAt: 2,
+  }, chatConversationId);
+  t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const body = JSON.parse(String(init?.body));
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
+    if (instructions.includes('input Scope Checker')) {
+      const scope = JSON.parse(body.messages.at(-1).content);
+      assert.equal(scope.draft_memory.focusedDraftId, laptop.id);
+      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'same_draft', intent: 'update_listing', continues_draft: true }));
+    }
+    assert.ok(!body.tools?.some((tool: { function: { name: string } }) => tool.function.name === 'updateListing'));
+    return completion('حدّد المسودة باسمها');
+  });
+  const next = userTurn('ordinal-update', 'خل سعر الأول ١٧٠٠، والثاني خله على سعره');
+  const messages = [
+    userTurn('previous-draft', 'سعر اللابتوب ٢٤٠٠'),
+    { id: 'previous-reply', role: 'assistant', parts: [{ type: 'text', text: 'تم حفظ المسودة.' }], metadata: { hamadDraftMemory: memory } },
+    next,
+  ];
+  const response = await POST(request(owner, next.id, { creationMethod: 'chat', chatConversationId, messages }));
+  assert.equal(response.status, 200);
+  assert.match(assistantTurn(await response.text()).parts[0].text, /حدّد اسم المسودة أو رقمها/);
+  assert.equal(getListing(phone.id)?.price, 1800);
+  assert.equal(getListing(laptop.id)?.price, 2400);
+  assert.equal(selectChatDraft('عدّل وصف لابتوب للبيع إلى «مع الشاحن من الجيل الثاني»', [phone, laptop])?.id, laptop.id);
+});
+
 test('a natural draft reply retains the selected draft and saves only customer-authorized changes', async t => {
   mockIntent(t, 'update_listing');
   const owner = 'draft-context-owner';

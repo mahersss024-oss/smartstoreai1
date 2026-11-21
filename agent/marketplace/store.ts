@@ -844,45 +844,6 @@ export function listSellerListings(sellerId: string) {
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-export function resetIncompleteSellerDrafts(sellerId: string) {
-  seedListings();
-
-  const timestamp = nowIso();
-  const deletedDrafts: ListingRecord[] = [];
-
-  for (const listing of listings.values()) {
-    const hasListingDetails = Boolean(
-      listing.title?.trim() ||
-        listing.description?.trim() ||
-        listing.city?.trim() ||
-        listing.images.length > 0,
-    );
-
-    if (
-      listing.sellerId !== sellerId ||
-      listing.status !== 'draft' ||
-      hasListingDetails
-    ) {
-      continue;
-    }
-
-    const deletedListing: ListingRecord = {
-      ...listing,
-      status: 'deleted',
-      updatedAt: timestamp,
-    };
-
-    listings.set(deletedListing.id, deletedListing);
-    deletedDrafts.push(deletedListing);
-  }
-
-  if (deletedDrafts.length) {
-    persistStore();
-  }
-
-  return deletedDrafts;
-}
-
 export function getListing(listingId: string) {
   seedListings();
   return listings.get(listingId) ?? null;

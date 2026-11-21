@@ -4,6 +4,12 @@ import type { DraftEdits } from './draft-edits';
 export type ChatDraftAction = ({ intent: 'create' } | { intent: 'update'; listingId: string }) & { edits?: DraftEdits };
 
 const sameDraftReference = /(?:^| )[لب]?نفس (?:المسوده|الاعلان)(?= |$)/u;
+const draftOrdinal = '(?:الاول(?:ي)?|الثاني(?:ه)?|الثالث(?:ه)?|الرابع(?:ه)?|الاخير(?:ه)?|الاخر(?:ي)?)';
+const ambiguousDraftGroup = /(?:^| )(?:المسودات|الاعلانات|(?:ال)?مسودتين|(?:ال)?اعلانين)(?= |$)/u;
+const unnamedOrdinalReference = new RegExp(
+  `^${draftOrdinal}(?= |$)|(?:^| )(?:و${draftOrdinal}|(?:عدل|غير|حدث|خل|خلي|سعر|وصف|عنوان|المسوده|الاعلان|مسوده|اعلان) ${draftOrdinal})(?= |$)`,
+  'u',
+);
 const genericDraftWords = new Set([
   'الى', 'في', 'من', 'علي', 'مع', 'الان', 'الحالي', 'الحاليه', 'السابق', 'السابقه',
   'الجديد', 'الجديده', 'جديد', 'جديده', 'اعلان', 'الاعلان',
@@ -45,8 +51,9 @@ function findDraftReference<T extends { id: string; title?: string | null }>(req
 }
 
 export function canResumeUnnamedDraftEdit(request: string, drafts: readonly { id: string; title?: string | null }[]) {
+  const words = wordsIn(request);
   return findDraftReference(request, drafts) === undefined
-    && !/(?:مسودتين|اعلانين|المسودات|الاعلانات|والثانيه|والثاني|والاخر)(?:\s|$)/u.test(wordsIn(request));
+    && !ambiguousDraftGroup.test(words) && !unnamedOrdinalReference.test(words);
 }
 
 export function selectChatDraft<T extends { id: string; title?: string | null }>(
@@ -54,8 +61,11 @@ export function selectChatDraft<T extends { id: string; title?: string | null }>
   drafts: readonly T[],
   context: { previousUserRequest?: string; focusedDraftId?: string; draftReference?: string; continuesDraft?: boolean } = {},
 ) {
+  const words = wordsIn(request);
+  if (unnamedOrdinalReference.test(words)) return undefined;
   const target = findDraftReference(request, drafts);
   if (target !== undefined) return target ?? undefined;
+  if (ambiguousDraftGroup.test(words)) return undefined;
   if (context.draftReference) {
     const reference = wordsIn(context.draftReference);
     if (!reference || !` ${wordsIn(request)} `.includes(` ${reference} `)) return undefined;
@@ -69,7 +79,7 @@ export function selectChatDraft<T extends { id: string; title?: string | null }>
       ? drafts.filter(draft => terms.every(term => titleWords(draft.title ?? '').includes(term))) : [];
     return named.length === 1 ? named[0] : undefined;
   }
-  const refersToSame = sameDraftReference.test(wordsIn(request));
+  const refersToSame = sameDraftReference.test(words);
   if (context.focusedDraftId && (refersToSame || context.continuesDraft)) {
     return drafts.find(draft => draft.id === context.focusedDraftId);
   }

@@ -10,7 +10,7 @@ import {
   getOwnedDirectImageUpload, getOwnedActiveDirectImageUploads,
 } from '@/agent/marketplace/direct-image-uploads';
 import {
-  addListingImageForSeller, resetIncompleteSellerDrafts, setListingStatusForSeller,
+  addListingImageForSeller, setListingStatusForSeller,
   setPrimaryListingImageForSeller,
 } from '@/agent/marketplace/repository';
 import { getRealtimeEventsSince } from '@/lib/realtime/event-bus';
@@ -18,6 +18,7 @@ import { getDirectImagePublicUrls, type DirectImageObjectJob, type DirectImageVa
 import { processImageObjectCleanup } from '@/agent/marketplace/image-object-cleanup';
 import { directImagePromotionReceiptId, reserveDirectImagePromotion, releaseDirectImagePromotion } from '@/agent/marketplace/direct-image-promotion';
 import { POST as reserveImageUpload } from '@/app/api/marketplace/listings/[listingId]/image-uploads/route';
+import { POST as resetChat } from '@/app/api/chat/reset/route';
 import { createSessionCookie } from '@/lib/auth/session';
 
 const enabled = process.env.SMARTSTORE_DB_INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
@@ -293,12 +294,16 @@ test('database attaches the eighth upload when seven images are saved and reject
   await assert.rejects(start(f), { code: 'listing_image_limit_reached' });
 });
 
-test('database pending images block publication and blank-draft reset without making photos mandatory', { skip: !enabled }, async t => {
+test('database pending images block publication and survive chat reset without making photos mandatory', { skip: !enabled }, async t => {
   const f = await fixture(t);
   await prisma.listing.update({ where: { id: f.listing.id }, data: { title: null } });
   const upload = await start(f);
   await assert.rejects(setListingStatusForSeller(f.listing.id, f.seller.id, 'published'), { code: 'image_uploads_pending' });
-  assert.equal(await resetIncompleteSellerDrafts(f.seller.id), 0);
+  const response = await resetChat(new Request('http://localhost/api/chat/reset', {
+    method: 'POST', headers: { cookie: createSessionCookie({ id: f.seller.id, email: f.seller.email }) },
+  }));
+  assert.equal(response.status, 200);
+  assert.equal((await getOwnedDirectImageUpload(f.listing.id, f.seller.id, upload.upload.id)).upload.status, 'pending');
   await cancelOwnedDirectImageUpload(f.listing.id, f.seller.id, upload.upload.id);
   // Optional photos stay optional once no upload is waiting.
   assert.equal((await setListingStatusForSeller(f.listing.id, f.seller.id, 'published'))?.status, 'published');

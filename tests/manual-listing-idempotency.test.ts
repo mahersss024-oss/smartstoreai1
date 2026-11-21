@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
 
 type Receipt = {
-  namespace: string; actorKey: string; key: string;
+  id: string; namespace: string; actorKey: string; key: string;
   status: string; updatedAt: Date; response: unknown; statusCode: number | null;
 };
 type Listing = Record<string, unknown> & { id: string; sellerId: string; title: string; status: string };
@@ -35,39 +35,31 @@ function fixture(t: TestContext) {
   const receiptKey = (value: { namespace: string; actorKey: string; key: string }) =>
     JSON.stringify([value.namespace, value.actorKey, value.key]);
 
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'create', async ({ data }: { data: Receipt }) => {
-    const key = receiptKey(data);
-    if (receipts.has(key)) throw new Error('unique_reservation_conflict');
-    const row = { ...data, status: 'pending', updatedAt: new Date(), response: null, statusCode: null };
-    receipts.set(key, row);
-    return row;
+  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'createManyAndReturn', async ({ data: [data] }: { data: Receipt[] }) => {
+    const id = receiptKey(data);
+    if (receipts.has(id)) return [];
+    const row = { ...data, id, status: 'pending', updatedAt: new Date(), response: null, statusCode: null };
+    receipts.set(id, row);
+    return [row];
   });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'findUnique', async ({ where }: {
     where: { namespace_actorKey_key: Receipt };
   }) => structuredClone(receipts.get(receiptKey(where.namespace_actorKey_key)) ?? null));
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'update', async ({ where, data }: {
-    where: { namespace_actorKey_key: Receipt }; data: Partial<Receipt>;
-  }) => {
-    if (failAcknowledgement) {
-      failAcknowledgement = false;
-      throw new Error('receipt_write_unavailable_after_listing_commit');
-    }
-    const row = receipts.get(receiptKey(where.namespace_actorKey_key));
-    assert.ok(row);
-    Object.assign(row, data, { updatedAt: new Date() });
-    return row;
-  });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'updateMany', async ({ where, data }: {
     where: Receipt; data: Partial<Receipt>;
   }) => {
-    const row = receipts.get(receiptKey(where));
+    if (failAcknowledgement && data.status === 'completed') {
+      failAcknowledgement = false;
+      throw new Error('receipt_write_unavailable_after_listing_commit');
+    }
+    const row = receipts.get(where.id);
     if (!row || row.status !== where.status || row.updatedAt.getTime() !== where.updatedAt.getTime()) return { count: 0 };
-    Object.assign(row, data, { updatedAt: new Date() });
+    Object.assign(row, { updatedAt: new Date() }, data);
     return { count: 1 };
   });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'deleteMany', async ({ where }: { where: Receipt }) => {
-    const row = receipts.get(receiptKey(where));
-    return { count: row?.status === where.status && receipts.delete(receiptKey(where)) ? 1 : 0 };
+    const row = receipts.get(where.id);
+    return { count: row?.status === where.status && row.updatedAt.getTime() === where.updatedAt.getTime() && receipts.delete(where.id) ? 1 : 0 };
   });
   mockDatabaseMethod(t, prisma.user, 'upsert', async ({ where }: { where: { id: string } }) => ({ id: where.id }));
   const findListing = async ({ where }: { where: { id: string } }) => listings.get(where.id) ?? null;

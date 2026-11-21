@@ -81,6 +81,29 @@ test('treats old pending idempotency reservations as retryable', () => {
   );
 });
 
+test('a superseded memory reservation cannot complete or abandon its replacement', async t => {
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  const request = new Request('https://smartstore.test/api', { headers: { 'Idempotency-Key': 'lease-retry' } });
+  const input = { namespace: 'memory_lease', actorKey: 'user:one' };
+  const first = await reserveIdempotencyKey(request, input);
+  assert.ok(first && !first.response);
+
+  now += 120_001;
+  const retry = await reserveIdempotencyKey(request, input);
+  assert.ok(retry && !retry.response);
+  assert.equal(retry.operationKey, first.operationKey);
+
+  await first.complete({ attempt: 'old' });
+  await first.abandon();
+  assert.equal((await reserveIdempotencyKey(request, input))?.response?.status, 409);
+
+  await retry.complete({ attempt: 'new' }, 201);
+  const replay = (await reserveIdempotencyKey(request, input))?.response;
+  assert.equal(replay?.status, 201);
+  assert.deepEqual(await replay?.json(), { attempt: 'new' });
+});
+
 test('deduplicates customer conversation creation requests', async () => {
   const originalStore = process.env.SMARTSTORE_MARKETPLACE_STORE;
   process.env.SMARTSTORE_MARKETPLACE_STORE = 'memory';

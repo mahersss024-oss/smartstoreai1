@@ -65,7 +65,6 @@ import {
   hasReachedListingImageLimit,
 } from './listing-image-limits';
 import { normalizeListingImageDeliveryUrls } from './listing-image-delivery';
-import { deleteListingObject } from './object-storage';
 import { recordDatabaseFirstPublication } from './listing-publication';
 import { ensureDatabaseSaleCommission } from './listing-commission';
 import { enqueueImageObjectCleanup, processImageObjectCleanup } from './image-object-cleanup';
@@ -2293,111 +2292,6 @@ export async function listSellerListingsPage(
   });
 
   return toPaginatedResponse(listings.map(toListingRecord), pagination);
-}
-
-async function deleteListingObjectsBestEffort(listing: memoryStore.ListingRecord) {
-  await Promise.all(
-    listing.images.map(async (image) => {
-      try {
-        await deleteListingObject({
-          imageId: image.id,
-          urls: [image.originalUrl, image.displayUrl, image.thumbnailUrl],
-        });
-      } catch (error) {
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        console.warn(`[listing_draft_storage_delete] failure=${errorName}`);
-      }
-    }),
-  );
-}
-
-function publishDeletedListingEvents(listing: memoryStore.ListingRecord) {
-  safelyPublishRealtimeEvent({
-    type: 'ad_status_changed',
-    payload: {
-      listingId: listing.id,
-      sellerId: listing.sellerId,
-      previousStatus: 'draft',
-      status: listing.status,
-    },
-    visibility: getListingRealtimeVisibility(listing.sellerId, listing.status),
-  });
-
-  safelyPublishRealtimeEvent({
-    type: 'ad_deleted',
-    payload: {
-      listingId: listing.id,
-      sellerId: listing.sellerId,
-    },
-    visibility: {
-      includePublic: true,
-      includeAdmins: true,
-      userIds: [listing.sellerId],
-    },
-  });
-}
-
-export async function resetIncompleteSellerDrafts(sellerId: string) {
-  if (!shouldUseDatabaseStore()) {
-    const deletedDrafts = memoryStore.resetIncompleteSellerDrafts(sellerId);
-
-    for (const listing of deletedDrafts) {
-      publishDeletedListingEvents(listing);
-    }
-
-    return deletedDrafts.length;
-  }
-
-  const deletedDrafts = await retryDirectImageTransaction(() => prisma.$transaction(async (tx) => {
-    const waitingListingIds = directImageUploadsEnabled() ? await tx.listingImageUpload.findMany({
-      where: { sellerId, status: { in: [...activeImageUploadStatuses] }, expiresAt: { gt: new Date() } },
-      select: { listingId: true }, distinct: ['listingId'],
-    }) : [];
-    const drafts = await tx.listing.findMany({
-      where: {
-        sellerId,
-        status: 'draft',
-        title: null,
-        description: null,
-        city: null,
-        images: {
-          none: {},
-        },
-        ...(waitingListingIds.length ? { id: { notIn: waitingListingIds.map(job => job.listingId) } } : {}),
-      },
-      include: {
-        images: true,
-      },
-    });
-
-    if (!drafts.length) {
-      return [];
-    }
-
-    const updatedDrafts: DatabaseListingRecord[] = [];
-
-    for (const draft of drafts) {
-      const updatedDraft = await tx.listing.update({
-        where: { id: draft.id },
-        data: { status: 'deleted' },
-        include: { images: true },
-      });
-
-      updatedDrafts.push(updatedDraft);
-    }
-
-    return updatedDrafts;
-  }, directImageUploadsEnabled() ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined));
-
-  const mappedDrafts = deletedDrafts.map(toListingRecord);
-
-  await Promise.all(mappedDrafts.map(deleteListingObjectsBestEffort));
-
-  for (const listing of mappedDrafts) {
-    publishDeletedListingEvents(listing);
-  }
-
-  return mappedDrafts.length;
 }
 
 export async function createListingDraft(

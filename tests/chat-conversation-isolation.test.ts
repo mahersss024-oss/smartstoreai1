@@ -48,13 +48,18 @@ test('a stale tab cannot reset the newly authenticated account drafts', async ()
   assert.equal(getListing(draft.id)?.status, 'draft');
 });
 
-test('chat reset preserves published ads and another account drafts', async () => {
+test('legacy chat reset preserves saved listings, including unfinished drafts', async () => {
   const incomplete = createListingDraft({ sellerId: user.id, category: 'cars' });
+  const priced = createListingDraft({ sellerId: user.id, category: 'cars', price: 1234 });
   const otherAccount = createListingDraft({ sellerId: 'other-chat-owner', category: 'cars' });
   const published = createListingDraft({ sellerId: user.id, category: 'cars', title: 'إعلان منشور', description: 'تفاصيل الإعلان' });
   publishListing(published.id);
-  assert.equal((await resetChat(request(firstConversation, true))).status, 200);
-  assert.equal(getListing(incomplete.id)?.status, 'deleted');
+  const response = await resetChat(request(firstConversation, true));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: 'reset' });
+  assert.equal(getListing(incomplete.id)?.status, 'draft');
+  assert.equal(getListing(priced.id)?.status, 'draft');
+  assert.equal(getListing(priced.id)?.price, 1234);
   assert.equal(getListing(otherAccount.id)?.status, 'draft');
   assert.equal(getListing(published.id)?.status, 'published');
 });

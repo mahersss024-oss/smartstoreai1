@@ -125,7 +125,7 @@ test('site message updates require the configured owner, are transactional and a
   assert.doesNotMatch(layout, /<SiteMessageBanner/);
   assert.match(siteMessagePage, /رسائل التطبيق/);
   assert.match(siteMessagePage, /useAdminAccess\('owner'\)/);
-  assert.match(siteMessageLayout, /isPlatformOwner/);
+  assert.match(siteMessageLayout, /await getVerifiedRoleForSession/);
   assert.match(siteMessageLayout, /notFound/);
   assert.match(siteMessagePage, /\/api\/admin\/site-message/);
   assert.doesNotMatch(siteMessagePage, /localStorage|\/api\/admin\/maintenance|DatabaseExplorer|MarketResetPanel/);

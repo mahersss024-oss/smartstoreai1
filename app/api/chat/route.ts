@@ -33,7 +33,6 @@ import {
 } from '@/agent/marketplace/listing-image-limits';
 import {
   listSellerListings,
-  resetIncompleteSellerDrafts,
 } from '@/agent/marketplace/repository';
 import {
   applyAllowedRequestToLatestUserMessage,
@@ -950,10 +949,6 @@ export async function POST(request: Request) {
         userRequest: preliminaryUserRequest,
         textPolicyDecision: preliminaryComplianceDecision,
       });
-    }
-
-    if (body.resetDraftContext === true) {
-      await resetIncompleteSellerDrafts(session.user.id);
     }
 
     const sellerDrafts = body.creationMethod === 'chat'

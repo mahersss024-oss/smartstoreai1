@@ -15,7 +15,7 @@ function fixture(t: TestContext) {
     t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
   }
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('live_io_forbidden'); });
-  type Receipt = { namespace: string; actorKey: string; key: string; status: string;
+  type Receipt = { id: string; namespace: string; actorKey: string; key: string; status: string;
     updatedAt: Date; response: unknown; statusCode: number | null };
   type Message = { id: string; conversationId: string; senderId: string; body: string;
     status: string; type: string; metadata: object; reasons: string[]; createdAt: Date };
@@ -24,25 +24,22 @@ function fixture(t: TestContext) {
   const jobs = new Set<string>();
   let failReceipt = false;
   const receiptKey = (v: Pick<Receipt, 'namespace' | 'actorKey' | 'key'>) => JSON.stringify([v.namespace, v.actorKey, v.key]);
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'create', async ({ data }: { data: Receipt }) => {
-    if (receipts.has(receiptKey(data))) throw new Error('unique_key');
-    const row = { ...data, status: 'pending', updatedAt: new Date(), response: null, statusCode: null };
-    receipts.set(receiptKey(data), row); return row;
+  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'createManyAndReturn', async ({ data: [data] }: { data: Receipt[] }) => {
+    const id = receiptKey(data);
+    if (receipts.has(id)) return [];
+    const row = { ...data, id, status: 'pending', updatedAt: new Date(), response: null, statusCode: null };
+    receipts.set(id, row);
+    return [row];
   });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'findUnique', async ({ where }: {
     where: { namespace_actorKey_key: Receipt };
   }) => structuredClone(receipts.get(receiptKey(where.namespace_actorKey_key)) ?? null));
-  mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'update', async ({ where, data }: {
-    where: { namespace_actorKey_key: Receipt }; data: Partial<Receipt>;
-  }) => {
-    if (failReceipt) { failReceipt = false; throw new Error('receipt_failed_after_message_commit'); }
-    const row = receipts.get(receiptKey(where.namespace_actorKey_key)); assert.ok(row);
-    Object.assign(row, data, { updatedAt: new Date() }); return row;
-  });
   mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'updateMany', async ({ where, data }: { where: Receipt; data: Partial<Receipt> }) => {
-    const row = receipts.get(receiptKey(where));
+    if (failReceipt && data.status === 'completed') { failReceipt = false; throw new Error('receipt_failed_after_message_commit'); }
+    const row = receipts.get(where.id);
     if (!row || row.status !== where.status || row.updatedAt.getTime() !== where.updatedAt.getTime()) return { count: 0 };
-    Object.assign(row, data, { updatedAt: new Date() }); return { count: 1 };
+    Object.assign(row, { updatedAt: new Date() }, data);
+    return { count: 1 };
   });
   const conversation = () => ({ id: 'retry-conversation', buyerId: 'retry-buyer', sellerId: 'retry-seller',
     listingId: 'retry-listing', status: 'open', messages: [...messages.values()],
