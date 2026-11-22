@@ -6,10 +6,12 @@ export type ChatDraftAction = ({ intent: 'create' } | { intent: 'update'; listin
 const sameDraftReference = /(?:^| )[لب]?نفس (?:المسوده|الاعلان)(?= |$)/u;
 const draftOrdinal = '(?:الاول(?:ي)?|الثاني(?:ه)?|الثالث(?:ه)?|الرابع(?:ه)?|الاخير(?:ه)?|الاخر(?:ي)?)';
 const ambiguousDraftGroup = /(?:^| )(?:المسودات|الاعلانات|(?:ال)?مسودتين|(?:ال)?اعلانين)(?= |$)/u;
-const unnamedOrdinalReference = new RegExp(
-  `^${draftOrdinal}(?= |$)|(?:^| )(?:و${draftOrdinal}|(?:عدل|غير|حدث|خل|خلي|سعر|وصف|عنوان|المسوده|الاعلان|مسوده|اعلان) ${draftOrdinal})(?= |$)`,
-  'u',
-);
+const relativeDraftReference = '(?:(?:اللي|الذي|التي) (?:(?:كان|كانت) )?قبل(?:ه|ها)?|السابق(?:ه)?)';
+const draftEditCue = '(?:عدل|غير|حدث|خل|خلي|اقصد|قصدي|(?:ال|لل|ل)?(?:سعر|وصف|عنوان|مسوده|اعلان))';
+const unnamedDraftReference = new RegExp([
+  `^(?:${draftOrdinal}|${relativeDraftReference})(?= |$)`,
+  `(?:^| )(?:و${draftOrdinal}|و?${draftEditCue} (?:${draftOrdinal}|${relativeDraftReference}))(?= |$)`,
+].join('|'), 'u');
 const genericDraftWords = new Set([
   'الى', 'في', 'من', 'علي', 'مع', 'الان', 'الحالي', 'الحاليه', 'السابق', 'السابقه',
   'الجديد', 'الجديده', 'جديد', 'جديده', 'اعلان', 'الاعلان',
@@ -17,6 +19,11 @@ const genericDraftWords = new Set([
 
 function wordsIn(value: string) {
   return normalizeMarketplaceSearchText(value).replace(/[^\p{L}\p{N}-]+/gu, ' ').trim();
+}
+
+function hasUnnamedDraftReference(words: string, originalRequest?: string) {
+  return unnamedDraftReference.test(words)
+    || (originalRequest !== undefined && unnamedDraftReference.test(wordsIn(originalRequest)));
 }
 
 function findDraftReference<T extends { id: string; title?: string | null }>(request: string, drafts: readonly T[]): T | null | undefined {
@@ -50,19 +57,23 @@ function findDraftReference<T extends { id: string; title?: string | null }>(req
   if (/(?:رقم|معرف) (?:المسوده|الاعلان)(?: |$)/u.test(words)) return null;
 }
 
-export function canResumeUnnamedDraftEdit(request: string, drafts: readonly { id: string; title?: string | null }[]) {
+export function canResumeUnnamedDraftEdit(
+  request: string,
+  drafts: readonly { id: string; title?: string | null }[],
+  originalRequest?: string,
+) {
   const words = wordsIn(request);
-  return findDraftReference(request, drafts) === undefined
-    && !ambiguousDraftGroup.test(words) && !unnamedOrdinalReference.test(words);
+  return !hasUnnamedDraftReference(words, originalRequest)
+    && !ambiguousDraftGroup.test(words) && findDraftReference(request, drafts) === undefined;
 }
 
 export function selectChatDraft<T extends { id: string; title?: string | null }>(
   request: string,
   drafts: readonly T[],
-  context: { previousUserRequest?: string; focusedDraftId?: string; draftReference?: string; continuesDraft?: boolean } = {},
+  context: { previousUserRequest?: string; focusedDraftId?: string; draftReference?: string; continuesDraft?: boolean; originalRequest?: string } = {},
 ) {
   const words = wordsIn(request);
-  if (unnamedOrdinalReference.test(words)) return undefined;
+  if (hasUnnamedDraftReference(words, context.originalRequest)) return undefined;
   const target = findDraftReference(request, drafts);
   if (target !== undefined) return target ?? undefined;
   if (ambiguousDraftGroup.test(words)) return undefined;
