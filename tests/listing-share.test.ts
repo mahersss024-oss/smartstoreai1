@@ -143,11 +143,14 @@ test('listing contact passes the selected listing into the conversation page', (
 test('assistant context contains owned drafts only and directs manual review without retrieving other sellers', () => {
   const marketplaceTools = readProjectFile('agent', 'tools', 'marketplace.ts');
   const chatRoute = readProjectFile('app', 'api', 'chat', 'route.ts');
+  const capabilities = readProjectFile('lib', 'chat', 'hamad-capabilities.ts');
+  const turn = readProjectFile('lib', 'chat', 'hamad-structured-turn.ts');
   const marketplaceInstructions = readProjectFile('agent', 'marketplace', 'agents.ts');
 
   assert.doesNotMatch(marketplaceTools, /searchMarketplaceListings|compareMarketplaceListings|listMarketplaceListings/);
-  assert.match(chatRoute, /listSellerListings\(session\.user\.id\)/);
-  assert.match(chatRoute, /reviewUrl: '\/account\/listings'/);
+  assert.match(capabilities, /listSellerListings\(context\.session\.user\.id\)/);
+  assert.match(capabilities, /listing\?\.sellerId === context\.session\.user\.id/);
+  assert.match(turn, /\[إعلاناتي\]\(\/account\/listings\)/);
   assert.doesNotMatch(chatRoute, /getVerifiedSelectedListingContext|getListing\(parsed\.id\)/);
   assert.match(marketplaceInstructions, /customer reviews and publishes from \/account\/listings themselves/);
 });
