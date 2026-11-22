@@ -64,6 +64,8 @@ import { draftImageSource, draftRequestSource, readDraftMemory, signDraftMemory,
 import { authorizeDraftEdits } from '@/lib/chat/draft-edits';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 import { reserveChatGeneration } from '@/lib/chat/admission';
+import { runStructuredHamadTurn } from '@/lib/chat/hamad-structured-turn';
+import { safeHamadStructuredReply } from '@/lib/chat/hamad-structured-model';
 
 const maxMessagesPerRequest = 40;
 const maxTextCharactersPerRequest = 24_000;
@@ -391,9 +393,9 @@ function getRequestLanguage(settings: LocationSettings | undefined): AppLanguage
 
 function createTextUIResponse(
   text: string,
-  options: { creationChoice?: boolean; hamadDraftMemory?: string } = {},
+  options: { creationChoice?: boolean; hamadDraftMemory?: string; systemMessage?: boolean } = {},
 ) {
-  text = getHamadCustomerReply(text) || (text.includes(authRequiredMarker)
+  text = (options.systemMessage ? text : getHamadCustomerReply(text)) || (text.includes(authRequiredMarker)
     ? `${authRequiredMarker} يرجى تسجيل الدخول أولًا لمتابعة المساعدة في سوق حمد.`
     : chatServiceUnavailableMessage);
   const messageId = `guard-message-${crypto.randomUUID()}`;
@@ -621,9 +623,14 @@ function addDefaultTextToLatestImageOnlyMessage(
   return nextMessages;
 }
 
-function createHamadUIResponse(turn: HamadTurn, options: {
-  marketplaceIntent: string;
-  conversationId: string | null;
+function createGeneratedChatResponse(generate: () => Promise<{
+  text: string;
+  hamadDraftMemory?: string;
+  creationChoice?: boolean;
+  sections?: { text: string; preview?: { url: string; mediaType: 'image/webp' } }[];
+}>, options: {
+  marketplaceIntent?: string;
+  structured?: boolean;
   onGenerationSettled: () => Promise<void>;
 }) {
   return createUIMessageStreamResponse({
@@ -631,23 +638,44 @@ function createHamadUIResponse(turn: HamadTurn, options: {
       execute: async ({ writer }) => {
         try {
           const id = `checked-${crypto.randomUUID()}`;
-          writer.write({ type: 'start', messageId: id, messageMetadata: { marketplaceIntent: options.marketplaceIntent } });
-          const reply = await runHamadTurn(turn);
-          if (reply.draftMemory && options.conversationId) {
+          writer.write({ type: 'start', messageId: id, messageMetadata: options.marketplaceIntent
+            ? { marketplaceIntent: options.marketplaceIntent } : {} });
+          const reply = await generate();
+          if (reply.hamadDraftMemory || reply.creationChoice) {
             writer.write({
               type: 'message-metadata',
-              messageMetadata: { hamadDraftMemory: signDraftMemory(reply.draftMemory, turn.session, options.conversationId) },
+              messageMetadata: {
+                ...(reply.hamadDraftMemory ? { hamadDraftMemory: reply.hamadDraftMemory } : {}),
+                ...(reply.creationChoice ? { creationChoice: true } : {}),
+              },
             });
           }
-          writer.write({ type: 'text-start', id });
-          writer.write({ type: 'text-delta', id, delta: getHamadCustomerReply(reply.text) || chatServiceUnavailableMessage });
-          writer.write({ type: 'text-end', id });
+          for (const [index, section] of (reply.sections ?? [{ text: reply.text }]).entries()) {
+            const partId = index === 0 ? id : `${id}-${index}`;
+            writer.write({ type: 'text-start', id: partId });
+            const text = options.structured ? safeHamadStructuredReply(section.text) : getHamadCustomerReply(section.text);
+            writer.write({ type: 'text-delta', id: partId, delta: text || chatServiceUnavailableMessage });
+            writer.write({ type: 'text-end', id: partId });
+            if (section.preview) writer.write({ type: 'file', ...section.preview });
+          }
           writer.write({ type: 'finish', finishReason: 'stop' });
         } finally { await options.onGenerationSettled(); }
       },
       onError: () => chatServiceUnavailableMessage,
     }),
   });
+}
+
+function createHamadUIResponse(turn: HamadTurn, options: {
+  marketplaceIntent: string;
+  conversationId: string | null;
+  onGenerationSettled: () => Promise<void>;
+}) {
+  return createGeneratedChatResponse(async () => {
+    const reply = await runHamadTurn(turn);
+    return { text: reply.text, hamadDraftMemory: reply.draftMemory && options.conversationId
+      ? signDraftMemory(reply.draftMemory, turn.session, options.conversationId) : undefined };
+  }, options);
 }
 
 type ChatIssueResponseInput = {
@@ -898,7 +926,8 @@ export async function POST(request: Request) {
   if (body.beginDraftWithHamad !== undefined && (typeof body.beginDraftWithHamad !== 'boolean' || (body.beginDraftWithHamad && body.creationMethod !== 'chat'))) {
     return new Response('اختيار طريقة إنشاء الإعلان غير صالح.', { status: 400 });
   }
-  const draftMemory: DraftMemory = body.creationMethod === 'chat' && body.resetDraftContext !== true
+  const structured = process.env.SMARTSTORE_HAMAD_STRUCTURED === '1';
+  const draftMemory: DraftMemory = !structured && body.creationMethod === 'chat' && body.resetDraftContext !== true
     ? readDraftMemory(filteredMessages, session, chatConversationId) : {};
 
   const missingApiKeys = getMissingApiKeys();
@@ -914,14 +943,43 @@ export async function POST(request: Request) {
   if (admission.response) return admission.response;
   let backgroundGeneration = false;
   try {
-    const imageValidationFailure = validateChatImageAttachments(filteredMessages);
+    const currentParts = Array.isArray(latestUserMessage?.parts) ? latestUserMessage.parts : [];
+    const unsupportedStructuredFile = structured && currentParts.some((part) => isFilePart(part) &&
+      (typeof part.mediaType !== 'string' || !supportedChatImageMimeTypes.has(part.mediaType)));
+    const imageValidationFailure = structured
+      ? unsupportedStructuredFile ? 'unsupported_image_type' : validateRetainedListingImages(currentParts)
+      : validateChatImageAttachments(filteredMessages);
     if (imageValidationFailure) {
+      if (structured) return createTextUIResponse(getImageUploadValidationResponse(language, imageValidationFailure), { systemMessage: true });
       return await generateProfessionalChatIssueResponse({
         kind: 'upload_validation',
         language,
         userRequest: preliminaryUserRequest,
         validationReason: imageValidationFailure,
       });
+    }
+
+    if (structured) {
+      const previousAssistant = latestUserMessage && filteredMessages.slice(0, filteredMessages.lastIndexOf(latestUserMessage))
+        .findLast((message) => message.role === 'assistant');
+      const metadata = previousAssistant?.metadata as { hamadDraftMemory?: unknown } | undefined;
+      const history = filteredMessages.flatMap<{ role: 'user' | 'assistant'; text: string; id?: string }>((message) => {
+        const item = buildScopeContext([message], 1)[0];
+        return item?.role === 'user' || item?.role === 'assistant'
+          ? [{ role: item.role, text: item.text, id: typeof message.id === 'string' ? message.id : undefined }] : [];
+      }).slice(-8);
+      const response = createGeneratedChatResponse(() => runStructuredHamadTurn({
+        session, history, request: preliminaryUserRequest, requestKey, conversationId: chatConversationId,
+        checkpoint: metadata?.hamadDraftMemory,
+        creationEnabled: body.creationMethod === 'chat', reset: body.resetDraftContext === true || body.beginDraftWithHamad === true,
+        currentImages: extractRetainedUploadedListingImages(latestUserMessage?.parts),
+        retainedImages: ({ sourceId }) => sourceId === body.retainedListingImageMessageId
+          && !validateRetainedListingImages(body.retainedListingImages)
+          ? extractRetainedUploadedListingImages(body.retainedListingImages) : [],
+        signal: request.signal,
+      }), { structured: true, onGenerationSettled: admission.release });
+      backgroundGeneration = true;
+      return response;
     }
 
     const preliminaryComplianceDecision = await resolveAmbiguousTextPolicyDecision(

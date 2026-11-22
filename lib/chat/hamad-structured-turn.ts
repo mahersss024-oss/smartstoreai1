@@ -1,0 +1,275 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { platformHelpTopics } from '@/agent/platform-guide';
+import type { UploadedListingImage } from '@/agent/marketplace/listing-image-storage';
+import { reserveIdempotencyKey } from '@/lib/api/idempotency';
+import type { AuthSession } from '@/lib/auth/session';
+import { chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
+import { draftImageSource } from './draft-memory';
+import { hamadCapabilities as capabilities, structuredWriteResultSchema } from './hamad-capabilities';
+import { composeHamadReply, inferHamadDraftCategory, planHamadTurn, verifyHamadReply, verifyHamadWrite, type HamadPlan } from './hamad-structured-model';
+import { openHamadState, sealHamadState, type HamadStructuredState } from './hamad-structured-state';
+
+type History = { role: 'user' | 'assistant'; text: string; id?: string };
+type Run = {
+  session: AuthSession;
+  history: History[];
+  request: string;
+  requestKey?: string;
+  conversationId: string | null;
+  checkpoint?: unknown;
+  creationEnabled: boolean;
+  reset: boolean;
+  currentImages: UploadedListingImage[];
+  retainedImages: (source: NonNullable<HamadStructuredState['image']>) => UploadedListingImage[];
+  signal: AbortSignal;
+};
+type Reply = { text: string; hamadDraftMemory?: string; creationChoice?: boolean;
+  sections?: { text: string; preview?: { url: string; mediaType: 'image/webp' } }[] };
+
+const day = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', { dateStyle: 'short', timeZone: 'Asia/Riyadh' });
+const unavailable = 'تعذّر التحقق من التفاصيل الآن. جرّب مرة أخرى بعد قليل.';
+const mutationActions = new Set<HamadPlan['action']>(['create', 'update', 'attach']);
+
+function hasExactQuote(text: string, quote: string | undefined) {
+  return Boolean(quote && text.includes(quote));
+}
+
+function decimalFromQuote(value: string) {
+  const normalized = [...value].map((char) => {
+    const code = char.charCodeAt(0);
+    if (code >= 0x660 && code <= 0x669) return String(code - 0x660);
+    if (code >= 0x6f0 && code <= 0x6f9) return String(code - 0x6f0);
+    return char;
+  }).join('').replaceAll('٫', '.').replaceAll('٬', ',');
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/u.test(normalized)) return undefined;
+  return Number(normalized.replaceAll(',', ''));
+}
+
+function hasFieldProof(plan: HamadPlan, texts: readonly string[]) {
+  const evidence: Record<string, string> = plan.evidence ?? {};
+  const fields = Object.entries(plan.details ?? {}).flatMap(([key, value]) => key === 'attributes'
+    ? Object.entries(value as Record<string, unknown>).map(([field, detail]) => ['attributes.' + field, detail] as const)
+    : [[key, value] as const]);
+  return fields.every(([key, value]) => {
+    const quote = evidence[key];
+    if (!quote || !texts.some((text) => hasExactQuote(text, quote))) return false;
+    return key !== 'price' || typeof value !== 'number' || decimalFromQuote(quote) === value;
+  });
+}
+
+export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
+  const context = { trace: randomUUID(), signal: AbortSignal.any([input.signal, AbortSignal.timeout(55_000)]) };
+  let state = input.reset ? {} : openHamadState(input.checkpoint, input.session, input.conversationId);
+  const collectingStart = state.collecting ? input.history.findIndex(({ id }) => id === state.collecting) : -1;
+  const untaggedHistory = input.history.map(({ role, text }) => ({ role, text }));
+  const draftHistory = collectingStart < 0 ? [] : untaggedHistory.slice(collectingStart);
+  const currentImage = draftImageSource(input.requestKey, input.currentImages);
+  if (currentImage) state = { ...state, image: currentImage };
+  const capabilityContext = { ...context, session: input.session, images: input.currentImages,
+    sourceId: input.currentImages.length ? input.requestKey : undefined };
+  const answer = (text: string, options: Pick<Reply, 'creationChoice' | 'sections'> = {}): Reply => ({
+    text, ...options, hamadDraftMemory: sealHamadState(state, input.session, input.conversationId),
+  });
+  async function groundedReply(facts: unknown, fallback = unavailable, approvedPaths: readonly string[] = []) {
+    try {
+      const text = await composeHamadReply({ request: input.request, facts }, context);
+      const links = [...text.matchAll(/\]\(([^)\s]+)\)|(https?:\/\/[^\s)]+)/gu)].map((match) => match[1] ?? match[2]);
+      if (text && links.every((link) => approvedPaths.includes(link))
+        && await verifyHamadReply({ request: input.request, facts, text }, context)) return text;
+    } catch {
+      // Once a write is saved, a wording failure must not turn it into another write.
+    }
+    return fallback;
+  }
+
+  async function showPage(offset: number, compareHash?: string) {
+    let page = await capabilities.list_my_drafts.run(capabilityContext, { offset });
+    if (compareHash && compareHash !== page.rosterHash) {
+      page = await capabilities.list_my_drafts.run(capabilityContext, { offset: 0 });
+    }
+    state = { ...state, focus: undefined, collecting: undefined,
+      page: page.entries.length ? { offset: page.offset, rosterHash: page.rosterHash, hasNext: page.hasNext,
+        entries: page.entries.map(({ ref }) => ref) } : undefined };
+    if (!page.entries.length) return answer(await groundedReply({ status: 'no_drafts', instruction: 'Invite a new draft if wanted.' }));
+    const choices = page.entries.map(({ data, preview }, index) => {
+      const modified = Date.parse(data.modified);
+      const date = Number.isFinite(modified) ? day.format(modified) : '';
+      return { text: [String(index + 1) + '. ' + (data.title || 'مسودة'), 'مسودة', date, 'عدد الصور ' + data.imageCount]
+        .filter(Boolean).join(' · '), preview };
+    });
+    if (page.hasNext) choices.push({ text: 'الصفحة التالية متاحة.', preview: undefined });
+    return answer(choices.map(({ text }) => text).join('\n'), choices.some(({ preview }) => preview) ? { sections: choices } : {});
+  }
+
+  let plan: HamadPlan;
+  try {
+    plan = await planHamadTurn({
+      request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
+      canRequestRetainedImages: Boolean(state.image && !currentImage),
+      conversation: { collecting: collectingStart >= 0, hasConfirmedDraft: Boolean(state.focus),
+        displayedChoices: state.page?.entries.length ?? 0, hasNext: state.page?.hasNext === true },
+      authorizedTopics: platformHelpTopics,
+    }, context);
+    if (process.env.SMARTSTORE_DEEPSEEK_METRICS === '1') {
+      console.info(JSON.stringify({ event: 'hamad_structured_plan', trace: context.trace, action: plan.action }));
+    }
+    if (plan.action === 'list') return await showPage(0);
+    if (plan.action === 'next') return state.page?.hasNext
+      ? await showPage(state.page.offset + state.page.entries.length, state.page.rosterHash) : await showPage(0);
+
+    if (plan.action === 'select') {
+      const page = state.page;
+      const chosen = page && plan.choice ? page.entries[plan.choice - 1] : undefined;
+      if (!chosen || !page || !hasExactQuote(input.request, plan.reference)) return await showPage(0);
+      const currentPage = await capabilities.list_my_drafts.run(capabilityContext, { offset: page.offset });
+      if (currentPage.rosterHash !== page.rosterHash) return await showPage(0);
+      const current = await capabilities.get_draft.run(capabilityContext, chosen);
+      if (!current || current.ref.version !== chosen.version) return await showPage(0);
+      state = { ...state, focus: current.ref, page: undefined, collecting: undefined };
+      const text = await groundedReply({ status: 'selected', draft: current.data });
+      return answer([current.data.title, text].filter(Boolean).join('\n'));
+    }
+    if (plan.action === 'view') {
+      if (!state.focus) return await showPage(0);
+      const current = await capabilities.get_draft.run(capabilityContext, state.focus);
+      if (!current || current.ref.version !== state.focus.version) return await showPage(0);
+      return answer(await groundedReply({ status: 'read', draft: current.data }));
+    }
+    if (plan.action === 'help') {
+      const sources = await Promise.all([...new Set(plan.topics ?? [])].map((topic) =>
+        capabilities.get_platform_info.run(capabilityContext, { topic })));
+      const paths = sources.flatMap(({ content }) => {
+        const source = (content as { source?: { path?: unknown } }).source;
+        return typeof source?.path === 'string' && source.path.startsWith('/') && !source.path.startsWith('//') ? [source.path] : [];
+      });
+      return answer(await groundedReply({ sources, status: sources.length ? 'documented' : 'undocumented' },
+        'ما عندي معلومة موثقة أقدر أؤكدها في هذا السؤال.', paths));
+    }
+    if (plan.action === 'categories') {
+      const categories = await capabilities.get_categories.run(capabilityContext, {});
+      return answer(await groundedReply({ categories }));
+    }
+    if (!mutationActions.has(plan.action) && plan.action !== 'inspect') {
+      state = { ...state, ...(plan.action === 'outside' ? { collecting: undefined } : {}) };
+      return answer(await groundedReply({ status: plan.action, suggestion: plan.reply,
+        capabilities: ['draft preparation', 'platform help'] }));
+    }
+
+    if (plan.action !== 'inspect' && !input.creationEnabled) {
+      return answer(await groundedReply({ status: 'creation_choice', modes: ['الإنشاء مع حمد', 'الإنشاء اليدوي'] },
+        'اختر طريقة إنشاء الإعلان للمتابعة.'), { creationChoice: true });
+    }
+
+    let images = input.currentImages;
+    let imageSource = currentImage?.sourceId;
+    if (!images.length && plan.useRetained && state.image && hasExactQuote(input.request, plan.reference)) {
+      const retained = input.retainedImages(state.image);
+      if (draftImageSource(state.image.sourceId, retained)?.digest === state.image.digest) {
+        images = retained;
+        imageSource = state.image.sourceId;
+      }
+    }
+    const mediaContext = { ...capabilityContext, images, sourceId: imageSource };
+    const indexes = [...new Set(plan.photos ?? (plan.action === 'inspect' && images.length ? [1] : []))].map((index) => index - 1);
+    if (indexes.some((index) => !images[index]) || (indexes.length > 0 && !imageSource)) {
+      return answer(await groundedReply({ status: 'image_unavailable' }));
+    }
+    if (plan.action === 'inspect') {
+      if (!indexes.length) return answer(await groundedReply({ status: 'image_required' }));
+      const observed = await capabilities.analyze_image.run(mediaContext, { photos: indexes });
+      return answer(await groundedReply({ status: observed.status, tentativeObservations: observed.observations }));
+    }
+
+    const creating = plan.action === 'create';
+    if (creating && !plan.details?.category && (plan.details?.title || plan.details?.description)) {
+      const catalog = await capabilities.get_categories.run(capabilityContext, {});
+      const inferred = await inferHamadDraftCategory({ request: input.request, details: plan.details, catalog }, context);
+      if (inferred) {
+        plan = { ...plan, details: { ...plan.details, ...inferred.details },
+          evidence: { ...plan.evidence, ...inferred.evidence } };
+      }
+    }
+    const details = plan.details ?? {};
+    if (creating && (!details.category || !(details.title?.trim() || details.description?.trim()))) {
+      state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.requestKey, focus: undefined, page: undefined };
+      // A photo can inform the next question, yet only customer-confirmed facts can be saved.
+      const observations = images.length && imageSource
+        ? await capabilities.analyze_image.run(mediaContext, { photos: indexes.length ? indexes : [0] }) : undefined;
+      return answer(await groundedReply({ status: 'collecting', suggestion: plan.reply,
+        missing: !details.title && !details.description ? 'product identity' : 'category', observations }));
+    }
+    if (!creating && !state.focus) return await showPage(0);
+    const quotes = creating
+      ? [...draftHistory.filter(({ role }) => role === 'user').map(({ text }) => text), input.request] : [input.request];
+    if (!input.requestKey || !input.conversationId || !plan.confirmWrite ||
+      !hasExactQuote(input.request, plan.reference) || !hasFieldProof(plan, quotes) ||
+      (plan.action === 'update' && !Object.keys(details).length) || (plan.action === 'attach' && !indexes.length)) {
+      return answer(await groundedReply({ status: 'write_needs_clarification', suggestion: plan.reply }));
+    }
+
+    const key = createHash('sha256').update(JSON.stringify([
+      input.session.user.sessionVersion ?? 0, input.session.issuedAt, input.conversationId, input.requestKey,
+    ])).digest('hex');
+    const lease = await reserveIdempotencyKey(new Request('http://localhost/api/chat', { headers: { 'idempotency-key': key } }),
+      { namespace: 'hamad_structured_write', actorKey: input.session.user.id });
+    if (!lease) return answer(unavailable);
+    if (lease.response?.status === 409) return answer('الطلب نفسه قيد المعالجة. جرّب بعد قليل.');
+    let result: ReturnType<typeof structuredWriteResultSchema.parse>;
+    if (lease.response) {
+      result = structuredWriteResultSchema.parse(await lease.response.json());
+    } else {
+      let writeStarted = false;
+      let draftLease: Awaited<ReturnType<typeof reserveIdempotencyKey>> = null;
+      try {
+        const target = !creating && state.focus ? await capabilities.get_draft.run(capabilityContext, state.focus) : null;
+        if (!creating && (!target || target.ref.version !== state.focus?.version)) {
+          await lease.abandon();
+          return await showPage(0);
+        }
+        if (target) {
+          const lockKey = createHash('sha256').update(JSON.stringify([input.session.user.id, target.ref.id])).digest('hex');
+          draftLease = await reserveIdempotencyKey(new Request('http://localhost/api/chat', { headers: { 'idempotency-key': lockKey } }),
+            { namespace: 'hamad_structured_draft_lock', actorKey: input.session.user.id });
+          if (!draftLease || draftLease.response) {
+            await lease.abandon();
+            return answer('يُنفّذ حمد طلبًا آخر على هذه المسودة الآن. جرّب بعد قليل.');
+          }
+        }
+        const approved = await verifyHamadWrite({
+          request: input.request, history: creating ? draftHistory : [],
+          action: plan.action, proposedDetails: details, evidence: plan.evidence, reference: plan.reference,
+          confirmedDraft: target?.data, collecting: collectingStart >= 0, photoCount: indexes.length,
+        }, context);
+        if (!approved) {
+          await lease.abandon();
+          return answer(await groundedReply({ status: 'write_not_authorized', suggestion: plan.reply }));
+        }
+        writeStarted = true;
+        const writeContext = { ...mediaContext, operationKey: lease.operationKey };
+        result = creating && details.category ? await capabilities.create_draft.run(writeContext, {
+          details: { ...details, category: details.category }, photos: indexes,
+        }) : plan.action === 'update' && target ? await capabilities.update_draft.run(writeContext, {
+          focus: target.ref, details, evidence: plan.evidence ?? {},
+        }) : await capabilities.attach_draft_images.run(writeContext, { focus: target!.ref, photos: indexes });
+        await lease.complete(result);
+      } catch (error) {
+        // An unknown outcome after dispatch keeps its operation reservation. Later retries use the same identity.
+        if (!writeStarted) await lease.abandon();
+        throw error;
+      } finally {
+        if (draftLease && !draftLease.response) {
+          await draftLease.abandon().catch(() => console.warn('[hamad_structured] draft_lease_release_failed'));
+        }
+      }
+    }
+    if (result.status === 'draft_changed') return await showPage(0);
+    if (result.focus) state = { ...state, focus: result.focus, page: undefined, collecting: undefined };
+    const { status, receipts } = result;
+    const fallback = receipts.length && ['saved', 'updated'].includes(receipts[0].kind)
+      ? 'حُفظت البيانات التي أكدها السيرفر في مسودتك. راجعها من «إعلاناتي».'
+      : 'راجع مسودتك من «إعلاناتي» للتأكد من نتيجة الطلب.';
+    return answer(await groundedReply({ status, receipts }, fallback));
+  } catch {
+    return answer(chatServiceUnavailableMessage);
+  }
+}

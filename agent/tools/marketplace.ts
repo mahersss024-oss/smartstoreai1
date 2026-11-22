@@ -77,7 +77,7 @@ const listingDetailsSchema = {
   attributes: z.record(z.string(), z.unknown()).optional(),
 };
 
-const listingDetailsInputSchema = z.object(listingDetailsSchema);
+export const listingDetailsInputSchema = z.object(listingDetailsSchema);
 const uploadedImageSelection = {
   imageIndexes: z.array(z.number().int().nonnegative()).max(8).optional()
     .describe('Explicit zero-based indexes of photos for this product only. Omit or use [] for no photos. Never inherit earlier product photos or attach every photo to each separate draft.'),
