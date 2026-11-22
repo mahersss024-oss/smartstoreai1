@@ -45,8 +45,11 @@ function findDraftReference<T extends { id: string; title?: string | null }>(req
     if (!matches.length && !genericDraftWords.has(firstWord) && !identifiers.has(firstWord)) return null;
     for (const match of matches) targets.add(match.draft);
   }
+  const boundedWords = ` ${words} `;
   for (const entry of draftTitles) {
-    if (` ${words} `.includes(` ${entry.title} `)) targets.add(entry.draft);
+    if (boundedWords.includes(` ${entry.title} `) || boundedWords.includes(` و${entry.title} `)) {
+      targets.add(entry.draft);
+    }
   }
   if (identifiers.size) {
     if (identifiers.size !== 1) return null;

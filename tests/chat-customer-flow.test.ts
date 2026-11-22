@@ -70,7 +70,7 @@ test('a mixed request naming two drafts never authorizes both edits on the focus
   assert.equal(selectChatDraft('أرجع إلى المكتب', drafts, { draftReference: 'المكتب' })?.id, 'desk');
 });
 
-test('ordinal and relative draft edits require a draft name even when the model continues the focused draft', async t => {
+test('ambiguous draft edits never write to a guessed draft', async t => {
   mockIntent(t, 'update_listing');
   const owner = 'ordinal-draft-context-owner';
   const phone = createListingDraft({ sellerId: owner, category: 'other', title: 'آيفون للبيع', price: 1800 });
@@ -106,16 +106,17 @@ test('ordinal and relative draft edits require a draft name even when the model 
     { id: 'ordinal-update', text: 'خل سعر الأول ١٧٠٠، والثاني خله على سعره' },
     { id: 'relative-update', text: 'خل سعر اللي قبله ١٧٠٠' },
     { id: 'scoped-relative-update', text: 'خل سعر اللي قبله ١٧٠٠ وعطني تقييم للسعر', allowedRequest: 'خل سعره ١٧٠٠' },
+    { id: 'joined-titles-update', text: 'غيّر سعر آيفون للبيع ولابتوب للبيع إلى ١٧٠٠' },
   ]) {
     allowedRequest = scenario.allowedRequest;
     const next = userTurn(scenario.id, scenario.text);
     const response = await POST(request(owner, next.id, { creationMethod: 'chat', chatConversationId, messages: [...history, next] }));
     assert.equal(response.status, 200);
     const reply = assistantTurn(await response.text());
+    assert.equal(getListing(phone.id)?.price, 1800, scenario.id);
+    assert.equal(getListing(laptop.id)?.price, 2400, scenario.id);
     assert.equal(offeredUpdate, false, scenario.id);
     assert.match(reply.parts[0].text, /حدّد اسم المسودة أو رقمها/);
-    assert.equal(getListing(phone.id)?.price, 1800);
-    assert.equal(getListing(laptop.id)?.price, 2400);
   }
   assert.equal(selectChatDraft('عدّل وصف لابتوب للبيع إلى «مع الشاحن من الجيل الثاني»', [phone, laptop])?.id, laptop.id);
   assert.equal(selectChatDraft('عدّل وصف لابتوب للبيع إلى «أخف من اللي قبله»', [phone, laptop])?.id, laptop.id);
