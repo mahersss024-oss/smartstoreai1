@@ -70,11 +70,15 @@ test('the real chat route cannot execute old product searches or emit marketplac
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
-    const checker = body.messages.some((message: { content: unknown }) => typeof message.content === 'string' && message.content.includes('output Scope Checker'));
-    if (!checker) assert.deepEqual(body.tools.map((tool: { function: { name: string } }) => tool.function.name), ['getPlatformHelp']);
+    const instructions = body.messages.filter((message: { role: string }) => message.role === 'system')
+      .map((message: { content: string }) => message.content).join('\n');
+    assert.equal(body.tools, undefined);
+    const content = instructions.includes('[hamad:plan]') ? '{"action":"help","topics":["listings"]}'
+      : instructions.includes('[hamad:source-check]') ? '{"allow":true}'
+      : 'اكتب اسم المنتج في خانة البحث بالصفحة الرئيسية وحدد المدينة.';
     return Response.json({ id: 'scoped-help', object: 'chat.completion', created: 1, model: 'test-model',
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
-        content: checker ? JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'verified' }) : 'اكتب اسم المنتج في خانة البحث بالصفحة الرئيسية وحدد المدينة.',
+        content,
       } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });
   const beforeEvents = getRealtimeEventsSince(null, { userId: user.id, isAdmin: false });

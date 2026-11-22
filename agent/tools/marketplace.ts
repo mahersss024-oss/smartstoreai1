@@ -27,9 +27,8 @@ import {
 } from '@/agent/marketplace/repository';
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
-import type { ChatDraftAction } from '@/lib/chat/draft-selection';
 import type { ChatDraftReceipt } from '@/lib/chat/draft-receipt';
-import { filterDraftEdits } from '@/lib/chat/draft-edits';
+import { filterDraftEdits, type ChatDraftAction } from '@/lib/chat/draft-edits';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 

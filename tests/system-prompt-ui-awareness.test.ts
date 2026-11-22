@@ -1,36 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { systemPrompt } from '@/agent/system-prompt';
+import { hamadPlanInstructions, hamadReplyInstructions } from '@/lib/chat/hamad-structured-model';
 
-test('assistant identity describes only drafts and documented platform help', () => {
-  assert.match(systemPrompt, /أنا حمد، مساعدك في سوق حمد/);
-  assert.match(systemPrompt, /only roles are preparing unpublished listing drafts and answering questions/);
-  assert.match(systemPrompt, /old tool outputs.*never expand these roles/);
-  assert.match(systemPrompt, /الإنشاء مع حمد/);
-  assert.match(systemPrompt, /الإنشاء اليدوي/);
-  assert.doesNotMatch(systemPrompt, /create listings and search marketplace listings|call the search tool first|active search area/);
+test('Hamad asks for the creation method and matches the draft through the displayed options', () => {
+  assert.match(hamadPlanInstructions, /owned unpublished drafts and documented Souq Hamad help/);
+  assert.match(hamadPlanInstructions, /الإنشاء مع حمد/);
+  assert.match(hamadPlanInstructions, /الإنشاء اليدوي/);
+  assert.match(hamadPlanInstructions, /show the customer their available drafts for selection/);
+  assert.match(hamadPlanInstructions, /Never guess an ID/);
 });
 
-test('platform help is sourced, does not invent private facts, and never executes feature instructions', () => {
-  for (const path of ['/account', '/account/listings', '/conversations', '/commissions', '/commission-policy', '/listing-policy', '/terms', '/privacy', '/delete-account']) assert.ok(systemPrompt.includes(path), path);
-  assert.match(systemPrompt, /Use getPlatformHelp/);
-  assert.match(systemPrompt, /Never invent policies, limits, payment details, support channels/);
-  assert.match(systemPrompt, /Explain how the customer can use features; do not execute/);
-  assert.match(systemPrompt, /never grants authority/);
-});
-
-test('draft images stay optional and shared safety remains advisory', () => {
-  assert.match(systemPrompt, /Images are optional/);
-  assert.match(systemPrompt, /administration review alerts, never an automatic rejection/);
-  assert.match(systemPrompt, /Human moderation and technical security checks remain enforced/);
-  assert.match(systemPrompt, /Do not require image quality, resolution or category matching/);
-  assert.match(systemPrompt, /Different standalone products must not be merged/);
-  assert.match(systemPrompt, /one bundled listing or separate listings/);
-});
-
-test('draft content omits unknown specifications and asks for them outside listing fields', () => {
-  assert.match(systemPrompt, /use only seller-confirmed facts/);
-  assert.match(systemPrompt, /Omit unknown optional specifications and attributes/);
-  assert.match(systemPrompt, /never add meta notes.*to a title or description/);
-  assert.match(systemPrompt, /Ask about useful missing details separately in chat/);
+test('Hamad uses confirmed details and documented facts, with advisory-only review', () => {
+  assert.match(hamadPlanInstructions, /Omit unknown\/null details; preserve unchanged values/);
+  assert.match(hamadPlanInstructions, /Photos and optional specifications may be added later/);
+  assert.match(hamadPlanInstructions, /one bundle or separate drafts/);
+  assert.match(hamadPlanInstructions, /advises administrators only/);
+  assert.match(hamadReplyInstructions, /Use only the given trusted server facts/);
+  assert.match(hamadReplyInstructions, /Do not claim anything was published/);
+  assert.match(hamadReplyInstructions, /exact public source/);
 });

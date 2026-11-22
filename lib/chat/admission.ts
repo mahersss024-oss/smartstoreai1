@@ -17,9 +17,7 @@ function configuredInteger(name: string, fallback: number, min: number, max: num
 
 export function chatGenerationLimits() {
   return {
-    // Preserve the SDK's prior 20-step allowance. Output accommodates draft
-    // arguments and platform help; this is per model step, not total billing.
-    maxSteps: configuredInteger('SMARTSTORE_CHAT_MAX_STEPS', 20, 1, 20),
+    // This ceiling applies to each structured model call.
     maxOutputTokens: configuredInteger('SMARTSTORE_CHAT_MAX_OUTPUT_TOKENS', 4096, 256, 16384),
     concurrent: configuredInteger('SMARTSTORE_CHAT_MAX_CONCURRENT_PER_USER', 2, 1, 10),
     // A new business allowance is a deployment choice, not an implicit policy.

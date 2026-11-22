@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { platformHelpTopics } from '@/agent/platform-guide';
 import type { UploadedListingImage } from '@/agent/marketplace/listing-image-storage';
+import { recordModelReview } from '@/lib/admin/model-review';
 import { reserveIdempotencyKey } from '@/lib/api/idempotency';
 import type { AuthSession } from '@/lib/auth/session';
 import { chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
@@ -21,8 +22,10 @@ type Run = {
   draftAction?: HamadDraftAction;
   validationMessage?: string;
   creationEnabled: boolean;
+  creationIntake?: string;
   reset: boolean;
   currentImages: UploadedListingImage[];
+  imageSourceId?: string;
   retainedImages: (source: NonNullable<HamadStructuredState['image']>) => UploadedListingImage[];
   signal: AbortSignal;
 };
@@ -86,11 +89,13 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
   let state = input.reset ? {} : openHamadState(input.checkpoint, input.session, input.conversationId);
   const collectingStart = state.collecting ? input.history.findIndex(({ id }) => id === state.collecting) : -1;
   const untaggedHistory = input.history.map(({ role, text }) => ({ role, text }));
-  const draftHistory = collectingStart < 0 ? [] : untaggedHistory.slice(collectingStart);
-  const currentImage = draftImageSource(input.requestKey, input.currentImages);
+  const draftHistory = input.creationIntake
+    ? [{ role: 'user' as const, text: input.creationIntake }]
+    : collectingStart < 0 ? [] : untaggedHistory.slice(collectingStart);
+  const currentImage = draftImageSource(input.imageSourceId ?? input.requestKey, input.currentImages);
   if (currentImage) state = { ...state, image: currentImage };
   const capabilityContext = { ...context, session: input.session, images: input.currentImages,
-    sourceId: input.currentImages.length ? input.requestKey : undefined };
+    sourceId: currentImage?.sourceId };
   const answer = (text: string, options: Pick<Reply, 'creationChoice' | 'sections'> = {},
     view: Omit<HamadDraftUi, 'active'> = {}): Reply => {
     const now = Date.now();
@@ -173,11 +178,16 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     plan = await planHamadTurn({
       request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
       canRequestRetainedImages: Boolean(state.image && !currentImage),
-      conversation: { collecting: collectingStart >= 0, hasConfirmedDraft: Boolean(state.focus),
+      conversation: { collecting: collectingStart >= 0 || Boolean(input.creationIntake), hasConfirmedDraft: Boolean(state.focus),
         selectedDraftTitle: state.focusTitle,
         displayedChoices: state.page?.entries.length ?? 0, hasNext: state.page?.hasNext === true },
       authorizedTopics: platformHelpTopics,
     }, context);
+    if (plan.advisory && input.request) {
+      await recordModelReview({ subject: 'message', subjectId: 'assistant:' + input.session.user.id,
+        userId: input.session.user.id, text: input.request, assessment: plan.advisory })
+        .catch(() => console.warn('[hamad_structured] advisory_review_unavailable'));
+    }
     if (process.env.SMARTSTORE_DEEPSEEK_METRICS === '1') {
       console.info(JSON.stringify({ event: 'hamad_structured_plan', trace: context.trace, action: plan.action }));
     }
@@ -299,7 +309,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
         const approved = await verifyHamadWrite({
           request: input.request, history: creating ? draftHistory : [],
           action: plan.action, proposedDetails: details, evidence: plan.evidence, reference: plan.reference,
-          confirmedDraft: target?.data, collecting: collectingStart >= 0, photoCount: indexes.length,
+          confirmedDraft: target?.data, collecting: collectingStart >= 0 || Boolean(input.creationIntake), photoCount: indexes.length,
         }, context);
         if (!approved) {
           await lease.abandon();
@@ -339,18 +349,25 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     if (result.focus) state = { ...state, focus: result.focus,
       focusTitle: result.receipts.at(-1)?.title || state.focusTitle || 'مسودة', page: undefined, collecting: undefined };
     const { status, receipts } = result;
-    const savedFields = receipts.some(({ kind }) => kind === 'updated');
-    const attachedPhotos = receipts.find(({ kind }) => kind === 'photos')?.facts?.attached;
-    const partialSave = savedFields && indexes.length > 0 && attachedPhotos !== indexes.length;
-    const fallback = savedFields && indexes.length ? 'حُفظت التعديلات وأُضيفت الصور المحددة إلى المسودة.'
-      : receipts.length && ['saved', 'updated'].includes(receipts[0].kind)
-      ? 'حُفظت البيانات التي أكدها السيرفر في مسودتك. راجعها من «إعلاناتي».'
-      : 'راجع مسودتك من «إعلاناتي» للتأكد من نتيجة الطلب.';
+    const saved = receipts.some(({ kind }) => kind === 'saved' || kind === 'updated' || kind === 'replayed');
+    const photos = receipts.find(({ kind }) => kind === 'photos')?.facts;
+    const requested = typeof photos?.requested === 'number' ? photos.requested : saved ? indexes.length : 0;
+    const attached = typeof photos?.attached === 'number' ? photos.attached : 0;
+    const savedText = receipts.some(({ kind }) => kind === 'updated') ? 'حُدّثت المسودة.' : 'حُفظت المسودة.';
+    const partialSave = requested > attached;
+    const fallback = [saved ? savedText : '', requested > 0 && attached === requested ? `عدد الصور المحفوظة ${attached}.` : '',
+      'راجع التفاصيل من [إعلاناتي](/account/listings).'].filter(Boolean).join(' ');
     const current = input.draftCards && result.focus
       ? await capabilities.get_draft.run(capabilityContext, result.focus).catch(() => null) : null;
     const view = current && current.ref.version === result.focus?.version ? { preview: draftPreview(current) } : {};
-    if (partialSave) return answer('حُفظت التعديلات. راجع الصور في المسودة لمعرفة ما أُضيف قبل إعادة المحاولة.', {}, view);
-    return answer(await groundedReply({ status, receipts }, fallback), {}, view);
+    if (status === 'fields_saved_photos_unconfirmed') {
+      return answer(savedText + ' تعذّر تأكيد إرفاق الصور. افحصها في المسودة قبل إعادة المحاولة.', {}, view);
+    }
+    if (partialSave) {
+      const resultText = `حُفظت ${attached} من أصل ${requested} صورة. يمكنك إعادة إرفاق الصور المتبقية.`;
+      return answer([saved ? savedText : '', resultText].filter(Boolean).join(' '), {}, view);
+    }
+    return answer(await groundedReply({ status, receipts }, fallback, ['/account/listings']), {}, view);
   } catch {
     return answer(chatServiceUnavailableMessage);
   }

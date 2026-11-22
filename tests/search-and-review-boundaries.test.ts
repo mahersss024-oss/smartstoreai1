@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
@@ -87,15 +86,12 @@ test('human moderation survives seller edits and publication attempts until an a
   assert.equal(store.getListing(listing.id)?.compliance.humanDecision, 'allow');
 });
 
-test('regeneration exposes no draft write tools and unavailable output review never releases generated text', () => {
+test('read-only support exposes no draft write tools', () => {
   const full = createMarketplaceTools(null);
   assert.ok('createListingDraft' in full);
   const safe = createReadOnlyMarketplaceTools();
   for (const name of ['createListingDraft', 'updateListing', 'addUploadedImagesToListing', 'setListingStatus', 'sendMessage', 'openConversation']) assert.ok(!(name in safe), name);
   assert.deepEqual(Object.keys(safe), ['getPlatformHelp']);
-  const engine = readFileSync('lib/chat/hamad-engine.ts', 'utf8');
-  assert.match(engine, /const retryAgent = createChatAgent\(session, \{[\s\S]*?answerOnly: true/);
-  assert.match(engine, /decision\.reason_code === 'output_checker_failure'\) return \{ text: getModelProviderFailureResponse/);
 });
 
 test('a concurrent human moderation decision cannot be overwritten by a seller content or publication write', async t => {

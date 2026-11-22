@@ -13,11 +13,13 @@ purchase recommendations and marketplace management are not chat capabilities.
 
 ## Enforcement
 
-- The chat tool registry exposes only draft creation, draft editing, explicit
-  draft photo selection, actual image metadata and `getPlatformHelp`.
-- Without `creationMethod=chat`, the agent receives the documentation tool only.
-  A creation request offers conversational and manual creation before any draft
-  write. Even with the method selected, support-only requests receive no write tools.
+- The structured planner interprets customer wording and suggests an action. The
+  server registry validates account ownership and applies the selected action.
+  It handles draft lists, selection, creation, editing, photo attachment and
+  inspection, categories, and documented help.
+- Draft creation requires `creationMethod=chat`. A creation request offers
+  conversational and manual creation before any draft write. Editing uses a
+  confirmed, account-owned draft from the chat's displayed list.
 - The manual choice opens the existing manual form. Publication and all other
   sensitive actions remain customer-operated UI actions, never chat permissions.
 - Incoming historical tool parts are discarded. Old search flags, selected
@@ -26,8 +28,8 @@ purchase recommendations and marketplace management are not chat capabilities.
   preceding customer upload. It never re-inspects an unrelated older product as
   the new draft, and raw historical images are stripped from the text-agent input.
 - Chat no longer changes market search state or emits search-result cards.
-- Output checking receives verified results from all agent steps. Rewriting is
-  answer-only, cannot repeat writes, and must not restore removed services.
+- An independent check verifies proposed writes and drafted responses. Save
+  receipts use the recorded result and survive a reply failure or request retry.
 
 ## Sources And Shared Services
 

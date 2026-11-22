@@ -4,7 +4,6 @@ import { platformCapabilities, renderPlatformCapabilitiesForPrompt } from '@/age
 import { createMarketplaceTools, createReadOnlyMarketplaceTools } from '@/agent/tools/marketplace';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { platformPolicies } from '@/lib/platform/policies';
-import { systemPrompt } from '@/agent/system-prompt';
 import { marketplaceSystemInstructions } from '@/agent/marketplace/agents';
 
 test('Hamad exposes only documented help and owned unpublished draft tools', () => {
@@ -29,8 +28,8 @@ test('help reads the same policy objects rendered by public pages, not a second 
   for (const topic of platformHelpTopics) assert.ok(getPlatformHelp(topic).source, topic);
 });
 
-test('both prompt layers enforce manual choice, sourced help, removed roles and human-only sensitive actions', () => {
-  for (const prompt of [systemPrompt, marketplaceSystemInstructions]) {
+test('the marketplace instructions enforce manual choice, sourced help, removed roles and human-only sensitive actions', () => {
+  for (const prompt of [marketplaceSystemInstructions]) {
     assert.match(prompt, /unpublished.*draft/i);
     assert.match(prompt, /manual creation|الإنشاء اليدوي/);
     assert.match(prompt, /getPlatformHelp/);

@@ -8,15 +8,14 @@ function reply(body) {
       compliance: { decision: 'allow', reasons: [], shariaSensitive: false },
     } })) }) };
   }
-  if (instructions.includes('Scope Checker')) {
-    return { role: 'assistant', content: JSON.stringify({ decision: 'ALLOW', confidence: 0.99, reason_code: 'load_test_platform_help' }) };
+  if (instructions.includes('[hamad:plan]')) {
+    return { role: 'assistant', content: JSON.stringify({ action: 'help', topics: ['listings'] }) };
   }
-  if (request.tools?.some(tool => tool.function.name !== 'getPlatformHelp')) {
-    throw new Error('The platform-help fixture must not be offered draft or sensitive-action tools.');
+  if (instructions.includes('[hamad:source-check]')) {
+    return { role: 'assistant', content: '{"allow":true}' };
   }
-  if (request.tools?.length && !request.messages.some(message => message.role === 'tool')) {
-    return { role: 'assistant', content: null, tool_calls: [{ id: 'load-platform-help', type: 'function',
-      function: { name: 'getPlatformHelp', arguments: JSON.stringify({ topic: 'listings' }) } }] };
+  if (!instructions.includes('[hamad:reply]') || request.tools?.length) {
+    throw new Error('The platform-help fixture only accepts the structured help dialogue.');
   }
   return { role: 'assistant', content: 'يمكنك اختيار الإنشاء اليدوي أو تجهيز مسودة مع حمد، ثم مراجعتها ونشرها بنفسك من إعلاناتي.' };
 }

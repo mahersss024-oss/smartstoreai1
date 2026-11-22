@@ -12,7 +12,6 @@ import {
 import { resolveListingCategory } from '@/agent/marketplace/listing-category';
 import { parseMarketplaceSearchQuery } from '@/agent/marketplace/search';
 import { inferExpectedMarketplaceCategory } from '@/agent/marketplace/vision-compliance';
-import { systemPrompt } from '@/agent/system-prompt';
 import { marketplaceSystemInstructions } from '@/agent/marketplace/agents';
 import { createListingDraft, listMarketplaceListings, setListingStatusForSeller, updateListingForSeller } from '@/agent/marketplace/store';
 
@@ -44,7 +43,6 @@ for (const category of marketplaceCategoryDefinitions) {
     assert.equal(updateListingForSeller(listing.id, sellerId, { description: 'Catalog fixture details' })?.category, category.id);
     assert.equal(setListingStatusForSeller(listing.id, sellerId, 'published')?.status, 'published');
     assert.ok(listMarketplaceListings({ category: category.id, take: 100 }).some(item => item.id === listing.id));
-    assert.ok(systemPrompt.includes(`${category.id} (${category.label})`));
     assert.ok(marketplaceSystemInstructions.includes(`${category.id} (${category.label})`));
   });
 }
