@@ -72,7 +72,7 @@ if (process.env[fixture] === '1') {
     CI: '1', NEXT_TELEMETRY_DISABLED: '1',
     AUTH_SECRET: 'hamad-http-synthetic-only-verified-secret',
     DEEPSEEK_API_KEY: 'fixture-deepseek-key',
-    SMARTSTORE_HAMAD_STRUCTURED: '1', SMARTSTORE_MARKETPLACE_STORE: dbMode ? 'database' : 'file',
+    SMARTSTORE_MARKETPLACE_STORE: dbMode ? 'database' : 'file',
     SMARTSTORE_IMAGE_STORAGE: '', SMARTSTORE_DATA_DIR: mkdtempSync(join(tmpdir(), 'hamad-http-proof-')),
     [fixture]: '1', NODE_OPTIONS: '--import=' + import.meta.url,
   };

@@ -5,8 +5,9 @@
 - Arabic-first, RTL Saudi marketplace built with Next.js App Router, React,
   TypeScript, Tailwind CSS, the AI SDK and Prisma/PostgreSQL.
 - `app/`: pages and API route handlers; `components/` and `hooks/`: browser UI.
-- `agent/chat-agent.ts`, `agent/system-prompt.ts`, `agent/tools/`: Hamad's active
-  instructions and tools; `app/api/chat/route.ts`: server chat orchestration.
+- `lib/chat/hamad-structured-*.ts`, `lib/chat/hamad-capabilities.ts` and
+  `agent/tools/`: Hamad's active instructions and tools;
+  `app/api/chat/route.ts`: server chat entry point.
 - `agent/marketplace/repository.ts`: shared marketplace persistence and business
   operations; `agent/marketplace/store.ts`: development file/memory fallback.
 - `lib/auth/`, `lib/security/`, `lib/admin/`, `lib/push/`, `lib/realtime/`: session,

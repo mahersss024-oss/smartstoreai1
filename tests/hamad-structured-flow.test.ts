@@ -7,6 +7,7 @@ import { addListingImageForSeller, createListingDraft, getListing, listSellerLis
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { readHamadKnowledge } from '@/lib/chat/hamad-knowledge';
 import { hamadCapabilities } from '@/lib/chat/hamad-capabilities';
+import { getLocalModelReviews } from '@/lib/admin/model-review';
 import sharp from 'sharp';
 import { textAnalysis } from './helpers/text-understanding';
 
@@ -19,15 +20,9 @@ function user(id: string, text: string): Turn {
   return { id, role: 'user', parts: [{ type: 'text', text }] };
 }
 function enable(t: TestContext, plans: Plan[], options: {
-  reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean;
+  reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean; failReply?: boolean;
   onModelInput?: (role: string, data: Record<string, unknown>) => void | Promise<void>;
 } = {}) {
-  const saved = process.env.SMARTSTORE_HAMAD_STRUCTURED;
-  process.env.SMARTSTORE_HAMAD_STRUCTURED = '1';
-  t.after(() => {
-    if (saved === undefined) delete process.env.SMARTSTORE_HAMAD_STRUCTURED;
-    else process.env.SMARTSTORE_HAMAD_STRUCTURED = saved;
-  });
   const roles: string[] = [];
   let index = 0;
   const analysis = textAnalysis({ intent: 'create_listing' });
@@ -50,6 +45,7 @@ function enable(t: TestContext, plans: Plan[], options: {
       content = JSON.stringify({ allow: options.writeAllowed ?? true });
     } else if (system.includes('[hamad:reply]')) {
       roles.push('reply');
+      if (options.failReply) throw new DOMException('fixture timeout', 'AbortError');
       content = options.reply ?? 'تفضل، هذه نتيجة الطلب.';
     } else if (system.includes('[hamad:source-check]')) {
       roles.push('source-check');
@@ -376,6 +372,95 @@ test('preserves the existing choice contract and denies a mutation rejected by t
   assert.equal(declined.metadata.creationChoice, undefined);
   assert.equal(roles.filter((role) => role === 'write-check').length, 1);
   assert.equal(listSellerListings(owner).length, 0);
+});
+
+test('choosing Hamad carries the preceding description and exact photo source into the saved draft', async (t) => {
+  const selection = 'أختار الإنشاء مع حمد.';
+  const description = 'جهز مسودة مكتب خشبي بسعر ٣٠٠';
+  const roles = enable(t, [{
+    action: 'create', confirmWrite: true, reference: selection, details: { title: 'مكتب خشبي', category: 'other', price: 300 },
+    evidence: { title: 'مكتب خشبي', category: 'مكتب خشبي', price: '٣٠٠' }, photos: [1],
+  }], {
+    onModelInput: (role, data) => {
+      if (role === 'plan') assert.equal(data.hasImages, true);
+    },
+  });
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'steelblue' } }).png().toBuffer();
+  const original = user('creation-entry-photo', description);
+  original.parts.push({ type: 'text', text: 'Earlier image attachment reference: creation-entry-photo' });
+  const owner = 'hamad-choice-entry-active';
+  await send(owner, [original, user('choose-hamad-entry', selection)], {
+    beginDraftWithHamad: true,
+    retainedListingImageMessageId: 'creation-entry-photo',
+    retainedListingImages: [{ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') }],
+  });
+  const [saved] = listSellerListings(owner);
+  assert.equal(saved?.title, 'مكتب خشبي');
+  assert.equal(saved?.price, 300);
+  assert.equal(saved?.images.length, 1);
+  assert.equal(saved?.status, 'draft');
+  assert.ok(roles.includes('write-check'));
+});
+
+test('a provider failure after draft save reports it and replay cannot duplicate the draft', async (t) => {
+  const plan = { action: 'create', details: { category: 'other', title: 'مكتب' },
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true };
+  const roles = enable(t, [plan, plan], { failReply: true });
+  const owner = 'hamad-adopt-replay';
+  const message = user('creation-replay', 'جهز مسودة مكتب');
+  for (let i = 0; i < 2; i++) {
+    const reply = await send(owner, [message]);
+    assert.match(reply.parts[0].text, /حُفظت المسودة/u);
+    assert.match(reply.parts[0].text, /\/account\/listings/u);
+  }
+  assert.equal(listSellerListings(owner).length, 1);
+  assert.equal(roles.filter((role) => role === 'write-check').length, 1);
+});
+
+test('the receipt uses saved draft facts even when the model falsely claims publication', async (t) => {
+  enable(t, [{ action: 'create', details: { category: 'other', title: 'مكتب' },
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true }],
+  { reply: 'تم نشر إعلانك فورًا.', answerAllowed: false });
+  const owner = 'hamad-adopt-false-publication';
+  const reply = await send(owner, [user('false-publication', 'جهز مسودة مكتب')]);
+  assert.match(reply.parts[0].text, /حُفظت المسودة/u);
+  assert.doesNotMatch(reply.parts[0].text, /تم نشر/u);
+  assert.equal(listSellerListings(owner)[0]?.status, 'draft');
+});
+
+test('a made-up save reply cannot confirm an operation when no draft tool was called', async (t) => {
+  enable(t, [{ action: 'clarify' }], { reply: 'حفظت مسودة جديدة.', answerAllowed: false });
+  const owner = 'hamad-adopt-fake-save';
+  const reply = await send(owner, [user('false-save', 'عندي استفسار')]);
+  assert.match(reply.parts[0].text, /تعذّر التحقق/u);
+  assert.doesNotMatch(reply.parts[0].text, /حفظت مسودة/u);
+  assert.equal(listSellerListings(owner).length, 0);
+});
+
+test('the receipt reports a partial image save even when the model says all photos were attached', async (t) => {
+  enable(t, [{ action: 'create', details: { category: 'other', title: 'مكتب' }, photos: [1, 2],
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true }],
+  { reply: 'أرفقت جميع الصور بالمسودة.' });
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
+  const turn = user('partial-photo-save', 'جهز مسودة مكتب مع الصورتين');
+  turn.parts.push({ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') },
+    { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,AQID' });
+  const owner = 'hamad-adopt-partial-photos';
+  const reply = await send(owner, [turn]);
+  assert.match(reply.parts[0].text, /حُفظت 1 من أصل 2 صورة/u);
+  assert.doesNotMatch(reply.parts[0].text, /أرفقت جميع الصور/u);
+  assert.equal(listSellerListings(owner)[0]?.images.length, 1);
+});
+
+test('Hamad records advisory message reviews without making a moderation decision on the draft', async (t) => {
+  enable(t, [{ action: 'create', details: { category: 'other', title: 'مكتب' },
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true,
+    advisory: { decision: 'block', reasons: ['review_fixture'] } }]);
+  const owner = 'hamad-adopt-advisory';
+  await send(owner, [user('advisory-request', 'جهز مسودة مكتب')]);
+  assert.equal(listSellerListings(owner)[0]?.status, 'draft');
+  assert.ok(getLocalModelReviews().some((review) =>
+    review.subject === 'message' && review.userId === owner && review.assessment.decision === 'block'));
 });
 
 test('retrieves versioned policies only for help and rejects unapproved links', async (t) => {

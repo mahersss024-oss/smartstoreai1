@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { chatGenerationLimits, reserveChatGeneration } from '@/lib/chat/admission';
-import { createChatAgent } from '@/agent/chat-agent';
+import { planHamadTurn } from '@/lib/chat/hamad-structured-model';
 import { prisma } from '@/lib/db/prisma';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
 import type { AuthSession } from '@/lib/auth/session';
@@ -66,25 +66,25 @@ test('database admission fails closed instead of falling back to per-process per
 });
 
 test('daily quota is opt-in, and generation settings reject malformed/unbounded values', t => {
-  environment(t, { SMARTSTORE_CHAT_DAILY_REQUEST_LIMIT: '', SMARTSTORE_CHAT_MAX_STEPS: '900', SMARTSTORE_CHAT_MAX_OUTPUT_TOKENS: 'bad' });
+  environment(t, { SMARTSTORE_CHAT_DAILY_REQUEST_LIMIT: '', SMARTSTORE_CHAT_MAX_OUTPUT_TOKENS: 'bad' });
   assert.equal(chatGenerationLimits().dailyRequests, 0);
-  assert.equal(chatGenerationLimits().maxSteps, 20);
   assert.equal(chatGenerationLimits().maxOutputTokens, 4096);
 });
 
-test('actual agent calls send the configured output cap and stop repeated help tools at the configured step bound', async t => {
-  environment(t, { SMARTSTORE_MARKETPLACE_STORE: 'file', SMARTSTORE_CHAT_MAX_STEPS: '2', SMARTSTORE_CHAT_MAX_OUTPUT_TOKENS: '4096' });
+test('the structured planner applies the configured output cap without a repeated tool loop', async t => {
+  environment(t, { SMARTSTORE_MARKETPLACE_STORE: 'file', SMARTSTORE_CHAT_MAX_OUTPUT_TOKENS: '512' });
   let calls = 0;
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-    calls++; const body = JSON.parse(String(init?.body)); assert.equal(body.max_tokens, 4096);
+    calls++; const body = JSON.parse(String(init?.body));
+    assert.equal(body.max_tokens, 512);
+    assert.equal(body.tools, undefined);
     return Response.json({ id: 'bounded-help', object: 'chat.completion', created: 1, model: 'test-model',
-      choices: [{ index: 0, finish_reason: 'tool_calls', message: { role: 'assistant', content: null,
-        tool_calls: [{ id: 'help-' + calls, type: 'function', function: { name: 'getPlatformHelp', arguments: JSON.stringify({ topic: 'commissions' }) } }],
-      } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
+        content: '{"action":"help","topics":["commissions"]}' } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });
-  const result = await createChatAgent(null).generate({ messages: [{ role: 'user', content: 'Explain platform fees' }] });
-  assert.equal(calls, 2); assert.equal(result.steps.length, 2);
-  assert.ok(result.steps.every(step => step.toolResults.length === 1));
+  const result = await planHamadTurn({ request: 'Explain platform fees' }, { trace: 'output-cap', signal: new AbortController().signal });
+  assert.equal(calls, 1);
+  assert.deepEqual(result, { action: 'help', topics: ['commissions'] });
 });
 
 
@@ -101,7 +101,8 @@ test('real chat route keeps both permits during deferred generation and releases
     const body = JSON.parse(String(init?.body));
     const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
     let content: string;
-    if (instructions.includes('Scope Checker')) content = JSON.stringify({ decision: 'ALLOW', confidence: 1, intent: 'support', reason_code: 'platform_identity' });
+    if (instructions.includes('[hamad:plan]')) content = '{"action":"clarify"}';
+    else if (instructions.includes('[hamad:source-check]')) content = '{"allow":true}';
     else { starts++; if (starts === 2) started(); await pending; content = '\u0623\u0646\u0627 \u062d\u0645\u062f\u060c \u0645\u0633\u0627\u0639\u062f\u0643 \u0641\u064a \u0633\u0648\u0642 \u062d\u0645\u062f.'; }
     return Response.json({ id: 'pending-chat', object: 'chat.completion', created: 1, model: 'test-model', choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   });

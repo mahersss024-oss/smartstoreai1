@@ -12,6 +12,7 @@ import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import type { AuthSession } from '@/lib/auth/session';
 import type { ChatDraftReceipt } from './draft-receipt';
 import type { DraftEdits } from './draft-edits';
+import { modelReviewImageFingerprint, recordModelReview } from '@/lib/admin/model-review';
 import { readHamadKnowledge } from './hamad-knowledge';
 import { hamadDetails } from './hamad-structured-model';
 import { hamadDraftRef } from './hamad-structured-state';
@@ -212,6 +213,12 @@ export const hamadCapabilities = {
       const readable = await Promise.all(selected.map(isReadableChatImage));
       if (!readable.every(Boolean)) return { status: 'unavailable', observations: [] };
       const review = await reviewListingImageContent(selected);
+      await recordModelReview({
+        subject: 'image', subjectId: 'assistant:' + modelReviewImageFingerprint(selected.map((image) => image.data)),
+        userId: context.session.user.id, text: review.compliance?.detectedProduct ?? 'صورة مرفوعة للإعلان',
+        assessment: { decision: review.compliance?.decision ?? 'needs_review',
+          reasons: review.compliance?.reasons ?? ['image_inspection_unavailable'], unavailable: review.status === 'unavailable' },
+      }).catch(() => console.warn('[hamad_structured] image_advisory_review_unavailable'));
       return {
         status: review.status,
         observations: (review.compliance?.imageProducts ?? []).map((item, index) => ({

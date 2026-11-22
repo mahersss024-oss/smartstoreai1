@@ -35,7 +35,9 @@ test('AI load checks exercise documented platform help through the real route an
     assert.equal(level.providerRejectedCalls, 0);
   }
   const source = readFileSync(resolve('scripts/testing/platform-help-model-fixture.mjs'), 'utf8');
-  assert.match(source, /getPlatformHelp/);
+  assert.match(source, /\[hamad:plan\]/);
+  assert.match(source, /\[hamad:source-check\]/);
+  assert.match(source, /topics: \['listings'\]/);
   assert.doesNotMatch(source, /load_test_search|adaptive intent router|وجدت لك نتائج مناسبة|أبحث عن كامري/);
   assert.match(readFileSync(resolve('scripts/ai-path-load-test.ts'), 'utf8'), /performance\.now\(\) - start > requestTimeoutMs/);
 });
@@ -48,13 +50,14 @@ for (const [ci, key, mode, expected] of [
 ] as const) {
   test(`isolated model fixture is opt-in: ci=${ci}, placeholder=${key === 'test-model-placeholder'}, fixture=${mode || 'disabled'}`, async () => {
     const { stdout } = await run(process.execPath, ['--import', pathToFileURL(resolve('scripts/testing/isolated-model-provider.mjs')).href, '-e',
-      `fetch('https://api.deepseek.com/chat/completions', { method: 'POST', body: JSON.stringify({ messages: [], tools: [{ function: { name: 'getPlatformHelp' } }] }) }).then(async response => console.log(JSON.stringify({ status: response.status, body: await response.json() })));`], {
+      `fetch('https://api.deepseek.com/chat/completions', { method: 'POST', body: JSON.stringify({ messages: [{ role: 'system', content: '[hamad:plan]' }] }) }).then(async response => console.log(JSON.stringify({ status: response.status, body: await response.json() })));`], {
       timeout: 10_000,
       env: { ...process.env, CI: ci, DEEPSEEK_API_KEY: key, SMARTSTORE_TEST_MODEL_FIXTURE: mode },
     });
     const result = JSON.parse(stdout);
     assert.equal(result.status, expected);
-    if (expected === 200) assert.equal(result.body.choices[0].message.tool_calls[0].function.name, 'getPlatformHelp');
+    if (expected === 200) assert.deepEqual(JSON.parse(result.body.choices[0].message.content),
+      { action: 'help', topics: ['listings'] });
   });
 }
 

@@ -5,7 +5,6 @@ import { appCopy } from '@/app/i18n';
 import { customerLanguageInstructions, getArabicCustomerMessage, isArabicCustomerText, resolveCustomerLanguage } from '@/lib/customer-language';
 import { getSafeAssistantText } from '@/lib/chat-response-safety';
 import { getAuthRequiredResponse, getComplianceBlockResponse, getComplianceReviewResponse } from '@/agent/marketplace/policy';
-import { getSafeScopeResponse } from '@/agent/scope-guard';
 
 test('Arabic is used even for old English preferences or another requested locale', () => {
   for (const value of ['ar', 'en', 'fr', 'zh', undefined, null, { language: 'en' }]) {
@@ -51,21 +50,17 @@ test('raw English API errors use Arabic fallback without translating stored list
   assert.equal(getArabicCustomerMessage(undefined, ''), '');
 });
 
-test('static auth policy and scope replies remain Arabic for all accepted language arguments', () => {
+test('static auth and policy replies remain Arabic for all accepted language arguments', () => {
   for (const response of [getAuthRequiredResponse, getComplianceBlockResponse, getComplianceReviewResponse]) {
     assert.equal(response('en'), response('ar'));
     assert.ok(isArabicCustomerText(response('en')));
-  }
-  for (const decision of ['ALLOW', 'BLOCK', 'UNCLEAR', 'OUTPUT_BLOCK'] as const) {
-    assert.equal(getSafeScopeResponse(decision, 'en'), getSafeScopeResponse(decision, 'ar'));
-    assert.ok(isArabicCustomerText(getSafeScopeResponse(decision, 'en')));
   }
 });
 
 test('server and client guard generated replies without page-specific rendering checks', () => {
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
-  const agent = readFileSync('agent/chat-agent.ts', 'utf8');
-  assert.match(route, /return resolveCustomerLanguage\(settings\?\.language\)/);
-  assert.match(route, /text = getHamadCustomerReply\(text\)/);
-  assert.match(agent, /customerLanguageInstructions/);
+  const model = readFileSync('lib/chat/hamad-structured-model.ts', 'utf8');
+  assert.match(route, /getAuthRequiredResponse\('ar'\)/);
+  assert.match(route, /createChatResponse\(async \(\) => \(\{ text \}\), async \(\) => \{\}, getHamadCustomerReply\)/);
+  assert.match(model, /Reply naturally and concisely in Saudi Arabic/);
 });

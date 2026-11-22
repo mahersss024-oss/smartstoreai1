@@ -72,7 +72,6 @@ let providerInFlight = 0;
 let providerRejectedCalls = 0;
 let maxProviderInFlight = 0;
 let deepseekProviderModule: DeepseekProviderModule | null = null;
-const scopeFallbackReplies = new Set<string>();
 
 process.env.SMARTSTORE_MARKETPLACE_STORE ||= 'memory';
 process.env.SMARTSTORE_DEEPSEEK_METRICS = '1';
@@ -287,7 +286,7 @@ function summarize(
   const emptyBodies = results.filter(
     (result) => result.ok && !result.body.trim(),
   ).length;
-  const isProviderFallback = (result: RequestResult) => scopeFallbackReplies.has(result.body) || result.body === chatServiceUnavailableMessage ||
+  const isProviderFallback = (result: RequestResult) => result.body === chatServiceUnavailableMessage ||
     result.body.startsWith('تعذر إكمال رد حمد الآن.') || result.body.startsWith('حُفظت مسودة إعلانك، لكن تعذر إكمال رد المساعد.');
   const providerFallbackResponses = results.filter(isProviderFallback).length;
   const ok = results.filter(
@@ -358,11 +357,6 @@ async function main() {
   } else if (!(await getDeepseekProviderModule()).getDeepseekApiKey()) {
     throw new Error('DEEPSEEK_API_KEY is required for AI_LOAD_MODE=real.');
   }
-  const { getSafeScopeResponse } = await import('../agent/scope-guard');
-  scopeFallbackReplies.add(getSafeScopeResponse('BLOCK', 'ar'));
-  scopeFallbackReplies.add(getSafeScopeResponse('UNCLEAR', 'ar'));
-  scopeFallbackReplies.add(getSafeScopeResponse('UNCLEAR', 'ar', true));
-  scopeFallbackReplies.add(getSafeScopeResponse('OUTPUT_BLOCK', 'ar'));
 
   const summaries: LoadResult[] = [];
 

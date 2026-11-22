@@ -1,4 +1,32 @@
 import type { UIMessage } from 'ai';
+import { getSafeAssistantText, legacyHamadRoleReply } from '@/lib/chat-response-safety';
+
+export type ChatInputMessage = {
+  role?: unknown;
+  id?: unknown;
+  content?: unknown;
+  parts?: unknown;
+  metadata?: unknown;
+};
+
+export function getChatMessageText(message?: ChatInputMessage) {
+  if (Array.isArray(message?.parts)) {
+    return message.parts
+      .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text).join(' ').trim();
+  }
+  return typeof message?.content === 'string' ? message.content.trim() : '';
+}
+
+export function buildHamadHistory(messages: readonly ChatInputMessage[]) {
+  return messages.flatMap((message) => {
+    const { role } = message;
+    if (role !== 'user' && role !== 'assistant') return [];
+    const text = getChatMessageText(message).slice(0, 1_200);
+    if (!text || (role === 'assistant' && getSafeAssistantText(text) === legacyHamadRoleReply)) return [];
+    return [{ role, text, id: typeof message.id === 'string' ? message.id : undefined }] as const;
+  }).slice(-8);
+}
 
 const chatContextMessageLimit = 40;
 export const chatContextTextLimit = 24_000;
