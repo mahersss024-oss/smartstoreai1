@@ -6,6 +6,7 @@ export const hamadDraftRef = z.object({ id: z.string().min(1).max(200), version:
 const digest = z.string().regex(/^[a-f0-9]{64}$/u);
 const stateSchema = z.object({
   focus: hamadDraftRef.optional(),
+  focusTitle: z.string().min(1).max(120).optional(),
   page: z.object({
     offset: z.number().int().nonnegative(),
     rosterHash: digest,
@@ -18,8 +19,16 @@ const stateSchema = z.object({
 export type HamadStructuredState = z.infer<typeof stateSchema>;
 export type HamadDraftRef = z.infer<typeof hamadDraftRef>;
 
+const pageKey = z.string().regex(/^[a-f0-9]{64}:[0-9]{1,5}$/u);
+export const hamadDraftActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('list') }).strict(),
+  z.object({ type: z.literal('next'), page: pageKey }).strict(),
+  z.object({ type: z.literal('select'), page: pageKey, choice: z.number().int().min(1).max(4) }).strict(),
+]);
+export type HamadDraftAction = z.infer<typeof hamadDraftActionSchema>;
+
 const checkpoint = stateSchema.extend({ expires: z.number().int() });
-const ttlMs = 20 * 60_000;
+export const hamadDraftTtlMs = 20 * 60_000;
 function key() {
   return createHmac('sha256', getAuthSecret()).update('souq-hamad.structured-checkpoint.v2').digest();
 }
@@ -35,7 +44,7 @@ export function sealHamadState(state: HamadStructuredState, session: AuthSession
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key(), iv);
   cipher.setAAD(associatedData(session, conversationId));
-  const payload = Buffer.from(JSON.stringify(checkpoint.parse({ ...state, expires: Date.now() + ttlMs })));
+  const payload = Buffer.from(JSON.stringify(checkpoint.parse({ ...state, expires: Date.now() + hamadDraftTtlMs })));
   const encrypted = Buffer.concat([cipher.update(payload), cipher.final()]);
   const frame = 'h2_' + Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
   // Already released clients retain only the historical payload.mac envelope in local history.

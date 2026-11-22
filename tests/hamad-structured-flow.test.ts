@@ -171,6 +171,69 @@ test('paginates drafts and refreshes a selection page after a newer change alter
   assert.doesNotMatch(c.parts[0].text, /هذه نتيجة الطلب/u);
 });
 
+test('picking an owned card opens its preview without a model and scopes a compound edit to that draft', async (t) => {
+  const change = { action: 'update', confirmWrite: true, reference: 'خل السعر ٥٠٠ وأضف الصورة',
+    details: { price: 500 }, evidence: { price: '٥٠٠' }, photos: [1] };
+  const roles = enable(t, [{ action: 'list' }, change, change]);
+  const owner = 'hamad-v2-tappable-cards';
+  const firstDraft = draft(owner, 'مسودة المكتب', '2026-11-20T09:00:00.000Z');
+  const secondDraft = draft(owner, 'مسودة الجوال', '2026-11-20T08:00:00.000Z');
+  const first = user('open-cards', 'أريد تعديل إعلان سابق');
+  const listed = await send(owner, [first], { hamadDraftCards: true });
+  const page = listed.metadata.hamadDraftUi.page;
+  assert.deepEqual(page.cards.map((card: { title: string }) => card.title), ['مسودة المكتب', 'مسودة الجوال']);
+  assert.ok(!JSON.stringify(page).includes(secondDraft.id));
+  const choice = user('tap-second', 'أرني المسودة المختارة.');
+  const selected = await send(owner, [first, listed, choice], { hamadDraftCards: true,
+    hamadDraftAction: { type: 'select', page: page.key, choice: 2 } });
+  assert.deepEqual(roles, ['plan']);
+  assert.equal(selected.metadata.hamadDraftUi.active.title, 'مسودة الجوال');
+  assert.equal(selected.metadata.hamadDraftUi.preview.description, 'وصف سابق محفوظ');
+  assert.equal(selected.metadata.hamadDraftUi.preview.price, 300);
+  const png = await sharp({ create: { width: 96, height: 96, channels: 3, background: '#35877c' } }).png().toBuffer();
+  const edit = user('update-and-attach', 'خل السعر ٥٠٠ وأضف الصورة');
+  edit.parts.push({ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') });
+  const thread = [first, listed, choice, selected, edit];
+  const saved = await send(owner, thread, { hamadDraftCards: true });
+  await send(owner, thread, { hamadDraftCards: true });
+  assert.equal(saved.metadata.hamadDraftUi.active.title, 'مسودة الجوال');
+  assert.equal(getListing(secondDraft.id)?.price, 500);
+  assert.equal(getListing(secondDraft.id)?.images.length, 1);
+  assert.equal(getListing(secondDraft.id)?.status, 'draft');
+  assert.equal(getListing(firstDraft.id)?.price, 300);
+  assert.equal(getListing(firstDraft.id)?.images.length, 0);
+  assert.equal(roles.filter((role) => role === 'write-check').length, 1);
+  const reopened = await send(owner, [first, listed, choice, selected, edit, saved,
+    user('open-list-again', 'اعرض مسوداتي')], { hamadDraftCards: true, hamadDraftAction: { type: 'list' } });
+  assert.equal(reopened.metadata.hamadDraftUi.active, null);
+  assert.equal(reopened.metadata.hamadDraftUi.page.cards.length, 2);
+});
+
+test('direct card actions page without a model and fail safely on stale or foreign selections', async (t) => {
+  const roles = enable(t, [], { failPlan: true });
+  const owner = 'hamad-v2-stale-card';
+  const records = Array.from({ length: 5 }, (_, i) => draft(owner, 'مسودة بطاقة ' + i, '2026-11-2' + i + 'T08:00:00.000Z'));
+  const first = user('open-picker', 'اعرض مسوداتي');
+  const a = await send(owner, [first], { hamadDraftCards: true, hamadDraftAction: { type: 'list' } });
+  const next = user('next-picker', 'اعرض المسودات التالية.');
+  const b = await send(owner, [first, a, next], { hamadDraftCards: true,
+    hamadDraftAction: { type: 'next', page: a.metadata.hamadDraftUi.page.key } });
+  const shown = b.metadata.hamadDraftUi.page;
+  assert.deepEqual(shown.cards.map((card: { title: string }) => card.title), ['مسودة بطاقة 0']);
+  records[0].updatedAt = '2026-11-28T08:00:00.000Z';
+  const choose = user('tap-stale-picker', 'أرني المسودة المختارة.');
+  const action = { hamadDraftCards: true, hamadDraftAction: { type: 'select', page: shown.key, choice: 1 } };
+  const stale = await send(owner, [first, a, next, b, choose], action);
+  assert.equal(stale.metadata.hamadDraftUi.active, null);
+  assert.equal(stale.metadata.hamadDraftUi.page.refreshed, true);
+  assert.equal(stale.metadata.hamadDraftUi.page.cards[0].title, 'مسودة بطاقة 0');
+  const other = await send('hamad-v2-foreign-card', [first, a, next, b, choose], action);
+  assert.equal(other.metadata.hamadDraftUi.active, null);
+  assert.equal(other.metadata.hamadDraftUi.page, undefined);
+  assert.doesNotMatch(other.parts[0].text, /مسودة بطاقة 0/u);
+  assert.deepEqual(roles, []);
+});
+
 test('serializes concurrent chat writes with different message IDs for the same draft', { timeout: 10_000 }, async (t) => {
   const entered = Promise.withResolvers<void>();
   const continueFirst = Promise.withResolvers<void>();

@@ -64,7 +64,8 @@ import { draftImageSource, draftRequestSource, readDraftMemory, signDraftMemory,
 import { authorizeDraftEdits } from '@/lib/chat/draft-edits';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 import { reserveChatGeneration } from '@/lib/chat/admission';
-import { runStructuredHamadTurn } from '@/lib/chat/hamad-structured-turn';
+import { runStructuredHamadTurn, type HamadDraftUi } from '@/lib/chat/hamad-structured-turn';
+import { hamadDraftActionSchema } from '@/lib/chat/hamad-structured-state';
 import { safeHamadStructuredReply } from '@/lib/chat/hamad-structured-model';
 
 const maxMessagesPerRequest = 40;
@@ -120,6 +121,8 @@ type ChatRequestBody = {
   resetDraftContext?: unknown;
   chatOwnerId?: unknown;
   chatConversationId?: unknown;
+  hamadDraftCards?: unknown;
+  hamadDraftAction?: unknown;
   data?: {
     model?: string;
     [key: string]: unknown;
@@ -627,6 +630,7 @@ function createGeneratedChatResponse(generate: () => Promise<{
   text: string;
   hamadDraftMemory?: string;
   creationChoice?: boolean;
+  hamadDraftUi?: HamadDraftUi;
   sections?: { text: string; preview?: { url: string; mediaType: 'image/webp' } }[];
 }>, options: {
   marketplaceIntent?: string;
@@ -641,12 +645,13 @@ function createGeneratedChatResponse(generate: () => Promise<{
           writer.write({ type: 'start', messageId: id, messageMetadata: options.marketplaceIntent
             ? { marketplaceIntent: options.marketplaceIntent } : {} });
           const reply = await generate();
-          if (reply.hamadDraftMemory || reply.creationChoice) {
+          if (reply.hamadDraftMemory || reply.creationChoice || reply.hamadDraftUi) {
             writer.write({
               type: 'message-metadata',
               messageMetadata: {
                 ...(reply.hamadDraftMemory ? { hamadDraftMemory: reply.hamadDraftMemory } : {}),
                 ...(reply.creationChoice ? { creationChoice: true } : {}),
+                ...(reply.hamadDraftUi ? { hamadDraftUi: reply.hamadDraftUi } : {}),
               },
             });
           }
@@ -927,12 +932,20 @@ export async function POST(request: Request) {
     return new Response('اختيار طريقة إنشاء الإعلان غير صالح.', { status: 400 });
   }
   const structured = process.env.SMARTSTORE_HAMAD_STRUCTURED === '1';
+  const draftCards = structured && body.hamadDraftCards === true && Boolean(chatConversationId);
+  const draftAction = body.hamadDraftAction === undefined ? undefined : hamadDraftActionSchema.safeParse(body.hamadDraftAction);
+  if (draftAction && !draftCards) {
+    return createTextUIResponse('تعذّر فتح بطاقة المسودة. اطلب عرض المسودات في المحادثة.');
+  }
+  if (draftAction?.success === false) {
+    return new Response('اختيار المسودة غير صالح.', { status: 400 });
+  }
   const draftMemory: DraftMemory = !structured && body.creationMethod === 'chat' && body.resetDraftContext !== true
     ? readDraftMemory(filteredMessages, session, chatConversationId) : {};
 
   const missingApiKeys = getMissingApiKeys();
 
-  if (missingApiKeys.length) {
+  if (missingApiKeys.length && !draftAction) {
     console.warn(
       `[chat_config] missing_required_env=${missingApiKeys.join(',')}`,
     );
@@ -946,7 +959,7 @@ export async function POST(request: Request) {
     const currentParts = Array.isArray(latestUserMessage?.parts) ? latestUserMessage.parts : [];
     const unsupportedStructuredFile = structured && currentParts.some((part) => isFilePart(part) &&
       (typeof part.mediaType !== 'string' || !supportedChatImageMimeTypes.has(part.mediaType)));
-    const imageValidationFailure = structured
+    const imageValidationFailure = draftAction ? null : structured
       ? unsupportedStructuredFile ? 'unsupported_image_type' : validateRetainedListingImages(currentParts)
       : validateChatImageAttachments(filteredMessages);
     if (imageValidationFailure) {
@@ -976,8 +989,9 @@ export async function POST(request: Request) {
       const response = createGeneratedChatResponse(() => runStructuredHamadTurn({
         session, history, request: preliminaryUserRequest, requestKey, conversationId: chatConversationId,
         checkpoint: metadata?.hamadDraftMemory,
+        draftCards, draftAction: draftAction?.data,
         creationEnabled: body.creationMethod === 'chat', reset: body.resetDraftContext === true || body.beginDraftWithHamad === true,
-        currentImages: extractRetainedUploadedListingImages(latestUserMessage?.parts),
+        currentImages: draftAction ? [] : extractRetainedUploadedListingImages(latestUserMessage?.parts),
         retainedImages: ({ sourceId }) => sourceId === body.retainedListingImageMessageId
           && !validateRetainedListingImages(body.retainedListingImages)
           ? extractRetainedUploadedListingImages(body.retainedListingImages) : [],

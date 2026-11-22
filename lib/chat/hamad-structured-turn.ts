@@ -7,7 +7,7 @@ import { chatServiceUnavailableMessage } from '@/lib/chat-response-safety';
 import { draftImageSource } from './draft-memory';
 import { hamadCapabilities as capabilities, structuredWriteResultSchema } from './hamad-capabilities';
 import { composeHamadReply, inferHamadDraftCategory, planHamadTurn, verifyHamadReply, verifyHamadWrite, type HamadPlan } from './hamad-structured-model';
-import { openHamadState, sealHamadState, type HamadStructuredState } from './hamad-structured-state';
+import { hamadDraftTtlMs, openHamadState, sealHamadState, type HamadDraftAction, type HamadStructuredState } from './hamad-structured-state';
 
 type History = { role: 'user' | 'assistant'; text: string; id?: string };
 type Run = {
@@ -17,18 +17,41 @@ type Run = {
   requestKey?: string;
   conversationId: string | null;
   checkpoint?: unknown;
+  draftCards?: boolean;
+  draftAction?: HamadDraftAction;
   creationEnabled: boolean;
   reset: boolean;
   currentImages: UploadedListingImage[];
   retainedImages: (source: NonNullable<HamadStructuredState['image']>) => UploadedListingImage[];
   signal: AbortSignal;
 };
-type Reply = { text: string; hamadDraftMemory?: string; creationChoice?: boolean;
+type Draft = NonNullable<Awaited<ReturnType<typeof capabilities.get_draft.run>>>;
+type Card = Pick<Draft['data'], 'title' | 'modified' | 'price' | 'imageCount'> & { thumbnail?: string };
+type Preview = Card & Pick<Draft['data'], 'description' | 'city'>;
+export type HamadDraftUi = {
+  active: { title: string; expires: number } | null;
+  page?: { key: string; cards: Card[]; hasNext: boolean; refreshed?: true };
+  preview?: Preview;
+};
+type Reply = { text: string; hamadDraftMemory?: string; creationChoice?: boolean; hamadDraftUi?: HamadDraftUi;
   sections?: { text: string; preview?: { url: string; mediaType: 'image/webp' } }[] };
 
 const day = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', { dateStyle: 'short', timeZone: 'Asia/Riyadh' });
 const unavailable = 'تعذّر التحقق من التفاصيل الآن. جرّب مرة أخرى بعد قليل.';
 const mutationActions = new Set<HamadPlan['action']>(['create', 'update', 'attach']);
+
+function draftCard({ data, preview }: Draft): Card {
+  return { title: data.title || 'مسودة', modified: data.modified, price: data.price,
+    imageCount: data.imageCount, thumbnail: preview?.url };
+}
+
+function draftPreview(draft: Draft): Preview {
+  return { ...draftCard(draft), description: draft.data.description, city: draft.data.city };
+}
+
+function pageKey({ offset, rosterHash }: NonNullable<HamadStructuredState['page']>) {
+  return rosterHash + ':' + offset;
+}
 
 function hasExactQuote(text: string, quote: string | undefined) {
   return Boolean(quote && text.includes(quote));
@@ -67,9 +90,14 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
   if (currentImage) state = { ...state, image: currentImage };
   const capabilityContext = { ...context, session: input.session, images: input.currentImages,
     sourceId: input.currentImages.length ? input.requestKey : undefined };
-  const answer = (text: string, options: Pick<Reply, 'creationChoice' | 'sections'> = {}): Reply => ({
-    text, ...options, hamadDraftMemory: sealHamadState(state, input.session, input.conversationId),
-  });
+  const answer = (text: string, options: Pick<Reply, 'creationChoice' | 'sections'> = {},
+    view: Omit<HamadDraftUi, 'active'> = {}): Reply => {
+    const now = Date.now();
+    const hamadDraftMemory = sealHamadState(state, input.session, input.conversationId);
+    return { text, ...options, hamadDraftMemory,
+      ...(input.draftCards && { hamadDraftUi: { ...view, active: hamadDraftMemory && state.focus && state.focusTitle
+        ? { title: state.focusTitle, expires: now + hamadDraftTtlMs } : null } }) };
+  };
   async function groundedReply(facts: unknown, fallback = unavailable, approvedPaths: readonly string[] = []) {
     try {
       const text = await composeHamadReply({ request: input.request, facts }, context);
@@ -82,15 +110,17 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     return fallback;
   }
 
-  async function showPage(offset: number, compareHash?: string) {
+  async function showPage(offset: number, compareHash?: string, updated = false) {
     let page = await capabilities.list_my_drafts.run(capabilityContext, { offset });
     if (compareHash && compareHash !== page.rosterHash) {
       page = await capabilities.list_my_drafts.run(capabilityContext, { offset: 0 });
+      updated = true;
     }
-    state = { ...state, focus: undefined, collecting: undefined,
+    state = { ...state, focus: undefined, focusTitle: undefined, collecting: undefined,
       page: page.entries.length ? { offset: page.offset, rosterHash: page.rosterHash, hasNext: page.hasNext,
         entries: page.entries.map(({ ref }) => ref) } : undefined };
-    if (!page.entries.length) return answer(await groundedReply({ status: 'no_drafts', instruction: 'Invite a new draft if wanted.' }));
+    if (!state.page) return answer(input.draftAction ? 'ما عندك مسودات حاليًا. تقدر تطلب مني أجهّز إعلان جديد.'
+      : await groundedReply({ status: 'no_drafts', instruction: 'Invite a new draft if wanted.' }));
     const choices = page.entries.map(({ data, preview }, index) => {
       const modified = Date.parse(data.modified);
       const date = Number.isFinite(modified) ? day.format(modified) : '';
@@ -98,11 +128,46 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
         .filter(Boolean).join(' · '), preview };
     });
     if (page.hasNext) choices.push({ text: 'الصفحة التالية متاحة.', preview: undefined });
+    const instruction = updated ? 'تحدّثت القائمة. اختر المسودة من القائمة الحالية.' : '';
+    if (input.draftCards) {
+      return answer([instruction, ...choices.map(({ text }) => text)].filter(Boolean).join('\n'), {}, {
+        page: { key: pageKey(state.page), cards: page.entries.map(draftCard), hasNext: page.hasNext,
+          ...(updated && { refreshed: true }) },
+      });
+    }
     return answer(choices.map(({ text }) => text).join('\n'), choices.some(({ preview }) => preview) ? { sections: choices } : {});
+  }
+
+  async function selectDraft(choice: number, shownPage?: string) {
+    const page = state.page;
+    const chosen = page?.entries[choice - 1];
+    if (!page || !chosen || (shownPage && shownPage !== pageKey(page))) return showPage(0, undefined, true);
+    const currentPage = await capabilities.list_my_drafts.run(capabilityContext, { offset: page.offset });
+    if (currentPage.rosterHash !== page.rosterHash) return showPage(0, undefined, true);
+    const current = await capabilities.get_draft.run(capabilityContext, chosen);
+    if (!current || current.ref.version !== chosen.version) return showPage(0, undefined, true);
+    state = { ...state, focus: current.ref, focusTitle: current.data.title || 'مسودة', page: undefined, collecting: undefined,
+      ...(shownPage && { image: undefined }) };
+    const text = shownPage ? 'تم اختيار المسودة. اكتب التعديل المطلوب أو أرفق الصور.' :
+      await groundedReply({ status: 'selected', draft: current.data });
+    return answer([current.data.title, text].filter(Boolean).join('\n'), {}, { preview: draftPreview(current) });
   }
 
   let plan: HamadPlan;
   try {
+    if (input.draftAction) {
+      if (input.draftAction.type === 'list') return await showPage(0);
+      if (input.draftAction.type === 'select') return await selectDraft(input.draftAction.choice, input.draftAction.page);
+      const page = state.page;
+      return page?.hasNext && input.draftAction.page === pageKey(page)
+        ? await showPage(page.offset + page.entries.length, page.rosterHash) : await showPage(0, undefined, true);
+    }
+    // A conversation resumed from a checkpoint issued before cards may still have a selected draft.
+    if (input.draftCards && state.focus && !state.focusTitle) {
+      const selected = await capabilities.get_draft.run(capabilityContext, state.focus);
+      if (!selected || selected.ref.version !== state.focus.version) return await showPage(0, undefined, true);
+      state = { ...state, focusTitle: selected.data.title || 'مسودة' };
+    }
     plan = await planHamadTurn({
       request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
       canRequestRetainedImages: Boolean(state.image && !currentImage),
@@ -118,22 +183,14 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       ? await showPage(state.page.offset + state.page.entries.length, state.page.rosterHash) : await showPage(0);
 
     if (plan.action === 'select') {
-      const page = state.page;
-      const chosen = page && plan.choice ? page.entries[plan.choice - 1] : undefined;
-      if (!chosen || !page || !hasExactQuote(input.request, plan.reference)) return await showPage(0);
-      const currentPage = await capabilities.list_my_drafts.run(capabilityContext, { offset: page.offset });
-      if (currentPage.rosterHash !== page.rosterHash) return await showPage(0);
-      const current = await capabilities.get_draft.run(capabilityContext, chosen);
-      if (!current || current.ref.version !== chosen.version) return await showPage(0);
-      state = { ...state, focus: current.ref, page: undefined, collecting: undefined };
-      const text = await groundedReply({ status: 'selected', draft: current.data });
-      return answer([current.data.title, text].filter(Boolean).join('\n'));
+      if (!plan.choice || !hasExactQuote(input.request, plan.reference)) return await showPage(0);
+      return await selectDraft(plan.choice);
     }
     if (plan.action === 'view') {
       if (!state.focus) return await showPage(0);
       const current = await capabilities.get_draft.run(capabilityContext, state.focus);
       if (!current || current.ref.version !== state.focus.version) return await showPage(0);
-      return answer(await groundedReply({ status: 'read', draft: current.data }));
+      return answer(await groundedReply({ status: 'read', draft: current.data }), {}, { preview: draftPreview(current) });
     }
     if (plan.action === 'help') {
       const sources = await Promise.all([...new Set(plan.topics ?? [])].map((topic) =>
@@ -191,7 +248,8 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     }
     const details = plan.details ?? {};
     if (creating && (!details.category || !(details.title?.trim() || details.description?.trim()))) {
-      state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.requestKey, focus: undefined, page: undefined };
+      state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.requestKey,
+        focus: undefined, focusTitle: undefined, page: undefined };
       // A photo can inform the next question, yet only customer-confirmed facts can be saved.
       const observations = images.length && imageSource
         ? await capabilities.analyze_image.run(mediaContext, { photos: indexes.length ? indexes : [0] }) : undefined;
@@ -251,6 +309,18 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
         }) : plan.action === 'update' && target ? await capabilities.update_draft.run(writeContext, {
           focus: target.ref, details, evidence: plan.evidence ?? {},
         }) : await capabilities.attach_draft_images.run(writeContext, { focus: target!.ref, photos: indexes });
+        if (plan.action === 'update' && indexes.length && result.focus && result.status === 'updated') {
+          // The fields may already be saved when image processing fails. Keep their receipt on retries.
+          try {
+            const photos = await capabilities.attach_draft_images.run(writeContext, { focus: result.focus, photos: indexes });
+            result = { status: photos.status === 'draft_changed' ? 'fields_saved_photos_unconfirmed' : photos.status,
+              focus: photos.focus ?? result.focus,
+              receipts: [...result.receipts, ...photos.receipts] };
+          } catch (error) {
+            console.warn('[hamad_structured] followup_photos_unconfirmed', error instanceof Error ? error.name : 'UnknownError');
+            result = { ...result, status: 'fields_saved_photos_unconfirmed' };
+          }
+        }
         await lease.complete(result);
       } catch (error) {
         // An unknown outcome after dispatch keeps its operation reservation. Later retries use the same identity.
@@ -263,12 +333,21 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       }
     }
     if (result.status === 'draft_changed') return await showPage(0);
-    if (result.focus) state = { ...state, focus: result.focus, page: undefined, collecting: undefined };
+    if (result.focus) state = { ...state, focus: result.focus,
+      focusTitle: result.receipts.at(-1)?.title || state.focusTitle || 'مسودة', page: undefined, collecting: undefined };
     const { status, receipts } = result;
-    const fallback = receipts.length && ['saved', 'updated'].includes(receipts[0].kind)
+    const savedFields = receipts.some(({ kind }) => kind === 'updated');
+    const attachedPhotos = receipts.find(({ kind }) => kind === 'photos')?.facts?.attached;
+    const partialSave = savedFields && indexes.length > 0 && attachedPhotos !== indexes.length;
+    const fallback = savedFields && indexes.length ? 'حُفظت التعديلات وأُضيفت الصور المحددة إلى المسودة.'
+      : receipts.length && ['saved', 'updated'].includes(receipts[0].kind)
       ? 'حُفظت البيانات التي أكدها السيرفر في مسودتك. راجعها من «إعلاناتي».'
       : 'راجع مسودتك من «إعلاناتي» للتأكد من نتيجة الطلب.';
-    return answer(await groundedReply({ status, receipts }, fallback));
+    const current = input.draftCards && result.focus
+      ? await capabilities.get_draft.run(capabilityContext, result.focus).catch(() => null) : null;
+    const view = current && current.ref.version === result.focus?.version ? { preview: draftPreview(current) } : {};
+    if (partialSave) return answer('حُفظت التعديلات. راجع الصور في المسودة لمعرفة ما أُضيف قبل إعادة المحاولة.', {}, view);
+    return answer(await groundedReply({ status, receipts }, fallback), {}, view);
   } catch {
     return answer(chatServiceUnavailableMessage);
   }
