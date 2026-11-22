@@ -340,7 +340,7 @@ test('runs vision for validated photos only and keeps the observation tentative'
   const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#a64b76' } }).png().toBuffer();
   const image = { type: 'file' as const, mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
   const bad = await send('hamad-v2-images', [{ id: 'broken', role: 'user', parts: [{ ...image, mediaType: 'video/mp4' }] }]);
-  assert.match(bad.parts[0].text, /JPG/u);
+  assert.match(bad.parts[0].text, /جي بي جي أو بي إن جي أو ويب بي/u);
   assert.equal(roles.length, 0);
   await send('hamad-v2-images', [{ id: 'inspect-two', role: 'user', parts: [{ type: 'text', text: 'وش ظاهر في الصورتين؟' }, image, image] }]);
   assert.ok(roles.includes('vision'));

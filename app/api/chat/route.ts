@@ -393,9 +393,9 @@ function getRequestLanguage(settings: LocationSettings | undefined): AppLanguage
 
 function createTextUIResponse(
   text: string,
-  options: { creationChoice?: boolean; hamadDraftMemory?: string; systemMessage?: boolean } = {},
+  options: { creationChoice?: boolean; hamadDraftMemory?: string } = {},
 ) {
-  text = (options.systemMessage ? text : getHamadCustomerReply(text)) || (text.includes(authRequiredMarker)
+  text = getHamadCustomerReply(text) || (text.includes(authRequiredMarker)
     ? `${authRequiredMarker} يرجى تسجيل الدخول أولًا لمتابعة المساعدة في سوق حمد.`
     : chatServiceUnavailableMessage);
   const messageId = `guard-message-${crypto.randomUUID()}`;
@@ -950,7 +950,12 @@ export async function POST(request: Request) {
       ? unsupportedStructuredFile ? 'unsupported_image_type' : validateRetainedListingImages(currentParts)
       : validateChatImageAttachments(filteredMessages);
     if (imageValidationFailure) {
-      if (structured) return createTextUIResponse(getImageUploadValidationResponse(language, imageValidationFailure), { systemMessage: true });
+      if (structured) {
+        const message = imageValidationFailure === 'unsupported_image_type'
+          ? 'أرفق صور المنتج فقط بصيغة جي بي جي أو بي إن جي أو ويب بي.'
+          : getImageUploadValidationResponse(language, imageValidationFailure);
+        return createTextUIResponse(message);
+      }
       return await generateProfessionalChatIssueResponse({
         kind: 'upload_validation',
         language,
