@@ -172,6 +172,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
       canRequestRetainedImages: Boolean(state.image && !currentImage),
       conversation: { collecting: collectingStart >= 0, hasConfirmedDraft: Boolean(state.focus),
+        selectedDraftTitle: state.focusTitle,
         displayedChoices: state.page?.entries.length ?? 0, hasNext: state.page?.hasNext === true },
       authorizedTopics: platformHelpTopics,
     }, context);

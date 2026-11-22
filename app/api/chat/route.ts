@@ -933,11 +933,11 @@ export async function POST(request: Request) {
   }
   const structured = process.env.SMARTSTORE_HAMAD_STRUCTURED === '1';
   const draftCards = structured && body.hamadDraftCards === true && Boolean(chatConversationId);
-  const draftAction = body.hamadDraftAction === undefined ? undefined : hamadDraftActionSchema.safeParse(body.hamadDraftAction);
-  if (draftAction && !draftCards) {
+  const cardAction = body.hamadDraftAction === undefined ? undefined : hamadDraftActionSchema.safeParse(body.hamadDraftAction);
+  if (cardAction && !draftCards) {
     return createTextUIResponse('تعذّر فتح بطاقة المسودة. اطلب عرض المسودات في المحادثة.');
   }
-  if (draftAction?.success === false) {
+  if (cardAction?.success === false) {
     return new Response('اختيار المسودة غير صالح.', { status: 400 });
   }
   const draftMemory: DraftMemory = !structured && body.creationMethod === 'chat' && body.resetDraftContext !== true
@@ -945,7 +945,7 @@ export async function POST(request: Request) {
 
   const missingApiKeys = getMissingApiKeys();
 
-  if (missingApiKeys.length && !draftAction) {
+  if (missingApiKeys.length && !cardAction) {
     console.warn(
       `[chat_config] missing_required_env=${missingApiKeys.join(',')}`,
     );
@@ -959,7 +959,7 @@ export async function POST(request: Request) {
     const currentParts = Array.isArray(latestUserMessage?.parts) ? latestUserMessage.parts : [];
     const unsupportedStructuredFile = structured && currentParts.some((part) => isFilePart(part) &&
       (typeof part.mediaType !== 'string' || !supportedChatImageMimeTypes.has(part.mediaType)));
-    const imageValidationFailure = draftAction ? null : structured
+    const imageValidationFailure = cardAction ? null : structured
       ? unsupportedStructuredFile ? 'unsupported_image_type' : validateRetainedListingImages(currentParts)
       : validateChatImageAttachments(filteredMessages);
     if (imageValidationFailure) {
@@ -989,9 +989,9 @@ export async function POST(request: Request) {
       const response = createGeneratedChatResponse(() => runStructuredHamadTurn({
         session, history, request: preliminaryUserRequest, requestKey, conversationId: chatConversationId,
         checkpoint: metadata?.hamadDraftMemory,
-        draftCards, draftAction: draftAction?.data,
+        draftCards, draftAction: cardAction?.data,
         creationEnabled: body.creationMethod === 'chat', reset: body.resetDraftContext === true || body.beginDraftWithHamad === true,
-        currentImages: draftAction ? [] : extractRetainedUploadedListingImages(latestUserMessage?.parts),
+        currentImages: cardAction ? [] : extractRetainedUploadedListingImages(latestUserMessage?.parts),
         retainedImages: ({ sourceId }) => sourceId === body.retainedListingImageMessageId
           && !validateRetainedListingImages(body.retainedListingImages)
           ? extractRetainedUploadedListingImages(body.retainedListingImages) : [],
