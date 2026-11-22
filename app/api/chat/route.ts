@@ -962,13 +962,7 @@ export async function POST(request: Request) {
     const imageValidationFailure = cardAction ? null : structured
       ? unsupportedStructuredFile ? 'unsupported_image_type' : validateRetainedListingImages(currentParts)
       : validateChatImageAttachments(filteredMessages);
-    if (imageValidationFailure) {
-      if (structured) {
-        const message = imageValidationFailure === 'unsupported_image_type'
-          ? 'أرفق صور المنتج فقط بصيغة جي بي جي أو بي إن جي أو ويب بي.'
-          : getImageUploadValidationResponse(language, imageValidationFailure);
-        return createTextUIResponse(message);
-      }
+    if (imageValidationFailure && !structured) {
       return await generateProfessionalChatIssueResponse({
         kind: 'upload_validation',
         language,
@@ -978,6 +972,9 @@ export async function POST(request: Request) {
     }
 
     if (structured) {
+      const validationMessage = imageValidationFailure === 'unsupported_image_type'
+        ? 'أرفق صور المنتج فقط بصيغة جي بي جي أو بي إن جي أو ويب بي.'
+        : imageValidationFailure ? getImageUploadValidationResponse(language, imageValidationFailure) : undefined;
       const previousAssistant = latestUserMessage && filteredMessages.slice(0, filteredMessages.lastIndexOf(latestUserMessage))
         .findLast((message) => message.role === 'assistant');
       const metadata = previousAssistant?.metadata as { hamadDraftMemory?: unknown } | undefined;
@@ -991,7 +988,8 @@ export async function POST(request: Request) {
         checkpoint: metadata?.hamadDraftMemory,
         draftCards, draftAction: cardAction?.data,
         creationEnabled: body.creationMethod === 'chat', reset: body.resetDraftContext === true || body.beginDraftWithHamad === true,
-        currentImages: cardAction ? [] : extractRetainedUploadedListingImages(latestUserMessage?.parts),
+        validationMessage,
+        currentImages: cardAction || validationMessage ? [] : extractRetainedUploadedListingImages(latestUserMessage?.parts),
         retainedImages: ({ sourceId }) => sourceId === body.retainedListingImageMessageId
           && !validateRetainedListingImages(body.retainedListingImages)
           ? extractRetainedUploadedListingImages(body.retainedListingImages) : [],

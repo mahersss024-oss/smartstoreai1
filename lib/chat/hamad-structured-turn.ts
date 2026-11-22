@@ -19,6 +19,7 @@ type Run = {
   checkpoint?: unknown;
   draftCards?: boolean;
   draftAction?: HamadDraftAction;
+  validationMessage?: string;
   creationEnabled: boolean;
   reset: boolean;
   currentImages: UploadedListingImage[];
@@ -155,6 +156,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
 
   let plan: HamadPlan;
   try {
+    if (input.validationMessage) return answer(input.validationMessage);
     if (input.draftAction) {
       if (input.draftAction.type === 'list') return await showPage(0);
       if (input.draftAction.type === 'select') return await selectDraft(input.draftAction.choice, input.draftAction.page);

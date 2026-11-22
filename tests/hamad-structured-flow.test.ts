@@ -190,10 +190,16 @@ test('picking an owned card opens its preview without a model and scopes a compo
   assert.equal(selected.metadata.hamadDraftUi.active.title, 'مسودة الجوال');
   assert.equal(selected.metadata.hamadDraftUi.preview.description, 'وصف سابق محفوظ');
   assert.equal(selected.metadata.hamadDraftUi.preview.price, 300);
+  const invalidFile = user('invalid-photo', 'أرفق الملف');
+  invalidFile.parts.push({ type: 'file', mediaType: 'video/mp4', url: 'data:video/mp4;base64,AAA=' });
+  const validation = await send(owner, [first, listed, choice, selected, invalidFile], { hamadDraftCards: true });
+  assert.match(validation.parts[0].text, /أرفق صور المنتج/u);
+  assert.equal(validation.metadata.hamadDraftUi.active.title, 'مسودة الجوال');
+  assert.deepEqual(roles, ['plan']);
   const png = await sharp({ create: { width: 96, height: 96, channels: 3, background: '#35877c' } }).png().toBuffer();
   const edit = user('update-and-attach', 'خل السعر ٥٠٠ وأضف الصورة');
   edit.parts.push({ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') });
-  const thread = [first, listed, choice, selected, edit];
+  const thread = [first, listed, choice, selected, invalidFile, validation, edit];
   const saved = await send(owner, thread, { hamadDraftCards: true });
   await send(owner, thread, { hamadDraftCards: true });
   assert.equal(saved.metadata.hamadDraftUi.active.title, 'مسودة الجوال');
