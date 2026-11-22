@@ -41,10 +41,11 @@ if (process.env[fixture] === '1') {
       usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 } });
   };
 } else {
-  const [source, output, mode] = process.argv.slice(2);
-  assert.ok(source && output, 'Usage: node verify-local-http.mjs CLEAN_SERVER_WORKTREE RECEIPT_JSON');
-  assert.ok(mode === undefined || mode === '--postgres', 'Unknown smoke-test mode');
-  const dbMode = mode === '--postgres';
+  const [source, output, ...flags] = process.argv.slice(2);
+  assert.ok(source && output, 'Usage: node verify-local-http.mjs CLEAN_SERVER_WORKTREE RECEIPT_JSON [--cards] [--postgres]');
+  assert.ok(flags.every((flag) => flag === '--postgres' || flag === '--cards'), 'Unknown smoke-test mode');
+  const dbMode = flags.includes('--postgres');
+  const cards = flags.includes('--cards');
   let databaseUrl;
   if (dbMode) {
     const target = new URL(process.env.DATABASE_URL ?? '');
@@ -98,6 +99,7 @@ if (process.env[fixture] === '1') {
 
   const observed = [];
   const messages = [];
+  let pageKey;
   let seeded = false;
   try {
     let ready = false;
@@ -110,12 +112,14 @@ if (process.env[fixture] === '1') {
       databaseScript('await prisma.user.create({data:' + JSON.stringify({ id: owner, email, sessionVersion: 0 }) + '});');
       seeded = true;
     }
-    for (const [index, text] of ['جهز مسودة لابتوب', 'اعرض مسوداتي', 'الأولى', 'خل السعر ٥٠٠'].entries()) {
+    for (const [index, text] of ['جهز مسودة لابتوب', 'اعرض مسوداتي', cards ? 'أرني المسودة المختارة.' : 'الأولى', 'خل السعر ٥٠٠'].entries()) {
       messages.push({ id: 'synthetic-turn-' + index, role: 'user', parts: [{ type: 'text', text }] });
       const started = performance.now();
       const response = await fetch(origin + '/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json', cookie, [aiConsentHeader]: version },
-        body: JSON.stringify({ messages, chatOwnerId: owner, chatConversationId: 'synthetic-hamad-http-conversation', creationMethod: 'chat' }),
+        body: JSON.stringify({ messages, chatOwnerId: owner, chatConversationId: 'synthetic-hamad-http-conversation', creationMethod: 'chat',
+          ...(cards && { hamadDraftCards: true }),
+          ...(cards && index === 2 && { hamadDraftAction: { type: 'select', page: pageKey, choice: 1 } }) }),
         signal: AbortSignal.timeout(16_000),
       });
       assert.equal(response.status, 200);
@@ -125,6 +129,16 @@ if (process.env[fixture] === '1') {
       const metadata = Object.assign({}, ...data.map((entry) => entry.messageMetadata ?? {}));
       assert.match(String(metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
       assert.match(answer, index === 0 || index === 3 ? /تم حفظ/u : /لابتوب/u);
+      if (cards && index === 1) {
+        pageKey = metadata.hamadDraftUi?.page?.key;
+        assert.match(String(pageKey), /^[a-f0-9]{64}:0$/u);
+        assert.equal(metadata.hamadDraftUi.page.cards[0].title, 'لابتوب');
+      }
+      if (cards && index >= 2) {
+        assert.equal(metadata.hamadDraftUi.active.title, 'لابتوب');
+        assert.equal(metadata.hamadDraftUi.preview.title, 'لابتوب');
+        if (index === 3) assert.equal(metadata.hamadDraftUi.preview.price, 500);
+      }
       messages.push({ id: data.find((entry) => entry.type === 'start').messageId, role: 'assistant', parts: [{ type: 'text', text: answer }], metadata });
       observed.push({ turn: index + 1, status: response.status, elapsedMs: Math.round(performance.now() - started) });
     }
@@ -136,7 +150,7 @@ if (process.env[fixture] === '1') {
     assert.equal(listings[0].price, 500);
     const receipt = { status: 'PASS', revision: git('rev-parse', 'HEAD'), startedAt, completedAt: new Date().toISOString(),
       mode: dbMode ? 'built Next.js over loopback with synthetic provider and isolated PostgreSQL'
-        : 'built Next.js over loopback with synthetic provider and file-store data', observed,
+        : 'built Next.js over loopback with synthetic provider and file-store data', cards, observed,
       persisted: { listingCount: listings.length, status: listings[0].status, price: listings[0].price } };
     writeFileSync(resolve(output), JSON.stringify(receipt, null, 2) + '\n');
     console.log(JSON.stringify(receipt));
