@@ -1075,7 +1075,9 @@ export async function POST(request: Request) {
       } else if (inputScopeDecision.intent === 'update_listing') {
         if (!sellerDrafts) return createTextUIResponse('تعذر التحقق من مسوداتك الآن. أعد إرسال طلب التعديل بعد قليل.');
         if (!sellerDrafts.length) return createTextUIResponse('لا توجد مسودة قابلة للتعديل. لتجهيز مسودة جديدة، اذكر المنتج وتفاصيله.');
+        const originalDraftRequest = preliminaryUserRequest === userRequest ? undefined : preliminaryUserRequest;
         const target = selectChatDraft(userRequest, sellerDrafts, {
+          originalRequest: originalDraftRequest,
           previousUserRequest: getLatestUserRequest([previousUserMessage]),
           focusedDraftId: draftMemory.focusedDraftId,
           continuesDraft: inputScopeDecision.continues_draft,
@@ -1089,7 +1091,7 @@ export async function POST(request: Request) {
             fallback: 'حدّد اسم المسودة أو رقمها من [إعلاناتي](/account/listings)، واكتب التعديل المطلوب معها. إذا كانت هناك صور، أرفق صور هذه المسودة أو اذكر صراحةً أنك تقصد الصور من رسالتك السابقة.',
             conversationId: chatConversationId, session, abortSignal: request.signal,
             memory: { pending: { field: 'draft', request: inputScopeDecision.decision === 'ALLOW'
-              && !inputScopeDecision.draft_reference && canResumeUnnamedDraftEdit(userRequest, sellerDrafts)
+              && !inputScopeDecision.draft_reference && canResumeUnnamedDraftEdit(userRequest, sellerDrafts, originalDraftRequest)
               ? draftRequestSource(requestKey, preliminaryUserRequest) : undefined } },
           });
         }

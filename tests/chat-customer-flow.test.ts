@@ -70,7 +70,7 @@ test('a mixed request naming two drafts never authorizes both edits on the focus
   assert.equal(selectChatDraft('أرجع إلى المكتب', drafts, { draftReference: 'المكتب' })?.id, 'desk');
 });
 
-test('ordinal draft edits require a draft name even when the model continues the previous draft', async t => {
+test('ordinal and relative draft edits require a draft name even when the model continues the focused draft', async t => {
   mockIntent(t, 'update_listing');
   const owner = 'ordinal-draft-context-owner';
   const phone = createListingDraft({ sellerId: owner, category: 'other', title: 'آيفون للبيع', price: 1800 });
@@ -79,29 +79,47 @@ test('ordinal draft edits require a draft name even when the model continues the
   const memory = signDraftMemory({ focusedDraftId: laptop.id }, {
     user: { id: owner, email: owner + '@example.test' }, issuedAt: 1, expiresAt: 2,
   }, chatConversationId);
+  let allowedRequest: string | undefined;
+  let offeredUpdate = false;
   t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const body = JSON.parse(String(init?.body));
     const instructions = body.messages.filter((message: { role: string }) => message.role === 'system').map((message: { content: string }) => message.content).join('\n');
     if (instructions.includes('input Scope Checker')) {
       const scope = JSON.parse(body.messages.at(-1).content);
       assert.equal(scope.draft_memory.focusedDraftId, laptop.id);
-      return completion(JSON.stringify({ decision: 'ALLOW', confidence: 1, reason_code: 'same_draft', intent: 'update_listing', continues_draft: true }));
+      return completion(JSON.stringify({
+        decision: allowedRequest ? 'PARTIAL' : 'ALLOW', confidence: 1, reason_code: 'same_draft',
+        intent: 'update_listing', continues_draft: true, allowed_request: allowedRequest,
+      }));
     }
-    assert.ok(!body.tools?.some((tool: { function: { name: string } }) => tool.function.name === 'updateListing'));
+    if (body.tools?.some((tool: { function: { name: string } }) => tool.function.name === 'updateListing')) {
+      offeredUpdate = true;
+      return completion(null, { name: 'updateListing', arguments: JSON.stringify({ price: 1700 }) });
+    }
     return completion('حدّد المسودة باسمها');
   });
-  const next = userTurn('ordinal-update', 'خل سعر الأول ١٧٠٠، والثاني خله على سعره');
-  const messages = [
+  const history = [
     userTurn('previous-draft', 'سعر اللابتوب ٢٤٠٠'),
     { id: 'previous-reply', role: 'assistant', parts: [{ type: 'text', text: 'تم حفظ المسودة.' }], metadata: { hamadDraftMemory: memory } },
-    next,
   ];
-  const response = await POST(request(owner, next.id, { creationMethod: 'chat', chatConversationId, messages }));
-  assert.equal(response.status, 200);
-  assert.match(assistantTurn(await response.text()).parts[0].text, /حدّد اسم المسودة أو رقمها/);
-  assert.equal(getListing(phone.id)?.price, 1800);
-  assert.equal(getListing(laptop.id)?.price, 2400);
+  for (const scenario of [
+    { id: 'ordinal-update', text: 'خل سعر الأول ١٧٠٠، والثاني خله على سعره' },
+    { id: 'relative-update', text: 'خل سعر اللي قبله ١٧٠٠' },
+    { id: 'scoped-relative-update', text: 'خل سعر اللي قبله ١٧٠٠ وعطني تقييم للسعر', allowedRequest: 'خل سعره ١٧٠٠' },
+  ]) {
+    allowedRequest = scenario.allowedRequest;
+    const next = userTurn(scenario.id, scenario.text);
+    const response = await POST(request(owner, next.id, { creationMethod: 'chat', chatConversationId, messages: [...history, next] }));
+    assert.equal(response.status, 200);
+    const reply = assistantTurn(await response.text());
+    assert.equal(offeredUpdate, false, scenario.id);
+    assert.match(reply.parts[0].text, /حدّد اسم المسودة أو رقمها/);
+    assert.equal(getListing(phone.id)?.price, 1800);
+    assert.equal(getListing(laptop.id)?.price, 2400);
+  }
   assert.equal(selectChatDraft('عدّل وصف لابتوب للبيع إلى «مع الشاحن من الجيل الثاني»', [phone, laptop])?.id, laptop.id);
+  assert.equal(selectChatDraft('عدّل وصف لابتوب للبيع إلى «أخف من اللي قبله»', [phone, laptop])?.id, laptop.id);
+  assert.equal(canResumeUnnamedDraftEdit('عدّل المسودة السابقة', [phone, laptop]), false);
 });
 
 test('a natural draft reply retains the selected draft and saves only customer-authorized changes', async t => {
