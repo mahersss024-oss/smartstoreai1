@@ -1,4 +1,4 @@
-import { APICallError, generateText, Output } from 'ai';
+import { APICallError, generateText, NoContentGeneratedError, NoObjectGeneratedError, Output } from 'ai';
 import { z } from 'zod';
 import { getDeepseekChatModel } from '@/agent/deepseek-provider';
 import { chatGenerationLimits } from './admission';
@@ -89,6 +89,10 @@ async function call(role: Role, instructions: string, data: unknown, context: Mo
     status = 'completed';
     return result.text.trim();
   } catch (error) {
+    // The SDK can reject an empty or malformed JSON completion before returning
+    // the result. Give the bounded formatter retry the same input in that case.
+    if (role !== 'reply' && NoObjectGeneratedError.isInstance(error)) return error.text?.trim() ?? '';
+    if (role !== 'reply' && NoContentGeneratedError.isInstance(error)) return '';
     if (!context.signal.aborted || context.signal.reason?.name === 'TimeoutError') {
       console.warn(JSON.stringify({ event: 'hamad_model_failure', trace: context.trace, role,
         reason: timeout.aborted || context.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'provider',
