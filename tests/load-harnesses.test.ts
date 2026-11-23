@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -121,10 +121,14 @@ for (const separator of [[], ['--']]) {
   test(`k6 runner preserves command flags ${separator.length ? 'with' : 'without'} an explicit separator`, async () => {
     const flags = ['--vus', '1', '--iterations', '1', '--duration', '10s', '--quiet'];
     const { stdout } = await run(process.execPath, ['--import', pathToFileURL(resolve('tests/fixtures/k6-spawn-probe.mjs')).href,
-      resolve('tests/load/scripts/run-k6.mjs'), 'tests/load/scenarios/public-read.js', ...separator, ...flags]);
+      resolve('tests/load/scripts/run-k6.mjs'), 'tests/load/scenarios/public-read.js', ...separator, ...flags], {
+      // The probe captures invocation without requiring k6 to be installed in CI.
+      env: { ...process.env, SMARTSTORE_K6_EXECUTABLE: process.execPath },
+    });
     const invocation = JSON.parse(stdout);
-    assert.equal(invocation.command, 'k6');
+    assert.equal(invocation.command, realpathSync(process.execPath));
     assert.deepEqual(invocation.args, ['run', resolve('tests/load/scenarios/public-read.js'), ...flags]);
+    assert.equal(invocation.shell, false);
   });
 }
 

@@ -123,12 +123,11 @@ async function audit(target) {
   }
   const executablePath = await findChrome();
   const diagnosticsRoot = join(repoRoot, '.data/browser-diagnostics');
-  await mkdir(diagnosticsRoot, { recursive: true });
+  await mkdir(diagnosticsRoot, { recursive: true, mode: 0o700 });
   const runDir = await mkdtemp(join(diagnosticsRoot, 'lighthouse-'));
   const tempDir = join(runDir, 'temp');
   const profileDir = join(runDir, 'profile');
-  await Promise.all([mkdir(tempDir), mkdir(profileDir)]);
-  process.env.TEMP = process.env.TMP = tempDir;
+  await Promise.all([mkdir(tempDir, { mode: 0o700 }), mkdir(profileDir, { mode: 0o700 })]);
   const summary = {
     success: false, startedAt: new Date().toISOString(), target: displayUrl(target),
     mode: 'prepared browsing context navigation; desktop; storage reset enabled; provided throttling',
@@ -146,6 +145,7 @@ async function audit(target) {
   try {
     const { puppeteer, lighthouse, desktopConfig, saveAssets, ReportGenerator } = await loadTools();
     browser = await puppeteer.launch({ executablePath, headless: true,
+      env: { ...process.env, TEMP: tempDir, TMP: tempDir, TMPDIR: tempDir },
       userDataDir: profileDir, pipe: false, timeout: 15_000 });
     summary.versions.browser = await browser.version();
     const pages = await browser.pages();

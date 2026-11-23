@@ -40,7 +40,8 @@
     const request = init && input instanceof Request ? new Request(source, init) : source;
     const requestId = typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      : `${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(16)),
+        byte => byte.toString(16).padStart(2, '0')).join('')}`;
     const signal = request.signal;
 
     if (signal.aborted) throw new DOMException('The request was aborted.', 'AbortError');

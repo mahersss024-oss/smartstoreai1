@@ -7,6 +7,7 @@ import {
   detectAppPlatform,
   isInsideNativeApp,
   postToNative,
+  subscribeToNativeMessages,
 } from '@/lib/native/app-bridge';
 
 test('detectAppPlatform returns web when no navigator', () => {
@@ -36,6 +37,37 @@ test('postToNative returns false without a native shell', () => {
     postToNative({ type: 'ready', platform: 'web', version: '1' }),
     false,
   );
+});
+
+test('native bridge accepts messages only from the same window and origin', () => {
+  const listeners = new Map<string, (event: MessageEvent) => void>();
+  const bridgeWindow = {
+    location: { origin: 'https://localhost' },
+    addEventListener: (type: string, listener: (event: MessageEvent) => void) => listeners.set(type, listener),
+    removeEventListener: (type: string) => listeners.delete(type),
+  };
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: bridgeWindow });
+  try {
+    const received: string[] = [];
+    const unsubscribe = subscribeToNativeMessages(message => received.push(message.type));
+    const listener = listeners.get('message');
+    assert.ok(listener);
+    const trusted = {
+      origin: bridgeWindow.location.origin,
+      source: bridgeWindow as unknown as Window,
+      data: '{"type":"resume"}',
+    };
+    listener({ ...trusted, origin: 'https://example.test' } as MessageEvent);
+    listener({ ...trusted, source: null } as MessageEvent);
+    listener(trusted as MessageEvent);
+    assert.deepEqual(received, ['resume']);
+    unsubscribe();
+    assert.equal(listeners.size, 0);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
 });
 
 test('native bridge accepts android viewport inset updates', () => {

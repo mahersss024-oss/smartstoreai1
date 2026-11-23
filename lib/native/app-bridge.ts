@@ -138,6 +138,9 @@ export function subscribeToNativeMessages(
   }
 
   const onMessage = (event: MessageEvent) => {
+    if (event.source !== window || event.origin === 'null' || event.origin !== window.location.origin) {
+      return;
+    }
     const parsed = parseInboundMessage(event.data);
 
     if (parsed) {
