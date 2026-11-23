@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { MouseEvent, TouchEvent, WheelEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent, TouchEvent, WheelEvent } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
@@ -36,6 +36,13 @@ const minImageZoom = 1;
 const maxImageZoom = 4;
 const imageZoomStep = 0.5;
 const emptyImagePan: ImagePan = { x: 0, y: 0 };
+const keyboardPanStep = 40;
+const keyboardPanOffsets = new Map<string, ImagePan>([
+  ['ArrowLeft', { x: keyboardPanStep, y: 0 }],
+  ['ArrowRight', { x: -keyboardPanStep, y: 0 }],
+  ['ArrowUp', { x: 0, y: keyboardPanStep }],
+  ['ArrowDown', { x: 0, y: -keyboardPanStep }],
+]);
 
 function clampImageZoom(value: number) {
   return Math.min(maxImageZoom, Math.max(minImageZoom, Number(value.toFixed(2))));
@@ -287,6 +294,19 @@ export function ListingImageGallery({
     mousePanStartRef.current = null;
   };
 
+  const handleLightboxKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (imageZoom <= 1 || event.target !== event.currentTarget ||
+        event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const offset = keyboardPanOffsets.get(event.key);
+    if (!offset) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    setImagePan(pan => getBoundedImagePan(
+      { x: pan.x + offset.x, y: pan.y + offset.y }, imageZoom, imageViewportRef.current,
+    ));
+  };
+
   useEffect(() => {
     if (!isLightboxOpen) {
       return;
@@ -441,9 +461,11 @@ export function ListingImageGallery({
           </div>
           <div
             ref={imageViewportRef}
+            aria-label={imageZoom > 1 ? 'تحريك الصورة المكبّرة بالأسهم' : undefined}
             className={`relative grid min-h-0 touch-none place-items-center overflow-hidden px-3 py-3 sm:px-20 sm:py-4 ${
               imageZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
+            onKeyDown={handleLightboxKeyDown}
             onMouseDown={handleLightboxMouseDown}
             onMouseLeave={endMousePan}
             onMouseMove={handleLightboxMouseMove}
@@ -454,6 +476,8 @@ export function ListingImageGallery({
             onTouchMove={handleLightboxTouchMove}
             onTouchStart={handleLightboxTouchStart}
             onWheel={handleLightboxWheel}
+            role={imageZoom > 1 ? 'region' : undefined}
+            tabIndex={imageZoom > 1 ? 0 : undefined}
           >
             <ResilientImage
               key={`backdrop-${selectedThumbnailUrl || selectedDisplayUrl}`}

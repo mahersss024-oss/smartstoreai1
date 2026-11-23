@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, MapPin, Search } from 'lucide-react';
 
@@ -39,9 +39,12 @@ export function CitySelector({
   className,
   popoverClassName,
 }: CitySelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(null);
+  const isOpen = popoverContainer !== null;
   const [query, setQuery] = useState('');
+  const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -107,10 +110,15 @@ export function CitySelector({
     }
     const closeOnOutsideClick = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node) &&
-          !popoverRef.current?.contains(event.target as Node)) setIsOpen(false);
+          !popoverRef.current?.contains(event.target as Node)) setPopoverContainer(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key !== 'Escape') return;
+      setPopoverContainer(null);
+      const target = event.target as Node | null;
+      if (rootRef.current?.contains(target) || popoverRef.current?.contains(target)) {
+        triggerRef.current?.focus({ preventScroll: true });
+      }
     };
 
     document.addEventListener('mousedown', closeOnOutsideClick);
@@ -124,7 +132,23 @@ export function CitySelector({
   const selectValue = (nextValue: string) => {
     onValueChange(nextValue);
     setQuery('');
-    setIsOpen(false);
+    setPopoverContainer(null);
+    triggerRef.current?.focus({ preventScroll: true });
+  };
+
+  const moveOptionFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (!isOpen || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const options = Array.from(popoverRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    if (!options.length) return;
+
+    event.preventDefault();
+    const currentIndex = options.findIndex(option => option === event.target);
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = currentIndex < 0
+      ? (direction === 1 ? 0 : options.length - 1)
+      : Math.max(0, Math.min(currentIndex + direction, options.length - 1));
+    options[nextIndex].focus();
   };
 
   const visibleLabel = value === allValue ? allLabel : value || placeholder;
@@ -132,18 +156,22 @@ export function CitySelector({
   return (
     <div
       className={cn('relative min-w-0', isOpen && 'z-50', className)}
+      data-city-selector-open={isOpen || undefined}
       ref={rootRef}
     >
       {name ? <input name={name} type="hidden" value={value} /> : null}
       <button
+        aria-controls={isOpen ? listboxId : undefined}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         className="flex h-10 w-full items-center gap-2 rounded-md border bg-background px-3 text-right text-sm outline-none transition-colors hover:bg-accent focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
-        onClick={() => {
+        onClick={(event) => {
           setQuery('');
-          setIsOpen((current) => !current);
+          setPopoverContainer(isOpen ? null : event.currentTarget.closest<HTMLElement>('[role="dialog"]') ?? document.body);
         }}
+        onKeyDown={moveOptionFocus}
+        ref={triggerRef}
         type="button"
       >
         <MapPin className="size-4 shrink-0 text-blue-600" />
@@ -163,7 +191,7 @@ export function CitySelector({
         />
       </button>
 
-      {isOpen ? createPortal(
+      {popoverContainer ? createPortal(
         <div
           ref={popoverRef}
           className={cn(
@@ -171,8 +199,10 @@ export function CitySelector({
             popoverClassName,
           )}
           dir="rtl"
+          data-city-selector-open
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
+          onKeyDown={moveOptionFocus}
         >
           <div className="flex shrink-0 items-center gap-2 border-b px-3">
             <Search className="size-4 shrink-0 text-muted-foreground" />
@@ -186,7 +216,7 @@ export function CitySelector({
               value={query}
             />
           </div>
-          <div className="min-h-0 max-h-64 overflow-y-auto overscroll-contain p-1" role="listbox">
+          <div aria-label="المدن" className="min-h-0 max-h-64 overflow-y-auto overscroll-contain p-1" id={listboxId} role="listbox">
             {allValue !== undefined && !query ? (
               <button
                 aria-selected={value === allValue}
@@ -223,7 +253,7 @@ export function CitySelector({
             ) : null}
           </div>
         </div>,
-        document.body,
+        popoverContainer,
       ) : null}
     </div>
   );

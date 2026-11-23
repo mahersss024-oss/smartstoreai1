@@ -47,6 +47,11 @@ export function AdminRecordPreview({
           className="admin-preview"
           dir="rtl"
           aria-describedby={undefined}
+          onEscapeKeyDown={(event) => {
+            if (event.target instanceof Element && event.target.closest('[data-city-selector-open]')) {
+              event.preventDefault();
+            }
+          }}
           onOpenAutoFocus={() => {
             opener.current = document.activeElement as HTMLElement;
           }}

@@ -172,6 +172,40 @@ test('listing and user saves send only the fields the administrator changed', as
   expect(writes[1].body).toEqual({ phoneNumber: '0555555555' });
 });
 
+test('listing city keyboard selection keeps focus in the preview and saves the same city field', async ({ page, baseURL }) => {
+  const writes = await prepare(page, baseURL!);
+  await page.goto('/admin/listings');
+  await page.getByRole('button', { name: 'معاينة إعلان الاختبار', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'معاينة الإعلان', exact: true });
+  const trigger = preview.getByRole('button', { name: 'الرياض', exact: true });
+  const search = preview.getByRole('searchbox', { name: 'البحث عن مدينة' });
+  const listbox = preview.getByRole('listbox', { name: 'المدن' });
+  const options = listbox.getByRole('option');
+
+  await trigger.press('Enter');
+  await search.press('ArrowDown');
+  await expect(options.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(options.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(options.first()).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(listbox).toHaveCount(0);
+  await expect(preview).toBeVisible();
+  await expect(trigger).toBeFocused();
+
+  await trigger.press('Enter');
+  await search.fill('جدة');
+  await search.press('ArrowDown');
+  await expect(listbox.getByRole('option', { name: 'جدة', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(preview.getByRole('button', { name: 'جدة', exact: true })).toBeFocused();
+  await preview.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await expect.poll(() => writes).toEqual([{
+    path: '/api/admin/listings/presentation-listing', method: 'PATCH', body: { city: 'جدة' },
+  }]);
+});
+
 test('record previews preserve drafts results focus and original deletion confirmation', async ({
   page,
   baseURL,

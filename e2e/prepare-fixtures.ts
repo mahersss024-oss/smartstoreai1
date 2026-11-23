@@ -7,6 +7,18 @@ if (!process.env.SMARTSTORE_DATA_DIR || process.env.SMARTSTORE_MARKETPLACE_STORE
 
 for (const project of ['desktop-chromium', 'mobile-chromium-layout']) {
   createListingDraft({ id: `e2e-private-draft-${project}`, sellerId: 'e2e-report-seller', category: 'other', title: 'Private draft fixture', description: 'Unpublished fixture, never public' });
+  const galleryListingId = `e2e-admin-gallery-${project}`;
+  createListingDraft({
+    id: galleryListingId, sellerId: 'e2e-gallery-seller', category: 'other', title: 'إعلان اختبار المعرض',
+    images: [1, 2].map(index => {
+      const url = `${process.env.NEXT_PUBLIC_APP_URL}/hamad-market-logo.webp?gallery=${index}`;
+      return {
+        id: `${galleryListingId}-${index}`, listingId: galleryListingId,
+        originalUrl: url, displayUrl: url, thumbnailUrl: url,
+        isPrimary: index === 1, qualityScore: 100, status: 'approved', enhancements: [],
+      };
+    }),
+  });
   const listing = createListingDraft({
     id: `e2e-report-${project}`,
     sellerId: 'e2e-report-seller',
