@@ -20,6 +20,7 @@ export async function retryDirectImageTransaction<T>(operation: () => Promise<T>
     catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
       if (code !== 'P2034' || attempt >= retries) throw error;
+      // Spread transaction retries after a concurrent write.
       await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1) + Math.floor(Math.random() * 40)));
     }
   }

@@ -61,6 +61,7 @@ async function serializable<T>(operation: (tx: Prisma.TransactionClient) => Prom
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
       if (!['P2034', 'P2002'].includes(String(code)) || attempt >= 8) throw error;
+      // Spread transaction retries after a concurrent write.
       await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1) + Math.floor(Math.random() * 50)));
     }
   }

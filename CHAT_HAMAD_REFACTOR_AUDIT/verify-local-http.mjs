@@ -7,6 +7,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { localExecutable } from '../scripts/dev-tools/local-executable.mjs';
 
 const fixture = 'HAMAD_HTTP_SMOKE_CHILD';
 if (process.env[fixture] === '1') {
@@ -55,7 +56,8 @@ if (process.env[fixture] === '1') {
     databaseUrl = target.href;
   }
   const cwd = resolve(source);
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const gitExecutable = localExecutable('git');
+  const git = (...args) => execFileSync(gitExecutable, args, { cwd, encoding: 'utf8' }).trim();
   assert.equal(git('status', '--porcelain=v1'), '');
   for (const name of ['.env', '.env.local', '.env.production', '.env.production.local', '.env.test', '.env.test.local']) {
     assert.ok(!existsSync(resolve(cwd, name)), 'The isolated checkout must contain no runtime environment files');

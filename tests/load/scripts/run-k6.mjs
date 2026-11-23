@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { localExecutable } from '../../../scripts/dev-tools/local-executable.mjs';
 
 const scenario = process.argv[2];
 
@@ -37,17 +38,21 @@ if (env.K6_DURATION && !env.SMARTSTORE_LOAD_DURATION) {
 delete env.K6_MAX_VUS;
 delete env.K6_DURATION;
 
-const result = spawnSync('k6', ['run', scenarioPath, ...passthroughArgs], {
-  cwd: process.cwd(),
-  env,
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-});
-
-if (result.error?.code === 'ENOENT') {
-  console.error('k6 is not installed or is not available on PATH.');
+let executable;
+try {
+  executable = localExecutable('k6');
+} catch (error) {
+  console.error(error.message);
   console.error('Install it from https://grafana.com/docs/k6/latest/set-up/install-k6/.');
   process.exit(1);
 }
+
+const result = spawnSync(executable, ['run', scenarioPath, ...passthroughArgs], {
+  cwd: process.cwd(),
+  env,
+  stdio: 'inherit',
+});
+
+if (result.error) console.error(result.error.message);
 
 process.exit(result.status ?? 1);
