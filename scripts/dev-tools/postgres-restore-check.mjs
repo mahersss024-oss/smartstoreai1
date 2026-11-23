@@ -289,13 +289,17 @@ export async function runRestoreCheck(root, options = {}) {
       }
       if (!receipt.clusterStateRestored) throw new Error('Cluster state was not restored.');
     } catch { failure ??= new Error('Could not restore the original isolated cluster running state.'); }
-    const within = relative(join(plan.state, 'restore-drills'), resolve(plan.directory));
-    if (within !== plan.token || !tokenPattern.test(within)) throw new Error('Refusing filesystem cleanup outside the generated local recovery directory.');
-    assertLocalRecoveryPath(plan.state); assertLocalRecoveryPath(parent); assertLocalRecoveryPath(plan.directory);
-    rmSync(plan.directory, { recursive: true, force: true });
+    try {
+      const within = relative(join(plan.state, 'restore-drills'), resolve(plan.directory));
+      if (within !== plan.token || !tokenPattern.test(within)) throw new Error('Refusing filesystem cleanup outside the generated local recovery directory.');
+      assertLocalRecoveryPath(plan.state); assertLocalRecoveryPath(parent); assertLocalRecoveryPath(plan.directory);
+      rmSync(plan.directory, { recursive: true, force: true });
+    } catch (error) { failure ??= error; }
     receipt.status = failure ? 'failed' : 'passed'; receipt.durationMilliseconds = Date.now() - began;
-    mkdirSync(dirname(plan.receipt), { recursive: true });
-    writeFileSync(plan.receipt, JSON.stringify(receipt, null, 2) + '\n');
+    try {
+      mkdirSync(dirname(plan.receipt), { recursive: true });
+      writeFileSync(plan.receipt, JSON.stringify(receipt, null, 2) + '\n');
+    } catch (error) { failure ??= error; }
   }
   if (failure) throw failure;
   return receipt;

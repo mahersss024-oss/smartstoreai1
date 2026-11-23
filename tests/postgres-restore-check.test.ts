@@ -133,6 +133,19 @@ test('restore drill rejects changed data or schema and always removes both tempo
   }
 });
 
+test('a failed report write preserves the first restore failure and still cleans up', async t => {
+  const runtime = fakeRuntime(t, { running: true, failPhase: 'target-restore' });
+  writeFileSync(join(runtime.root, 'coverage'), 'synthetic report obstruction');
+
+  await assert.rejects(
+    runRestoreCheck(runtime.root, { env, settings, token, postgresBin: runtime.bin, execute: runtime.execute }),
+    /failed at target-restore/,
+  );
+  assert.equal(runtime.databases.size, 0);
+  assert.equal(runtime.isRunning(), true);
+  assert.equal(existsSync(runtime.plan.directory), false);
+});
+
 test('restore executable refuses to start without opt-in and never prints an inherited production connection', () => {
   const child = spawnSync(process.execPath, [resolve('scripts/dev-tools/postgres-restore-check.mjs')], {
     env: { ...process.env, ...env, SMARTSTORE_LOCAL_RESTORE_DRILL: '0', NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 5_000,

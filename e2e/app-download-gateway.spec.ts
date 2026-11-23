@@ -64,6 +64,33 @@ test('administrative previews remain browser-accessible and private drafts stay 
   await expect(page.locator('[data-admin-record-preview]')).toHaveCount(0);
 });
 
+test('administrative image gallery pans a zoomed image with the keyboard and preserves image navigation', async ({ page, baseURL }, info) => {
+  const [name, value] = createSessionCookie({ id: 'preview-admin', email: 'preview-admin@example.test', role: 'admin' }).split(';')[0].split('=');
+  await page.context().addCookies([{ name, value, url: baseURL! }]);
+  await page.goto(`/listings/e2e-admin-gallery-${info.project.name}`);
+  await page.getByRole('button', { name: /فتح الصورة 1 بالحجم الكامل/ }).press('Enter');
+  const lightbox = page.getByRole('dialog', { name: 'عارض صور الإعلان' });
+  const image = lightbox.getByRole('img', { name: 'إعلان اختبار المعرض', exact: true });
+  const viewport = lightbox.getByRole('region', { name: 'تحريك الصورة المكبّرة بالأسهم' });
+  await expect(image).toHaveAttribute('src', /gallery=1/);
+
+  await lightbox.getByRole('button', { name: 'تكبير الصورة', exact: true }).press('Enter');
+  await expect(viewport).toHaveAttribute('tabindex', '0');
+  await viewport.press('ArrowRight');
+  await expect(viewport).toBeFocused();
+  await viewport.press('ArrowDown');
+  await expect.poll(() => image.evaluate(element => {
+    const pan = new DOMMatrix(getComputedStyle(element).transform);
+    return pan.m41 < 0 && pan.m42 < 0;
+  })).toBe(true);
+  await expect(image).toHaveAttribute('src', /gallery=1/);
+
+  await lightbox.getByRole('button', { name: 'تصغير الصورة', exact: true }).press('Enter');
+  await expect(viewport).toHaveCount(0);
+  await page.keyboard.press('ArrowLeft');
+  await expect(image).toHaveAttribute('src', /gallery=2/);
+});
+
 test('public root is an honest app gateway without market navigation or redirects', async ({ page, isMobile }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
