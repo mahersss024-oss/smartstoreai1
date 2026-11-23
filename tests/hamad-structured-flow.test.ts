@@ -19,12 +19,15 @@ const cookies = new Map<string, string>();
 function user(id: string, text: string): Turn {
   return { id, role: 'user', parts: [{ type: 'text', text }] };
 }
-function enable(t: TestContext, plans: Plan[], options: {
+function enable(t: TestContext, plans: (Plan | string)[], options: {
   reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean; failReply?: boolean;
+  categoryReplies?: string[];
+  onProviderRequest?: (role: string, responseFormat: unknown) => void;
   onModelInput?: (role: string, data: Record<string, unknown>) => void | Promise<void>;
 } = {}) {
   const roles: string[] = [];
   let index = 0;
+  let categoryIndex = 0;
   const analysis = textAnalysis({ intent: 'create_listing' });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
@@ -36,10 +39,12 @@ function enable(t: TestContext, plans: Plan[], options: {
     if (system.includes('[hamad:plan]')) {
       roles.push('plan');
       if (options.failPlan) throw new DOMException('fixture timeout', 'AbortError');
-      content = JSON.stringify(plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' });
+      const plan = plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' };
+      content = typeof plan === 'string' ? plan : JSON.stringify(plan);
     } else if (system.includes('[hamad:draft-fields]')) {
       roles.push('draft-fields');
-      content = '{"details":{"category":"mobile_phones"},"evidence":{"category":"جوال"}}';
+      content = options.categoryReplies?.[categoryIndex++]
+        ?? '{"details":{"category":"mobile_phones"},"evidence":{"category":"جوال"}}';
     } else if (system.includes('[hamad:write-check]')) {
       roles.push('write-check');
       content = JSON.stringify({ allow: options.writeAllowed ?? true });
@@ -57,8 +62,10 @@ function enable(t: TestContext, plans: Plan[], options: {
       roles.push('other');
       content = '{"decision":"ALLOW","confidence":1,"reason_code":"legacy_fixture","intent":"support"}';
     }
-    if (options.onModelInput && roles.at(-1) !== 'vision' && roles.at(-1) !== 'other') {
-      await options.onModelInput(roles.at(-1)!, JSON.parse(String(messages.at(-1)?.content)));
+    const role = roles.at(-1)!;
+    if (role !== 'vision' && role !== 'other') {
+      await options.onModelInput?.(role, JSON.parse(String(messages.at(-1)?.content)));
+      options.onProviderRequest?.(role, input.response_format);
     }
     return Response.json({ id: 'synthetic-hamad', object: 'chat.completion', created: 1, model: 'fixture',
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
@@ -333,6 +340,51 @@ test('creates a draft from customer details and consults the official category c
   assert.deepEqual(roles, ['plan', 'draft-fields', 'write-check', 'reply', 'source-check']);
   assert.equal(facts?.receipts[0]?.title, 'جوال أسود');
   assert.equal(facts?.receipts[0]?.status, 'draft');
+  assert.match(String(reply.metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
+});
+
+test('draft creation resolves a model category label and ignores optional null fields without losing customer facts', async (t) => {
+  const name = 'hamad-draft-category-label-recovery';
+  const roles = enable(t, [{
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود', category: 'الجوالات', description: null, price: null },
+    evidence: { title: 'جوال أسود', category: 'جوال', description: null, price: null }, photos: null,
+  }]);
+  await send(name, [user('category-label', 'سو مسودة لجوال أسود')]);
+  const [saved] = listSellerListings(name);
+  assert.equal(saved?.title, 'جوال أسود');
+  assert.equal(saved?.category, 'mobile_phones');
+  assert.equal(saved?.status, 'draft');
+  assert.equal(saved?.price, undefined);
+  assert.deepEqual(roles, ['plan', 'draft-fields', 'write-check', 'reply', 'source-check']);
+});
+
+test('an empty model plan requests a JSON object once more before saving exactly one draft', async (t) => {
+  const name = 'hamad-draft-empty-json-recovery';
+  const calls: [string, unknown][] = [];
+  const roles = enable(t, [' ', {
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود', category: 'mobile_phones' },
+    evidence: { title: 'جوال أسود', category: 'جوال' },
+  }], { onProviderRequest: (role, responseFormat) => { calls.push([role, responseFormat]); } });
+  await send(name, [user('empty-plan', 'سو مسودة لجوال أسود')]);
+  assert.equal(listSellerListings(name).length, 1);
+  assert.deepEqual(roles, ['plan', 'plan', 'write-check', 'reply', 'source-check']);
+  for (const [role, responseFormat] of calls) {
+    assert.deepEqual(responseFormat, role === 'reply' ? undefined : { type: 'json_object' });
+  }
+});
+
+test('an unverified category preserves intake and never saves a guessed category', async (t) => {
+  const name = 'hamad-draft-category-unverified';
+  const roles = enable(t, [{
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود' }, evidence: { title: 'جوال أسود' },
+  }], { categoryReplies: [' ', '{"details":{"category":"guessed"}}'], failReply: true });
+  const reply = await send(name, [user('category-unverified', 'سو مسودة لجوال أسود')]);
+  assert.match(reply.parts[0].text, /تصنيف المنتج/u);
+  assert.equal(listSellerListings(name).length, 0);
+  assert.deepEqual(roles, ['plan', 'draft-fields', 'draft-fields', 'reply']);
   assert.match(String(reply.metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
 });
 

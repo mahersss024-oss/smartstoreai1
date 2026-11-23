@@ -160,9 +160,11 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
   }
 
   let plan: HamadPlan;
+  let stage = 'plan';
   try {
     if (input.validationMessage) return answer(input.validationMessage);
     if (input.draftAction) {
+      stage = 'draft_picker';
       if (input.draftAction.type === 'list') return await showPage(0);
       if (input.draftAction.type === 'select') return await selectDraft(input.draftAction.choice, input.draftAction.page);
       const page = state.page;
@@ -171,10 +173,12 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     }
     // A conversation resumed from a checkpoint issued before cards may still have a selected draft.
     if (input.draftCards && state.focus && !state.focusTitle) {
+      stage = 'draft_read';
       const selected = await capabilities.get_draft.run(capabilityContext, state.focus);
       if (!selected || selected.ref.version !== state.focus.version) return await showPage(0, undefined, true);
       state = { ...state, focusTitle: selected.data.title || 'مسودة' };
     }
+    stage = 'plan';
     plan = await planHamadTurn({
       request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
       canRequestRetainedImages: Boolean(state.image && !currentImage),
@@ -191,6 +195,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     if (process.env.SMARTSTORE_DEEPSEEK_METRICS === '1') {
       console.info(JSON.stringify({ event: 'hamad_structured_plan', trace: context.trace, action: plan.action }));
     }
+    stage = plan.action;
     if (plan.action === 'list') return await showPage(0);
     if (plan.action === 'next') return state.page?.hasNext
       ? await showPage(state.page.offset + state.page.entries.length, state.page.rosterHash) : await showPage(0);
@@ -252,8 +257,12 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
 
     const creating = plan.action === 'create';
     if (creating && !plan.details?.category && (plan.details?.title || plan.details?.description)) {
+      stage = 'draft_category';
       const catalog = await capabilities.get_categories.run(capabilityContext, {});
-      const inferred = await inferHamadDraftCategory({ request: input.request, details: plan.details, catalog }, context);
+      const inferred = await inferHamadDraftCategory({
+        request: input.request, history: draftHistory, details: plan.details, catalog,
+      }, context).catch(() => null);
+      context.signal.throwIfAborted();
       if (inferred) {
         plan = { ...plan, details: { ...plan.details, ...inferred.details },
           evidence: { ...plan.evidence, ...inferred.evidence } };
@@ -261,13 +270,15 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     }
     const details = plan.details ?? {};
     if (creating && (!details.category || !(details.title?.trim() || details.description?.trim()))) {
+      const missingProduct = !details.title?.trim() && !details.description?.trim();
       state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.requestKey,
         focus: undefined, focusTitle: undefined, page: undefined };
       // A photo can inform the next question, yet only customer-confirmed facts can be saved.
       const observations = images.length && imageSource
         ? await capabilities.analyze_image.run(mediaContext, { photos: indexes.length ? indexes : [0] }) : undefined;
       return answer(await groundedReply({ status: 'collecting', suggestion: plan.reply,
-        missing: !details.title && !details.description ? 'product identity' : 'category', observations }));
+        missing: missingProduct ? 'product identity' : 'category', observations },
+      missingProduct ? 'وش المنتج اللي تبي تجهّز له إعلان؟' : 'وش تصنيف المنتج اللي تبي تعلن عنه؟'));
     }
     if (!creating && !state.focus) return await showPage(0);
     const quotes = creating
@@ -281,6 +292,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     const key = createHash('sha256').update(JSON.stringify([
       input.session.user.sessionVersion ?? 0, input.session.issuedAt, input.conversationId, input.requestKey,
     ])).digest('hex');
+    stage = 'write_reservation';
     const lease = await reserveIdempotencyKey(new Request('http://localhost/api/chat', { headers: { 'idempotency-key': key } }),
       { namespace: 'hamad_structured_write', actorKey: input.session.user.id });
     if (!lease) return answer(unavailable);
@@ -306,6 +318,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
             return answer('يُنفّذ حمد طلبًا آخر على هذه المسودة الآن. جرّب بعد قليل.');
           }
         }
+        stage = 'write_check';
         const approved = await verifyHamadWrite({
           request: input.request, history: creating ? draftHistory : [],
           action: plan.action, proposedDetails: details, evidence: plan.evidence, reference: plan.reference,
@@ -316,6 +329,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
           return answer(await groundedReply({ status: 'write_not_authorized', suggestion: plan.reply }));
         }
         writeStarted = true;
+        stage = 'draft_save';
         const writeContext = { ...mediaContext, operationKey: lease.operationKey };
         result = creating && details.category ? await capabilities.create_draft.run(writeContext, {
           details: { ...details, category: details.category }, photos: indexes,
@@ -334,6 +348,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
             result = { ...result, status: 'fields_saved_photos_unconfirmed' };
           }
         }
+        stage = 'write_receipt';
         await lease.complete(result);
       } catch (error) {
         // An unknown outcome after dispatch keeps its operation reservation. Later retries use the same identity.
@@ -368,7 +383,12 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       return answer([saved ? savedText : '', resultText].filter(Boolean).join(' '), {}, view);
     }
     return answer(await groundedReply({ status, receipts }, fallback, ['/account/listings']), {}, view);
-  } catch {
+  } catch (error) {
+    if (!input.signal.aborted) {
+      const code = typeof error === 'object' && error && 'code' in error && typeof error.code === 'string'
+        && /^P\d{4}$/u.test(error.code) ? error.code : undefined;
+      console.warn(JSON.stringify({ event: 'hamad_turn_failure', trace: context.trace, stage, code }));
+    }
     return answer(chatServiceUnavailableMessage);
   }
 }
