@@ -22,7 +22,7 @@ type Run = {
   draftAction?: HamadDraftAction;
   validationMessage?: string;
   creationEnabled: boolean;
-  creationIntake?: string;
+  creationIntake?: { text: string; id?: string };
   reset: boolean;
   currentImages: UploadedListingImage[];
   imageSourceId?: string;
@@ -72,16 +72,16 @@ function decimalFromQuote(value: string) {
   return Number(normalized.replaceAll(',', ''));
 }
 
-function hasFieldProof(plan: HamadPlan, texts: readonly string[]) {
+function unverifiedFields(plan: HamadPlan, texts: readonly string[]) {
   const evidence: Record<string, string> = plan.evidence ?? {};
   const fields = Object.entries(plan.details ?? {}).flatMap(([key, value]) => key === 'attributes'
     ? Object.entries(value as Record<string, unknown>).map(([field, detail]) => ['attributes.' + field, detail] as const)
     : [[key, value] as const]);
-  return fields.every(([key, value]) => {
+  return fields.filter(([key, value]) => {
     const quote = evidence[key];
-    if (!quote || !texts.some((text) => hasExactQuote(text, quote))) return false;
-    return key !== 'price' || typeof value !== 'number' || decimalFromQuote(quote) === value;
-  });
+    if (!quote || !texts.some((text) => hasExactQuote(text, quote))) return true;
+    return key === 'price' && typeof value === 'number' && decimalFromQuote(quote) !== value;
+  }).map(([key]) => key);
 }
 
 export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
@@ -89,9 +89,14 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
   let state = input.reset ? {} : openHamadState(input.checkpoint, input.session, input.conversationId);
   const collectingStart = state.collecting ? input.history.findIndex(({ id }) => id === state.collecting) : -1;
   const untaggedHistory = input.history.map(({ role, text }) => ({ role, text }));
-  const draftHistory = input.creationIntake
-    ? [{ role: 'user' as const, text: input.creationIntake }]
+  const draftHistory = input.creationIntake?.text
+    ? [{ role: 'user' as const, text: input.creationIntake.text }]
     : collectingStart < 0 ? [] : untaggedHistory.slice(collectingStart);
+  const collecting = collectingStart >= 0 || Boolean(input.creationIntake?.text);
+  const keepDraftIntake = () => {
+    state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.creationIntake?.id || input.requestKey,
+      focus: undefined, focusTitle: undefined, page: undefined };
+  };
   const currentImage = draftImageSource(input.imageSourceId ?? input.requestKey, input.currentImages);
   if (currentImage) state = { ...state, image: currentImage };
   const capabilityContext = { ...context, session: input.session, images: input.currentImages,
@@ -160,9 +165,11 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
   }
 
   let plan: HamadPlan;
+  let stage = 'plan';
   try {
     if (input.validationMessage) return answer(input.validationMessage);
     if (input.draftAction) {
+      stage = 'draft_picker';
       if (input.draftAction.type === 'list') return await showPage(0);
       if (input.draftAction.type === 'select') return await selectDraft(input.draftAction.choice, input.draftAction.page);
       const page = state.page;
@@ -171,14 +178,17 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     }
     // A conversation resumed from a checkpoint issued before cards may still have a selected draft.
     if (input.draftCards && state.focus && !state.focusTitle) {
+      stage = 'draft_read';
       const selected = await capabilities.get_draft.run(capabilityContext, state.focus);
       if (!selected || selected.ref.version !== state.focus.version) return await showPage(0, undefined, true);
       state = { ...state, focusTitle: selected.data.title || 'مسودة' };
     }
+    stage = 'plan';
     plan = await planHamadTurn({
       request: input.request, history: untaggedHistory, hasImages: input.currentImages.length > 0,
+      imageCount: input.currentImages.length,
       canRequestRetainedImages: Boolean(state.image && !currentImage),
-      conversation: { collecting: collectingStart >= 0 || Boolean(input.creationIntake), hasConfirmedDraft: Boolean(state.focus),
+      conversation: { collecting, hasConfirmedDraft: Boolean(state.focus),
         selectedDraftTitle: state.focusTitle,
         displayedChoices: state.page?.entries.length ?? 0, hasNext: state.page?.hasNext === true },
       authorizedTopics: platformHelpTopics,
@@ -191,6 +201,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     if (process.env.SMARTSTORE_DEEPSEEK_METRICS === '1') {
       console.info(JSON.stringify({ event: 'hamad_structured_plan', trace: context.trace, action: plan.action }));
     }
+    stage = plan.action;
     if (plan.action === 'list') return await showPage(0);
     if (plan.action === 'next') return state.page?.hasNext
       ? await showPage(state.page.offset + state.page.entries.length, state.page.rosterHash) : await showPage(0);
@@ -252,8 +263,12 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
 
     const creating = plan.action === 'create';
     if (creating && !plan.details?.category && (plan.details?.title || plan.details?.description)) {
+      stage = 'draft_category';
       const catalog = await capabilities.get_categories.run(capabilityContext, {});
-      const inferred = await inferHamadDraftCategory({ request: input.request, details: plan.details, catalog }, context);
+      const inferred = await inferHamadDraftCategory({
+        request: input.request, history: draftHistory, details: plan.details, catalog,
+      }, context).catch(() => null);
+      context.signal.throwIfAborted();
       if (inferred) {
         plan = { ...plan, details: { ...plan.details, ...inferred.details },
           evidence: { ...plan.evidence, ...inferred.evidence } };
@@ -261,26 +276,33 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
     }
     const details = plan.details ?? {};
     if (creating && (!details.category || !(details.title?.trim() || details.description?.trim()))) {
-      state = { ...state, collecting: collectingStart >= 0 ? state.collecting : input.requestKey,
-        focus: undefined, focusTitle: undefined, page: undefined };
+      const missingProduct = !details.title?.trim() && !details.description?.trim();
+      keepDraftIntake();
       // A photo can inform the next question, yet only customer-confirmed facts can be saved.
       const observations = images.length && imageSource
         ? await capabilities.analyze_image.run(mediaContext, { photos: indexes.length ? indexes : [0] }) : undefined;
       return answer(await groundedReply({ status: 'collecting', suggestion: plan.reply,
-        missing: !details.title && !details.description ? 'product identity' : 'category', observations }));
+        missing: missingProduct ? 'product identity' : 'category', observations },
+      missingProduct ? 'وش المنتج اللي تبي تجهّز له إعلان؟' : 'وش تصنيف المنتج اللي تبي تعلن عنه؟'));
     }
     if (!creating && !state.focus) return await showPage(0);
     const quotes = creating
       ? [...draftHistory.filter(({ role }) => role === 'user').map(({ text }) => text), input.request] : [input.request];
-    if (!input.requestKey || !input.conversationId || !plan.confirmWrite ||
-      !hasExactQuote(input.request, plan.reference) || !hasFieldProof(plan, quotes) ||
+    const confirmedRequest = plan.confirmWrite === true && hasExactQuote(input.request, plan.reference);
+    const unverified = unverifiedFields(plan, quotes);
+    if (!input.requestKey || !input.conversationId || !confirmedRequest || unverified.length ||
       (plan.action === 'update' && !Object.keys(details).length) || (plan.action === 'attach' && !indexes.length)) {
-      return answer(await groundedReply({ status: 'write_needs_clarification', suggestion: plan.reply }));
+      if (creating && confirmedRequest) keepDraftIntake();
+      const priceQuestion = unverified.length === 1 && unverified[0] === 'price';
+      return answer(await groundedReply({ status: 'write_needs_clarification', unverifiedFields: unverified,
+        suggestion: plan.reply, ...(priceQuestion && { instruction: 'Ask only for the price in digits.' }) },
+      priceQuestion ? 'كم السعر بالأرقام؟' : unavailable));
     }
 
     const key = createHash('sha256').update(JSON.stringify([
       input.session.user.sessionVersion ?? 0, input.session.issuedAt, input.conversationId, input.requestKey,
     ])).digest('hex');
+    stage = 'write_reservation';
     const lease = await reserveIdempotencyKey(new Request('http://localhost/api/chat', { headers: { 'idempotency-key': key } }),
       { namespace: 'hamad_structured_write', actorKey: input.session.user.id });
     if (!lease) return answer(unavailable);
@@ -306,16 +328,18 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
             return answer('يُنفّذ حمد طلبًا آخر على هذه المسودة الآن. جرّب بعد قليل.');
           }
         }
+        stage = 'write_check';
         const approved = await verifyHamadWrite({
           request: input.request, history: creating ? draftHistory : [],
           action: plan.action, proposedDetails: details, evidence: plan.evidence, reference: plan.reference,
-          confirmedDraft: target?.data, collecting: collectingStart >= 0 || Boolean(input.creationIntake), photoCount: indexes.length,
+          confirmedDraft: target?.data, collecting, photoCount: indexes.length,
         }, context);
         if (!approved) {
           await lease.abandon();
           return answer(await groundedReply({ status: 'write_not_authorized', suggestion: plan.reply }));
         }
         writeStarted = true;
+        stage = 'draft_save';
         const writeContext = { ...mediaContext, operationKey: lease.operationKey };
         result = creating && details.category ? await capabilities.create_draft.run(writeContext, {
           details: { ...details, category: details.category }, photos: indexes,
@@ -334,6 +358,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
             result = { ...result, status: 'fields_saved_photos_unconfirmed' };
           }
         }
+        stage = 'write_receipt';
         await lease.complete(result);
       } catch (error) {
         // An unknown outcome after dispatch keeps its operation reservation. Later retries use the same identity.
@@ -367,8 +392,19 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       const resultText = `حُفظت ${attached} من أصل ${requested} صورة. يمكنك إعادة إرفاق الصور المتبقية.`;
       return answer([saved ? savedText : '', resultText].filter(Boolean).join(' '), {}, view);
     }
+    const pendingPhotoSource = state.image?.sourceId;
+    const photosInIntake = collectingStart >= 0 && pendingPhotoSource
+      && input.history.slice(collectingStart).some(({ id }) => id === pendingPhotoSource);
+    if (creating && saved && !requested && (currentImage || photosInIntake || (plan.useRetained && pendingPhotoSource))) {
+      return answer(savedText + ' لم تُرفق الصور المرسلة. تقدر تضيفها من [إعلاناتي](/account/listings).', {}, view);
+    }
     return answer(await groundedReply({ status, receipts }, fallback, ['/account/listings']), {}, view);
-  } catch {
+  } catch (error) {
+    if (!input.signal.aborted) {
+      const code = typeof error === 'object' && error && 'code' in error && typeof error.code === 'string'
+        && /^P\d{4}$/u.test(error.code) ? error.code : undefined;
+      console.warn(JSON.stringify({ event: 'hamad_turn_failure', trace: context.trace, stage, code }));
+    }
     return answer(chatServiceUnavailableMessage);
   }
 }

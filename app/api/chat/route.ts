@@ -363,7 +363,10 @@ export async function POST(request: Request) {
       conversationId: chatConversationId, checkpoint: metadata?.hamadDraftMemory,
       draftCards, draftAction: cardAction?.data,
       creationEnabled: body.creationMethod === 'chat', reset: body.resetDraftContext === true || body.beginDraftWithHamad === true,
-      creationIntake: creationIntake ? getChatMessageText(creationIntake).slice(0, 1_200) : undefined,
+      creationIntake: creationIntake ? {
+        text: getChatMessageText(creationIntake).slice(0, 1_200),
+        id: typeof creationIntake.id === 'string' && creationIntake.id.length <= 200 ? creationIntake.id : undefined,
+      } : undefined,
       validationMessage: getImageValidationMessage(imageFailure),
       currentImages: cardAction || imageFailure ? [] : extractRetainedUploadedListingImages(imageParts),
       imageSourceId: creationImageId ?? requestKey,

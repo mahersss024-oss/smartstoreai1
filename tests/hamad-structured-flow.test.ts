@@ -19,12 +19,15 @@ const cookies = new Map<string, string>();
 function user(id: string, text: string): Turn {
   return { id, role: 'user', parts: [{ type: 'text', text }] };
 }
-function enable(t: TestContext, plans: Plan[], options: {
+function enable(t: TestContext, plans: (Plan | string)[], options: {
   reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean; failReply?: boolean;
+  categoryReplies?: string[];
+  onProviderRequest?: (role: string, responseFormat: unknown) => void;
   onModelInput?: (role: string, data: Record<string, unknown>) => void | Promise<void>;
 } = {}) {
   const roles: string[] = [];
   let index = 0;
+  let categoryIndex = 0;
   const analysis = textAnalysis({ intent: 'create_listing' });
   t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
   t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
@@ -36,10 +39,12 @@ function enable(t: TestContext, plans: Plan[], options: {
     if (system.includes('[hamad:plan]')) {
       roles.push('plan');
       if (options.failPlan) throw new DOMException('fixture timeout', 'AbortError');
-      content = JSON.stringify(plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' });
+      const plan = plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' };
+      content = typeof plan === 'string' ? plan : JSON.stringify(plan);
     } else if (system.includes('[hamad:draft-fields]')) {
       roles.push('draft-fields');
-      content = '{"details":{"category":"mobile_phones"},"evidence":{"category":"جوال"}}';
+      content = options.categoryReplies?.[categoryIndex++]
+        ?? '{"details":{"category":"mobile_phones"},"evidence":{"category":"جوال"}}';
     } else if (system.includes('[hamad:write-check]')) {
       roles.push('write-check');
       content = JSON.stringify({ allow: options.writeAllowed ?? true });
@@ -57,8 +62,10 @@ function enable(t: TestContext, plans: Plan[], options: {
       roles.push('other');
       content = '{"decision":"ALLOW","confidence":1,"reason_code":"legacy_fixture","intent":"support"}';
     }
-    if (options.onModelInput && roles.at(-1) !== 'vision' && roles.at(-1) !== 'other') {
-      await options.onModelInput(roles.at(-1)!, JSON.parse(String(messages.at(-1)?.content)));
+    const role = roles.at(-1)!;
+    if (role !== 'vision' && role !== 'other') {
+      await options.onModelInput?.(role, JSON.parse(String(messages.at(-1)?.content)));
+      options.onProviderRequest?.(role, input.response_format);
     }
     return Response.json({ id: 'synthetic-hamad', object: 'chat.completion', created: 1, model: 'fixture',
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
@@ -336,6 +343,51 @@ test('creates a draft from customer details and consults the official category c
   assert.match(String(reply.metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
 });
 
+test('draft creation resolves a model category label and ignores optional null fields without losing customer facts', async (t) => {
+  const name = 'hamad-draft-category-label-recovery';
+  const roles = enable(t, [{
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود', category: 'الجوالات', description: null, price: null },
+    evidence: { title: 'جوال أسود', category: 'جوال', description: null, price: null }, photos: null,
+  }]);
+  await send(name, [user('category-label', 'سو مسودة لجوال أسود')]);
+  const [saved] = listSellerListings(name);
+  assert.equal(saved?.title, 'جوال أسود');
+  assert.equal(saved?.category, 'mobile_phones');
+  assert.equal(saved?.status, 'draft');
+  assert.equal(saved?.price, undefined);
+  assert.deepEqual(roles, ['plan', 'draft-fields', 'write-check', 'reply', 'source-check']);
+});
+
+test('an empty model plan requests a JSON object once more before saving exactly one draft', async (t) => {
+  const name = 'hamad-draft-empty-json-recovery';
+  const calls: [string, unknown][] = [];
+  const roles = enable(t, [' ', {
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود', category: 'mobile_phones' },
+    evidence: { title: 'جوال أسود', category: 'جوال' },
+  }], { onProviderRequest: (role, responseFormat) => { calls.push([role, responseFormat]); } });
+  await send(name, [user('empty-plan', 'سو مسودة لجوال أسود')]);
+  assert.equal(listSellerListings(name).length, 1);
+  assert.deepEqual(roles, ['plan', 'plan', 'write-check', 'reply', 'source-check']);
+  for (const [role, responseFormat] of calls) {
+    assert.deepEqual(responseFormat, role === 'reply' ? undefined : { type: 'json_object' });
+  }
+});
+
+test('an unverified category preserves intake and never saves a guessed category', async (t) => {
+  const name = 'hamad-draft-category-unverified';
+  const roles = enable(t, [{
+    action: 'create', confirmWrite: true, reference: 'سو مسودة',
+    details: { title: 'جوال أسود' }, evidence: { title: 'جوال أسود' },
+  }], { categoryReplies: [' ', '{"details":{"category":"guessed"}}'], failReply: true });
+  const reply = await send(name, [user('category-unverified', 'سو مسودة لجوال أسود')]);
+  assert.match(reply.parts[0].text, /تصنيف المنتج/u);
+  assert.equal(listSellerListings(name).length, 0);
+  assert.deepEqual(roles, ['plan', 'draft-fields', 'draft-fields', 'reply']);
+  assert.match(String(reply.metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
+});
+
 test('resumes an active draft intake without importing a price from an older unrelated request', async (t) => {
   const correct = {
     action: 'create', confirmWrite: true, reference: 'أسود ونظيف',
@@ -357,6 +409,49 @@ test('resumes an active draft intake without importing a price from an older unr
   assert.equal(listSellerListings(owner)[0]?.title, 'جوال');
   assert.equal(listSellerListings(owner)[0]?.price, undefined);
   assert.equal(roles.filter((role) => role === 'write-check').length, 1);
+});
+
+test('keeps the first product details when a seller corrects a spoken price', async (t) => {
+  const owner = 'hamad-clarifies-spoken-price';
+  const details = { title: 'جوال أسود', category: 'mobile_phones', price: 500 };
+  const evidence = { title: 'جوال أسود', category: 'جوال', price: 'خمس مية' };
+  const roles = enable(t, [
+    { action: 'create', confirmWrite: true, reference: 'أبي مسودة', details, evidence },
+    { action: 'create', confirmWrite: true, reference: '٥٠٠', details, evidence: { ...evidence, price: '٥٠٠' } },
+  ], { failReply: true });
+  const first = user('spoken-price', 'أبي مسودة إعلان لجوال أسود بخمس مية');
+  const clarification = await send(owner, [first]);
+  assert.match(clarification.parts[0].text, /السعر بالأرقام/u);
+  assert.equal(listSellerListings(owner).length, 0);
+
+  await send(owner, [first, clarification, user('corrected-price', '٥٠٠')]);
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0]?.title, 'جوال أسود');
+  assert.equal(listings[0]?.price, 500);
+  assert.equal(listings[0]?.status, 'draft');
+  assert.equal(roles.filter((role) => role === 'write-check').length, 1);
+});
+
+test('keeps details supplied before the Hamad creation choice when a field needs clarification', async (t) => {
+  const owner = 'hamad-clarifies-after-choosing';
+  const details = { title: 'مكتب خشبي', category: 'other', price: 300 };
+  const evidence = { title: 'مكتب خشبي', category: 'مكتب خشبي', price: 'ثلاث مية' };
+  const choice = 'أختار الإنشاء مع حمد.';
+  enable(t, [
+    { action: 'create', confirmWrite: true, reference: choice, details, evidence },
+    { action: 'create', confirmWrite: true, reference: '٣٠٠', details, evidence: { ...evidence, price: '٣٠٠' } },
+  ]);
+  const first = user('choose-with-details', 'سو مسودة مكتب خشبي بثلاث مية');
+  const selected = user('choose-hamad-method', choice);
+  const clarification = await send(owner, [first, selected], { beginDraftWithHamad: true });
+  assert.equal(listSellerListings(owner).length, 0);
+
+  await send(owner, [first, selected, clarification, user('choose-clarified-price', '٣٠٠')]);
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0]?.title, 'مكتب خشبي');
+  assert.equal(listings[0]?.price, 300);
 });
 
 test('preserves the existing choice contract and denies a mutation rejected by the independent check', async (t) => {
@@ -450,6 +545,45 @@ test('the receipt reports a partial image save even when the model says all phot
   assert.match(reply.parts[0].text, /حُفظت 1 من أصل 2 صورة/u);
   assert.doesNotMatch(reply.parts[0].text, /أرفقت جميع الصور/u);
   assert.equal(listSellerListings(owner)[0]?.images.length, 1);
+});
+
+test('reports that sent photos are missing when a creation plan omits their selection', async (t) => {
+  enable(t, [{
+    action: 'create', details: { category: 'other', title: 'مكتب' },
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true,
+  }], { reply: 'حُفظت المسودة.' });
+  const owner = 'hamad-draft-missing-selection';
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
+  const turn = user('missing-photo-selection', 'جهز مسودة مكتب مع الصورتين');
+  const photo = { type: 'file' as const, mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') };
+  turn.parts.push(photo, photo);
+
+  const reply = await send(owner, [turn], { hamadDraftCards: true });
+  assert.match(reply.parts[0].text, /حُفظت المسودة/u);
+  assert.match(reply.parts[0].text, /لم تُرفق الصور/u);
+  assert.equal(listSellerListings(owner).length, 1);
+  assert.equal(listSellerListings(owner)[0]?.images.length, 0);
+  assert.equal((reply.metadata.hamadDraftUi as { preview?: { imageCount: number } }).preview?.imageCount, 0);
+});
+
+test('reports an omitted earlier attachment only for the current draft intake', async (t) => {
+  const plan = {
+    action: 'create', details: { category: 'other', title: 'مكتب' },
+    evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true,
+  };
+  enable(t, [{ action: 'create' }, plan, plan], { reply: 'حُفظت المسودة.' });
+  const owner = 'hamad-draft-missing-retained-selection';
+  const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: 'orange' } }).png().toBuffer();
+  const first = user('pending-draft-photo', 'أبي أجهز مسودة بهالصورة');
+  first.parts.push({ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,' + png.toString('base64') });
+  const intake = await send(owner, [first]);
+  const resumed = user('finish-pending-draft', 'جهز مسودة مكتب');
+  const saved = await send(owner, [first, intake, resumed]);
+  assert.match(saved.parts[0].text, /لم تُرفق الصور/u);
+
+  const separate = await send(owner, [first, intake, resumed, saved, user('separate-draft-request', 'جهز مسودة مكتب ثاني')]);
+  assert.doesNotMatch(separate.parts[0].text, /لم تُرفق الصور/u);
+  assert.equal(listSellerListings(owner).length, 2);
 });
 
 test('Hamad records advisory message reviews without making a moderation decision on the draft', async (t) => {
