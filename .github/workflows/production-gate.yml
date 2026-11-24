@@ -99,7 +99,7 @@ jobs:
       - name: Upload Playwright reports
         if: ${{ always() }}
         timeout-minutes: 5
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-${{ matrix.project }}-${{ github.run_attempt }}
           path: |
@@ -142,7 +142,7 @@ jobs:
       - name: Upload API contract reports
         if: ${{ always() }}
         timeout-minutes: 5
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-api-contracts-${{ github.run_attempt }}
           path: |
@@ -228,7 +228,7 @@ jobs:
       - name: Upload mobile backend contract reports
         if: ${{ always() }}
         timeout-minutes: 5
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-backend-contracts-${{ github.run_attempt }}
           path: |

@@ -34,7 +34,7 @@ jobs:
 
       - name: Preserve bounded health result
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-health-${{ github.run_id }}-${{ github.run_attempt }}
           path: coverage/production-health-check.json
