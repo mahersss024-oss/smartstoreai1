@@ -28,7 +28,7 @@ jobs:
     steps:
       # Use trusted default-branch tooling, never code/artifacts from an untrusted run.
       - name: Checkout trusted promotion tooling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
