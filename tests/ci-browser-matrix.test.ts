@@ -122,7 +122,7 @@ test('CI reserves time for Playwright termination, report upload and setup', () 
 test('reports and traces upload on failures and cancellations without hiding failures', () => {
   const upload = browser.steps.find(step => step.name === 'Upload Playwright reports')!;
   assert.equal(upload.if, '${{ always() }}');
-  assert.equal(upload.uses, 'actions/upload-artifact@v4');
+  assert.equal(upload.uses, 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9');
   assert.equal(upload.with!.name, 'playwright-${{ matrix.project }}-${{ github.run_attempt }}');
   assert.equal(upload.with!.path, 'playwright-report/\ntest-results/\n');
   assert.equal(upload.with!['retention-days'], 14);
