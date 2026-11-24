@@ -63,7 +63,7 @@
     "next": "16.4.6",
     "qrcode.react": "^4.2.0",
     "react": "19.3.0",
-    "react-apexcharts": "2.1.1",
+    "react-apexcharts": "2.2.1",
     "react-dom": "19.3.0",
     "sharp": "0.35.5",
     "streamdown": "^2.6.0",
