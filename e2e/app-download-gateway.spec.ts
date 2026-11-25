@@ -91,7 +91,7 @@ test('administrative image gallery pans a zoomed image with the keyboard and pre
   await expect(image).toHaveAttribute('src', /gallery=2/);
 });
 
-test('public root is an honest app gateway without market navigation or redirects', async ({ page, isMobile }, testInfo) => {
+test('public root links to Google Play without market navigation or redirects', async ({ page, isMobile }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   const response = await page.goto('/');
@@ -99,13 +99,14 @@ test('public root is an honest app gateway without market navigation or redirect
   await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1');
   await expect(page.getByRole('heading', { name: 'سوق حمد على جوالك' })).toBeVisible();
   await expect(page.locator('main')).toHaveAttribute('dir', 'rtl');
-  await expect(page.locator('[data-store-platform="android"]')).toHaveAttribute('data-store-state', 'unpublished');
+  await expect(page.locator('[data-store-platform="android"]')).toHaveAttribute('data-store-state', 'configured');
   await expect(page.locator('[data-store-platform="ios"]')).toHaveAttribute('data-store-state', 'unpublished');
-  await expect(page.getByRole('button', { name: 'Android — قريبًا' })).toBeDisabled();
+  const androidLink = page.getByRole('link', { name: 'الانتقال إلى Google Play', exact: true });
+  await expect(androidLink).toBeVisible();
+  await expect(androidLink).toHaveAttribute('href', 'https://play.google.com/store/apps/details?id=com.souqhamad.app');
   await expect(page.getByRole('button', { name: 'iPhone — قريبًا' })).toBeDisabled();
-  await expect(page.getByRole('status').filter({ hasText: 'روابط التحميل الرسمية ستظهر هنا بعد نشر التطبيق.' })).toBeVisible();
   await expect(page.locator('.marketplace-bottom-nav, .open-in-app-banner, .site-message-banner')).toHaveCount(0);
-  await expect(page.locator('a[href*="play.google.com"], a[href*="apps.apple.com"], a[href*="testflight.apple.com"]')).toHaveCount(0);
+  await expect(page.locator('a[href*="apps.apple.com"], a[href*="testflight.apple.com"]')).toHaveCount(0);
   await expect(page).toHaveURL(url => url.pathname === '/');
   expect((await page.locator('main.app-download-gateway').boundingBox())?.y).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
