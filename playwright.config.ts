@@ -74,7 +74,7 @@ export default defineConfig({
           NODE_ENV: 'test',
           PORT: String(port),
           NEXT_PUBLIC_APP_URL: baseURL,
-          // Exercise the unpublished state without inheriting real store links.
+          // Verify the built-in store availability without inheriting overrides.
           NEXT_PUBLIC_ANDROID_APP_STORE_URL: '',
           NEXT_PUBLIC_IOS_APP_STORE_URL: '',
           SMARTSTORE_DATA_DIR: testDataDir!,

@@ -9,11 +9,12 @@ type StoreConfiguration = {
   NEXT_PUBLIC_IOS_APP_STORE_URL?: string;
 };
 
-/** Validate configured destinations; an absent URL never implies a published app. */
+/** Validate store destinations, including the published Android listing by default. */
 export function getMobileAppStoreUrl(
   platform: MobileAppPlatform,
   configuration: StoreConfiguration = {
-    NEXT_PUBLIC_ANDROID_APP_STORE_URL: process.env.NEXT_PUBLIC_ANDROID_APP_STORE_URL,
+    NEXT_PUBLIC_ANDROID_APP_STORE_URL: process.env.NEXT_PUBLIC_ANDROID_APP_STORE_URL?.trim()
+      || `https://play.google.com/store/apps/details?id=${mobileAppPackageId}`,
     NEXT_PUBLIC_IOS_APP_STORE_URL: process.env.NEXT_PUBLIC_IOS_APP_STORE_URL,
   },
 ): string | null {

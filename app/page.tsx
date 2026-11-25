@@ -6,7 +6,7 @@ import { detectMobileAppPlatform, getMobileAppStoreUrl } from '@/lib/mobile/app-
 
 export const metadata: Metadata = {
   title: 'سوق حمد | تطبيق Android وiPhone',
-  description: 'افتح تطبيق سوق حمد على جوالك، وتابع روابط Android وiPhone الرسمية عند إتاحتها.',
+  description: 'حمّل تطبيق سوق حمد على Android من Google Play وتابع إعلاناتك ومحادثاتك على جوالك.',
 };
 
 export default async function AppDownloadPage() {
