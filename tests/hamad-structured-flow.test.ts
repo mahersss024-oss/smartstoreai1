@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { POST } from '@/app/api/chat/route';
-import { createSessionCookie } from '@/lib/auth/session';
+import { createSessionCookie, getAuthSession } from '@/lib/auth/session';
 import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import { addListingImageForSeller, createListingDraft, getListing, listSellerListings } from '@/agent/marketplace/store';
 import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
 import { readHamadKnowledge } from '@/lib/chat/hamad-knowledge';
 import { hamadCapabilities } from '@/lib/chat/hamad-capabilities';
+import { openHamadState, sealHamadState } from '@/lib/chat/hamad-structured-state';
 import { getLocalModelReviews } from '@/lib/admin/model-review';
 import sharp from 'sharp';
 import { textAnalysis } from './helpers/text-understanding';
@@ -452,6 +453,180 @@ test('keeps details supplied before the Hamad creation choice when a field needs
   assert.equal(listings.length, 1);
   assert.equal(listings[0]?.title, 'مكتب خشبي');
   assert.equal(listings[0]?.price, 300);
+});
+
+test('retains the chosen draft intake across clarification turns and saves the confirmed laptop details', async (t) => {
+  const owner = 'hamad-draft-choice-clarification';
+  const product = 'لابتوب اتش بي';
+  const price = 'السعر ٢٥٠٠';
+  const notes = 'لاتوجد به ملاحظات';
+  const collecting: boolean[] = [];
+  const roles = enable(t, [
+    { action: 'clarify', reply: 'كم السعر المطلوب؟' },
+    { action: 'clarify', reply: 'هل عندك ملاحظات عن الجهاز؟' },
+    { action: 'create', confirmWrite: true, reference: notes,
+      details: { title: product, category: 'computers', price: 2500, defects: notes },
+      evidence: { title: product, category: 'لابتوب', price: '٢٥٠٠', defects: notes } },
+  ], {
+    onModelInput(role, data) {
+      if (role === 'plan') collecting.push((data.conversation as { collecting: boolean }).collecting);
+    },
+  });
+  const first = user('laptop', product);
+  const selected = user('choose-hamad', 'أختار الإنشاء مع حمد.');
+  const clarification = await send(owner, [first, selected], { beginDraftWithHamad: true });
+  const askingPrice = user('laptop-price', price);
+  const followUp = await send(owner, [first, selected, clarification, askingPrice]);
+  await send(owner, [first, selected, clarification, askingPrice, followUp, user('laptop-notes', notes)]);
+
+  assert.deepEqual(collecting, [true, true, true]);
+  assert.equal(roles.filter(role => role === 'write-check').length, 1);
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0].title, product);
+  assert.equal(listings[0].price, 2500);
+  assert.equal(listings[0].status, 'draft');
+});
+
+test('remembers the product and corrected price after their turns leave the chat history', async (t) => {
+  const owner = 'hamad-long-draft-intake';
+  const product = 'لابتوب HP';
+  const initialPrice = 'السعر ٢٥٠٠';
+  const correctedPrice = 'خل السعر ٢٣٠٠';
+  const notes = 'لا توجد ملاحظات';
+  let checkedWrite = false;
+  enable(t, [
+    { action: 'clarify', details: { title: product, category: 'computers' },
+      evidence: { title: product, category: product } },
+    { action: 'clarify', details: { price: 2500 }, evidence: { price: '٢٥٠٠' } },
+    { action: 'clarify', details: { price: 2300 }, evidence: { price: '٢٣٠٠' } },
+    ...Array.from({ length: 5 }, () => ({ action: 'clarify' })),
+    { action: 'create', confirmWrite: true, reference: notes, details: { price: 2500, defects: notes },
+      evidence: { price: '٢٥٠٠', defects: notes } },
+  ], {
+    onModelInput(role, data) {
+      if (data.request !== notes) return;
+      if (role === 'plan') {
+        assert.equal((data.conversation as { collecting: boolean }).collecting, true);
+        assert.doesNotMatch(JSON.stringify(data.history), /٢٥٠٠|٢٣٠٠|لابتوب HP/u);
+        assert.match(JSON.stringify(data.rememberedDraft), /٢٣٠٠/u);
+      }
+      if (role === 'write-check') {
+        assert.deepEqual(data.proposedDetails, { title: product, category: 'computers', price: 2300, defects: notes });
+        assert.deepEqual((data.customerFieldSources as { field: string; text: string }[]).find(({ field }) => field === 'price'),
+          { field: 'price', quote: '٢٣٠٠', text: correctedPrice });
+        checkedWrite = true;
+      }
+    },
+  });
+  const messages: Turn[] = [user('remember-product', product), user('remember-choice', 'أختار الإنشاء مع حمد.')];
+  messages.push(await send(owner, messages, { beginDraftWithHamad: true }));
+  for (const [index, text] of [initialPrice, correctedPrice, 'طيب', 'تمام', 'أكمل', 'وش بعد؟', 'لحظة'].entries()) {
+    messages.push(user('intake-turn-' + index, text));
+    messages.push(await send(owner, messages));
+  }
+  messages.push(user('intake-notes', notes));
+  await send(owner, messages.slice(-8));
+
+  assert.equal(checkedWrite, true);
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0].title, product);
+  assert.equal(listings[0].price, 2300);
+  assert.equal(listings[0].status, 'draft');
+});
+
+test('a separate draft starts without the previous product or price', async (t) => {
+  const owner = 'hamad-separate-draft-intake';
+  const laptop = 'لابتوب HP بسعر ٢٥٠٠';
+  const nextProduct = 'سماعات لاسلكية';
+  const next = 'ابدأ مسودة ثانية لسماعات لاسلكية';
+  enable(t, [
+    { action: 'clarify', details: { title: 'لابتوب HP', category: 'computers', price: 2500 },
+      evidence: { title: 'لابتوب HP', category: 'لابتوب', price: '٢٥٠٠' } },
+    { action: 'create', newDraft: next, confirmWrite: true, reference: next,
+      details: { title: nextProduct, category: 'tv_audio' }, evidence: { title: nextProduct, category: 'سماعات' } },
+  ], {
+    onModelInput(role, data) {
+      if (data.request !== next) return;
+      if (role === 'plan') assert.match(JSON.stringify(data.rememberedDraft), /٢٥٠٠/u);
+      if (role === 'write-check') {
+        assert.equal(data.collecting, false);
+        assert.doesNotMatch(JSON.stringify(data), /٢٥٠٠|لابتوب/u);
+      }
+    },
+  });
+  const first = [user('separate-laptop', laptop), user('separate-choice', 'أختار الإنشاء مع حمد.')];
+  const followUp = await send(owner, first, { beginDraftWithHamad: true });
+  await send(owner, [...first, followUp, user('separate-speakers', next)]);
+
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0].title, nextProduct);
+  assert.equal(listings[0].price, undefined);
+});
+
+test('selecting a saved draft clears intake facts and scopes the following edit to that card', async (t) => {
+  const owner = 'hamad-pick-draft-while-collecting';
+  const laptop = 'لابتوب HP بسعر ٢٥٠٠';
+  const edit = 'خل السعر ٨٠٠';
+  const firstDraft = draft(owner, 'مسودة المكتب', '2026-11-20T09:00:00.000Z', 350);
+  const selectedDraft = draft(owner, 'مسودة الجوال', '2026-11-20T08:00:00.000Z', 450);
+  const roles = enable(t, [
+    { action: 'clarify', details: { title: 'لابتوب HP', category: 'computers', price: 2500 },
+      evidence: { title: 'لابتوب HP', category: 'لابتوب', price: '٢٥٠٠' } },
+    { action: 'update', confirmWrite: true, reference: edit, details: { price: 800 }, evidence: { price: '٨٠٠' } },
+  ], {
+    onModelInput(role, data) {
+      if (role === 'plan' && data.request === edit) {
+        assert.equal(data.rememberedDraft, undefined);
+        assert.equal((data.conversation as { selectedDraftTitle: string }).selectedDraftTitle, selectedDraft.title);
+      }
+      if (role === 'write-check') assert.deepEqual(data.proposedDetails, { price: 800 });
+    },
+  });
+  const messages: Turn[] = [user('intake-laptop', laptop), user('intake-choice', 'أختار الإنشاء مع حمد.')];
+  messages.push(await send(owner, messages, { beginDraftWithHamad: true, hamadDraftCards: true }));
+  const session = getAuthSession(new Request('http://localhost/api/chat', { headers: { cookie: cookies.get(owner)! } }))!;
+  const intake = openHamadState(messages.at(-1)?.metadata?.hamadDraftMemory, session, conversation);
+  assert.equal(intake.intake?.find(({ field }) => field === 'price')?.value, 2500);
+
+  messages.push(user('open-existing-picker', 'اعرض مسوداتي'));
+  const listed = await send(owner, messages, { hamadDraftCards: true, hamadDraftAction: { type: 'list' } });
+  messages.push(listed, user('tap-existing-second', 'أرني المسودة المختارة.'));
+  const selected = await send(owner, messages, { hamadDraftCards: true,
+    hamadDraftAction: { type: 'select', page: listed.metadata.hamadDraftUi.page.key, choice: 2 } });
+  assert.equal(selected.metadata.hamadDraftUi.preview.price, 450);
+  assert.deepEqual(roles, ['plan', 'reply', 'source-check']);
+  messages.push(selected, user('edit-existing-price', edit));
+  await send(owner, messages, { hamadDraftCards: true });
+
+  assert.equal(listSellerListings(owner).length, 2);
+  assert.equal(getListing(firstDraft.id)?.price, 350);
+  assert.equal(getListing(selectedDraft.id)?.price, 800);
+});
+
+test('the bounded intake token preserves essential facts and stays bound to its owner and conversation', () => {
+  const sessionFor = (id: string) => getAuthSession(new Request('http://localhost/api/chat', {
+    headers: { cookie: createSessionCookie({ id, email: id + '@example.test' }) },
+  }))!;
+  const owner = sessionFor('hamad-intake-token-owner');
+  const bulkyNote = 'تفاصيل إضافية '.repeat(70);
+  const token = sealHamadState({
+    collecting: 'first-message',
+    intake: [
+      { field: 'description', value: bulkyNote, quote: bulkyNote.slice(0, 400), source: bulkyNote },
+      { field: 'title', value: 'لابتوب HP', quote: 'لابتوب HP' },
+      { field: 'price', value: 2300, quote: '٢٣٠٠', source: 'خل السعر ٢٣٠٠' },
+    ],
+  }, owner, conversation);
+
+  assert.ok(token && token.length <= 2_400);
+  assert.deepEqual(openHamadState(token, owner, conversation).intake?.map(({ field, value }) => [field, value]), [
+    ['title', 'لابتوب HP'], ['price', 2300],
+  ]);
+  assert.deepEqual(openHamadState(token, sessionFor('hamad-intake-token-other'), conversation), {});
+  assert.deepEqual(openHamadState(token, owner, 'another-hamad-conversation'), {});
 });
 
 test('preserves the existing choice contract and denies a mutation rejected by the independent check', async (t) => {

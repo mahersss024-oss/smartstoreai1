@@ -4,6 +4,13 @@ import { getAuthSecret, type AuthSession } from '@/lib/auth/session';
 
 export const hamadDraftRef = z.object({ id: z.string().min(1).max(200), version: z.string().min(1).max(64) }).strict();
 const digest = z.string().regex(/^[a-f0-9]{64}$/u);
+const intakeFact = z.object({
+  field: z.string().min(1).max(90),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+  quote: z.string().min(1).max(500),
+  source: z.string().max(1_200).optional(),
+}).strict();
+export type HamadIntakeFact = z.infer<typeof intakeFact>;
 const stateSchema = z.object({
   focus: hamadDraftRef.optional(),
   focusTitle: z.string().min(1).max(120).optional(),
@@ -14,6 +21,8 @@ const stateSchema = z.object({
     hasNext: z.boolean(),
   }).optional(),
   collecting: z.string().min(1).max(200).optional(),
+  intake: z.array(intakeFact).max(32).optional(),
+  intakeStartText: z.string().max(1_200).optional(),
   image: z.object({ sourceId: z.string().min(1).max(200), digest }).optional(),
 }).strict();
 export type HamadStructuredState = z.infer<typeof stateSchema>;
@@ -29,6 +38,33 @@ export type HamadDraftAction = z.infer<typeof hamadDraftActionSchema>;
 
 const checkpoint = stateSchema.extend({ expires: z.number().int() });
 export const hamadDraftTtlMs = 20 * 60_000;
+const maxCheckpointLength = 2_400;
+// Leave space for the IV, encryption tag, base64url expansion and frame signature.
+const maxCheckpointBytes = 1_730;
+const intakePriority = ['title', 'price', 'category', 'description'];
+
+function checkpointPayload(state: HamadStructuredState) {
+  const { intake, intakeStartText, ...rest } = state;
+  const payload = checkpoint.parse({ ...rest, expires: Date.now() + hamadDraftTtlMs });
+  if (intake?.length) {
+    const prioritized = [
+      ...intakePriority.flatMap(field => intake.filter(fact => fact.field === field)),
+      ...intake.filter(fact => !intakePriority.includes(fact.field)),
+    ];
+    for (const fact of prioritized) {
+      if (payload.intake?.length === 32) break;
+      if (!intakeFact.safeParse(fact).success) continue;
+      const candidate = [...(payload.intake ?? []), fact];
+      if (Buffer.byteLength(JSON.stringify({ ...payload, intake: candidate })) <= maxCheckpointBytes) {
+        payload.intake = candidate;
+      }
+    }
+  }
+  if (intakeStartText && Buffer.byteLength(JSON.stringify({ ...payload, intakeStartText })) <= maxCheckpointBytes) {
+    payload.intakeStartText = intakeStartText;
+  }
+  return Buffer.from(JSON.stringify(payload));
+}
 function key() {
   return createHmac('sha256', getAuthSecret()).update('souq-hamad.structured-checkpoint.v2').digest();
 }
@@ -44,16 +80,16 @@ export function sealHamadState(state: HamadStructuredState, session: AuthSession
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key(), iv);
   cipher.setAAD(associatedData(session, conversationId));
-  const payload = Buffer.from(JSON.stringify(checkpoint.parse({ ...state, expires: Date.now() + hamadDraftTtlMs })));
+  const payload = checkpointPayload(state);
   const encrypted = Buffer.concat([cipher.update(payload), cipher.final()]);
   const frame = 'h2_' + Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
   // Already released clients retain only the historical payload.mac envelope in local history.
   const token = frame + '.' + frameMac(frame).toString('base64url');
-  return token.length <= 2_400 ? token : undefined;
+  return token.length <= maxCheckpointLength ? token : undefined;
 }
 
 export function openHamadState(token: unknown, session: AuthSession, conversationId: string | null): HamadStructuredState {
-  if (!conversationId || typeof token !== 'string' || token.length > 2_400 || !/^h2_[\w-]+\.[\w-]{43}$/u.test(token)) return {};
+  if (!conversationId || typeof token !== 'string' || token.length > maxCheckpointLength || !/^h2_[\w-]+\.[\w-]{43}$/u.test(token)) return {};
   try {
     const [frame, signature] = token.split('.');
     const mac = Buffer.from(signature, 'base64url');
