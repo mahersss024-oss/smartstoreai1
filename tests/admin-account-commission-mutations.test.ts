@@ -153,18 +153,23 @@ test('existing commission write outages and conflicts return retryable 503 inste
   assert.equal(reads, 7, 'each failed write follows a successful target read');
 });
 
-test('commission connection initialization failure returns unavailable before any transaction', async t => {
+test('commission connection initialization failure at transaction start returns retryable unavailable', async t => {
   const request = environment(t);
   t.mock.method(console, 'warn', () => undefined);
-  mockDatabaseMethod(t, prisma.user, 'upsert', async () => {
+  mockDatabaseMethod(t, prisma.user, 'upsert', async () => assert.fail('a guarded commission update must not update the staff account'));
+  let attempts = 0;
+  mockDatabaseMethod(t, prisma, '$transaction', async () => {
+    attempts += 1;
     throw new Prisma.PrismaClientInitializationError('Synthetic connection failure', 'test', 'P1001');
   });
-  mockDatabaseMethod(t, prisma, '$transaction', async () => assert.fail('connection failed before transaction'));
   const response = await editCommission(request('/api/admin/commissions/existing', { status: 'paid' }), {
     params: Promise.resolve({ commissionId: 'existing' }),
   });
+  assert.equal(attempts, 1);
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error, 'commission_update_unavailable');
+  assert.match(response.headers.get('Cache-Control') ?? '', /no-store/);
+  assert.ok(Number(response.headers.get('Retry-After')) > 0);
 });
 
 test('unexpected commission write and audit errors are not disguised as missing records', async t => {

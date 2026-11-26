@@ -112,6 +112,8 @@ test('PostgreSQL report listing actions commit the decision listing and both aud
 test('PostgreSQL concurrent dismiss and listing deletion cannot apply a losing report decision', { timeout: 20_000 }, async t => {
   if (!enabled()) return t.skip('Requires the disposable loopback PostgreSQL test database.');
   const f = await fixture(t);
+  const profileUpdatedAt = new Date('2026-01-01T12:00:00Z');
+  await prisma.user.update({ where: { id: f.owner.id }, data: { updatedAt: profileUpdatedAt } });
   const listing = await prisma.listing.create({ data: { sellerId: f.seller.id, category: 'furniture', title: 'Concurrent report target', status: 'published' } });
   const report = await prisma.report.create({ data: { listingId: listing.id, reporterId: f.buyer.id, reason: 'fraud' } });
   const decide = (action: string) => resolveReport(new Request(`https://example.test/api/admin/moderation/reports/${report.id}`, {
@@ -119,6 +121,9 @@ test('PostgreSQL concurrent dismiss and listing deletion cannot apply a losing r
   }), { params: Promise.resolve({ reportId: report.id }) });
   const responses = await Promise.all([decide('dismiss'), decide('delete_listing')]);
   assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+  const moderator = await prisma.user.findUniqueOrThrow({ where: { id: f.owner.id }, select: { updatedAt: true } });
+  assert.equal(moderator.updatedAt.getTime(), profileUpdatedAt.getTime(),
+    'Moderating a report must not update the acting staff account');
   const winner = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
   const expectedListingStatus = winner.status === 'dismissed' ? 'published' : 'deleted';
   assert.equal((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status, expectedListingStatus);
