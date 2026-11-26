@@ -110,10 +110,13 @@ function display(record: Draft) {
     preview: publicThumbnail(record),
   };
 }
+function isOwnedDraft(listing: Draft | null | undefined, context: CapabilityContext): listing is Draft {
+  return listing?.sellerId === context.session.user.id && listing.status === 'draft' && listing.compliance.humanDecision !== 'block';
+}
+
 async function ownedDraftRecord(id: string, context: CapabilityContext) {
   const listing = await getListing(id);
-  return listing?.sellerId === context.session.user.id && listing.status === 'draft' && listing.compliance.humanDecision !== 'block'
-    ? listing : null;
+  return isOwnedDraft(listing, context) ? listing : null;
 }
 
 const empty = z.object({}).strict();
@@ -138,15 +141,17 @@ function makeWriteTools(context: CapabilityContext, input: { focus?: z.infer<typ
     onDraftReceipt: (receipt) => events.push(receipt),
   });
   const toolContext = { toolCallId: context.trace, messages: [], abortSignal: context.signal, context: {} };
-  async function finish(status: string) {
+  async function finish(status: string, committed?: Draft) {
     const receipts = events.map((entry) => ({
       kind: entry.kind, title: safeText(entry.listing.title, 120), status: entry.listing.status,
       facts: entry.kind === 'updated' ? entry.changes : entry.kind === 'saved' ? entry.facts
         : entry.kind === 'photos' ? { attached: entry.photos.attached.length, requested: entry.photos.requested.length, added: entry.photos.added.length } : undefined,
     }));
-    const last = events.at(-1);
-    const draft = last ? await ownedDraftRecord(last.listing.id, context) : null;
-    return { status, receipts, ...(draft ? { focus: display(draft).ref } : {}) };
+    // The tool receipt already contains the committed record. Reads for the
+    // displayed preview and subsequent edits still verify its current state.
+    const last = events.at(-1)?.listing;
+    const draft = last && (committed?.id === last.id ? committed : await ownedDraftRecord(last.id, context));
+    return { status, receipts, ...(isOwnedDraft(draft, context) ? { focus: display(draft).ref } : {}) };
   }
   return { tools, toolContext, finish };
 }
@@ -172,7 +177,7 @@ export const hamadCapabilities = {
       const { tools, toolContext, finish } = makeWriteTools(context, {});
       const result = await tools.createListingDraft.execute({ ...details, imageIndexes: photos,
         imageSourceMessageId: context.sourceId }, toolContext);
-      return finish(existingToolResult.parse(result).status);
+      return finish(existingToolResult.parse(result).status, 'listing' in result ? result.listing : undefined);
     }),
   update_draft: register('update_draft', 'Write only verified fields to the selected, revalidated owned draft.',
     z.object({ focus: hamadDraftRef, details: hamadDetails, evidence: z.record(z.string(), z.string()) }).strict(),

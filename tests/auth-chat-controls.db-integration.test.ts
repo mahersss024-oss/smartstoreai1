@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { prisma } from '@/lib/db/prisma';
 import { reserveChatGeneration } from '@/lib/chat/admission';
+import { openHamadState } from '@/lib/chat/hamad-structured-state';
 import { assertStaffMutationAccess } from '@/lib/auth/staff-mutation';
 import { createSignedSession, parseSignedSession, type AuthSession } from '@/lib/auth/session';
 import { persistUserRegistration } from '@/lib/auth/registration';
@@ -14,10 +16,15 @@ import { createMobileAuthTicket } from '@/lib/auth/mobile-oauth';
 import { GET as exchangeTicket } from '@/app/api/auth/mobile/exchange/route';
 import { GET as readSession } from '@/app/api/auth/session/route';
 import { PATCH as editListing } from '@/app/api/admin/listings/[listingId]/route';
+import { POST as sendHamadMessage } from '@/app/api/chat/route';
+import { GET as readMyListings } from '@/app/api/marketplace/me/listings/route';
+import { aiConsentHeader, aiSharingConsent } from '@/lib/platform/ai-consent';
 import { proxy } from '@/proxy';
 import { mockDatabaseMethod } from './helpers/mock-database-method';
 import { createMarketplaceTools } from '@/agent/tools/marketplace';
 import { renderChatDraftReceipt, type ChatDraftReceipt } from '@/lib/chat/draft-receipt';
+import { marketplaceTextAnalyzer } from '@/agent/marketplace/text-understanding';
+import { textAnalysis } from './helpers/text-understanding';
 
 function enabled() {
   if (process.env.SMARTSTORE_DB_INTEGRATION !== '1') return false;
@@ -50,6 +57,127 @@ async function fixture(t: TestContext) {
     await prisma.user.deleteMany({ where: { id: { in: users.map(user => user.id) } } });
   });
   return { customer, moderator, owner, session };
+}
+
+for (const failure of ['read_after_commit', 'receipt_after_commit', 'before_commit'] as const) {
+  test(`PostgreSQL Hamad draft creation handles ${failure}`, { timeout: 20000 }, async t => {
+    if (!enabled()) return t.skip('Requires the named disposable loopback PostgreSQL test database.');
+    const f = await fixture(t);
+    const token = createSignedSession(f.session(f.customer).user);
+    const namespace = 'hamad_structured_write';
+    t.after(() => prisma.apiIdempotencyKey.deleteMany({ where: { namespace, actorKey: f.customer.id } }));
+    const analysis = textAnalysis({ intent: 'create_listing' });
+    t.mock.method(marketplaceTextAnalyzer, 'analyze', async () => analysis);
+    t.mock.method(marketplaceTextAnalyzer, 'peek', () => analysis);
+    let plannerCalls = 0;
+    let verifierCalls = 0;
+    t.mock.method(globalThis, 'fetch', async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const body = JSON.parse(String(init?.body)) as { messages: { content: string | unknown[] }[] };
+      const instruction = body.messages[0]?.content;
+      assert.equal(typeof instruction, 'string');
+      const system = String(instruction);
+      let content: string;
+      if (system.includes('[hamad:plan]')) {
+        plannerCalls++;
+        content = JSON.stringify({ action: 'create', confirmWrite: true, reference: 'جهز مسودة',
+          details: { category: 'other', title: 'مكتب خشبي' },
+          evidence: { category: 'مكتب خشبي', title: 'مكتب خشبي' } });
+      } else if (system.includes('[hamad:write-check]')) {
+        verifierCalls++;
+        content = '{"allow":true}';
+      } else {
+        throw new Error('fixture_reply_outage');
+      }
+      return Response.json({ id: 'hamad-db-fixture', object: 'chat.completion', created: 1, model: 'fixture',
+        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
+        usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 } });
+    });
+    let injected = false;
+    if (failure === 'read_after_commit') {
+      const find = prisma.listing.findUnique.bind(prisma.listing);
+      mockDatabaseMethod(t, prisma.listing, 'findUnique', async (args: Parameters<typeof find>[0]) => {
+        const row = await find(args);
+        if (!injected && row?.sellerId === f.customer.id && row.status === 'draft') {
+          injected = true;
+          throw new Error('fixture_read_outage');
+        }
+        return row;
+      });
+      t.after(() => { Object.defineProperty(prisma.listing, 'findUnique', { configurable: true, writable: true, value: find }); });
+    } else if (failure === 'receipt_after_commit') {
+      const update = prisma.apiIdempotencyKey.updateMany.bind(prisma.apiIdempotencyKey);
+      mockDatabaseMethod(t, prisma.apiIdempotencyKey, 'updateMany', async (args: Parameters<typeof update>[0]) => {
+        if (!injected && args?.data.status === 'completed') {
+          injected = true;
+          throw new Error('fixture_receipt_outage');
+        }
+        return update(args);
+      });
+      t.after(() => { Object.defineProperty(prisma.apiIdempotencyKey, 'updateMany', { configurable: true, writable: true, value: update }); });
+    } else {
+      const transaction = prisma.$transaction.bind(prisma);
+      mockDatabaseMethod(t, prisma, '$transaction', async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        options?: { isolationLevel?: Prisma.TransactionIsolationLevel; maxWait?: number; timeout?: number }) => {
+        return transaction(async tx => {
+          const row = await callback(tx);
+          if (row && typeof row === 'object' && 'sellerId' in row && row.sellerId === f.customer.id) {
+            injected = true;
+            throw new Error('fixture_rollback');
+          }
+          return row;
+        }, options);
+      });
+    }
+    const conversationId = 'hamad-db-receipt';
+    const body = JSON.stringify({ chatOwnerId: f.customer.id, chatConversationId: conversationId,
+      creationMethod: 'chat', hamadDraftCards: true,
+      messages: [{ id: 'hamad-db-draft', role: 'user', parts: [{ type: 'text', text: 'جهز مسودة مكتب خشبي' }] }] });
+    const send = async () => {
+      const response = await sendHamadMessage(new Request('http://localhost/api/chat', {
+        method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token,
+          [aiConsentHeader]: aiSharingConsent.version }, body,
+      }));
+      assert.equal(response.status, 200);
+      const events = (await response.text()).split('\n').filter(line => line.startsWith('data: {'))
+        .map(line => JSON.parse(line.slice(6)));
+      const metadata = events.find(event => event.type === 'message-metadata')?.messageMetadata;
+      return { text: events.filter(event => event.type === 'text-delta').map(event => event.delta).join(''),
+        title: metadata?.hamadDraftUi?.active?.title,
+        focus: openHamadState(metadata?.hamadDraftMemory, parseSignedSession(token)!, conversationId).focus };
+    };
+    const { text, title, focus } = await send();
+    assert.equal(injected, true);
+    const listings = await prisma.listing.findMany({ where: { sellerId: { in: [f.customer.id, f.moderator.id] } } });
+    if (failure === 'before_commit') {
+      assert.deepEqual(listings, []);
+      assert.equal(focus, undefined);
+      assert.match(text, /تعذر إكمال رد المساعد الآن/u);
+      assert.doesNotMatch(text, /حُفظت المسودة/u);
+      assert.equal(verifierCalls, 1);
+      return;
+    }
+    assert.equal(listings.length, 1);
+    assert.equal(listings[0].status, 'draft');
+    assert.equal(listings[0].sellerId, f.customer.id);
+    assert.match(text, /حُفظت المسودة/u);
+    assert.equal(title, 'مكتب خشبي');
+    assert.equal(focus?.id, listings[0].id);
+    assert.doesNotMatch(text, /تعذر إكمال رد المساعد الآن/u);
+    const myListings = async (userToken: string) => {
+      const response = await readMyListings(new Request('http://localhost/api/marketplace/me/listings', {
+        headers: { authorization: 'Bearer ' + userToken },
+      }));
+      assert.equal(response.status, 200);
+      return (await response.json()).listings as { id: string; status: string }[];
+    };
+    assert.deepEqual((await myListings(token)).map(({ id, status }) => ({ id, status })),
+      [{ id: listings[0].id, status: 'draft' }]);
+    assert.deepEqual(await myListings(createSignedSession(f.session(f.moderator).user)), []);
+    await send();
+    assert.equal(plannerCalls, 2);
+    assert.equal(verifierCalls, 1);
+    assert.equal(await prisma.listing.count({ where: { sellerId: f.customer.id } }), 1);
+  });
 }
 
 test('PostgreSQL photo receipt reports only the selected image that committed to the owned draft', { timeout: 20000 }, async t => {
