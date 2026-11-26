@@ -7,7 +7,7 @@ services:
     region: frankfurt
     plan: 1c-2g
     branch: production
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     domains:
       - souqhamad.com
     healthCheckPath: /api/health

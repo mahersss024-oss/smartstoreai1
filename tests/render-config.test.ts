@@ -5,12 +5,12 @@ import test from 'node:test';
 
 const renderConfig = readFileSync(join(process.cwd(), 'render.yaml'), 'utf8');
 
-test('render deploys the production branch after commit checks', () => {
+test('render accepts deployments from the verified production workflow', () => {
   assert.match(renderConfig, /^\s+name: smartstore-ai-marketplace$/m);
   assert.match(renderConfig, /^\s+plan: 1c-2g$/m);
   assert.match(renderConfig, /^\s+region: frankfurt$/m);
   assert.match(renderConfig, /^\s+branch: production$/m);
-  assert.match(renderConfig, /^\s+autoDeployTrigger: checksPass$/m);
+  assert.match(renderConfig, /^\s+autoDeployTrigger: off$/m);
   assert.match(renderConfig, /domains:\s+- souqhamad\.com/);
   assert.match(renderConfig, /^\s+healthCheckPath: \/api\/health$/m);
 });

@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { eligiblePromotionEvent, productionRepository, promoteVerifiedProduction,
+import { eligiblePromotionEvent, productionRepository, promoteVerifiedProduction, requestRenderDeployment,
   requiredPromotionJobs } from '../scripts/deploy/promote-verified-production.mjs';
 
 const targetSha = 'b'.repeat(40);
@@ -208,6 +208,43 @@ test('workflow permission failures expose only a fixed diagnostic category and n
   assert.equal(h.writes().length, 1);
 });
 
+test('Render receives only the exact verified and promoted commit', async () => {
+  const hook = 'https://api.render.com/deploy/srv-dc42c95g1s2s73d466q0?key=test-only&ref=old&other=extra';
+  for (const initialProduction of [beforeSha, targetSha]) {
+    const result = await harness(initialProduction).invoke();
+    const deploy = await requestRenderDeployment(result, hook, async (destination, options) => {
+      assert.ok(destination instanceof URL);
+      assert.ok(options);
+      assert.equal(destination.searchParams.get('ref'), targetSha);
+      assert.deepEqual([...destination.searchParams], [['key', 'test-only'], ['ref', targetSha]]);
+      assert.equal(options.method, 'POST');
+      assert.equal(options.redirect, 'error');
+      return json({ deploy: { id: 'dep-123abc' } });
+    });
+    assert.deepEqual(deploy, { outcome: 'requested', deployId: 'dep-123abc' });
+  }
+});
+
+test('stale promotions and invalid hooks cannot request a Render deployment', async () => {
+  const fetcher = async () => { throw new Error('unexpected request'); };
+  assert.deepEqual(await requestRenderDeployment({ outcome: 'skipped' }, '', fetcher), { outcome: 'skipped' });
+  const result = await harness().invoke();
+  await assert.rejects(requestRenderDeployment(result, '', fetcher), /missing/);
+  await assert.rejects(requestRenderDeployment(result, 'https://wrong.invalid/deploy?key=private', fetcher), /production service/);
+});
+
+test('queued deploys are accepted without logging the hook or Render error body', async () => {
+  const result = await harness().invoke();
+  const hook = 'https://api.render.com/deploy/srv-dc42c95g1s2s73d466q0?key=test-only';
+  assert.deepEqual(await requestRenderDeployment(result, hook, async () => new Response(null, { status: 202 })),
+    { outcome: 'queued' });
+  await assert.rejects(requestRenderDeployment(result, hook, async () => json({ message: 'private error' }, 404)), error => {
+    assert.match(String(error), /HTTP 404/);
+    assert.doesNotMatch(String(error), /test-only|private error/);
+    return true;
+  });
+});
+
 test('promotion workflow trusts only main-push gate completions and isolates its write permission', () => {
   const rootRequire = createRequire(resolve('package.json'));
   const yaml = createRequire(rootRequire.resolve('eslint'))('js-yaml') as { load: (input: string) => unknown };
@@ -230,7 +267,8 @@ test('promotion workflow trusts only main-push gate completions and isolates its
   assert.equal(checkout.with?.ref, undefined, 'Never checkout untrusted workflow_run head code');
   const action = workflow.jobs.promote.steps.find(step => step.run)!;
   assert.equal(action.run, 'node scripts/deploy/promote-verified-production.mjs');
-  assert.deepEqual(action.env, { GITHUB_TOKEN: '${{ github.token }}' });
-  assert.doesNotMatch(JSON.stringify(workflow), /secrets\.|AWS_|pull_request_target/);
+  assert.deepEqual(action.env, { GITHUB_TOKEN: '${{ github.token }}',
+    RENDER_DEPLOY_HOOK_URL: '${{ secrets.RENDER_DEPLOY_HOOK_URL }}' });
+  assert.doesNotMatch(JSON.stringify(workflow), /AWS_|pull_request_target/);
   assert.equal(workflow.jobs.promote.steps.find(step => step.uses?.startsWith('actions/upload-artifact@'))?.if, '${{ always() }}');
 });

@@ -13,6 +13,7 @@ const shaPattern = /^[a-f0-9]{40}$/;
 const apiRoot = `https://api.github.com/repos/${productionRepository}`;
 
 class PromotionFailure extends Error {}
+class DeploymentFailure extends Error {}
 
 export function eligiblePromotionEvent(event, repository) {
   const run = event?.workflow_run;
@@ -138,6 +139,55 @@ export async function promoteVerifiedProduction({ event, repository, token, fetc
   return { ...context, outcome: 'promoted', previousSha: before, productionSha: sha };
 }
 
+export async function requestRenderDeployment(promotion, hookUrl, fetcher = globalThis.fetch) {
+  if (promotion.outcome !== 'promoted' && promotion.outcome !== 'unchanged') {
+    return { outcome: 'skipped' };
+  }
+
+  const sha = promotion.productionSha ?? promotion.previousSha;
+  if (!shaPattern.test(sha ?? '') || sha !== promotion.serverSha) {
+    throw new DeploymentFailure('The verified production revision is unavailable.');
+  }
+  if (!hookUrl?.trim()) throw new DeploymentFailure('RENDER_DEPLOY_HOOK_URL is missing.');
+
+  let destination;
+  try {
+    destination = new URL(hookUrl);
+  } catch {
+    throw new DeploymentFailure('The Render hook URL is invalid.');
+  }
+  const key = destination.searchParams.get('key');
+  if (destination.origin !== 'https://api.render.com' ||
+      destination.pathname !== '/deploy/srv-dc42c95g1s2s73d466q0' ||
+      destination.username || destination.password || !key) {
+    throw new DeploymentFailure('The hook must belong to the Render production service.');
+  }
+  destination.search = new URLSearchParams({ key, ref: sha }).toString();
+  destination.hash = '';
+
+  let response;
+  try {
+    response = await fetcher(destination, {
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new DeploymentFailure('Render did not confirm the deployment request.');
+  }
+  if (response.status === 202) {
+    void response.body?.cancel().catch(() => {});
+    return { outcome: 'queued' };
+  }
+  if (response.status !== 200) {
+    void response.body?.cancel().catch(() => {});
+    throw new DeploymentFailure('Render rejected the deployment request (HTTP ' + response.status + ').');
+  }
+  const receipt = await response.json().catch(() => null);
+  if (typeof receipt?.deploy?.id !== 'string' || !/^dep-[a-z0-9]+$/.test(receipt.deploy.id)) {
+    throw new DeploymentFailure('Render returned an invalid deployment receipt.');
+  }
+  return { outcome: 'requested', deployId: receipt.deploy.id };
+}
+
 async function main() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const report = resolve(root, 'coverage/production-promotion.json');
@@ -158,10 +208,17 @@ async function main() {
       ...(error instanceof PromotionFailure ? { diagnostic: error.message } : {}) };
     process.exitCode = 1;
   }
+  try {
+    result.renderDeployment = await requestRenderDeployment(result, process.env.RENDER_DEPLOY_HOOK_URL);
+  } catch (error) {
+    result.renderDeployment = { outcome: 'failed',
+      diagnostic: error instanceof DeploymentFailure ? error.message : 'Render deployment request failed.' };
+    process.exitCode = 1;
+  }
   writeFileSync(report, JSON.stringify(result, null, 2) + '\n');
   console.log(JSON.stringify(result));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    `# Verified production promotion\n\nOutcome: ${result.outcome}\n\nServer: ${result.serverSha ?? 'not promoted'}\n\nGate: ${result.gateUrl ?? 'verification unavailable'}\n\nRender watches the protected production branch. Verify the deployed SHA in Render and confirm production health.\n`);
+    `# Verified production promotion\n\nOutcome: ${result.outcome}\n\nServer: ${result.serverSha ?? 'not promoted'}\n\nGate: ${result.gateUrl ?? 'verification unavailable'}\n\nRender deploy request: ${result.renderDeployment.outcome}\n\nVerify the deployed SHA and health in Render.\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
