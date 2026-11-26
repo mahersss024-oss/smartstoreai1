@@ -24,8 +24,8 @@ cannot read this secret and cannot pass this private-source check until run in a
 trusted repository context; the workflow never uses `pull_request_target` to give
 untrusted code access. The database and test processes receive no hosted secrets.
 
-Its PostgreSQL 18.3 service matches the RDS version shown in the prelaunch
-configuration review and is created for that job only. Port 55432 and database
+Its pinned PostgreSQL 18.3 service covers the production PostgreSQL major
+version on Render and is created for that job only. Port 55432 and database
 `smartstore_codex_test` satisfy the existing integration-test destination guards.
 The portable runner requires an explicit CI opt-in, verifies loopback destination,
 database name and database-creation permission, applies committed migrations to
@@ -50,9 +50,8 @@ substitute for a failed required job and is not required for this status.
 The separate `Promote Verified Production` workflow advances the `production`
 branch only after a successful, trusted main-push gate run. It checks the run and
 attempt, requires the final status, rejects stale main results and uses only a
-fast-forward ref update. App Runner must watch `production` for this restriction
-to govern deployment; an App Runner service watching `main` can still publish
-before tests finish. Branch protection is a separate GitHub setting, not a side
+fast-forward ref update. Render deploys the protected `production` branch
+after its commit checks pass. Branch protection is a separate GitHub setting, not a side
 effect of parsing this YAML. Applied settings, baseline revisions, live checks,
 backup evidence and the rollback procedure are recorded in
 [the prelaunch operations guide](prelaunch-operations.ar.md).

@@ -2,8 +2,8 @@
 
 ## Server event delivery
 
-The SSE route recycles each request after 110 seconds, before App Runner's
-120-second whole-request limit. SMARTSTORE_SSE_MAX_LIFETIME_MS can shorten this
+The SSE route recycles each request after at most 110 seconds.
+SMARTSTORE_SSE_MAX_LIFETIME_MS can shorten this
 to at least 15 seconds; larger values are clamped to 110 seconds. Heartbeats
 remain 15 seconds and existing clients reconnect and reconcile authoritative
 API reads.
@@ -85,7 +85,6 @@ finite retries and terminal reconciliation with live-lease/promotion/expiry
 guards. Worker tests use mocked Cloudflare bindings and actual Sharp-generated
 image bytes. They do not contact production.
 
-- https://docs.aws.amazon.com/apprunner/latest/dg/develop.html
 - https://upstash.com/docs/redis/features/restapi
 - https://redis.io/docs/latest/commands/xread/
 - https://redis.io/docs/latest/commands/xadd/

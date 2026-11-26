@@ -21,7 +21,7 @@ function main() {
     '| Required check | Result |', '| --- | --- |',
     ...assessment.results.map(entry => `| ${entry.job} | ${['success', 'failure', 'cancelled', 'skipped', 'missing'].includes(entry.result) ? entry.result : 'invalid'} |`),
     '', assessment.passed ? 'All required automated checks passed.' : 'One or more required checks did not succeed.', '',
-    'This result covers automated checks for the checked-out server and pinned mobile source. Live providers, physical devices and AWS deployment approval remain separate.', ''].join('\n');
+    'This result covers automated checks for the checked-out server and pinned mobile source. Live providers, physical devices and Render deployment verification remain separate.', ''].join('\n');
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
   console.log(report);
   if (!assessment.passed) process.exitCode = 1;

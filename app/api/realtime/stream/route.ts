@@ -112,7 +112,7 @@ export async function GET(request: Request) {
       controller.enqueue(encoder.encode(`retry: 2000\nevent: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`));
       const unsubscribe = subscribeRealtimeEvents(context, sendEvent);
       const heartbeat = setInterval(() => sendEvent(null), 15_000);
-      // Complete before App Runner's 120-second whole-request limit.
+      // Recycle the stream at the configured lifetime so the client can reconcile.
       const lifetime = setTimeout(close, realtimeConnectionLifetimeMs());
       request.signal.addEventListener('abort', close, { once: true });
       cleanup = close;

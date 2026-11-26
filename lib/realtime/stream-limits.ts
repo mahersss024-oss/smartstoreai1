@@ -27,7 +27,7 @@ export function acquireRealtimeConnection(clientId: string): (() => void) | null
 
 export function realtimeConnectionLifetimeMs() {
   const configured = Number(process.env.SMARTSTORE_SSE_MAX_LIFETIME_MS);
-  // App Runner caps the whole request at 120 seconds, even with heartbeat data.
+  // Bound connection lifetimes so clients reconnect and reconcile missed events.
   return Number.isFinite(configured) && configured > 0
     ? Math.min(110_000, Math.max(15_000, configured))
     : 110_000;

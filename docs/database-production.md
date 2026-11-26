@@ -124,7 +124,7 @@ SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS=30000
 SMARTSTORE_MAX_IMAGES_PER_LISTING=8
 ```
 
-Keep object storage access keys server-side only in Render environment variables.
+Keep object storage access keys in the Render production secret file.
 `SMARTSTORE_OBJECT_STORAGE_TIMEOUT_MS` caps S3-compatible upload and delete
 requests so a stalled image provider cannot hold the request open indefinitely.
 `SMARTSTORE_MAX_IMAGES_PER_LISTING` defaults to `8` when unset. Production can
@@ -155,9 +155,8 @@ shown to sellers as "رقم الحساب". `SMARTSTORE_COMMISSION_STC_PAY_NUMBER
 accepted as a legacy alias when `..._ACCOUNT` is not set. Set only one of them
 in production; the account key takes priority when both are present.
 
-Keep these values in the production service configuration (AWS App Runner /
-Secrets Manager for the current deployment) so payment recipients can be
-changed without a code deployment.
+Keep these values in the Render production secret file. Deploy the updated
+service configuration to apply a change to payment recipients.
 
 `SMARTSTORE_OBJECT_STORAGE_PUBLIC_URL` must be a public bucket URL or CDN URL that can serve uploaded listing images in the browser. If `SMARTSTORE_IMAGE_STORAGE` is empty, the app keeps the local development fallback.
 
