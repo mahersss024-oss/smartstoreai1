@@ -50,8 +50,8 @@ substitute for a failed required job and is not required for this status.
 The separate `Promote Verified Production` workflow advances the `production`
 branch only after a successful, trusted main-push gate run. It checks the run and
 attempt, requires the final status, rejects stale main results and uses only a
-fast-forward ref update. Render deploys the protected `production` branch
-after its commit checks pass. Branch protection is a separate GitHub setting, not a side
+fast-forward ref update. An authenticated Render deploy hook receives the exact
+verified SHA after the ref update, including retried promotions for that SHA. Branch protection is a separate GitHub setting, not a side
 effect of parsing this YAML. Applied settings, baseline revisions, live checks,
 backup evidence and the rollback procedure are recorded in
 [the prelaunch operations guide](prelaunch-operations.ar.md).

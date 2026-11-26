@@ -37,10 +37,11 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Promote only the verified current main commit
+      - name: Promote and request deployment of the verified main commit
         run: node scripts/deploy/promote-verified-production.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
 
       - name: Preserve promotion verification
         if: ${{ always() }}
