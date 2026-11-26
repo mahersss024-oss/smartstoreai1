@@ -66,7 +66,7 @@ export const hamadPlanInstructions = [
   'Example JSON response: {"action":"clarify","reply":"وش المنتج اللي تبي تجهّز له إعلان؟"}',
 ].join('\n');
 const verdictSchema = z.object({ allow: z.boolean() }).strict();
-type Role = 'plan' | 'draft-fields' | 'write-check' | 'reply' | 'source-check';
+type Role = 'plan' | 'draft-replan' | 'draft-fields' | 'write-check' | 'reply' | 'source-check';
 type JsonRole = Exclude<Role, 'reply'>;
 type ModelContext = { trace: string; signal: AbortSignal };
 
@@ -164,7 +164,7 @@ async function callJson<T>(
     const parsed = schema.safeParse(prepare(value));
     if (parsed.success) return parsed.data;
     reason = 'invalid_fields';
-    if (role === 'plan') issues = summarizePlanIssues(parsed.error);
+    if (role === 'plan' || role === 'draft-replan') issues = summarizePlanIssues(parsed.error);
   }
   console.warn(JSON.stringify({ event: 'hamad_model_failure', trace: context.trace, role, reason, issues }));
   throw new Error('hamad_invalid_model_output');
@@ -195,6 +195,18 @@ function normalizePlan(value: unknown) {
 
 export async function planHamadTurn(data: unknown, context: ModelContext) {
   return callJson('plan', hamadPlanInstructions, data, context, 1_300, hamadPlanSchema, normalizePlan);
+}
+
+const draftReplanSchema = hamadPlanSchema.extend({ action: z.enum(['create', 'clarify']) });
+
+export async function reconsiderHamadDraftPlan(data: unknown, context: ModelContext) {
+  return callJson('draft-replan', [
+    hamadPlanInstructions,
+    'Recheck the clarification in a conversation where the customer selected Hamad creation.',
+    'Return create only if the customer explicitly authorizes saving one new unpublished draft now, or confirms an active draft request. Quote the authorization verbatim from the latest message.',
+    'Photos and product specifications are optional at draft save. When the product is clear, include supported details and omit optional facts lacking evidence. Never replace a stated price with a guess.',
+    'If the customer asks to upload or edit photos only, is considering options, refers to an existing draft, or the product or consent is ambiguous, return clarify. Do not claim a draft was saved.',
+  ].join('\n'), data, context, 1_000, draftReplanSchema, normalizePlan);
 }
 
 const categoryRecovery = z.union([z.object({

@@ -23,6 +23,7 @@ function user(id: string, text: string): Turn {
 function enable(t: TestContext, plans: (Plan | string | ((instructions: string) => Plan | string))[], options: {
   reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean; failReply?: boolean;
   categoryReplies?: string[];
+  draftReplan?: Plan;
   onProviderRequest?: (role: string, responseFormat: unknown) => void;
   onModelInput?: (role: string, data: Record<string, unknown>) => void | Promise<void>;
 } = {}) {
@@ -43,6 +44,9 @@ function enable(t: TestContext, plans: (Plan | string | ((instructions: string) 
       const plan = plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' };
       const value = typeof plan === 'function' ? plan(system) : plan;
       content = typeof value === 'string' ? value : JSON.stringify(value);
+    } else if (system.includes('[hamad:draft-replan]')) {
+      roles.push('draft-replan');
+      content = JSON.stringify(options.draftReplan ?? { action: 'clarify' });
     } else if (system.includes('[hamad:draft-fields]')) {
       roles.push('draft-fields');
       content = options.categoryReplies?.[categoryIndex++]
@@ -426,11 +430,11 @@ test('an unverified category preserves intake and never saves a guessed category
   const roles = enable(t, [{
     action: 'create', confirmWrite: true, reference: 'سو مسودة',
     details: { title: 'جوال أسود' }, evidence: { title: 'جوال أسود' },
-  }], { categoryReplies: [' ', '{"details":{"category":"guessed"}}'], failReply: true });
+  }], { categoryReplies: [' ', '{"details":{"category":"guessed"}}'] });
   const reply = await send(name, [user('category-unverified', 'سو مسودة لجوال أسود')]);
   assert.match(reply.parts[0].text, /تصنيف المنتج/u);
   assert.equal(listSellerListings(name).length, 0);
-  assert.deepEqual(roles, ['plan', 'draft-fields', 'draft-fields', 'reply']);
+  assert.deepEqual(roles, ['plan', 'draft-fields', 'draft-fields']);
   assert.match(String(reply.metadata.hamadDraftMemory), /^h2_[\w-]+\.[\w-]{43}$/u);
 });
 
@@ -677,7 +681,7 @@ test('selecting a saved draft clears intake facts and scopes the following edit 
   const selected = await send(owner, messages, { hamadDraftCards: true,
     hamadDraftAction: { type: 'select', page: listed.metadata.hamadDraftUi.page.key, choice: 2 } });
   assert.equal(selected.metadata.hamadDraftUi.preview.price, 450);
-  assert.deepEqual(roles, ['plan', 'reply', 'source-check']);
+  assert.deepEqual(roles, ['plan', 'draft-replan']);
   messages.push(selected, user('edit-existing-price', edit));
   await send(owner, messages, { hamadDraftCards: true });
 
@@ -781,10 +785,52 @@ test('the receipt uses saved draft facts even when the model falsely claims publ
 test('a made-up save reply cannot confirm an operation when no draft tool was called', async (t) => {
   enable(t, [{ action: 'clarify' }], { reply: 'حفظت مسودة جديدة.', answerAllowed: false });
   const owner = 'hamad-adopt-fake-save';
-  const reply = await send(owner, [user('false-save', 'عندي استفسار')]);
+  const reply = await send(owner, [user('false-save', 'عندي استفسار')], { creationMethod: undefined });
   assert.match(reply.parts[0].text, /تعذّر التحقق/u);
   assert.doesNotMatch(reply.parts[0].text, /حفظت مسودة/u);
   assert.equal(listSellerListings(owner).length, 0);
+});
+
+const hpDraftRequest = 'يا حمد، احفظ لي مسودة إعلان عن لابتوب HP 15 أسود، مستعمل ونظيف، في الرياض، بسعر ٢٥٠٠ ريال';
+const hpDraftPlan = {
+  action: 'create', confirmWrite: true, reference: 'احفظ لي مسودة إعلان',
+  details: { title: 'لابتوب HP 15 أسود', category: 'computers', price: 2500, city: 'الرياض', condition: 'used' },
+  evidence: { title: 'لابتوب HP 15 أسود', category: 'لابتوب', price: '٢٥٠٠', city: 'الرياض', condition: 'مستعمل' },
+};
+const misleadingPhotoQuestion = { action: 'clarify', reply: 'حفظت تفاصيل المسودة. تحب أضيف الصور؟' };
+
+test('rechecks a clarification and saves a complete HP draft without optional photos', async (t) => {
+  const owner = 'hamad-recheck-complete-draft';
+  const roles = enable(t, [misleadingPhotoQuestion], { draftReplan: hpDraftPlan, failReply: true });
+  const reply = await send(owner, [user('hp-complete-no-photos', hpDraftRequest)], { hamadDraftCards: true });
+  const listings = listSellerListings(owner);
+  assert.equal(listings.length, 1);
+  assert.equal(listings[0].title, hpDraftPlan.details.title);
+  assert.equal(listings[0].price, 2500);
+  assert.equal(listings[0].status, 'draft');
+  assert.equal(listings[0].images.length, 0);
+  assert.equal(reply.metadata.hamadDraftUi.preview.title, hpDraftPlan.details.title);
+  assert.match(reply.parts[0].text, /حُفظت المسودة/u);
+  assert.deepEqual(roles, ['plan', 'draft-replan', 'write-check', 'reply']);
+});
+
+test('a draft clarification reports that nothing was saved even if the model suggests a false confirmation', async (t) => {
+  const owner = 'hamad-recheck-ambiguous-draft';
+  const roles = enable(t, [misleadingPhotoQuestion], { reply: misleadingPhotoQuestion.reply, answerAllowed: true });
+  const reply = await send(owner, [user('hp-still-ambiguous', hpDraftRequest)]);
+  assert.match(reply.parts[0].text, /ما حُفظت المسودة بعد/u);
+  assert.doesNotMatch(reply.parts[0].text, /حفظت تفاصيل المسودة|الصور/u);
+  assert.equal(listSellerListings(owner).length, 0);
+  assert.deepEqual(roles, ['plan', 'draft-replan']);
+});
+
+test('a recovered creation proposal still requires the independent write check', async (t) => {
+  const owner = 'hamad-recheck-draft-denied';
+  const roles = enable(t, [misleadingPhotoQuestion], { draftReplan: hpDraftPlan, writeAllowed: false });
+  const reply = await send(owner, [user('hp-write-check-denied', hpDraftRequest)]);
+  assert.match(reply.parts[0].text, /ما حُفظت المسودة بعد/u);
+  assert.equal(listSellerListings(owner).length, 0);
+  assert.deepEqual(roles, ['plan', 'draft-replan', 'write-check']);
 });
 
 test('the receipt reports a partial image save even when the model says all photos were attached', async (t) => {
