@@ -171,7 +171,7 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
       page = await capabilities.list_my_drafts.run(capabilityContext, { offset: 0 });
       updated = true;
     }
-    state = { ...state, ...clearIntake, focus: undefined, focusTitle: undefined,
+    state = { ...state, ...(page.entries.length ? clearIntake : {}), focus: undefined, focusTitle: undefined,
       page: page.entries.length ? { offset: page.offset, rosterHash: page.rosterHash, hasNext: page.hasNext,
         entries: page.entries.map(({ ref }) => ref) } : undefined };
     if (!state.page) return answer(input.draftAction ? 'ما عندك مسودات حاليًا. تقدر تطلب مني أجهّز إعلان جديد.'
@@ -436,7 +436,15 @@ export async function runStructuredHamadTurn(input: Run): Promise<Reply> {
           }
         }
         stage = 'write_receipt';
-        await lease.complete(result);
+        try {
+          await lease.complete(result);
+        } catch (error) {
+          if (!creating || !result.receipts.some(({ kind }) => kind === 'saved' || kind === 'replayed')) throw error;
+          // The draft has committed. Keep the reservation intact and report
+          // the actual save even if the receipt cannot be cached for replay.
+          console.warn(JSON.stringify({ event: 'hamad_draft_receipt_unavailable', trace: context.trace,
+            operation: lease.operationKey.slice(0, 16) }));
+        }
       } catch (error) {
         // An unknown outcome after dispatch keeps its operation reservation. Later retries use the same identity.
         if (!writeStarted) await lease.abandon();

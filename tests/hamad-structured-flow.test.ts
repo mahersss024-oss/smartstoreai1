@@ -20,7 +20,7 @@ const cookies = new Map<string, string>();
 function user(id: string, text: string): Turn {
   return { id, role: 'user', parts: [{ type: 'text', text }] };
 }
-function enable(t: TestContext, plans: (Plan | string)[], options: {
+function enable(t: TestContext, plans: (Plan | string | ((instructions: string) => Plan | string))[], options: {
   reply?: string; writeAllowed?: boolean; answerAllowed?: boolean; failPlan?: boolean; failReply?: boolean;
   categoryReplies?: string[];
   onProviderRequest?: (role: string, responseFormat: unknown) => void;
@@ -41,7 +41,8 @@ function enable(t: TestContext, plans: (Plan | string)[], options: {
       roles.push('plan');
       if (options.failPlan) throw new DOMException('fixture timeout', 'AbortError');
       const plan = plans[index++] ?? { action: 'clarify', reply: 'وش تقصد؟' };
-      content = typeof plan === 'string' ? plan : JSON.stringify(plan);
+      const value = typeof plan === 'function' ? plan(system) : plan;
+      content = typeof value === 'string' ? value : JSON.stringify(value);
     } else if (system.includes('[hamad:draft-fields]')) {
       roles.push('draft-fields');
       content = options.categoryReplies?.[categoryIndex++]
@@ -376,6 +377,50 @@ test('an empty model plan requests a JSON object once more before saving exactly
   }
 });
 
+test('Hamad repairs a schema-invalid plan before saving one verified draft', async (t) => {
+  const owner = 'hamad-repairs-plan-fields';
+  const title = 'لابتوب اتش بي';
+  const correct = {
+    action: 'create', confirmWrite: true, reference: 'جهز مسودة',
+    details: { title, category: 'computers', price: 2500 },
+    evidence: { title, category: 'لابتوب', price: '٢٥٠٠' },
+  };
+  const invalid = { ...correct, details: { ...correct.details, price: '٢٥٠٠ ريال', condition: 'بلا ملاحظات' } };
+  let retryInstructions = '';
+  const roles = enable(t, [invalid, instructions => {
+    retryInstructions = instructions;
+    return instructions.includes('details.price') ? correct : invalid;
+  }], { failReply: true });
+  const message = user('invalid-plan-turn', 'جهز مسودة لابتوب اتش بي بـ٢٥٠٠ ريال');
+  const reply = await send(owner, [message], { hamadDraftCards: true });
+  assert.match(retryInstructions, /details\.condition/u);
+  assert.doesNotMatch(retryInstructions, /٢٥٠٠ ريال|بلا ملاحظات/u);
+  assert.match(reply.parts[0].text, /حُفظت المسودة/u);
+  const drafts = listSellerListings(owner);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].price, 2500);
+  assert.equal(drafts[0].status, 'draft');
+  assert.equal(drafts[0].condition, undefined);
+  assert.equal(roles.filter(role => role === 'write-check').length, 1);
+});
+
+test('two schema-invalid plans log only known paths and never start a draft write', async (t) => {
+  const owner = 'hamad-rejects-invalid-plan-fields';
+  const marker = 'synthetic-private-data';
+  const invalid = { action: 'create', confirmWrite: 'yes', details: { title: marker }, evidence: { [marker]: 2500 } };
+  const logs: string[] = [];
+  t.mock.method(console, 'warn', (line: string) => { logs.push(line); });
+  const roles = enable(t, [invalid, invalid]);
+  const reply = await send(owner, [user('unusable-plan-turn', 'جهز مسودة مكتب')]);
+  assert.match(reply.parts[0].text, /تعذر إكمال رد المساعد الآن/u);
+  assert.deepEqual(roles, ['plan', 'plan']);
+  assert.equal(listSellerListings(owner).length, 0);
+  const event = logs.find(line => line.includes('hamad_model_failure'));
+  assert.ok(event);
+  assert.doesNotMatch(event, /synthetic-private-data/u);
+  assert.deepEqual(JSON.parse(event).issues, ['evidence (invalid_type)', 'confirmWrite (invalid_type)']);
+});
+
 test('an unverified category preserves intake and never saves a guessed category', async (t) => {
   const name = 'hamad-draft-category-unverified';
   const roles = enable(t, [{
@@ -486,6 +531,41 @@ test('retains the chosen draft intake across clarification turns and saves the c
   assert.equal(listings[0].title, product);
   assert.equal(listings[0].price, 2500);
   assert.equal(listings[0].status, 'draft');
+});
+
+test('an empty draft picker preserves the intake for the customer’s confirmation', async (t) => {
+  const owner = 'hamad-continues-intake-after-empty-picker';
+  const product = 'لابتوب اتش بي';
+  const confirmation = 'ايوه';
+  const collecting: boolean[] = [];
+  const roles = enable(t, [
+    { action: 'clarify', details: { title: product, category: 'computers', price: 2500 },
+      evidence: { title: product, category: 'لابتوب', price: '٢٥٠٠' } },
+    { action: 'create', confirmWrite: true, reference: confirmation },
+  ], {
+    failReply: true,
+    onModelInput(role, data) {
+      if (role === 'plan') collecting.push((data.conversation as { collecting: boolean }).collecting);
+    },
+  });
+  const request = user('product', product + ' السعر ٢٥٠٠');
+  const choice = user('choose', 'أختار الإنشاء مع حمد.');
+  const intake = await send(owner, [request, choice], { beginDraftWithHamad: true });
+  const picker = user('picker', 'عندي مسودات');
+  const empty = await send(owner, [request, choice, intake, picker], {
+    hamadDraftCards: true, hamadDraftAction: { type: 'list' },
+  });
+  assert.match(empty.parts[0].text, /ما عندك مسودات/u);
+  assert.equal(listSellerListings(owner).length, 0);
+  const reply = await send(owner, [picker, empty, user('continue', confirmation)], { hamadDraftCards: true });
+  const drafts = listSellerListings(owner);
+  assert.deepEqual(collecting, [true, true]);
+  assert.equal(roles.filter(role => role === 'write-check').length, 1);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].title, product);
+  assert.equal(drafts[0].price, 2500);
+  assert.equal(drafts[0].status, 'draft');
+  assert.match(reply.parts[0].text, /حُفظت المسودة/u);
 });
 
 test('remembers the product and corrected price after their turns leave the chat history', async (t) => {
