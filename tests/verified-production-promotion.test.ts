@@ -213,6 +213,8 @@ test('Render receives only the exact verified and promoted commit', async () => 
   for (const initialProduction of [beforeSha, targetSha]) {
     const result = await harness(initialProduction).invoke();
     const deploy = await requestRenderDeployment(result, hook, async (destination, options) => {
+      assert.ok(destination instanceof URL);
+      assert.ok(options);
       assert.equal(destination.searchParams.get('ref'), targetSha);
       assert.deepEqual([...destination.searchParams], [['key', 'test-only'], ['ref', targetSha]]);
       assert.equal(options.method, 'POST');
