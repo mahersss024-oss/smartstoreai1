@@ -23,7 +23,7 @@ queued together are batched in groups of up to eight; results are matched by ID.
 An individual timeout does not cancel another active batch participant.
 Preparing a candidate set has a shared six-second budget, rather than a full
 timeout for every candidate. Cache entries are process-local, not database rows
-or a cache shared across App Runner instances. Provider usage can incur charges.
+or a cache shared across server instances. Provider usage can incur charges.
 
 ## Runtime Paths
 

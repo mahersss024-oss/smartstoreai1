@@ -45,7 +45,7 @@ test('connection admission enforces client and process caps and releases cancell
   await replacement.body!.cancel();
 });
 
-test('admission release is idempotent and request lifetime stays below the App Runner cap', t => {
+test('admission release is idempotent and request lifetime stays within the configured bounds', t => {
   isolated(t);
   environment(t, { SMARTSTORE_SSE_MAX_CONNECTIONS: '1', SMARTSTORE_SSE_MAX_CONNECTIONS_PER_CLIENT: '1' });
   const release = acquireRealtimeConnection('direct');

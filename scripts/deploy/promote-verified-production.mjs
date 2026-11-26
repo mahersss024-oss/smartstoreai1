@@ -161,7 +161,7 @@ async function main() {
   writeFileSync(report, JSON.stringify(result, null, 2) + '\n');
   console.log(JSON.stringify(result));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    `# Verified production promotion\n\nOutcome: ${result.outcome}\n\nServer: ${result.serverSha ?? 'not promoted'}\n\nGate: ${result.gateUrl ?? 'verification unavailable'}\n\nApp Runner must watch production. This result confirms the GitHub ref, not completion of an AWS deployment.\n`);
+    `# Verified production promotion\n\nOutcome: ${result.outcome}\n\nServer: ${result.serverSha ?? 'not promoted'}\n\nGate: ${result.gateUrl ?? 'verification unavailable'}\n\nRender watches the protected production branch. Verify the deployed SHA in Render and confirm production health.\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
