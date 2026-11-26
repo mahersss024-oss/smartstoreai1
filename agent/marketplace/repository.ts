@@ -889,12 +889,14 @@ async function ensureActorUser(actor: Actor) {
   });
 }
 
-async function getAdminAuditActorId(actor?: Actor) {
+async function getAdminAuditActorId(actor?: Actor, beforeMutation?: StaffMutationGuard) {
   if (!actor) {
     return null;
   }
 
-  await ensureActorUser(actor);
+  // Guarded requests verify and lock the existing staff account in the transaction.
+  // Updating it here would contend with that authorization lock on concurrent requests.
+  if (!beforeMutation) await ensureActorUser(actor);
   return getActorId(actor);
 }
 
@@ -5062,7 +5064,7 @@ export async function setUserReportModerationStatus(
           ? 'warn_user'
           : 'restrict_conversation';
 
-  const adminId = await getAdminAuditActorId(admin);
+  const adminId = await getAdminAuditActorId(admin, beforeMutation);
   const report = await prisma.$transaction(async (tx) => {
     const existing = await tx.userReport.findUnique({ where: { id: reportId } });
     if (!existing) return null;
@@ -5223,7 +5225,7 @@ export async function setListingModerationStatus(
     };
   }
 
-  const adminId = await getAdminAuditActorId(admin);
+  const adminId = await getAdminAuditActorId(admin, beforeMutation);
   const action: AdminAuditAction =
     status === 'published'
       ? 'approve_listing'
@@ -5368,7 +5370,7 @@ export async function setReportModerationStatus(
     return { status: result.status, report: result.report };
   }
 
-  const adminId = await getAdminAuditActorId(admin);
+  const adminId = await getAdminAuditActorId(admin, beforeMutation);
   const report = await prisma.$transaction(async (tx) => {
     const existing = await tx.report.findUnique({ where: { id: reportId }, select: {
       status: true, listingId: true, reporterId: true, listing: { select: { sellerId: true } },
@@ -5693,7 +5695,7 @@ export async function setCommissionStatusForAdmin(
     return result;
   }
 
-  const adminId = await getAdminAuditActorId(admin);
+  const adminId = await getAdminAuditActorId(admin, beforeMutation);
   const updated = await prisma.$transaction(async (tx) => {
     const identity = await tx.commission.findUnique({
       where: { id: commissionId }, select: { listingId: true },
