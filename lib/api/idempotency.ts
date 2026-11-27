@@ -121,6 +121,32 @@ function createDatabaseReservationHandle(
   };
 }
 
+export async function readIdempotencyOutcome(
+  request: Request,
+  input: IdempotencyInput,
+): Promise<{
+  operationKey: string;
+  pending?: 'current' | 'stale';
+  response?: Response;
+} | null> {
+  const key = getIdempotencyKey(request);
+  if (!key) return null;
+  const identity = { operationKey: operationKey(input, key) };
+  const now = Date.now();
+  const existing = shouldUseDatabaseStore()
+    ? await prisma.apiIdempotencyKey.findUnique({
+      where: { namespace_actorKey_key: { ...input, key } },
+      select: { status: true, statusCode: true, response: true, updatedAt: true },
+    })
+    : memoryRecords.get(memoryKey(input, key));
+  if (!existing || ('expiresAt' in existing && existing.expiresAt <= now)) return identity;
+  if (existing.status === 'completed' && existing.response != null) {
+    return { ...identity, response: jsonResponse(existing.response, existing.statusCode ?? 200) };
+  }
+  const updatedAt = typeof existing.updatedAt === 'number' ? new Date(existing.updatedAt) : existing.updatedAt;
+  return { ...identity, pending: isStaleIdempotencyReservation(updatedAt, now) ? 'stale' : 'current' };
+}
+
 export async function reserveIdempotencyKey(
   request: Request,
   input: IdempotencyInput,

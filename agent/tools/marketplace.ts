@@ -1,7 +1,6 @@
 import { marketplaceAmountSchema } from '@/lib/marketplace/amounts';
 import { tool } from 'ai';
 import sharp from 'sharp';
-import { createHash } from 'node:crypto';
 import { marketplaceCategoryIds, marketplaceCategoryPrompt } from '@/lib/marketplace/categories';
 import { InvalidMarketplaceCategoryOptionError, marketplaceCategoryOptionAttribute, marketplaceCategoryOptionsPrompt } from '@/lib/marketplace/category-options';
 import { marketplaceCarModelAttribute } from '@/lib/marketplace/car-models';
@@ -27,7 +26,7 @@ import {
 } from '@/agent/marketplace/repository';
 import type { AuthSession } from '@/lib/auth/session';
 import type { AppLanguage } from '@/app/i18n';
-import type { ChatDraftReceipt } from '@/lib/chat/draft-receipt';
+import { chatDraftOperationKey, type ChatDraftReceipt } from '@/lib/chat/draft-receipt';
 import { filterDraftEdits, type ChatDraftAction } from '@/lib/chat/draft-edits';
 import { getPlatformHelp, platformHelpTopics } from '@/agent/platform-guide';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
@@ -243,8 +242,10 @@ export function createMarketplaceTools(
         try {
           const signature = JSON.stringify({ ...listingInput, imageIndexes: input.imageIndexes, imageSourceMessageId: input.imageSourceMessageId }, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
             ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
-          if (!draftOperations.has(signature)) draftOperations.set(signature, draftOperations.size);
-          const idempotencyKey = options.requestKey ? createHash('sha256').update(JSON.stringify([session.user.id, options.requestKey, draftOperations.get(signature)])).digest('hex') : undefined;
+          const operationIndex = draftOperations.get(signature) ?? draftOperations.size;
+          draftOperations.set(signature, operationIndex);
+          const idempotencyKey = options.requestKey
+            ? chatDraftOperationKey(session.user.id, options.requestKey, operationIndex) : undefined;
           listing = await createListingDraft(session.user, listingInput, { idempotencyKey, modelReview: true });
           const savedProduct = normalizeMarketplaceSearchText(listing.title || listing.description || '');
           const requestedProduct = normalizeMarketplaceSearchText(listingInput.title || listingInput.description || '');

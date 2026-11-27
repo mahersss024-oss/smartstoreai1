@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ListingDraft } from '@/agent/marketplace/types';
 import { getHamadCustomerReply } from '@/lib/chat-response-safety';
 
@@ -55,4 +56,8 @@ export function renderChatDraftReceipt(receipts: readonly ChatDraftReceipt[]) {
   });
 
   return [...paragraphs, 'يمكنك مراجعة النتيجة من [إعلاناتي](/account/listings).'].join('\n\n');
+}
+
+export function chatDraftOperationKey(sellerId: string, requestKey: string, operationIndex: number) {
+  return createHash('sha256').update(JSON.stringify([sellerId, requestKey, operationIndex])).digest('hex');
 }

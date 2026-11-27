@@ -759,7 +759,8 @@ test('choosing Hamad carries the preceding description and exact photo source in
 test('a provider failure after draft save reports it and replay cannot duplicate the draft', async (t) => {
   const plan = { action: 'create', details: { category: 'other', title: 'مكتب' },
     evidence: { category: 'مكتب', title: 'مكتب' }, reference: 'جهز مسودة', confirmWrite: true };
-  const roles = enable(t, [plan, plan], { failReply: true });
+  const reclassified = { action: 'clarify', reply: 'وش المنتج؟' };
+  const roles = enable(t, [plan, reclassified, reclassified], { failReply: true });
   const owner = 'hamad-adopt-replay';
   const message = user('creation-replay', 'جهز مسودة مكتب');
   for (let i = 0; i < 2; i++) {
@@ -767,8 +768,13 @@ test('a provider failure after draft save reports it and replay cannot duplicate
     assert.match(reply.parts[0].text, /حُفظت المسودة/u);
     assert.match(reply.parts[0].text, /\/account\/listings/u);
   }
+  const afterReceiptExpiry = Date.now() + 16 * 60_000;
+  t.mock.method(Date, 'now', () => afterReceiptExpiry);
+  const replay = await send(owner, [message]);
+  assert.match(replay.parts[0].text, /سبق حفظ الإعلان لهذا الطلب/u);
+  assert.match(replay.parts[0].text, /\/account\/listings/u);
   assert.equal(listSellerListings(owner).length, 1);
-  assert.equal(roles.filter((role) => role === 'write-check').length, 1);
+  assert.deepEqual(roles, ['plan', 'write-check', 'reply', 'plan', 'plan']);
 });
 
 test('the receipt uses saved draft facts even when the model falsely claims publication', async (t) => {
@@ -797,7 +803,9 @@ const hpDraftPlan = {
   details: { title: 'لابتوب HP 15 أسود', category: 'computers', price: 2500, city: 'الرياض', condition: 'used' },
   evidence: { title: 'لابتوب HP 15 أسود', category: 'لابتوب', price: '٢٥٠٠', city: 'الرياض', condition: 'مستعمل' },
 };
-const misleadingPhotoQuestion = { action: 'clarify', reply: 'حفظت تفاصيل المسودة. تحب أضيف الصور؟' };
+const misleadingPhotoQuestion = {
+  action: 'clarify', reference: 'احفظ لي مسودة إعلان', reply: 'حفظت تفاصيل المسودة. تحب أضيف الصور؟',
+};
 
 test('rechecks a clarification and saves a complete HP draft without optional photos', async (t) => {
   const owner = 'hamad-recheck-complete-draft';
@@ -831,6 +839,81 @@ test('a recovered creation proposal still requires the independent write check',
   assert.match(reply.parts[0].text, /ما حُفظت المسودة بعد/u);
   assert.equal(listSellerListings(owner).length, 0);
   assert.deepEqual(roles, ['plan', 'draft-replan', 'write-check']);
+});
+
+test('a retry classified as clarification reports an in-progress write without starting another', { timeout: 30_000 }, async (t) => {
+  let startWrite!: () => void;
+  const writing = new Promise<void>((resolve) => { startWrite = resolve; });
+  let finishWrite!: () => void;
+  const release = new Promise<void>((resolve) => { finishWrite = resolve; });
+  const roles = enable(t, [hpDraftPlan, misleadingPhotoQuestion], {
+    failReply: true,
+    async onModelInput(role) {
+      if (role === 'write-check') {
+        startWrite();
+        await release;
+      }
+    },
+  });
+  const owner = 'hamad-active-write-retry';
+  const message = user('hp-concurrent-retry', hpDraftRequest);
+  const first = send(owner, [message]);
+  try {
+    await writing;
+    const retry = await send(owner, [message]);
+    assert.match(retry.parts[0].text, /قيد المعالجة/u);
+    assert.equal(listSellerListings(owner).length, 0);
+  } finally {
+    finishWrite();
+    await first;
+  }
+  assert.equal(listSellerListings(owner).length, 1);
+  assert.deepEqual(roles, ['plan', 'write-check', 'plan', 'reply']);
+});
+
+test('clarification keeps facts recovered from the customer and preserves the bundle question', async (t) => {
+  const owner = 'hamad-recovered-intake';
+  const bundle = 'تبي تجمع اللابتوب والشاشة في إعلان واحد، أو تبي إعلان لكل واحد؟';
+  const request = 'جهز مسودة لابتوب HP وشاشة سامسونج';
+  const message = user('bundle-clarify-recovery', request);
+  const roles = enable(t, [{ action: 'clarify', reply: 'حفظت المسودة. أرسل الصور؟' }], {
+    draftReplan: { action: 'clarify', reference: 'جهز مسودة', reply: bundle,
+      details: { title: 'لابتوب HP', price: 999, city: 'الرياض' },
+      evidence: { title: 'لابتوب HP', price: '999', city: 'الرياض' } },
+  });
+  const reply = await send(owner, [message]);
+  assert.match(reply.parts[0].text, /ما حُفظت المسودة بعد/u);
+  assert.ok(reply.parts[0].text.endsWith(bundle));
+  const session = getAuthSession(new Request('http://localhost/api/chat', { headers: { cookie: cookies.get(owner)! } }))!;
+  const state = openHamadState(reply.metadata.hamadDraftMemory, session, conversation);
+  assert.equal(state.collecting, message.id);
+  assert.deepEqual(state.intake?.map(({ field, value }) => [field, value]), [['title', 'لابتوب HP']]);
+  assert.equal(listSellerListings(owner).length, 0);
+  assert.deepEqual(roles, ['plan', 'draft-replan', 'source-check']);
+});
+
+test('a general question in creation mode keeps its clarification without opening draft intake', async (t) => {
+  const owner = 'hamad-general-clarification-while-creation-enabled';
+  const question = 'وش حاب تعرف عن سوق حمد؟';
+  enable(t, [{ action: 'clarify', reply: question }]);
+  const reply = await send(owner, [user('general-question', 'عندي استفسار')]);
+  assert.equal(reply.parts[0].text, question);
+  const session = getAuthSession(new Request('http://localhost/api/chat', { headers: { cookie: cookies.get(owner)! } }))!;
+  assert.equal(openHamadState(reply.metadata.hamadDraftMemory, session, conversation).collecting, undefined);
+  assert.equal(listSellerListings(owner).length, 0);
+});
+
+test('Hamad records advisory reasons from a recovery even when it still asks for clarification', async (t) => {
+  const owner = 'hamad-recovery-advisory';
+  enable(t, [{ action: 'clarify', advisory: { decision: 'needs_review', reasons: ['primary_fixture'] } }], {
+    draftReplan: { action: 'clarify', reference: 'احفظ لي مسودة إعلان',
+      advisory: { decision: 'needs_review', reasons: ['recovery_fixture'] } },
+  });
+  await send(owner, [user('recovery-advisory', hpDraftRequest)]);
+  const reviews = getLocalModelReviews().filter(review => review.userId === owner && review.subject === 'message');
+  assert.equal(reviews.length, 1);
+  assert.deepEqual(reviews[0].assessment.reasons, ['primary_fixture', 'recovery_fixture']);
+  assert.equal(listSellerListings(owner).length, 0);
 });
 
 test('the receipt reports a partial image save even when the model says all photos were attached', async (t) => {
