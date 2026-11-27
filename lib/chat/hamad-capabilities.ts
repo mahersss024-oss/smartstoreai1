@@ -10,7 +10,8 @@ import { platformHelpTopics } from '@/agent/platform-guide';
 import { marketplaceCategoryDefinitions } from '@/lib/marketplace/categories';
 import { normalizeMarketplaceSearchText } from '@/agent/marketplace/search';
 import type { AuthSession } from '@/lib/auth/session';
-import type { ChatDraftReceipt } from './draft-receipt';
+import { createListingId } from '@/lib/marketplace/listing-id';
+import { chatDraftOperationKey, type ChatDraftReceipt } from './draft-receipt';
 import type { DraftEdits } from './draft-edits';
 import { modelReviewImageFingerprint, recordModelReview } from '@/lib/admin/model-review';
 import { readHamadKnowledge } from './hamad-knowledge';
@@ -154,6 +155,13 @@ function makeWriteTools(context: CapabilityContext, input: { focus?: z.infer<typ
     return { status, receipts, ...(isOwnedDraft(draft, context) ? { focus: display(draft).ref } : {}) };
   }
   return { tools, toolContext, finish };
+}
+
+export async function findDraftSavedByHamadTurn(sellerId: string, operationKey: string) {
+  // A structured turn dispatches only one create call. Match the write's first operation.
+  const key = chatDraftOperationKey(sellerId, operationKey, 0);
+  const listing = await getListing(createListingId(sellerId, key)) ?? await getListing('chat-draft-' + key);
+  return listing?.sellerId === sellerId ? listing : null;
 }
 
 export const hamadCapabilities = {
